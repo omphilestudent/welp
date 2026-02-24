@@ -1,4 +1,4 @@
-// frontend/src/pages/CompanyPage.jsx
+// src/pages/CompanyPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -14,6 +14,7 @@ const CompanyPage = () => {
     const [company, setCompany] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
     const [showReviewForm, setShowReviewForm] = useState(false);
 
     useEffect(() => {
@@ -27,8 +28,9 @@ const CompanyPage = () => {
                 api.get(`/reviews/company/${id}`)
             ]);
             setCompany(companyRes.data);
-            setReviews(reviewsRes.data.reviews);
+            setReviews(reviewsRes.data.reviews || []);
         } catch (error) {
+            setError('Failed to load company data');
             console.error('Failed to fetch company data:', error);
         } finally {
             setLoading(false);
@@ -42,18 +44,18 @@ const CompanyPage = () => {
                 companyId: id
             });
             setShowReviewForm(false);
-            fetchCompanyData(); // Refresh data
+            fetchCompanyData();
         } catch (error) {
-            console.error('Failed to post review:', error);
+            alert(error.response?.data?.error || 'Failed to post review');
         }
     };
 
     if (loading) return <Loading />;
-    if (!company) return <div>Company not found</div>;
+    if (error) return <div className="alert alert-error">{error}</div>;
+    if (!company) return <div className="empty-state">Company not found</div>;
 
     return (
         <div className="company-page">
-            {/* Company Header */}
             <div className="company-header">
                 <div className="container">
                     <div className="company-info">
@@ -61,7 +63,7 @@ const CompanyPage = () => {
                             <img src={company.logo_url} alt={company.name} className="company-logo" />
                         ) : (
                             <div className="company-logo-placeholder">
-                                {company.name.charAt(0)}
+                                {company.name?.charAt(0).toUpperCase()}
                             </div>
                         )}
 
@@ -69,9 +71,9 @@ const CompanyPage = () => {
                             <h1 className="company-name">{company.name}</h1>
 
                             <div className="company-rating">
-                                <StarRating rating={company.avg_rating} readonly />
-                                <span className="rating-value">{company.avg_rating}</span>
-                                <span className="review-count">({company.review_count} reviews)</span>
+                                <StarRating rating={parseFloat(company.avg_rating || 0)} readonly />
+                                <span className="rating-value">{company.avg_rating || '0.0'}</span>
+                                <span className="review-count">({company.review_count || 0} reviews)</span>
                             </div>
 
                             {company.industry && (
@@ -110,17 +112,14 @@ const CompanyPage = () => {
                 </div>
             </div>
 
-            {/* Main Content */}
             <div className="container">
                 <div className="company-content">
-                    {/* Review Form */}
                     {showReviewForm && (
                         <div className="review-form-section">
                             <ReviewForm onSubmit={handleReviewSubmit} />
                         </div>
                     )}
 
-                    {/* Company Description */}
                     {company.description && (
                         <div className="company-description">
                             <h2>About {company.name}</h2>
@@ -128,7 +127,6 @@ const CompanyPage = () => {
                         </div>
                     )}
 
-                    {/* Reviews Section */}
                     <div className="reviews-section">
                         <h2>Employee Reviews</h2>
                         {reviews.length > 0 ? (

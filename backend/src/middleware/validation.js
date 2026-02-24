@@ -56,6 +56,24 @@ const messageValidation = [
     body('content').trim().isLength({ min: 1, max: 2000 })
 ];
 
+// Claim Request Validation
+const claimRequestValidation = [
+    body('businessEmail').isEmail().normalizeEmail(),
+    body('businessPhone').optional().trim(),
+    body('position').optional().trim(),
+    body('message').optional().trim().isLength({ max: 500 })
+];
+
+// Email Verification Validation
+const verifyEmailValidation = [
+    body('email').isEmail().normalizeEmail()
+];
+
+const confirmVerificationValidation = [
+    body('email').isEmail().normalizeEmail(),
+    body('code').isLength({ min: 6, max: 6 }).isNumeric()
+];
+
 module.exports = {
     validate,
     registerValidation,
@@ -63,5 +81,8 @@ module.exports = {
     companyValidation,
     reviewValidation,
     replyValidation,
-    messageValidation
+    messageValidation,
+    claimRequestValidation,
+    verifyEmailValidation,
+    confirmVerificationValidation
 };

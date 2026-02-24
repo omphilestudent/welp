@@ -1,14 +1,19 @@
-// frontend/src/components/companies/CompanyList.jsx
+// src/components/companies/CompanyList.jsx
 import React from 'react';
 import CompanyCard from './CompanyCard';
+import Loading from '../common/Loading';
 
 const CompanyList = ({ companies, loading, error }) => {
     if (loading) {
-        return <div className="loading-spinner">Loading...</div>;
+        return <Loading />;
     }
 
     if (error) {
-        return <div className="error-message">{error}</div>;
+        return (
+            <div className="empty-state">
+                <p className="error-text">{error}</p>
+            </div>
+        );
     }
 
     if (!companies || companies.length === 0) {

@@ -1,57 +1,75 @@
+// frontend/src/components/companies/CompanyCard.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import StarRating from '../reviews/StarRating';
+import { FaStar, FaMapMarkerAlt } from 'react-icons/fa';
 
 const CompanyCard = ({ company }) => {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
 
-  return (
-    <div 
-      className="company-card"
-      onClick={() => navigate(`/companies/${company.id}`)}
-    >
-      <div className="company-card-header">
-        {company.logo_url ? (
-          <img src={company.logo_url} alt={company.name} className="company-card-logo" />
-        ) : (
-          <div className="company-card-logo-placeholder">
-            {company.name.charAt(0)}
-          </div>
-        )}
-        <div className="company-card-info">
-          <h3 className="company-card-name">{company.name}</h3>
-          {company.industry && (
-            <span className="company-card-industry">{company.industry}</span>
-          )}
-        </div>
-      </div>
+    if (!company) return null;
 
-      <div className="company-card-rating">
-        <StarRating rating={parseFloat(company.avg_rating)} readonly />
-        <span className="company-card-rating-value">
-          {company.avg_rating} ({company.review_count} reviews)
+    const handleClick = () => {
+        navigate(`/companies/${company.id}`);
+    };
+
+    // Safely access properties with defaults
+    const name = company.name || 'Unknown Company';
+    const industry = company.industry || 'General';
+    const location = company.address || company.location || 'Location not specified';
+    const rating = parseFloat(company.avg_rating || company.rating || 0);
+    const reviewCount = company.review_count || company.reviewCount || 0;
+    const description = company.description || 'No description available';
+    const isClaimed = company.is_claimed || false;
+
+    return (
+        <div className="company-card" onClick={handleClick}>
+            <div className="company-card-header">
+                {company.logo_url ? (
+                    <img src={company.logo_url} alt={name} className="company-card-logo" />
+                ) : (
+                    <div className="company-card-logo-placeholder">
+                        {name.charAt(0)}
+                    </div>
+                )}
+                <div className="company-card-info">
+                    <h3 className="company-card-name">{name}</h3>
+                    <span className="company-card-industry">{industry}</span>
+                </div>
+            </div>
+
+            <div className="company-card-rating">
+                <div className="star-rating">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                        <span
+                            key={star}
+                            className={star <= rating ? 'star-filled' : 'star-empty'}
+                        >
+              ★
+            </span>
+                    ))}
+                </div>
+                <span className="company-card-rating-value">
+          {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
         </span>
-      </div>
+            </div>
 
-      {company.address && (
-        <p className="company-card-address">
-          📍 {company.address}
-        </p>
-      )}
+            {location && (
+                <p className="company-card-address">
+                    <FaMapMarkerAlt /> {location}
+                </p>
+            )}
 
-      {company.description && (
-        <p className="company-card-description">
-          {company.description.length > 100 
-            ? `${company.description.substring(0, 100)}...` 
-            : company.description}
-        </p>
-      )}
+            <p className="company-card-description">
+                {description.length > 100
+                    ? `${description.substring(0, 100)}...`
+                    : description}
+            </p>
 
-      {!company.is_claimed && (
-        <span className="company-card-unclaimed">Unclaimed</span>
-      )}
-    </div>
-  );
+            {!isClaimed && (
+                <span className="company-card-unclaimed">Unclaimed</span>
+            )}
+        </div>
+    );
 };
 
 export default CompanyCard;

@@ -1,4 +1,4 @@
-// frontend/src/components/common/Footer.jsx
+// src/components/common/Footer.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
 
@@ -30,16 +30,14 @@ const Footer = () => {
                         <h4>For Businesses</h4>
                         <ul className="footer-links">
                             <li><Link to="/claim">Claim Your Company</Link></li>
-                            <li><Link to="/business/guide">Business Guide</Link></li>
-                            <li><Link to="/pricing">Pricing</Link></li>
+                            <li><Link to="/business-guide">Business Guide</Link></li>
                         </ul>
                     </div>
 
                     <div className="footer-section">
                         <h4>For Psychologists</h4>
                         <ul className="footer-links">
-                            <li><Link to="/psychologist/join">Join as Psychologist</Link></li>
-                            <li><Link to="/psychologist/guide">Psychologist Guide</Link></li>
+                            <li><Link to="/psychologist-join">Join as Psychologist</Link></li>
                             <li><Link to="/resources">Resources</Link></li>
                         </ul>
                     </div>

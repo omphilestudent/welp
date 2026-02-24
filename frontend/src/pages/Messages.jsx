@@ -1,4 +1,4 @@
-// frontend/src/pages/Messages.jsx
+// src/pages/Messages.jsx
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -15,6 +15,7 @@ const Messages = () => {
     const [activeConversation, setActiveConversation] = useState(null);
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
     const [sendingMessage, setSendingMessage] = useState(false);
 
     useEffect(() => {
@@ -34,7 +35,6 @@ const Messages = () => {
 
     useEffect(() => {
         if (user) {
-            // Connect to socket
             const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
             if (token) {
                 socketService.connect(token);
@@ -49,8 +49,9 @@ const Messages = () => {
     const fetchConversations = async () => {
         try {
             const { data } = await api.get('/messages/conversations');
-            setConversations(data);
+            setConversations(data || []);
         } catch (error) {
+            setError('Failed to load conversations');
             console.error('Failed to fetch conversations:', error);
         } finally {
             setLoading(false);
@@ -60,7 +61,7 @@ const Messages = () => {
     const fetchMessages = async (conversationId) => {
         try {
             const { data } = await api.get(`/messages/conversations/${conversationId}/messages`);
-            setMessages(data);
+            setMessages(data || []);
         } catch (error) {
             console.error('Failed to fetch messages:', error);
         }
@@ -79,21 +80,8 @@ const Messages = () => {
             await api.post(`/messages/conversations/${activeConversation.id}/messages`, {
                 content
             });
-
-            // Message will be added via socket
-            setMessages(prev => [...prev, {
-                id: Date.now(), // temporary ID
-                content,
-                sender_id: user.id,
-                created_at: new Date().toISOString(),
-                sender: {
-                    id: user.id,
-                    displayName: user.displayName,
-                    role: user.role
-                }
-            }]);
         } catch (error) {
-            console.error('Failed to send message:', error);
+            throw error;
         } finally {
             setSendingMessage(false);
         }
@@ -103,16 +91,11 @@ const Messages = () => {
 
     return (
         <div className="messages-page">
+            {error && <div className="alert alert-error">{error}</div>}
             <div className="messages-container">
-                {/* Sidebar */}
                 <div className="messages-sidebar">
                     <div className="sidebar-header">
                         <h2>Messages</h2>
-                        {user.role === 'psychologist' && (
-                            <button className="btn btn-primary btn-small">
-                                New Message
-                            </button>
-                        )}
                     </div>
                     <ConversationList
                         conversations={conversations}
@@ -121,7 +104,6 @@ const Messages = () => {
                     />
                 </div>
 
-                {/* Main Chat Area */}
                 <div className="messages-main">
                     <MessageThread
                         conversation={activeConversation}

@@ -1,4 +1,4 @@
-// frontend/src/components/reviews/ReviewCard.jsx
+// src/components/reviews/ReviewCard.jsx
 import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
@@ -10,22 +10,25 @@ const ReviewCard = ({ review, onReplyAdded }) => {
     const [showReplyForm, setShowReplyForm] = useState(false);
     const [replyContent, setReplyContent] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
 
     const canReply = () => {
         if (!user) return false;
         if (user.role === 'employee') return true;
-        if (user.role === 'business') {
-            // Check if this is their company (you'd need company context)
-            return true;
-        }
+        if (user.role === 'business') return true;
+        if (user.role === 'psychologist') return true;
         return false;
     };
+
+    const canEdit = user && user.id === review.author_id &&
+        new Date() - new Date(review.created_at) < 24 * 60 * 60 * 1000;
 
     const handleSubmitReply = async (e) => {
         e.preventDefault();
         if (!replyContent.trim()) return;
 
         setSubmitting(true);
+        setError('');
         try {
             await api.post(`/reviews/${review.id}/replies`, {
                 content: replyContent
@@ -34,21 +37,29 @@ const ReviewCard = ({ review, onReplyAdded }) => {
             setShowReplyForm(false);
             onReplyAdded?.();
         } catch (error) {
-            console.error('Failed to add reply:', error);
+            setError(error.response?.data?.error || 'Failed to add reply');
         } finally {
             setSubmitting(false);
         }
     };
 
-    const canEdit = user && user.id === review.author_id &&
-        new Date() - new Date(review.created_at) < 24 * 60 * 60 * 1000;
+    const handleDelete = async () => {
+        if (!window.confirm('Are you sure you want to delete this review?')) return;
+
+        try {
+            await api.delete(`/reviews/${review.id}`);
+            onReplyAdded?.(); // Refresh
+        } catch (error) {
+            alert(error.response?.data?.error || 'Failed to delete review');
+        }
+    };
 
     return (
         <div className="review-card">
             <div className="review-header">
                 <div className="review-author">
           <span className="review-author-name">
-            {review.author.isanonymous ? 'Anonymous' : review.author.displayname}
+            {review.author?.is_anonymous ? 'Anonymous' : (review.author?.display_name || 'Unknown')}
           </span>
                     <span className="review-date">
             {formatDistanceToNow(new Date(review.created_at))} ago
@@ -66,18 +77,17 @@ const ReviewCard = ({ review, onReplyAdded }) => {
             {canEdit && (
                 <div className="review-actions">
                     <button className="btn btn-secondary btn-small">Edit</button>
-                    <button className="btn btn-secondary btn-small">Delete</button>
+                    <button onClick={handleDelete} className="btn btn-secondary btn-small">Delete</button>
                 </div>
             )}
 
-            {/* Replies */}
             {review.replies && review.replies.length > 0 && (
                 <div className="replies-section">
                     {review.replies.map((reply) => (
                         <div key={reply.id} className="reply">
                             <div className="reply-header">
                 <span className="reply-author">
-                  {reply.author.role === 'business' ? reply.author.displayname : 'Employee'}
+                  {reply.author?.display_name || 'Unknown'}
                 </span>
                                 <span className="reply-role">
                   {reply.author_role === 'business' ? 'Business' :
@@ -93,7 +103,6 @@ const ReviewCard = ({ review, onReplyAdded }) => {
                 </div>
             )}
 
-            {/* Reply Form */}
             {canReply() && !showReplyForm && (
                 <button
                     onClick={() => setShowReplyForm(true)}
@@ -105,13 +114,14 @@ const ReviewCard = ({ review, onReplyAdded }) => {
 
             {showReplyForm && (
                 <form onSubmit={handleSubmitReply} className="reply-form">
-          <textarea
-              value={replyContent}
-              onChange={(e) => setReplyContent(e.target.value)}
-              placeholder="Write your reply..."
-              className="form-textarea"
-              rows="3"
-          />
+                    {error && <div className="alert alert-error">{error}</div>}
+                    <textarea
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        placeholder="Write your reply..."
+                        className="form-textarea"
+                        rows="3"
+                    />
                     <div className="reply-form-actions">
                         <button
                             type="submit"

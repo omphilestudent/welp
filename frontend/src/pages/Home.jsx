@@ -1,32 +1,225 @@
 // frontend/src/pages/Home.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
 import CompanyCard from '../components/companies/CompanyCard';
-import Loading from '../components/common/Loading';
 
 const Home = () => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
-    const [trendingCompanies, setTrendingCompanies] = useState([]);
+    const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchTrendingCompanies();
-    }, []);
-
-    const fetchTrendingCompanies = async () => {
-        try {
-            const { data } = await api.get('/companies/search', {
-                params: { limit: 6, sort: 'rating' }
-            });
-            setTrendingCompanies(data.companies);
-        } catch (error) {
-            console.error('Failed to fetch trending companies:', error);
-        } finally {
-            setLoading(false);
+    // Sample global companies data
+    const globalCompanies = [
+        {
+            id: '1',
+            name: 'Google',
+            industry: 'Technology',
+            location: 'Mountain View, CA, USA',
+            description: 'Leading technology company specializing in internet services and products.',
+            rating: 4.5,
+            reviewCount: 15234,
+            is_claimed: true
+        },
+        {
+            id: '2',
+            name: 'DeepSeek AI',
+            industry: 'Artificial Intelligence',
+            location: 'Beijing, China',
+            description: 'Cutting-edge AI research and development company.',
+            rating: 4.8,
+            reviewCount: 3456,
+            is_claimed: true
+        },
+        {
+            id: '3',
+            name: 'Meta',
+            industry: 'Social Media',
+            location: 'Menlo Park, CA, USA',
+            description: 'Building the metaverse and connecting people through technology.',
+            rating: 4.2,
+            reviewCount: 12456,
+            is_claimed: true
+        },
+        {
+            id: '4',
+            name: 'Capitec Bank',
+            industry: 'Banking & Finance',
+            location: 'Stellenbosch, South Africa',
+            description: 'South Africas leading digital bank.',
+            rating: 4.3,
+            reviewCount: 5678,
+            is_claimed: false
+        },
+        {
+            id: '5',
+            name: 'Standard Bank',
+            industry: 'Banking & Finance',
+            location: 'Johannesburg, South Africa',
+            description: 'Africas largest bank by assets.',
+            rating: 4.1,
+            reviewCount: 7890,
+            is_claimed: false
+        },
+        {
+            id: '6',
+            name: 'Apple Inc.',
+            industry: 'Technology',
+            location: 'Cupertino, CA, USA',
+            description: 'Designing the worlds best consumer electronics.',
+            rating: 4.7,
+            reviewCount: 21345,
+            is_claimed: true
+        },
+        {
+            id: '7',
+            name: 'Amazon',
+            industry: 'E-commerce',
+            location: 'Seattle, WA, USA',
+            description: 'Earths most customer-centric company.',
+            rating: 4.0,
+            reviewCount: 32456,
+            is_claimed: true
+        },
+        {
+            id: '8',
+            name: 'Microsoft',
+            industry: 'Technology',
+            location: 'Redmond, WA, USA',
+            description: 'Empowering every person and organization.',
+            rating: 4.4,
+            reviewCount: 18765,
+            is_claimed: true
+        },
+        {
+            id: '9',
+            name: 'Tesla',
+            industry: 'Automotive',
+            location: 'Austin, TX, USA',
+            description: 'Accelerating worlds transition to sustainable energy.',
+            rating: 4.3,
+            reviewCount: 15432,
+            is_claimed: true
+        },
+        {
+            id: '10',
+            name: 'Netflix',
+            industry: 'Entertainment',
+            location: 'Los Gatos, CA, USA',
+            description: 'Leading streaming entertainment service.',
+            rating: 4.2,
+            reviewCount: 12345,
+            is_claimed: true
+        },
+        {
+            id: '11',
+            name: 'Spotify',
+            industry: 'Music Streaming',
+            location: 'Stockholm, Sweden',
+            description: 'Worlds most popular audio streaming service.',
+            rating: 4.3,
+            reviewCount: 9876,
+            is_claimed: true
+        },
+        {
+            id: '12',
+            name: 'Airbnb',
+            industry: 'Hospitality',
+            location: 'San Francisco, CA, USA',
+            description: 'Connecting travelers with unique accommodations.',
+            rating: 4.1,
+            reviewCount: 23456,
+            is_claimed: true
+        },
+        {
+            id: '13',
+            name: 'Uber',
+            industry: 'Transportation',
+            location: 'San Francisco, CA, USA',
+            description: 'Rethinking mobility through technology.',
+            rating: 3.9,
+            reviewCount: 34567,
+            is_claimed: true
+        },
+        {
+            id: '14',
+            name: 'LinkedIn',
+            industry: 'Professional Network',
+            location: 'Sunnyvale, CA, USA',
+            description: 'Worlds largest professional network.',
+            rating: 4.2,
+            reviewCount: 15678,
+            is_claimed: true
+        },
+        {
+            id: '15',
+            name: 'Salesforce',
+            industry: 'Cloud Computing',
+            location: 'San Francisco, CA, USA',
+            description: 'Customer relationship management platform.',
+            rating: 4.3,
+            reviewCount: 14567,
+            is_claimed: true
+        },
+        {
+            id: '16',
+            name: 'Oracle',
+            industry: 'Database Technology',
+            location: 'Austin, TX, USA',
+            description: 'Integrated cloud applications and services.',
+            rating: 4.0,
+            reviewCount: 11234,
+            is_claimed: true
+        },
+        {
+            id: '17',
+            name: 'IBM',
+            industry: 'Technology',
+            location: 'Armonk, NY, USA',
+            description: 'Leading hybrid cloud and AI services.',
+            rating: 4.1,
+            reviewCount: 22345,
+            is_claimed: true
+        },
+        {
+            id: '18',
+            name: 'Intel',
+            industry: 'Semiconductors',
+            location: 'Santa Clara, CA, USA',
+            description: 'Creating world-changing technology.',
+            rating: 4.2,
+            reviewCount: 13456,
+            is_claimed: true
+        },
+        {
+            id: '19',
+            name: 'NVIDIA',
+            industry: 'Semiconductors',
+            location: 'Santa Clara, CA, USA',
+            description: 'Pioneering accelerated computing and AI.',
+            rating: 4.8,
+            reviewCount: 17890,
+            is_claimed: true
+        },
+        {
+            id: '20',
+            name: 'Adobe',
+            industry: 'Software',
+            location: 'San Jose, CA, USA',
+            description: 'Changing the world through digital experiences.',
+            rating: 4.4,
+            reviewCount: 12345,
+            is_claimed: true
         }
-    };
+    ];
+
+    useEffect(() => {
+        // Simulate loading
+        setTimeout(() => {
+            setCompanies(globalCompanies);
+            setLoading(false);
+        }, 500);
+    }, []);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -35,7 +228,14 @@ const Home = () => {
         }
     };
 
-    if (loading) return <Loading />;
+    if (loading) {
+        return (
+            <div className="loading-container">
+                <div className="spinner"></div>
+                <p>Loading companies...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="home-page">
@@ -43,12 +243,12 @@ const Home = () => {
             <section className="hero-section">
                 <div className="container">
                     <h1 className="hero-title">
-                        Share Your Experience.
-                        <span className="hero-subtitle">Improve Workplaces.</span>
+                        Discover What It's Really Like to Work at
+                        <span className="hero-subtitle"> Global Companies</span>
                     </h1>
+
                     <p className="hero-description">
-                        Welp is where employees safely review companies, businesses respond,
-                        and psychologists help when needed. Your voice matters.
+                        Join millions of employees sharing honest reviews about the world's leading companies.
                     </p>
 
                     {/* Search Form */}
@@ -57,57 +257,54 @@ const Home = () => {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search for companies by name, industry, or location..."
+                            placeholder="Search Google, Meta, Amazon, or any company..."
                             className="search-input"
                         />
-                        <button type="submit" className="btn btn-primary btn-large">
+                        <button type="submit" className="btn btn-primary">
                             Search
                         </button>
                     </form>
-                </div>
-            </section>
 
-            {/* Features Section */}
-            <section className="features-section">
-                <div className="container">
-                    <h2 className="section-title">How Welp Works</h2>
-                    <div className="features-grid">
-                        <div className="feature-card">
-                            <div className="feature-icon">📝</div>
-                            <h3>Review Companies</h3>
-                            <p>
-                                Share your work experience anonymously or publicly.
-                                Your honest feedback helps others.
-                            </p>
-                        </div>
-                        <div className="feature-card">
-                            <div className="feature-icon">💬</div>
-                            <h3>Business Response</h3>
-                            <p>
-                                Companies can reply to reviews and improve their
-                                workplace based on feedback.
-                            </p>
-                        </div>
-                        <div className="feature-card">
-                            <div className="feature-icon">🤝</div>
-                            <h3>Wellbeing Support</h3>
-                            <p>
-                                Licensed psychologists can offer support when reviews
-                                signal distress.
-                            </p>
-                        </div>
+                    {/* Popular Companies */}
+                    <div className="popular-searches">
+                        <span>Popular:</span>
+                        {['Google', 'Meta', 'Amazon', 'Tesla'].map(company => (
+                            <button
+                                key={company}
+                                onClick={() => {
+                                    setSearchQuery(company);
+                                    navigate(`/search?q=${company}`);
+                                }}
+                                className="popular-tag"
+                            >
+                                {company}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </section>
 
-            {/* Trending Companies */}
-            <section className="trending-section">
+            {/* Companies Grid */}
+            <section className="companies-section">
                 <div className="container">
-                    <h2 className="section-title">Trending Companies</h2>
+                    <h2 className="section-title">Featured Companies</h2>
+
                     <div className="companies-grid">
-                        {trendingCompanies.map(company => (
-                            <CompanyCard key={company.id} company={company} />
+                        {companies.map(company => (
+                            <CompanyCard
+                                key={company.id}
+                                company={company}
+                            />
                         ))}
+                    </div>
+
+                    <div className="view-all-container">
+                        <button
+                            onClick={() => navigate('/search')}
+                            className="btn btn-primary"
+                        >
+                            View All Companies
+                        </button>
                     </div>
                 </div>
             </section>
@@ -116,20 +313,17 @@ const Home = () => {
             <section className="cta-section">
                 <div className="container">
                     <h2>Ready to Share Your Experience?</h2>
-                    <p>
-                        Join thousands of employees making workplaces better,
-                        one review at a time.
-                    </p>
+                    <p>Join thousands of employees making workplaces better.</p>
                     <div className="cta-buttons">
                         <button
                             onClick={() => navigate('/register')}
-                            className="btn btn-primary btn-large"
+                            className="btn btn-primary"
                         >
                             Sign Up Free
                         </button>
                         <button
                             onClick={() => navigate('/login')}
-                            className="btn btn-secondary btn-large"
+                            className="btn btn-secondary"
                         >
                             Log In
                         </button>

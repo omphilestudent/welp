@@ -2,18 +2,61 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
+// Check if email is configured
+const isEmailConfigured = () => {
+    return process.env.EMAIL_USER &&
+        process.env.EMAIL_PASSWORD &&
+        process.env.EMAIL_USER !== '' &&
+        process.env.EMAIL_PASSWORD !== '';
+};
+
+// Create transporter only if configured
+let transporter = null;
+if (isEmailConfigured()) {
+    try {
+        transporter = nodemailer.createTransport({
+            host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+            port: process.env.EMAIL_PORT || 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASSWORD
+            },
+            tls: {
+                rejectUnauthorized: false
+            }
+        });
+
+        // Verify connection
+        transporter.verify((error) => {
+            if (error) {
+                console.log('⚠️ Email service configured but not working:', error.message);
+                transporter = null;
+            } else {
+                console.log('✅ Email service is ready to send messages');
+            }
+        });
+    } catch (error) {
+        console.log('⚠️ Failed to initialize email service:', error.message);
+        transporter = null;
     }
-});
+} else {
+    console.log('📧 Email service not configured. Running in development mode with console logging.');
+}
 
 const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
-    const claimLink = `${process.env.FRONTEND_URL}/claim/${companyId}`;
+    const claimLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/claim/${companyId}`;
+
+    // If email not configured, just log to console
+    if (!transporter) {
+        console.log('\n=== EMAIL NOTIFICATION (DEV MODE) ===');
+        console.log(`To: ${companyEmail}`);
+        console.log(`Subject: Claim ${companyName} on Welp`);
+        console.log(`Company: ${companyName}`);
+        console.log(`Claim Link: ${claimLink}`);
+        console.log('=====================================\n');
+        return { success: true, devMode: true };
+    }
 
     const mailOptions = {
         from: process.env.EMAIL_USER,
@@ -26,27 +69,19 @@ const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #000; color: #fff; padding: 20px; text-align: center; }
-          .content { padding: 20px; background: #f9f9f9; }
-          .button { 
-            display: inline-block; 
-            padding: 10px 20px; 
-            background: #000; 
-            color: #fff; 
-            text-decoration: none; 
-            border-radius: 5px;
-            margin: 20px 0;
-          }
-          .footer { text-align: center; padding: 20px; color: #666; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { padding: 30px; background: #f9f9f9; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+          .button { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; text-decoration: none; border-radius: 30px; margin: 20px 0; font-weight: bold; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Welp</h1>
+            <h1>Welp Business Verification</h1>
           </div>
           <div class="content">
-            <h2>Your Company Has Been Listed on Welp</h2>
+            <h2>Claim Your Business on Welp</h2>
             <p>Hello,</p>
             <p>Your company <strong>${companyName}</strong> has been listed on Welp - the employee wellbeing review platform.</p>
             <p>To claim your company profile and start managing reviews, click the button below:</p>
@@ -54,6 +89,72 @@ const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
               <a href="${claimLink}" class="button">Claim ${companyName}</a>
             </div>
             <p>If you didn't expect this email, please ignore it.</p>
+            <p>Best regards,<br>The Welp Team</p>
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} Welp. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log('✅ Claim invitation email sent to:', companyEmail);
+        return { success: true, info };
+    } catch (error) {
+        console.error('❌ Failed to send email:', error.message);
+        // Fallback to console logging
+        console.log('\n=== EMAIL FALLBACK (DEV MODE) ===');
+        console.log(`To: ${companyEmail}`);
+        console.log(`Subject: Claim ${companyName} on Welp`);
+        console.log(`Claim Link: ${claimLink}`);
+        console.log('=====================================\n');
+        return { success: true, devMode: true };
+    }
+};
+
+const sendVerificationEmail = async (email, code) => {
+    // If email not configured, just log to console
+    if (!transporter) {
+        console.log('\n=== VERIFICATION EMAIL (DEV MODE) ===');
+        console.log(`To: ${email}`);
+        console.log(`Verification code: ${code}`);
+        console.log('=====================================\n');
+        return { success: true, devMode: true };
+    }
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: 'Verify Your Email - Welp',
+        html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { padding: 30px; background: #f9f9f9; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+          .code { font-size: 36px; font-weight: bold; color: #667eea; text-align: center; padding: 20px; background: #fff; border-radius: 10px; margin: 20px 0; letter-spacing: 5px; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Welp Email Verification</h1>
+          </div>
+          <div class="content">
+            <h2>Verify Your Email</h2>
+            <p>Use the following verification code to complete your request:</p>
+            <div class="code">${code}</div>
+            <p>This code will expire in 10 minutes.</p>
+            <p>If you didn't request this, please ignore this email.</p>
+            <p>Best regards,<br>The Welp Team</p>
           </div>
           <div class="footer">
             <p>&copy; ${new Date().getFullYear()} Welp. All rights reserved.</p>
@@ -66,10 +167,77 @@ const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log('Claim invitation email sent to:', companyEmail);
+        console.log('✅ Verification email sent to:', email);
+        return { success: true };
     } catch (error) {
-        console.error('Failed to send email:', error);
+        console.error('❌ Failed to send verification email:', error.message);
+        // Fallback to console logging
+        console.log('\n=== VERIFICATION FALLBACK (DEV MODE) ===');
+        console.log(`To: ${email}`);
+        console.log(`Verification code: ${code}`);
+        console.log('========================================\n');
+        return { success: true, devMode: true };
     }
 };
 
-module.exports = { sendClaimInvitation };
+const sendApplicationConfirmation = async (email, name) => {
+    if (!transporter) {
+        console.log('\n=== APPLICATION CONFIRMATION (DEV MODE) ===');
+        console.log(`To: ${email}`);
+        console.log(`Name: ${name}`);
+        console.log('============================================\n');
+        return { success: true, devMode: true };
+    }
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: 'Psychologist Application Received - Welp',
+        html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { padding: 30px; background: #f9f9f9; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Application Received!</h1>
+          </div>
+          <div class="content">
+            <h2>Thank you for applying, ${name}!</h2>
+            <p>We have received your application to become a verified psychologist on Welp.</p>
+            <p>Our team will review your credentials and get back to you within 3-5 business days.</p>
+            <p>If you have any questions, please contact us at support@welp.com</p>
+            <p>Best regards,<br>The Welp Team</p>
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} Welp. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log('✅ Application confirmation email sent to:', email);
+        return { success: true };
+    } catch (error) {
+        console.error('❌ Failed to send confirmation email:', error.message);
+        return { success: true, devMode: true };
+    }
+};
+
+module.exports = {
+    sendClaimInvitation,
+    sendVerificationEmail,
+    sendApplicationConfirmation
+};

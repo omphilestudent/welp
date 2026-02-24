@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
+const psychologistRoutes = require('./routes/psychologistRoutes');
 require('dotenv').config();
 
 const { apiLimiter } = require('./middleware/rateLimiter');
@@ -37,7 +38,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/messages', messageRoutes);
-
+app.use('/api/psychologists', psychologistRoutes);
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date() });

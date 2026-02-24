@@ -1,5 +1,6 @@
-// backend/src/routes/companyRoutes.js (UPDATED VERSION)
+// backend/src/routes/companyRoutes.js
 const express = require('express');
+const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate, companyValidation } = require('../middleware/validation');
@@ -45,6 +46,45 @@ router.get('/:id/business-reviews',
     authenticate,
     authorize('business'),
     companyController.getCompanyReviewsForBusiness
+);
+
+// Claim request routes
+router.post('/:id/request-claim',
+    authenticate,
+    authorize('business'),
+    validate([
+        body('businessEmail').isEmail().normalizeEmail(),
+        body('businessPhone').optional().trim(),
+        body('position').optional().trim(),
+        body('message').optional().trim().isLength({ max: 500 })
+    ]),
+    companyController.requestClaimCompany
+);
+
+router.get('/my-claim-requests',
+    authenticate,
+    authorize('business'),
+    companyController.getMyClaimRequests
+);
+
+// Email verification routes
+router.post('/verify-email',
+    authenticate,
+    authorize('business'),
+    validate([
+        body('email').isEmail().normalizeEmail()
+    ]),
+    companyController.verifyBusinessEmail
+);
+
+router.post('/confirm-verification',
+    authenticate,
+    authorize('business'),
+    validate([
+        body('email').isEmail().normalizeEmail(),
+        body('code').isLength({ min: 6, max: 6 }).isNumeric()
+    ]),
+    companyController.confirmEmailVerification
 );
 
 module.exports = router;

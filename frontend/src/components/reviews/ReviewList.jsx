@@ -1,4 +1,4 @@
-// frontend/src/components/reviews/ReviewList.jsx
+// src/components/reviews/ReviewList.jsx
 import React from 'react';
 import ReviewCard from './ReviewCard';
 

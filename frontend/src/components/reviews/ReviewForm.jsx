@@ -1,4 +1,4 @@
-// frontend/src/components/reviews/ReviewForm.jsx
+// src/components/reviews/ReviewForm.jsx
 import React, { useState } from 'react';
 import StarRating from './StarRating';
 
@@ -73,7 +73,7 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {} }) => {
                     <span>Make this review public</span>
                 </label>
                 <p className="checkbox-help">
-                    Public reviews can be seen by everyone. Private reviews are only visible to you.
+                    Public reviews can be seen by everyone.
                 </p>
             </div>
 

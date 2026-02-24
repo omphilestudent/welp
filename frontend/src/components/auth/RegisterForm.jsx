@@ -1,4 +1,4 @@
-// frontend/src/components/auth/RegisterForm.jsx
+// src/components/auth/RegisterForm.jsx
 import React, { useState } from 'react';
 
 const RegisterForm = ({ onSubmit, loading }) => {
@@ -42,7 +42,6 @@ const RegisterForm = ({ onSubmit, loading }) => {
             ...formData,
             [e.target.name]: value
         });
-        // Clear error for this field
         if (errors[e.target.name]) {
             setErrors({
                 ...errors,
@@ -55,7 +54,6 @@ const RegisterForm = ({ onSubmit, loading }) => {
         e.preventDefault();
         const newErrors = validate();
         if (Object.keys(newErrors).length === 0) {
-            // Remove confirmPassword from data sent to API
             const { confirmPassword, ...submitData } = formData;
             onSubmit(submitData);
         } else {
@@ -65,7 +63,6 @@ const RegisterForm = ({ onSubmit, loading }) => {
 
     return (
         <form onSubmit={handleSubmit} className="auth-form">
-            {/* Role Selection */}
             <div className="form-group">
                 <label className="form-label">I am a...</label>
                 <div className="role-options">
@@ -85,7 +82,6 @@ const RegisterForm = ({ onSubmit, loading }) => {
                 </div>
             </div>
 
-            {/* Anonymous Option */}
             <div className="form-group">
                 <label className="checkbox-label">
                     <input
@@ -102,7 +98,6 @@ const RegisterForm = ({ onSubmit, loading }) => {
                 </p>
             </div>
 
-            {/* Display Name */}
             <div className="form-group">
                 <label htmlFor="displayName" className="form-label">
                     Display Name
@@ -119,7 +114,6 @@ const RegisterForm = ({ onSubmit, loading }) => {
                 />
             </div>
 
-            {/* Email (not for anonymous) */}
             {!formData.isAnonymous && (
                 <>
                     <div className="form-group">

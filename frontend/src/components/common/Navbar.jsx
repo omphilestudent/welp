@@ -1,4 +1,4 @@
-// frontend/src/components/common/Navbar.jsx
+// src/components/common/Navbar.jsx
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -26,6 +26,17 @@ const Navbar = () => {
                         Companies
                     </Link>
 
+                    {!user && (
+                        <>
+                            <Link to="/psychologist/join" className="navbar-link">
+                                Join as Psychologist
+                            </Link>
+                            <Link to="/search" className="navbar-link">
+                                For Businesses
+                            </Link>
+                        </>
+                    )}
+
                     {user ? (
                         <>
                             {user.role === 'employee' && (
@@ -39,9 +50,14 @@ const Navbar = () => {
                                 </Link>
                             )}
                             {user.role === 'business' && (
-                                <Link to="/dashboard" className="navbar-link">
-                                    Business Dashboard
-                                </Link>
+                                <>
+                                    <Link to="/search?unclaimed=true" className="navbar-link">
+                                        Claim Business
+                                    </Link>
+                                    <Link to="/dashboard" className="navbar-link">
+                                        Business Dashboard
+                                    </Link>
+                                </>
                             )}
 
                             <button onClick={toggleTheme} className="btn btn-secondary">

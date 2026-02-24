@@ -10,32 +10,57 @@ const SearchPage = () => {
     const query = searchParams.get('q') || '';
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [pagination, setPagination] = useState({
-        page: 1,
-        total: 0,
-        pages: 0
-    });
+    const [error, setError] = useState('');
 
     useEffect(() => {
-        searchCompanies(1);
+        fetchCompanies();
     }, [query]);
 
-    const searchCompanies = async (page) => {
+    const fetchCompanies = async () => {
         setLoading(true);
+        setError('');
         try {
-            const { data } = await api.get('/companies/search', {
-                params: { q: query, page, limit: 12 }
+            console.log('Fetching companies...');
+            const response = await api.get('/companies/search', {
+                params: { q: query || undefined }
             });
-            setCompanies(data.companies);
-            setPagination(data.pagination);
+
+            console.log('API Response:', response.data);
+
+            // Make sure we're setting the companies array correctly
+            if (response.data && Array.isArray(response.data.companies)) {
+                setCompanies(response.data.companies);
+            } else {
+                setCompanies([]);
+                console.error('Unexpected response format:', response.data);
+            }
         } catch (error) {
             console.error('Search failed:', error);
+            setError(error.response?.data?.error || 'Failed to load companies');
         } finally {
             setLoading(false);
         }
     };
 
-    if (loading) return <Loading />;
+    if (loading) {
+        return (
+            <div className="loading-container">
+                <div className="spinner"></div>
+                <p>Loading companies...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="error-container">
+                <p className="error-text">{error}</p>
+                <button onClick={fetchCompanies} className="btn btn-primary">
+                    Try Again
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="search-page">
@@ -44,48 +69,20 @@ const SearchPage = () => {
                     {query ? `Search results for "${query}"` : 'All Companies'}
                 </h1>
 
-                {pagination.total > 0 && (
-                    <p className="search-count">
-                        Found {pagination.total} companies
-                    </p>
-                )}
-
-                {companies.length > 0 ? (
+                {companies.length === 0 ? (
+                    <div className="empty-state">
+                        <p>No companies found</p>
+                        <p>Try a different search term</p>
+                    </div>
+                ) : (
                     <>
+                        <p className="search-count">Found {companies.length} companies</p>
                         <div className="companies-grid">
                             {companies.map(company => (
                                 <CompanyCard key={company.id} company={company} />
                             ))}
                         </div>
-
-                        {/* Pagination */}
-                        {pagination.pages > 1 && (
-                            <div className="pagination">
-                                <button
-                                    onClick={() => searchCompanies(pagination.page - 1)}
-                                    disabled={pagination.page === 1}
-                                    className="btn btn-secondary"
-                                >
-                                    Previous
-                                </button>
-                                <span className="page-info">
-                  Page {pagination.page} of {pagination.pages}
-                </span>
-                                <button
-                                    onClick={() => searchCompanies(pagination.page + 1)}
-                                    disabled={pagination.page === pagination.pages}
-                                    className="btn btn-secondary"
-                                >
-                                    Next
-                                </button>
-                            </div>
-                        )}
                     </>
-                ) : (
-                    <div className="no-results">
-                        <p>No companies found matching your search.</p>
-                        <p>Try different keywords or browse all companies.</p>
-                    </div>
                 )}
             </div>
         </div>

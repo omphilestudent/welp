@@ -1,4 +1,4 @@
-// frontend/src/components/reviews/StarRating.jsx
+// src/components/reviews/StarRating.jsx
 import React from 'react';
 
 const StarRating = ({ rating, onRatingChange, readonly = false }) => {

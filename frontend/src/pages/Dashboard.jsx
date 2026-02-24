@@ -1,5 +1,6 @@
-// frontend/src/pages/Dashboard.jsx
+// src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import ReviewList from '../components/reviews/ReviewList';
@@ -12,6 +13,7 @@ const Dashboard = () => {
     const [myCompanies, setMyCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('reviews');
+    const [error, setError] = useState('');
 
     useEffect(() => {
         fetchDashboardData();
@@ -19,25 +21,24 @@ const Dashboard = () => {
 
     const fetchDashboardData = async () => {
         setLoading(true);
+        setError('');
         try {
-            if (user.role === 'employee') {
-                // Fetch employee's reviews
-                const reviewsRes = await api.get('/reviews/my-reviews');
-                setUserReviews(reviewsRes.data);
-
-                // Fetch pending message requests
-                const requestsRes = await api.get('/messages/conversations/pending');
-                setPendingRequests(requestsRes.data);
-            } else if (user.role === 'business') {
-                // Fetch business's companies
+            if (user?.role === 'employee') {
+                const [reviewsRes, requestsRes] = await Promise.all([
+                    api.get('/reviews/my-reviews'),
+                    api.get('/messages/conversations/pending').catch(() => ({ data: [] }))
+                ]);
+                setUserReviews(reviewsRes.data || []);
+                setPendingRequests(requestsRes.data || []);
+            } else if (user?.role === 'business') {
                 const companiesRes = await api.get('/companies/my-companies');
-                setMyCompanies(companiesRes.data);
-            } else if (user.role === 'psychologist') {
-                // Fetch psychologist's conversations
+                setMyCompanies(companiesRes.data || []);
+            } else if (user?.role === 'psychologist') {
                 const conversationsRes = await api.get('/messages/conversations');
-                setPendingRequests(conversationsRes.data.filter(c => c.status === 'pending'));
+                setPendingRequests(conversationsRes.data?.filter(c => c.status === 'pending') || []);
             }
         } catch (error) {
+            setError('Failed to load dashboard data');
             console.error('Failed to fetch dashboard data:', error);
         } finally {
             setLoading(false);
@@ -49,9 +50,10 @@ const Dashboard = () => {
             await api.patch(`/messages/conversations/${conversationId}/status`, {
                 status: 'accepted'
             });
+            toast.success('Message request accepted!');
             fetchDashboardData();
         } catch (error) {
-            console.error('Failed to accept request:', error);
+            toast.error('Failed to accept request');
         }
     };
 
@@ -60,9 +62,10 @@ const Dashboard = () => {
             await api.patch(`/messages/conversations/${conversationId}/status`, {
                 status: 'rejected'
             });
+            toast.success('Message request rejected');
             fetchDashboardData();
         } catch (error) {
-            console.error('Failed to reject request:', error);
+            toast.error('Failed to reject request');
         }
     };
 
@@ -73,27 +76,27 @@ const Dashboard = () => {
             <div className="container">
                 <h1 className="dashboard-title">Dashboard</h1>
 
-                {/* User Info */}
+                {error && <div className="alert alert-error">{error}</div>}
+
                 <div className="user-info-card">
                     <div className="user-avatar">
-                        {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={user.displayName} />
+                        {user?.avatar_url ? (
+                            <img src={user.avatar_url} alt={user.display_name} />
                         ) : (
                             <div className="avatar-placeholder">
-                                {user.displayName?.charAt(0) || 'U'}
+                                {user?.display_name?.charAt(0) || 'U'}
                             </div>
                         )}
                     </div>
                     <div className="user-details">
-                        <h2>{user.displayName}</h2>
-                        <p className="user-role">{user.role}</p>
-                        {user.email && <p className="user-email">{user.email}</p>}
+                        <h2>{user?.display_name || 'User'}</h2>
+                        <p className="user-role">{user?.role || 'Unknown'}</p>
+                        {user?.email && <p className="user-email">{user.email}</p>}
                     </div>
                 </div>
 
-                {/* Tabs */}
                 <div className="dashboard-tabs">
-                    {user.role === 'employee' && (
+                    {user?.role === 'employee' && (
                         <>
                             <button
                                 className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`}
@@ -110,7 +113,7 @@ const Dashboard = () => {
                         </>
                     )}
 
-                    {user.role === 'business' && (
+                    {user?.role === 'business' && (
                         <>
                             <button
                                 className={`tab-btn ${activeTab === 'companies' ? 'active' : ''}`}
@@ -127,7 +130,7 @@ const Dashboard = () => {
                         </>
                     )}
 
-                    {user.role === 'psychologist' && (
+                    {user?.role === 'psychologist' && (
                         <button
                             className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
                             onClick={() => setActiveTab('requests')}
@@ -137,10 +140,8 @@ const Dashboard = () => {
                     )}
                 </div>
 
-                {/* Tab Content */}
                 <div className="tab-content">
-                    {/* Employee: My Reviews */}
-                    {user.role === 'employee' && activeTab === 'reviews' && (
+                    {user?.role === 'employee' && activeTab === 'reviews' && (
                         <div className="my-reviews-section">
                             <h3>My Reviews</h3>
                             {userReviews.length > 0 ? (
@@ -151,8 +152,7 @@ const Dashboard = () => {
                         </div>
                     )}
 
-                    {/* Employee: Message Requests */}
-                    {user.role === 'employee' && activeTab === 'messages' && (
+                    {user?.role === 'employee' && activeTab === 'messages' && (
                         <div className="message-requests-section">
                             <h3>Message Requests from Psychologists</h3>
                             {pendingRequests.length > 0 ? (
@@ -160,7 +160,7 @@ const Dashboard = () => {
                                     {pendingRequests.map(request => (
                                         <div key={request.id} className="request-card">
                                             <div className="request-info">
-                                                <h4>{request.psychologist.displayName}</h4>
+                                                <h4>{request.psychologist?.display_name || 'Unknown'}</h4>
                                                 <p className="request-message">
                                                     {request.initial_message?.content}
                                                 </p>
@@ -191,8 +191,7 @@ const Dashboard = () => {
                         </div>
                     )}
 
-                    {/* Business: My Companies */}
-                    {user.role === 'business' && activeTab === 'companies' && (
+                    {user?.role === 'business' && activeTab === 'companies' && (
                         <div className="my-companies-section">
                             <h3>My Companies</h3>
                             {myCompanies.length > 0 ? (
@@ -211,12 +210,6 @@ const Dashboard = () => {
                                                 >
                                                     View Page
                                                 </button>
-                                                <button
-                                                    onClick={() => setActiveTab('reviews')}
-                                                    className="btn btn-primary btn-small"
-                                                >
-                                                    View Reviews
-                                                </button>
                                             </div>
                                         </div>
                                     ))}
@@ -230,17 +223,14 @@ const Dashboard = () => {
                         </div>
                     )}
 
-                    {/* Business: Company Reviews */}
-                    {user.role === 'business' && activeTab === 'reviews' && (
+                    {user?.role === 'business' && activeTab === 'reviews' && (
                         <div className="company-reviews-section">
                             <h3>Reviews for Your Companies</h3>
-                            {/* This would fetch and display reviews for all companies owned by the business */}
-                            <p className="coming-soon">Company reviews view coming soon...</p>
+                            <p className="coming-soon">Select a company to view its reviews</p>
                         </div>
                     )}
 
-                    {/* Psychologist: Pending Requests */}
-                    {user.role === 'psychologist' && activeTab === 'requests' && (
+                    {user?.role === 'psychologist' && activeTab === 'requests' && (
                         <div className="pending-requests-section">
                             <h3>Pending Message Requests</h3>
                             {pendingRequests.length > 0 ? (
@@ -249,9 +239,9 @@ const Dashboard = () => {
                                         <div key={request.id} className="request-card">
                                             <div className="request-info">
                                                 <h4>
-                                                    {request.employee.is_anonymous
+                                                    {request.employee?.is_anonymous
                                                         ? 'Anonymous Employee'
-                                                        : request.employee.displayName}
+                                                        : request.employee?.display_name || 'Unknown'}
                                                 </h4>
                                                 <p className="request-status">Status: {request.status}</p>
                                                 <p className="request-date">

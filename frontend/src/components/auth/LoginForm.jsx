@@ -1,4 +1,4 @@
-// frontend/src/components/auth/LoginForm.jsx
+// src/components/auth/LoginForm.jsx
 import React, { useState } from 'react';
 
 const LoginForm = ({ onSubmit, loading }) => {
@@ -26,7 +26,6 @@ const LoginForm = ({ onSubmit, loading }) => {
             ...formData,
             [e.target.name]: e.target.value
         });
-        // Clear error for this field
         if (errors[e.target.name]) {
             setErrors({
                 ...errors,

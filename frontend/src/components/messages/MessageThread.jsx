@@ -1,14 +1,16 @@
-// frontend/src/components/messages/MessageThread.jsx
+// src/components/messages/MessageThread.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
 import socketService from '../../services/socket';
+import api from '../../services/api';
 
 const MessageThread = ({ conversation, messages: initialMessages, onSendMessage }) => {
     const { user } = useAuth();
     const [messages, setMessages] = useState(initialMessages || []);
     const [newMessage, setNewMessage] = useState('');
     const [sending, setSending] = useState(false);
+    const [error, setError] = useState('');
     const messagesEndRef = useRef(null);
     const threadRef = useRef(null);
 
@@ -46,16 +48,42 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage 
         if (!newMessage.trim() || sending) return;
 
         setSending(true);
+        setError('');
         try {
             await onSendMessage(newMessage);
             setNewMessage('');
+        } catch (error) {
+            setError('Failed to send message');
         } finally {
             setSending(false);
         }
     };
 
+    const handleAcceptRequest = async () => {
+        try {
+            await api.patch(`/messages/conversations/${conversation.id}/status`, {
+                status: 'accepted'
+            });
+            window.location.reload();
+        } catch (error) {
+            setError('Failed to accept request');
+        }
+    };
+
+    const handleRejectRequest = async () => {
+        try {
+            await api.patch(`/messages/conversations/${conversation.id}/status`, {
+                status: 'rejected'
+            });
+            window.location.reload();
+        } catch (error) {
+            setError('Failed to reject request');
+        }
+    };
+
     const getOtherParticipant = () => {
-        if (conversation.employee?.id === user.id) {
+        if (!conversation) return null;
+        if (conversation.employee?.id === user?.id) {
             return conversation.psychologist;
         }
         return conversation.employee;
@@ -73,10 +101,9 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage 
 
     return (
         <div className="message-thread" ref={threadRef}>
-            {/* Thread Header */}
             <div className="thread-header">
                 <div className="thread-participant">
-                    <h3>{other?.display_name}</h3>
+                    <h3>{other?.display_name || 'Unknown'}</h3>
                     {other?.role === 'psychologist' && (
                         <span className="role-badge">
               {other.is_verified ? 'Verified Psychologist' : 'Psychologist'}
@@ -85,10 +112,11 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage 
                 </div>
             </div>
 
-            {/* Messages */}
             <div className="messages-container">
+                {error && <div className="alert alert-error">{error}</div>}
+
                 {messages.map((message, index) => {
-                    const isOwn = message.sender_id === user.id;
+                    const isOwn = message.sender_id === user?.id;
                     const showDate = index === 0 ||
                         format(new Date(message.created_at), 'yyyy-MM-dd') !==
                         format(new Date(messages[index - 1].created_at), 'yyyy-MM-dd');
@@ -114,7 +142,6 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage 
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Message Input */}
             {conversation.status === 'accepted' && (
                 <form onSubmit={handleSend} className="message-input-form">
                     <input
@@ -135,17 +162,17 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage 
                 </form>
             )}
 
-            {conversation.status === 'pending' && conversation.employee?.id === user.id && (
+            {conversation.status === 'pending' && conversation.employee?.id === user?.id && (
                 <div className="pending-message">
                     <p>This conversation request is pending your approval.</p>
                     <div className="pending-actions">
-                        <button className="btn btn-primary">Accept</button>
-                        <button className="btn btn-secondary">Decline</button>
+                        <button onClick={handleAcceptRequest} className="btn btn-primary">Accept</button>
+                        <button onClick={handleRejectRequest} className="btn btn-secondary">Decline</button>
                     </div>
                 </div>
             )}
 
-            {conversation.status === 'pending' && conversation.psychologist?.id === user.id && (
+            {conversation.status === 'pending' && conversation.psychologist?.id === user?.id && (
                 <div className="pending-message">
                     <p>Waiting for the employee to accept your message request...</p>
                 </div>

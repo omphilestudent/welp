@@ -1,4 +1,4 @@
-// frontend/src/services/socket.js
+// src/services/socket.js
 import { io } from 'socket.io-client';
 
 class SocketService {
@@ -7,9 +7,13 @@ class SocketService {
     }
 
     connect(token) {
-        this.socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const baseURL = API_URL.replace('/api', '');
+
+        this.socket = io(baseURL, {
             auth: { token },
             transports: ['websocket'],
+            withCredentials: true
         });
 
         this.socket.on('connect', () => {
@@ -18,6 +22,10 @@ class SocketService {
 
         this.socket.on('disconnect', () => {
             console.log('Socket disconnected');
+        });
+
+        this.socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
         });
 
         return this.socket;
@@ -57,6 +65,18 @@ class SocketService {
     offNewMessage() {
         if (this.socket) {
             this.socket.off('new-message');
+        }
+    }
+
+    onError(callback) {
+        if (this.socket) {
+            this.socket.on('error', callback);
+        }
+    }
+
+    offError() {
+        if (this.socket) {
+            this.socket.off('error');
         }
     }
 }
