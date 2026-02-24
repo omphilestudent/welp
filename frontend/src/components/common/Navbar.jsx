@@ -1,16 +1,41 @@
-// src/components/common/Navbar.jsx (Updated)
-import React, { useState } from 'react';
+// frontend/src/components/common/Navbar.jsx (Add after business section)
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaComment } from 'react-icons/fa';
+import { FaComment, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
-import ChatRequestModal from '../messages/ChatRequestModal'; // Add this import
+import api from '../../services/api';
+import ChatRequestModal from '../messages/ChatRequestModal';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
     const { isDarkMode, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [showChatModal, setShowChatModal] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [isHR, setIsHR] = useState(false);
+
+    useEffect(() => {
+        checkAdminStatus();
+    }, [user]);
+
+    const checkAdminStatus = async () => {
+        if (!user) return;
+
+        try {
+            await api.get('/admin/profile');
+            setIsAdmin(true);
+        } catch (error) {
+            setIsAdmin(false);
+        }
+
+        try {
+            await api.get('/hr/profile');
+            setIsHR(true);
+        } catch (error) {
+            setIsHR(false);
+        }
+    };
 
     const handleLogout = async () => {
         await logout();
@@ -35,8 +60,8 @@ const Navbar = () => {
                                 <Link to="/psychologist/join" className="navbar-link">
                                     Join as Psychologist
                                 </Link>
-                                <Link to="/search" className="navbar-link">
-                                    For Businesses
+                                <Link to="/pricing" className="navbar-link">
+                                    Pricing
                                 </Link>
                             </>
                         )}
@@ -44,15 +69,25 @@ const Navbar = () => {
                         {user ? (
                             <>
                                 {user.role === 'employee' && (
-                                    <Link to="/dashboard" className="navbar-link">
-                                        Dashboard
-                                    </Link>
+                                    <>
+                                        <Link to="/dashboard" className="navbar-link">
+                                            Dashboard
+                                        </Link>
+                                        <Link to="/pricing" className="navbar-link">
+                                            Pricing
+                                        </Link>
+                                    </>
                                 )}
 
                                 {user.role === 'psychologist' && (
-                                    <Link to="/messages" className="navbar-link">
-                                        Messages
-                                    </Link>
+                                    <>
+                                        <Link to="/messages" className="navbar-link">
+                                            Messages
+                                        </Link>
+                                        <Link to="/pricing" className="navbar-link">
+                                            Pricing
+                                        </Link>
+                                    </>
                                 )}
 
                                 {user.role === 'business' && (
@@ -63,7 +98,47 @@ const Navbar = () => {
                                         <Link to="/dashboard" className="navbar-link">
                                             Business Dashboard
                                         </Link>
+                                        <Link to="/pricing" className="navbar-link">
+                                            Pricing
+                                        </Link>
                                     </>
+                                )}
+
+                                {/* Admin Links */}
+                                {isAdmin && (
+                                    <div className="nav-dropdown">
+                                        <button className="nav-dropdown-btn">
+                                            <FaShieldAlt /> Admin
+                                        </button>
+                                        <div className="nav-dropdown-content">
+                                            <Link to="/admin/dashboard">Dashboard</Link>
+                                            <Link to="/admin/users">Users</Link>
+                                            <Link to="/admin/pricing">Pricing</Link>
+                                            <Link to="/admin/companies">Companies</Link>
+                                            <Link to="/admin/reviews">Reviews</Link>
+                                            <Link to="/admin/subscriptions">Subscriptions</Link>
+                                            {user.role === 'super_admin' && (
+                                                <Link to="/admin/settings">Settings</Link>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* HR Links */}
+                                {isHR && (
+                                    <div className="nav-dropdown">
+                                        <button className="nav-dropdown-btn">
+                                            <FaBriefcase /> HR
+                                        </button>
+                                        <div className="nav-dropdown-content">
+                                            <Link to="/hr/dashboard">Dashboard</Link>
+                                            <Link to="/hr/jobs">Job Postings</Link>
+                                            <Link to="/hr/applications">Applications</Link>
+                                            <Link to="/hr/interviews">Interviews</Link>
+                                            <Link to="/hr/employees">Employee Relations</Link>
+                                            <Link to="/hr/departments">Departments</Link>
+                                        </div>
+                                    </div>
                                 )}
 
                                 <Link to="/settings" className="navbar-link">
@@ -75,8 +150,7 @@ const Navbar = () => {
                                         onClick={() => setShowChatModal(true)}
                                         className="btn btn-primary"
                                     >
-                                        <FaComment style={{ marginRight: '6px' }} />
-                                        Chat with Psychologist
+                                        <FaComment /> Chat
                                     </button>
                                 )}
 
@@ -90,6 +164,9 @@ const Navbar = () => {
                             </>
                         ) : (
                             <>
+                                <Link to="/pricing" className="navbar-link">
+                                    Pricing
+                                </Link>
                                 <button onClick={toggleTheme} className="btn btn-secondary">
                                     {isDarkMode ? '☀️' : '🌙'}
                                 </button>
@@ -110,8 +187,7 @@ const Navbar = () => {
                 isOpen={showChatModal}
                 onClose={() => setShowChatModal(false)}
                 onSuccess={() => {
-                    // Optionally refresh data or show success message
-                    console.log('Chat request sent successfully');
+                    toast.success('Chat request sent successfully');
                 }}
             />
         </>

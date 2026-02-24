@@ -20,6 +20,7 @@ import ApplicationSuccess from './pages/ApplicationSuccess';
 import PrivateRoute from './components/auth/PrivateRoute';
 import './styles/global.css';
 import './styles/theme.css';
+import Pricing from './pages/Pricing';
 import './styles/components.css';
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
                         <Navbar />
                         <main className="main-content">
                             <Routes>
+                                <Route path="/pricing" element={<Pricing />} />
                                 <Route path="/" element={<Home />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
