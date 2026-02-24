@@ -8,7 +8,7 @@ const { Server } = require('socket.io');
 const psychologistRoutes = require('./routes/psychologistRoutes');
 const userRoutes = require('./routes/userRoutes');
 require('dotenv').config();
-
+const kycRoutes = require('./routes/kycRoutes');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const authRoutes = require('./routes/authRoutes');
 const companyRoutes = require('./routes/companyRoutes');
@@ -41,6 +41,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/psychologists', psychologistRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/kyc', kycRoutes);
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date() });

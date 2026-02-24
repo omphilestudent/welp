@@ -1,4 +1,4 @@
-// frontend/src/pages/CompanyPage.jsx
+// frontend/src/pages/CompanyPage.jsx (Complete working version)
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -7,6 +7,7 @@ import ReviewCard from '../components/reviews/ReviewCard';
 import ReviewForm from '../components/reviews/ReviewForm';
 import StarRating from '../components/reviews/StarRating';
 import Loading from '../components/common/Loading';
+import toast from 'react-hot-toast';
 
 const CompanyPage = () => {
     const { id } = useParams();
@@ -17,6 +18,7 @@ const CompanyPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showReviewForm, setShowReviewForm] = useState(false);
+    const [showClaimButton, setShowClaimButton] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -24,11 +26,23 @@ const CompanyPage = () => {
         }
     }, [id]);
 
+    useEffect(() => {
+        // Check if user can claim the company
+        if (user && user.role === 'business' && company && !company.is_claimed) {
+            setShowClaimButton(true);
+        } else {
+            setShowClaimButton(false);
+        }
+        console.log('User role:', user?.role);
+        console.log('Company claimed:', company?.is_claimed);
+        console.log('Show claim button:', showClaimButton);
+    }, [user, company]);
+
     const fetchCompanyData = async () => {
         setLoading(true);
         setError('');
         try {
-            console.log('Fetching company with ID:', id); // Debug log
+            console.log('Fetching company with ID:', id);
 
             const [companyRes, reviewsRes] = await Promise.all([
                 api.get(`/companies/${id}`).catch(err => {
@@ -134,14 +148,32 @@ const CompanyPage = () => {
                             </div>
                         </div>
 
-                        {user?.role === 'employee' && (
-                            <button
-                                onClick={() => setShowReviewForm(!showReviewForm)}
-                                className="btn btn-primary"
-                            >
-                                {showReviewForm ? 'Cancel' : 'Write a Review'}
-                            </button>
-                        )}
+                        <div className="company-actions">
+                            {user?.role === 'employee' && (
+                                <button
+                                    onClick={() => setShowReviewForm(!showReviewForm)}
+                                    className="btn btn-primary"
+                                >
+                                    {showReviewForm ? 'Cancel' : 'Write a Review'}
+                                </button>
+                            )}
+
+                            {showClaimButton && (
+                                <button
+                                    onClick={() => navigate(`/claim/${company.id}`)}
+                                    className="btn btn-primary"
+                                    style={{ marginLeft: user?.role === 'employee' ? '1rem' : '0' }}
+                                >
+                                    🏢 Claim This Business
+                                </button>
+                            )}
+
+                            {company.is_claimed && (
+                                <span className="verified-badge-large">
+                                    ✓ Verified Business
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -150,7 +182,11 @@ const CompanyPage = () => {
                 <div className="company-content">
                     {showReviewForm && (
                         <div className="review-form-section">
-                            <ReviewForm onSubmit={handleReviewSubmit} onCancel={() => setShowReviewForm(false)} />
+                            <ReviewForm
+                                onSubmit={handleReviewSubmit}
+                                onCancel={() => setShowReviewForm(false)}
+                                companyId={id}
+                            />
                         </div>
                     )}
 

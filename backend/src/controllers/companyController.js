@@ -2,11 +2,12 @@
 const { query } = require('../utils/database');
 const { sendClaimInvitation } = require('../utils/emailService');
 
-// Search companies with filters
+// Search companies with filters - UPDATED with unclaimed filter
 const searchCompanies = async (req, res) => {
     try {
-        const { q, page = 1, limit = 20, industry } = req.query;
+        const { q, page = 1, limit = 20, industry, unclaimed } = req.query;
 
+        // Validate and sanitize pagination parameters
         const validPage = Math.max(1, parseInt(page) || 1);
         const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
         const offset = (validPage - 1) * validLimit;
@@ -15,6 +16,7 @@ const searchCompanies = async (req, res) => {
         const params = [];
         let paramIndex = 1;
 
+        // Build search conditions
         if (q && q.trim() !== '') {
             whereClause += ` WHERE (name ILIKE $${paramIndex} OR description ILIKE $${paramIndex} OR industry ILIKE $${paramIndex})`;
             params.push(`%${q.trim()}%`);
@@ -27,12 +29,23 @@ const searchCompanies = async (req, res) => {
             paramIndex++;
         }
 
+        // Filter for unclaimed companies
+        if (unclaimed === 'true') {
+            if (whereClause) {
+                whereClause += ` AND is_claimed = false`;
+            } else {
+                whereClause = ` WHERE is_claimed = false`;
+            }
+        }
+
+        // Get total count
         const countResult = await query(
             `SELECT COUNT(*) FROM companies${whereClause}`,
             params
         );
         const total = parseInt(countResult.rows[0]?.count || 0);
 
+        // Get companies with review stats
         const result = await query(
             `SELECT
                  c.*,
@@ -80,15 +93,15 @@ const getCompany = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT 
-                c.*,
-                COALESCE(AVG(r.rating), 0) as avg_rating,
-                COUNT(r.id) as review_count,
-                json_agg(DISTINCT jsonb_build_object('id', u.id, 'displayName', u.display_name)) FILTER (WHERE u.id IS NOT NULL) as owners
+            `SELECT
+                 c.*,
+                 COALESCE(AVG(r.rating), 0) as avg_rating,
+                 COUNT(r.id) as review_count,
+                 json_agg(DISTINCT jsonb_build_object('id', u.id, 'displayName', u.display_name)) FILTER (WHERE u.id IS NOT NULL) as owners
              FROM companies c
-             LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
-             LEFT JOIN company_owners co ON c.id = co.company_id
-             LEFT JOIN users u ON co.user_id = u.id
+                      LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
+                      LEFT JOIN company_owners co ON c.id = co.company_id
+                      LEFT JOIN users u ON co.user_id = u.id
              WHERE c.id = $1
              GROUP BY c.id`,
             [id]
@@ -358,8 +371,17 @@ const requestClaimCompany = async (req, res) => {
         const { id } = req.params;
         const { businessEmail, businessPhone, position, message } = req.body;
 
+        // Validate required fields
         if (!businessEmail || !businessEmail.includes('@')) {
             return res.status(400).json({ error: 'Valid business email is required' });
+        }
+
+        if (!businessPhone) {
+            return res.status(400).json({ error: 'Business phone is required' });
+        }
+
+        if (!position) {
+            return res.status(400).json({ error: 'Your position is required' });
         }
 
         const company = await query(
@@ -428,7 +450,8 @@ const getMyClaimRequests = async (req, res) => {
                          'id', c.id,
                          'name', c.name,
                          'logo_url', c.logo_url,
-                         'industry', c.industry
+                         'industry', c.industry,
+                         'is_claimed', c.is_claimed
                  ) as company
              FROM claim_requests cr
                       JOIN companies c ON cr.company_id = c.id
@@ -448,6 +471,10 @@ const getMyClaimRequests = async (req, res) => {
 const verifyBusinessEmail = async (req, res) => {
     try {
         const { email } = req.body;
+
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ error: 'Valid email is required' });
+        }
 
         // Create email_verifications table if not exists
         await query(`
@@ -491,6 +518,10 @@ const confirmEmailVerification = async (req, res) => {
     try {
         const { email, code } = req.body;
 
+        if (!email || !code) {
+            return res.status(400).json({ error: 'Email and code are required' });
+        }
+
         const result = await query(
             `SELECT * FROM email_verifications
              WHERE email = $1 AND code = $2 AND expires_at > CURRENT_TIMESTAMP
@@ -512,19 +543,132 @@ const confirmEmailVerification = async (req, res) => {
     }
 };
 
+// Get pending claim requests (admin function)
+const getPendingClaimRequests = async (req, res) => {
+    try {
+        // Check if user is admin (you'll need to add this role check)
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const result = await query(
+            `SELECT 
+                cr.*,
+                json_build_object(
+                    'id', c.id,
+                    'name', c.name,
+                    'logo_url', c.logo_url,
+                    'industry', c.industry
+                ) as company,
+                json_build_object(
+                    'id', u.id,
+                    'displayName', u.display_name,
+                    'email', u.email
+                ) as user
+             FROM claim_requests cr
+             JOIN companies c ON cr.company_id = c.id
+             JOIN users u ON cr.user_id = u.id
+             WHERE cr.status = 'pending'
+             ORDER BY cr.created_at ASC`
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get pending claims error:', error);
+        res.status(500).json({ error: 'Failed to fetch pending claims' });
+    }
+};
+
+// Approve claim request (admin function)
+const approveClaimRequest = async (req, res) => {
+    try {
+        const { requestId } = req.params;
+
+        // Check if user is admin
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        await query('BEGIN');
+
+        // Get the claim request
+        const claimRequest = await query(
+            'SELECT * FROM claim_requests WHERE id = $1',
+            [requestId]
+        );
+
+        if (claimRequest.rows.length === 0) {
+            await query('ROLLBACK');
+            return res.status(404).json({ error: 'Claim request not found' });
+        }
+
+        // Update claim request status
+        await query(
+            'UPDATE claim_requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            ['approved', requestId]
+        );
+
+        // Update company as claimed
+        await query(
+            'UPDATE companies SET is_claimed = true WHERE id = $1',
+            [claimRequest.rows[0].company_id]
+        );
+
+        // Add company owner
+        await query(
+            'INSERT INTO company_owners (company_id, user_id) VALUES ($1, $2)',
+            [claimRequest.rows[0].company_id, claimRequest.rows[0].user_id]
+        );
+
+        await query('COMMIT');
+
+        res.json({ message: 'Claim request approved successfully' });
+    } catch (error) {
+        await query('ROLLBACK');
+        console.error('Approve claim error:', error);
+        res.status(500).json({ error: 'Failed to approve claim request' });
+    }
+};
+
+// Reject claim request (admin function)
+const rejectClaimRequest = async (req, res) => {
+    try {
+        const { requestId } = req.params;
+        const { reason } = req.body;
+
+        // Check if user is admin
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        await query(
+            'UPDATE claim_requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            ['rejected', requestId]
+        );
+
+        res.json({ message: 'Claim request rejected' });
+    } catch (error) {
+        console.error('Reject claim error:', error);
+        res.status(500).json({ error: 'Failed to reject claim request' });
+    }
+};
+
 // Export ALL functions
 module.exports = {
-    searchCompanies,
-    getCompany, // Updated version with UUID validation and owner information
+    searchCompanies, // Updated with unclaimed filter
+    getCompany,
     createCompany,
     claimCompany,
     getIndustries,
-    getMyCompanies, // Also updated to include owners
+    getMyCompanies,
     updateCompany,
     getCompanyReviewsForBusiness,
     getUnclaimedCompanies,
     requestClaimCompany,
     getMyClaimRequests,
     verifyBusinessEmail,
-    confirmEmailVerification
+    confirmEmailVerification,
+    getPendingClaimRequests, // New admin function
+    approveClaimRequest, // New admin function
+    rejectClaimRequest // New admin function
 };

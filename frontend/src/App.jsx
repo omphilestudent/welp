@@ -13,7 +13,8 @@ import SearchPage from './pages/SearchPage';
 import Dashboard from './pages/Dashboard';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
-import ClaimBusiness from './pages/ClaimBusiness';
+import ClaimBusiness from './pages/ClaimBusiness'; // Make sure this import exists
+import KYCRegistration from './pages/KYCRegistration'; // Add this import
 import JoinPsychologist from './pages/JoinPsychologist';
 import ApplicationSuccess from './pages/ApplicationSuccess';
 import PrivateRoute from './components/auth/PrivateRoute';
@@ -40,7 +41,22 @@ function App() {
                                 <Route path="/register" element={<Register />} />
                                 <Route path="/search" element={<SearchPage />} />
                                 <Route path="/companies/:id" element={<CompanyPage />} />
-                                <Route path="/claim/:id" element={<ClaimBusiness />} />
+                                <Route
+                                    path="/claim/:id"
+                                    element={
+                                        <PrivateRoute>
+                                            <ClaimBusiness />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/kyc/:id"
+                                    element={
+                                        <PrivateRoute>
+                                            <KYCRegistration />
+                                        </PrivateRoute>
+                                    }
+                                />
                                 <Route path="/psychologist/join" element={<JoinPsychologist />} />
                                 <Route path="/application-success" element={<ApplicationSuccess />} />
                                 <Route
