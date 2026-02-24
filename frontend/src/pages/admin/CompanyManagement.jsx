@@ -1,11 +1,1419 @@
 // frontend/src/pages/admin/CompanyManagement.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../../services/api';
+import Loading from '../../components/common/Loading';
+import toast from 'react-hot-toast';
+import {
+    FaBuilding,
+    FaSearch,
+    FaFilter,
+    FaEye,
+    FaCheckCircle,
+    FaTimesCircle,
+    FaEdit,
+    FaTrash,
+    FaPlus,
+    FaFileExport,
+    FaEnvelope,
+    FaPhone,
+    FaGlobe,
+    FaMapMarkerAlt,
+    FaStar,
+    FaUserTie,
+    FaCalendarAlt,
+    FaChartLine,
+    FaShieldAlt,
+    FaExclamationTriangle,
+    FaChevronLeft,
+    FaChevronRight,
+    FaDownload,
+    FaPrint,
+    FaCopy
+} from 'react-icons/fa';
 
 const CompanyManagement = () => {
+    const [companies, setCompanies] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [filterIndustry, setFilterIndustry] = useState('all');
+    const [selectedCompany, setSelectedCompany] = useState(null);
+    const [showDetails, setShowDetails] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10);
+    const [sortBy, setSortBy] = useState('name');
+    const [sortOrder, setSortOrder] = useState('asc');
+    const [dateRange, setDateRange] = useState({ start: '', end: '' });
+    const [stats, setStats] = useState({
+        total: 0,
+        verified: 0,
+        pending: 0,
+        claimed: 0,
+        unclaimed: 0
+    });
+
+    const industries = [
+        'Technology', 'Finance', 'Healthcare', 'Education', 'Retail',
+        'Manufacturing', 'Construction', 'Transportation', 'Hospitality',
+        'Media', 'Energy', 'Agriculture', 'Real Estate', 'Consulting'
+    ];
+
+    useEffect(() => {
+        fetchCompanies();
+    }, []);
+
+    const fetchCompanies = async () => {
+        setLoading(true);
+        try {
+            // Mock data - replace with API call
+            const mockCompanies = [
+                {
+                    id: 1,
+                    name: 'Google',
+                    description: 'Leading technology company specializing in internet services and products.',
+                    industry: 'Technology',
+                    website: 'https://google.com',
+                    email: 'careers@google.com',
+                    phone: '+1-650-253-0000',
+                    address: '1600 Amphitheatre Parkway, Mountain View, CA 94043, USA',
+                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg',
+                    is_claimed: true,
+                    is_verified: true,
+                    verification_date: '2023-01-15',
+                    claimed_by: 'John Smith',
+                    claimed_date: '2023-01-10',
+                    employee_count: 150000,
+                    founded: 1998,
+                    reviews_count: 15234,
+                    avg_rating: 4.5,
+                    monthly_revenue: 50000000,
+                    status: 'active',
+                    created_at: '2023-01-01',
+                    updated_at: '2024-01-15'
+                },
+                {
+                    id: 2,
+                    name: 'Meta',
+                    description: 'Building the metaverse and connecting people through technology.',
+                    industry: 'Social Media',
+                    website: 'https://meta.com',
+                    email: 'careers@meta.com',
+                    phone: '+1-650-543-4800',
+                    address: '1 Hacker Way, Menlo Park, CA 94025, USA',
+                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Meta_Platforms_Inc._logo.svg',
+                    is_claimed: true,
+                    is_verified: true,
+                    verification_date: '2023-02-20',
+                    claimed_by: 'Jane Doe',
+                    claimed_date: '2023-02-15',
+                    employee_count: 86000,
+                    founded: 2004,
+                    reviews_count: 12456,
+                    avg_rating: 4.2,
+                    monthly_revenue: 35000000,
+                    status: 'active',
+                    created_at: '2023-01-15',
+                    updated_at: '2024-01-14'
+                },
+                {
+                    id: 3,
+                    name: 'Microsoft',
+                    description: 'Empowering every person and organization on the planet to achieve more.',
+                    industry: 'Technology',
+                    website: 'https://microsoft.com',
+                    email: 'careers@microsoft.com',
+                    phone: '+1-425-882-8080',
+                    address: 'One Microsoft Way, Redmond, WA 98052, USA',
+                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg',
+                    is_claimed: true,
+                    is_verified: true,
+                    verification_date: '2023-03-10',
+                    claimed_by: 'Bob Johnson',
+                    claimed_date: '2023-03-05',
+                    employee_count: 221000,
+                    founded: 1975,
+                    reviews_count: 18765,
+                    avg_rating: 4.4,
+                    monthly_revenue: 60000000,
+                    status: 'active',
+                    created_at: '2023-02-01',
+                    updated_at: '2024-01-13'
+                },
+                {
+                    id: 4,
+                    name: 'Capitec Bank',
+                    description: 'South Africa\'s leading digital bank, making banking simple and affordable.',
+                    industry: 'Banking & Finance',
+                    website: 'https://capitecbank.co.za',
+                    email: 'careers@capitecbank.co.za',
+                    phone: '+27-21-007-1000',
+                    address: '10 Quantum Street, Techno Park, Stellenbosch, 7600, South Africa',
+                    logo_url: null,
+                    is_claimed: false,
+                    is_verified: false,
+                    verification_date: null,
+                    claimed_by: null,
+                    claimed_date: null,
+                    employee_count: 15000,
+                    founded: 2001,
+                    reviews_count: 5678,
+                    avg_rating: 4.3,
+                    monthly_revenue: 15000000,
+                    status: 'pending',
+                    created_at: '2023-04-01',
+                    updated_at: '2024-01-12'
+                },
+                {
+                    id: 5,
+                    name: 'Standard Bank',
+                    description: 'Africa\'s largest bank by assets, serving customers across the continent.',
+                    industry: 'Banking & Finance',
+                    website: 'https://standardbank.com',
+                    email: 'careers@standardbank.co.za',
+                    phone: '+27-11-636-9111',
+                    address: '9 Simmonds Street, Johannesburg, 2001, South Africa',
+                    logo_url: null,
+                    is_claimed: false,
+                    is_verified: false,
+                    verification_date: null,
+                    claimed_by: null,
+                    claimed_date: null,
+                    employee_count: 50000,
+                    founded: 1862,
+                    reviews_count: 7890,
+                    avg_rating: 4.1,
+                    monthly_revenue: 25000000,
+                    status: 'pending',
+                    created_at: '2023-05-01',
+                    updated_at: '2024-01-11'
+                },
+                {
+                    id: 6,
+                    name: 'Amazon',
+                    description: 'Earth\'s most customer-centric company.',
+                    industry: 'E-commerce',
+                    website: 'https://amazon.com',
+                    email: 'careers@amazon.com',
+                    phone: '+1-206-266-1000',
+                    address: '410 Terry Ave N, Seattle, WA 98109, USA',
+                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg',
+                    is_claimed: true,
+                    is_verified: true,
+                    verification_date: '2023-04-15',
+                    claimed_by: 'Alice Brown',
+                    claimed_date: '2023-04-10',
+                    employee_count: 1500000,
+                    founded: 1994,
+                    reviews_count: 32456,
+                    avg_rating: 4.0,
+                    monthly_revenue: 120000000,
+                    status: 'active',
+                    created_at: '2023-03-01',
+                    updated_at: '2024-01-10'
+                },
+                {
+                    id: 7,
+                    name: 'Tesla',
+                    description: 'Accelerating the world\'s transition to sustainable energy.',
+                    industry: 'Automotive',
+                    website: 'https://tesla.com',
+                    email: 'careers@tesla.com',
+                    phone: '+1-510-249-3000',
+                    address: '3500 Deer Creek Road, Palo Alto, CA 94304, USA',
+                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/e/e8/Tesla_logo.png',
+                    is_claimed: true,
+                    is_verified: true,
+                    verification_date: '2023-05-20',
+                    claimed_by: 'Charlie Wilson',
+                    claimed_date: '2023-05-15',
+                    employee_count: 140000,
+                    founded: 2003,
+                    reviews_count: 15432,
+                    avg_rating: 4.3,
+                    monthly_revenue: 45000000,
+                    status: 'active',
+                    created_at: '2023-04-01',
+                    updated_at: '2024-01-09'
+                },
+                {
+                    id: 8,
+                    name: 'Netflix',
+                    description: 'Leading streaming entertainment service with 230+ million subscribers.',
+                    industry: 'Entertainment',
+                    website: 'https://netflix.com',
+                    email: 'careers@netflix.com',
+                    phone: '+1-408-540-3700',
+                    address: '100 Winchester Circle, Los Gatos, CA 95032, USA',
+                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/7/75/Netflix_icon.svg',
+                    is_claimed: true,
+                    is_verified: true,
+                    verification_date: '2023-06-10',
+                    claimed_by: 'Diana Prince',
+                    claimed_date: '2023-06-05',
+                    employee_count: 12800,
+                    founded: 1997,
+                    reviews_count: 12345,
+                    avg_rating: 4.2,
+                    monthly_revenue: 30000000,
+                    status: 'active',
+                    created_at: '2023-05-01',
+                    updated_at: '2024-01-08'
+                }
+            ];
+
+            setCompanies(mockCompanies);
+
+            // Calculate stats
+            const stats = {
+                total: mockCompanies.length,
+                verified: mockCompanies.filter(c => c.is_verified).length,
+                pending: mockCompanies.filter(c => !c.is_verified).length,
+                claimed: mockCompanies.filter(c => c.is_claimed).length,
+                unclaimed: mockCompanies.filter(c => !c.is_claimed).length
+            };
+            setStats(stats);
+
+        } catch (error) {
+            console.error('Failed to fetch companies:', error);
+            toast.error('Failed to load companies');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSearch = (e) => {
+        setSearchTerm(e.target.value);
+        setCurrentPage(1);
+    };
+
+    const handleFilterStatus = (status) => {
+        setFilterStatus(status);
+        setCurrentPage(1);
+    };
+
+    const handleFilterIndustry = (industry) => {
+        setFilterIndustry(industry);
+        setCurrentPage(1);
+    };
+
+    const handleSort = (field) => {
+        if (sortBy === field) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortBy(field);
+            setSortOrder('asc');
+        }
+    };
+
+    const handleViewDetails = (company) => {
+        setSelectedCompany(company);
+        setShowDetails(true);
+    };
+
+    const handleVerify = async (id) => {
+        try {
+            // API call would go here
+            toast.success('Company verified successfully');
+            fetchCompanies();
+        } catch (error) {
+            toast.error('Failed to verify company');
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this company?')) return;
+
+        try {
+            // API call would go here
+            toast.success('Company deleted successfully');
+            fetchCompanies();
+        } catch (error) {
+            toast.error('Failed to delete company');
+        }
+    };
+
+    const handleExport = () => {
+        // Export functionality
+        const data = companies.map(c => ({
+            Name: c.name,
+            Industry: c.industry,
+            Status: c.is_verified ? 'Verified' : 'Pending',
+            Claimed: c.is_claimed ? 'Yes' : 'No',
+            Reviews: c.reviews_count,
+            Rating: c.avg_rating,
+            Employees: c.employee_count,
+            Founded: c.founded
+        }));
+
+        const csv = convertToCSV(data);
+        downloadCSV(csv, 'companies_export.csv');
+        toast.success('Companies exported successfully');
+    };
+
+    const convertToCSV = (data) => {
+        const headers = Object.keys(data[0]).join(',');
+        const rows = data.map(obj => Object.values(obj).join(','));
+        return [headers, ...rows].join('\n');
+    };
+
+    const downloadCSV = (csv, filename) => {
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+    };
+
+    // Filter and sort companies
+    const filteredCompanies = companies
+        .filter(company => {
+            const matchesSearch = company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                company.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                company.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            const matchesStatus = filterStatus === 'all' ||
+                (filterStatus === 'verified' && company.is_verified) ||
+                (filterStatus === 'pending' && !company.is_verified) ||
+                (filterStatus === 'claimed' && company.is_claimed) ||
+                (filterStatus === 'unclaimed' && !company.is_claimed);
+
+            const matchesIndustry = filterIndustry === 'all' || company.industry === filterIndustry;
+
+            return matchesSearch && matchesStatus && matchesIndustry;
+        })
+        .sort((a, b) => {
+            let aVal = a[sortBy];
+            let bVal = b[sortBy];
+
+            if (sortBy === 'avg_rating' || sortBy === 'reviews_count' || sortBy === 'employee_count') {
+                aVal = Number(aVal);
+                bVal = Number(bVal);
+            }
+
+            if (sortOrder === 'asc') {
+                return aVal > bVal ? 1 : -1;
+            } else {
+                return aVal < bVal ? 1 : -1;
+            }
+        });
+
+    // Pagination
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filteredCompanies.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredCompanies.length / itemsPerPage);
+
+    if (loading) return <Loading />;
+
     return (
-        <div>
-            <h1>Company Management</h1>
-            <p>Manage companies here.</p>
+        <div className="company-management">
+            {/* Header */}
+            <div className="page-header">
+                <div className="header-left">
+                    <h1>
+                        <FaBuilding className="header-icon" />
+                        Company Management
+                    </h1>
+                    <p className="page-description">
+                        Manage and verify companies on the platform
+                    </p>
+                </div>
+                <div className="header-actions">
+                    <button className="btn btn-primary" onClick={() => {}}>
+                        <FaPlus /> Add Company
+                    </button>
+                    <button className="btn btn-secondary" onClick={handleExport}>
+                        <FaFileExport /> Export
+                    </button>
+                </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="stats-grid">
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ backgroundColor: '#4299e120', color: '#4299e1' }}>
+                        <FaBuilding />
+                    </div>
+                    <div className="stat-content">
+                        <h3>Total Companies</h3>
+                        <div className="stat-value">{stats.total}</div>
+                        <div className="stat-change">+12 this month</div>
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ backgroundColor: '#48bb7820', color: '#48bb78' }}>
+                        <FaCheckCircle />
+                    </div>
+                    <div className="stat-content">
+                        <h3>Verified</h3>
+                        <div className="stat-value">{stats.verified}</div>
+                        <div className="stat-change">{Math.round(stats.verified / stats.total * 100)}% of total</div>
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ backgroundColor: '#ed893620', color: '#ed8936' }}>
+                        <FaExclamationTriangle />
+                    </div>
+                    <div className="stat-content">
+                        <h3>Pending Verification</h3>
+                        <div className="stat-value">{stats.pending}</div>
+                        <div className="stat-change">Awaiting review</div>
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ backgroundColor: '#9f7aea20', color: '#9f7aea' }}>
+                        <FaShieldAlt />
+                    </div>
+                    <div className="stat-content">
+                        <h3>Claimed</h3>
+                        <div className="stat-value">{stats.claimed}</div>
+                        <div className="stat-change">{stats.unclaimed} unclaimed</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filters */}
+            <div className="filters-section">
+                <div className="search-box">
+                    <FaSearch className="search-icon" />
+                    <input
+                        type="text"
+                        placeholder="Search companies by name, email, or description..."
+                        value={searchTerm}
+                        onChange={handleSearch}
+                    />
+                </div>
+
+                <div className="filter-group">
+                    <div className="filter-label">
+                        <FaFilter /> Status:
+                    </div>
+                    <select
+                        value={filterStatus}
+                        onChange={(e) => handleFilterStatus(e.target.value)}
+                        className="filter-select"
+                    >
+                        <option value="all">All Companies</option>
+                        <option value="verified">Verified</option>
+                        <option value="pending">Pending</option>
+                        <option value="claimed">Claimed</option>
+                        <option value="unclaimed">Unclaimed</option>
+                    </select>
+
+                    <select
+                        value={filterIndustry}
+                        onChange={(e) => handleFilterIndustry(e.target.value)}
+                        className="filter-select"
+                    >
+                        <option value="all">All Industries</option>
+                        {industries.map(ind => (
+                            <option key={ind} value={ind}>{ind}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Companies Table */}
+            <div className="table-container">
+                <table className="data-table">
+                    <thead>
+                    <tr>
+                        <th onClick={() => handleSort('name')}>
+                            Company {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th onClick={() => handleSort('industry')}>
+                            Industry {sortBy === 'industry' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th onClick={() => handleSort('is_verified')}>
+                            Status
+                        </th>
+                        <th onClick={() => handleSort('is_claimed')}>
+                            Claimed
+                        </th>
+                        <th onClick={() => handleSort('reviews_count')}>
+                            Reviews {sortBy === 'reviews_count' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th onClick={() => handleSort('avg_rating')}>
+                            Rating {sortBy === 'avg_rating' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th onClick={() => handleSort('employee_count')}>
+                            Employees {sortBy === 'employee_count' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {currentItems.map(company => (
+                        <tr key={company.id}>
+                            <td>
+                                <div className="company-cell">
+                                    {company.logo_url ? (
+                                        <img src={company.logo_url} alt={company.name} className="company-logo-small" />
+                                    ) : (
+                                        <div className="company-logo-placeholder-small">
+                                            {company.name.charAt(0)}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <div className="company-name">{company.name}</div>
+                                        <small className="company-email">{company.email}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span className="industry-badge">{company.industry}</span>
+                            </td>
+                            <td>
+                                {company.is_verified ? (
+                                    <span className="status-badge verified">
+                                            <FaCheckCircle /> Verified
+                                        </span>
+                                ) : (
+                                    <span className="status-badge pending">
+                                            <FaTimesCircle /> Pending
+                                        </span>
+                                )}
+                            </td>
+                            <td>
+                                {company.is_claimed ? (
+                                    <span className="claimed-badge claimed">
+                                            <FaCheckCircle /> Yes
+                                        </span>
+                                ) : (
+                                    <span className="claimed-badge unclaimed">
+                                            <FaTimesCircle /> No
+                                        </span>
+                                )}
+                            </td>
+                            <td>{company.reviews_count.toLocaleString()}</td>
+                            <td>
+                                <div className="rating-cell">
+                                        <span className="rating-stars">
+                                            {'★'.repeat(Math.floor(company.avg_rating))}
+                                            {'☆'.repeat(5 - Math.floor(company.avg_rating))}
+                                        </span>
+                                    <span className="rating-value">{company.avg_rating}</span>
+                                </div>
+                            </td>
+                            <td>{company.employee_count.toLocaleString()}</td>
+                            <td>
+                                <div className="action-buttons">
+                                    <button
+                                        className="btn-icon"
+                                        onClick={() => handleViewDetails(company)}
+                                        title="View Details"
+                                    >
+                                        <FaEye />
+                                    </button>
+                                    <button
+                                        className="btn-icon"
+                                        onClick={() => {}}
+                                        title="Edit"
+                                    >
+                                        <FaEdit />
+                                    </button>
+                                    {!company.is_verified && (
+                                        <button
+                                            className="btn-icon success"
+                                            onClick={() => handleVerify(company.id)}
+                                            title="Verify"
+                                        >
+                                            <FaCheckCircle />
+                                        </button>
+                                    )}
+                                    <button
+                                        className="btn-icon danger"
+                                        onClick={() => handleDelete(company.id)}
+                                        title="Delete"
+                                    >
+                                        <FaTrash />
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+
+                {filteredCompanies.length === 0 && (
+                    <div className="empty-state">
+                        <FaBuilding size={48} />
+                        <h3>No companies found</h3>
+                        <p>Try adjusting your search or filter criteria</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Pagination */}
+            {filteredCompanies.length > 0 && (
+                <div className="pagination">
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="pagination-btn"
+                    >
+                        <FaChevronLeft />
+                    </button>
+
+                    <span className="page-info">
+                        Page {currentPage} of {totalPages}
+                    </span>
+
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="pagination-btn"
+                    >
+                        <FaChevronRight />
+                    </button>
+
+                    <select
+                        value={itemsPerPage}
+                        onChange={(e) => setCurrentPage(1)}
+                        className="rows-per-page"
+                    >
+                        <option value={10}>10 rows</option>
+                        <option value={25}>25 rows</option>
+                        <option value={50}>50 rows</option>
+                        <option value={100}>100 rows</option>
+                    </select>
+                </div>
+            )}
+
+            {/* Company Details Modal */}
+            {showDetails && selectedCompany && (
+                <div className="modal-overlay" onClick={() => setShowDetails(false)}>
+                    <div className="modal-content large" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Company Details</h2>
+                            <button className="close-btn" onClick={() => setShowDetails(false)}>×</button>
+                        </div>
+
+                        <div className="company-details">
+                            <div className="detail-header">
+                                {selectedCompany.logo_url ? (
+                                    <img src={selectedCompany.logo_url} alt={selectedCompany.name} className="detail-logo" />
+                                ) : (
+                                    <div className="detail-logo-placeholder">
+                                        {selectedCompany.name.charAt(0)}
+                                    </div>
+                                )}
+                                <div className="detail-title">
+                                    <h3>{selectedCompany.name}</h3>
+                                    <p className="detail-industry">{selectedCompany.industry}</p>
+                                </div>
+                                <div className="detail-status">
+                                    {selectedCompany.is_verified ? (
+                                        <span className="status-badge verified">Verified</span>
+                                    ) : (
+                                        <span className="status-badge pending">Pending</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="detail-grid">
+                                <div className="detail-section">
+                                    <h4>Company Information</h4>
+                                    <div className="detail-item">
+                                        <FaGlobe /> <strong>Website:</strong>
+                                        <a href={selectedCompany.website} target="_blank" rel="noopener noreferrer">
+                                            {selectedCompany.website}
+                                        </a>
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaEnvelope /> <strong>Email:</strong> {selectedCompany.email}
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaPhone /> <strong>Phone:</strong> {selectedCompany.phone}
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaMapMarkerAlt /> <strong>Address:</strong> {selectedCompany.address}
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaCalendarAlt /> <strong>Founded:</strong> {selectedCompany.founded}
+                                    </div>
+                                </div>
+
+                                <div className="detail-section">
+                                    <h4>Verification Status</h4>
+                                    <div className="detail-item">
+                                        <FaCheckCircle /> <strong>Verified:</strong>
+                                        {selectedCompany.is_verified ? ' Yes' : ' No'}
+                                    </div>
+                                    {selectedCompany.is_verified && (
+                                        <>
+                                            <div className="detail-item">
+                                                <FaCalendarAlt /> <strong>Verification Date:</strong> {selectedCompany.verification_date}
+                                            </div>
+                                            <div className="detail-item">
+                                                <FaUserTie /> <strong>Verified By:</strong> {selectedCompany.claimed_by}
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="detail-item">
+                                        <FaBuilding /> <strong>Claimed:</strong>
+                                        {selectedCompany.is_claimed ? ' Yes' : ' No'}
+                                    </div>
+                                    {selectedCompany.is_claimed && (
+                                        <div className="detail-item">
+                                            <FaCalendarAlt /> <strong>Claimed Date:</strong> {selectedCompany.claimed_date}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="detail-section">
+                                    <h4>Statistics</h4>
+                                    <div className="detail-item">
+                                        <FaStar /> <strong>Average Rating:</strong>
+                                        <span className="rating-value">{selectedCompany.avg_rating}</span>
+                                        <span className="rating-stars">
+                                            {'★'.repeat(Math.floor(selectedCompany.avg_rating))}
+                                            {'☆'.repeat(5 - Math.floor(selectedCompany.avg_rating))}
+                                        </span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaBuilding /> <strong>Total Reviews:</strong> {selectedCompany.reviews_count.toLocaleString()}
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaUsers /> <strong>Employees:</strong> {selectedCompany.employee_count.toLocaleString()}
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaChartLine /> <strong>Monthly Revenue:</strong> ${selectedCompany.monthly_revenue.toLocaleString()}
+                                    </div>
+                                </div>
+
+                                <div className="detail-section full-width">
+                                    <h4>Description</h4>
+                                    <p>{selectedCompany.description}</p>
+                                </div>
+
+                                <div className="detail-section full-width">
+                                    <h4>Timeline</h4>
+                                    <div className="timeline">
+                                        <div className="timeline-item">
+                                            <div className="timeline-date">{selectedCompany.created_at}</div>
+                                            <div className="timeline-content">
+                                                <strong>Created</strong> - Company profile was created
+                                            </div>
+                                        </div>
+                                        {selectedCompany.claimed_date && (
+                                            <div className="timeline-item">
+                                                <div className="timeline-date">{selectedCompany.claimed_date}</div>
+                                                <div className="timeline-content">
+                                                    <strong>Claimed</strong> - Company was claimed by {selectedCompany.claimed_by}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {selectedCompany.verification_date && (
+                                            <div className="timeline-item">
+                                                <div className="timeline-date">{selectedCompany.verification_date}</div>
+                                                <div className="timeline-content">
+                                                    <strong>Verified</strong> - Company was verified
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="timeline-item">
+                                            <div className="timeline-date">{selectedCompany.updated_at}</div>
+                                            <div className="timeline-content">
+                                                <strong>Last Updated</strong> - Profile was updated
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setShowDetails(false)}>
+                                    Close
+                                </button>
+                                <button className="btn btn-primary" onClick={() => {}}>
+                                    <FaEdit /> Edit Company
+                                </button>
+                                {!selectedCompany.is_verified && (
+                                    <button className="btn btn-success" onClick={() => handleVerify(selectedCompany.id)}>
+                                        <FaCheckCircle /> Verify Company
+                                    </button>
+                                )}
+                                <button className="btn btn-danger" onClick={() => handleDelete(selectedCompany.id)}>
+                                    <FaTrash /> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style jsx>{`
+                .company-management {
+                    padding: 2rem;
+                }
+
+                .page-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 2rem;
+                }
+
+                .header-left h1 {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    color: #2d3748;
+                    font-size: 2rem;
+                }
+
+                .header-icon {
+                    color: #4299e1;
+                }
+
+                .page-description {
+                    color: #718096;
+                    margin-top: 0.5rem;
+                }
+
+                .header-actions {
+                    display: flex;
+                    gap: 1rem;
+                }
+
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                    gap: 1.5rem;
+                    margin-bottom: 2rem;
+                }
+
+                .stat-card {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                }
+
+                .stat-icon {
+                    width: 60px;
+                    height: 60px;
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.8rem;
+                }
+
+                .stat-content h3 {
+                    color: #718096;
+                    font-size: 0.9rem;
+                    margin-bottom: 0.5rem;
+                }
+
+                .stat-value {
+                    color: #2d3748;
+                    font-size: 1.8rem;
+                    font-weight: 700;
+                    margin-bottom: 0.25rem;
+                }
+
+                .stat-change {
+                    color: #48bb78;
+                    font-size: 0.85rem;
+                }
+
+                .filters-section {
+                    display: flex;
+                    gap: 1rem;
+                    margin-bottom: 2rem;
+                    flex-wrap: wrap;
+                }
+
+                .search-box {
+                    flex: 1;
+                    position: relative;
+                    min-width: 300px;
+                }
+
+                .search-icon {
+                    position: absolute;
+                    left: 1rem;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    color: #a0aec0;
+                }
+
+                .search-box input {
+                    width: 100%;
+                    padding: 0.75rem 1rem 0.75rem 2.5rem;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 0.95rem;
+                }
+
+                .filter-group {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    flex-wrap: wrap;
+                }
+
+                .filter-label {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    color: #4a5568;
+                    font-weight: 500;
+                }
+
+                .filter-select {
+                    padding: 0.75rem;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    background: white;
+                    min-width: 150px;
+                }
+
+                .table-container {
+                    background: white;
+                    border-radius: 12px;
+                    overflow-x: auto;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                }
+
+                .data-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+
+                .data-table th {
+                    padding: 1rem;
+                    text-align: left;
+                    color: #718096;
+                    font-weight: 600;
+                    font-size: 0.85rem;
+                    border-bottom: 2px solid #e2e8f0;
+                    cursor: pointer;
+                }
+
+                .data-table th:hover {
+                    color: #4299e1;
+                }
+
+                .data-table td {
+                    padding: 1rem;
+                    border-bottom: 1px solid #e2e8f0;
+                    color: #2d3748;
+                }
+
+                .company-cell {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                }
+
+                .company-logo-small {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 8px;
+                    object-fit: cover;
+                }
+
+                .company-logo-placeholder-small {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 8px;
+                    background: linear-gradient(135deg, #4299e1, #667eea);
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.2rem;
+                    font-weight: bold;
+                }
+
+                .company-name {
+                    font-weight: 600;
+                    color: #2d3748;
+                }
+
+                .company-email {
+                    color: #a0aec0;
+                    font-size: 0.85rem;
+                }
+
+                .industry-badge {
+                    padding: 0.25rem 0.75rem;
+                    background: #ebf8ff;
+                    color: #4299e1;
+                    border-radius: 30px;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                }
+
+                .status-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 30px;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                }
+
+                .status-badge.verified {
+                    background: #f0fff4;
+                    color: #48bb78;
+                }
+
+                .status-badge.pending {
+                    background: #fffaf0;
+                    color: #ed8936;
+                }
+
+                .claimed-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 30px;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                }
+
+                .claimed-badge.claimed {
+                    background: #f0fff4;
+                    color: #48bb78;
+                }
+
+                .claimed-badge.unclaimed {
+                    background: #fff5f5;
+                    color: #f56565;
+                }
+
+                .rating-cell {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .rating-stars {
+                    color: #fbbf24;
+                    font-size: 1rem;
+                }
+
+                .rating-value {
+                    font-weight: 600;
+                }
+
+                .action-buttons {
+                    display: flex;
+                    gap: 0.5rem;
+                }
+
+                .btn-icon {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 6px;
+                    border: none;
+                    background: #f7fafc;
+                    color: #718096;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s;
+                }
+
+                .btn-icon:hover {
+                    background: #4299e1;
+                    color: white;
+                }
+
+                .btn-icon.success:hover {
+                    background: #48bb78;
+                }
+
+                .btn-icon.danger:hover {
+                    background: #f56565;
+                }
+
+                .empty-state {
+                    text-align: center;
+                    padding: 4rem 2rem;
+                }
+
+                .empty-state svg {
+                    color: #cbd5e0;
+                    margin-bottom: 1rem;
+                }
+
+                .empty-state h3 {
+                    color: #2d3748;
+                    margin-bottom: 0.5rem;
+                }
+
+                .empty-state p {
+                    color: #a0aec0;
+                }
+
+                .pagination {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 1rem;
+                    margin-top: 2rem;
+                }
+
+                .pagination-btn {
+                    padding: 0.5rem 1rem;
+                    border: 1px solid #e2e8f0;
+                    background: white;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                }
+
+                .pagination-btn:hover:not(:disabled) {
+                    background: #4299e1;
+                    color: white;
+                    border-color: #4299e1;
+                }
+
+                .pagination-btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                .page-info {
+                    color: #4a5568;
+                }
+
+                .rows-per-page {
+                    padding: 0.5rem;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 6px;
+                    margin-left: 1rem;
+                }
+
+                /* Modal Styles */
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                }
+
+                .modal-content.large {
+                    max-width: 900px;
+                    width: 90%;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                }
+
+                .modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding-bottom: 1rem;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+
+                .close-btn {
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    cursor: pointer;
+                    color: #a0aec0;
+                }
+
+                .company-details {
+                    padding: 1rem 0;
+                }
+
+                .detail-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 1.5rem;
+                    margin-bottom: 2rem;
+                }
+
+                .detail-logo {
+                    width: 80px;
+                    height: 80px;
+                    border-radius: 12px;
+                    object-fit: cover;
+                }
+
+                .detail-logo-placeholder {
+                    width: 80px;
+                    height: 80px;
+                    border-radius: 12px;
+                    background: linear-gradient(135deg, #4299e1, #667eea);
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 2rem;
+                    font-weight: bold;
+                }
+
+                .detail-title h3 {
+                    color: #2d3748;
+                    font-size: 1.5rem;
+                    margin-bottom: 0.25rem;
+                }
+
+                .detail-industry {
+                    color: #718096;
+                }
+
+                .detail-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 2rem;
+                }
+
+                .detail-section {
+                    background: #f7fafc;
+                    padding: 1.5rem;
+                    border-radius: 8px;
+                }
+
+                .detail-section.full-width {
+                    grid-column: 1 / -1;
+                }
+
+                .detail-section h4 {
+                    color: #2d3748;
+                    margin-bottom: 1rem;
+                    font-size: 1.1rem;
+                }
+
+                .detail-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 0.75rem;
+                    color: #4a5568;
+                }
+
+                .detail-item svg {
+                    color: #4299e1;
+                }
+
+                .detail-item a {
+                    color: #4299e1;
+                    text-decoration: none;
+                }
+
+                .detail-item a:hover {
+                    text-decoration: underline;
+                }
+
+                .timeline {
+                    position: relative;
+                    padding-left: 2rem;
+                }
+
+                .timeline::before {
+                    content: '';
+                    position: absolute;
+                    left: 7px;
+                    top: 0;
+                    bottom: 0;
+                    width: 2px;
+                    background: #e2e8f0;
+                }
+
+                .timeline-item {
+                    position: relative;
+                    padding-bottom: 1.5rem;
+                }
+
+                .timeline-item::before {
+                    content: '';
+                    position: absolute;
+                    left: -2rem;
+                    top: 0.25rem;
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    background: #4299e1;
+                    border: 2px solid white;
+                }
+
+                .timeline-date {
+                    color: #718096;
+                    font-size: 0.85rem;
+                    margin-bottom: 0.25rem;
+                }
+
+                .timeline-content {
+                    color: #2d3748;
+                }
+
+                .modal-actions {
+                    display: flex;
+                    gap: 1rem;
+                    justify-content: flex-end;
+                    margin-top: 2rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid #e2e8f0;
+                }
+
+                .btn-success {
+                    background: #48bb78;
+                    color: white;
+                }
+
+                .btn-success:hover {
+                    background: #38a169;
+                }
+
+                @media (max-width: 1024px) {
+                    .detail-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+
+                @media (max-width: 768px) {
+                    .page-header {
+                        flex-direction: column;
+                        gap: 1rem;
+                    }
+
+                    .filters-section {
+                        flex-direction: column;
+                    }
+
+                    .search-box {
+                        min-width: 100%;
+                    }
+
+                    .filter-group {
+                        width: 100%;
+                    }
+
+                    .filter-select {
+                        flex: 1;
+                    }
+
+                    .stats-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+            `}</style>
         </div>
     );
 };

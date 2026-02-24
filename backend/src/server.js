@@ -5,19 +5,20 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
-const psychologistRoutes = require('./routes/psychologistRoutes');
-const userRoutes = require('./routes/userRoutes');
+const path = require('path');
 require('dotenv').config();
-const adminRoutes = require('./routes/adminRoutes');
-const hrRoutes = require('./routes/hrRoutes');
-const pricingRoutes = require('./routes/pricingRoutes');
-const kycRoutes = require('./routes/kycRoutes');
+
 const { apiLimiter } = require('./middleware/rateLimiter');
 const authRoutes = require('./routes/authRoutes');
 const companyRoutes = require('./routes/companyRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const messageRoutes = require('./routes/messageRoutes');
-const path = require('path');
+const userRoutes = require('./routes/userRoutes');
+const psychologistRoutes = require('./routes/psychologistRoutes');
+const pricingRoutes = require('./routes/pricingRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const hrRoutes = require('./routes/hrRoutes');
+
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -35,6 +36,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/', apiLimiter);
 
 // Routes
@@ -42,17 +44,16 @@ app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/messages', messageRoutes);
-app.use('/api/psychologists', psychologistRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/kyc', kycRoutes);
+app.use('/api/psychologists', psychologistRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hr', hrRoutes);
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date() });
 });
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Socket.io for real-time messaging
 io.use((socket, next) => {
@@ -86,22 +87,19 @@ io.on('connection', (socket) => {
         try {
             const { conversationId, content } = data;
 
-            // Save message to database
             const { query } = require('./utils/database');
             const result = await query(
                 `INSERT INTO messages (conversation_id, sender_id, content)
-         VALUES ($1, $2, $3)
-         RETURNING *`,
+                 VALUES ($1, $2, $3)
+                 RETURNING *`,
                 [conversationId, socket.userId, content]
             );
 
-            // Get sender info
             const sender = await query(
                 'SELECT id, display_name, role FROM users WHERE id = $1',
                 [socket.userId]
             );
 
-            // Update conversation timestamp
             await query(
                 'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
                 [conversationId]
@@ -112,7 +110,6 @@ io.on('connection', (socket) => {
                 sender: sender.rows[0]
             };
 
-            // Broadcast to conversation room
             io.to(`conversation-${conversationId}`).emit('new-message', message);
         } catch (error) {
             console.error('Socket message error:', error);

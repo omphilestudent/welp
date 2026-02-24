@@ -13,6 +13,10 @@ const router = express.Router();
 router.use(authenticate);
 router.use(authorizeHR());
 
+// Profile and dashboard
+router.get('/profile', hrController.getHRProfile);
+router.get('/dashboard/stats', hrController.getHRDashboardStats);
+
 // Job posting management
 router.post('/jobs',
     validate([
@@ -21,13 +25,10 @@ router.post('/jobs',
         body('employment_type').isIn(['full-time', 'part-time', 'contract', 'internship', 'remote']),
         body('description').notEmpty(),
         body('requirements').isArray(),
-        body('salary_min').optional().isFloat({ min: 0 }),
-        body('salary_max').optional().isFloat({ min: 0 }),
         body('application_deadline').optional().isDate()
     ]),
     hrController.createJobPosting
 );
-
 router.get('/jobs', hrController.getJobPostings);
 router.get('/jobs/:id', hrController.getJobDetails);
 router.patch('/jobs/:id', hrController.updateJobPosting);
@@ -46,9 +47,7 @@ router.patch('/applications/:id/status',
     hrController.updateApplicationStatus
 );
 router.post('/applications/:id/notes',
-    validate([
-        body('notes').notEmpty()
-    ]),
+    validate([body('notes').notEmpty()]),
     hrController.addApplicationNotes
 );
 
@@ -58,14 +57,11 @@ router.post('/applications/:id/interviews',
         body('interviewer_id').isUUID(),
         body('interview_type').isIn(['phone', 'video', 'in-person', 'technical', 'hr']),
         body('scheduled_at').isISO8601(),
-        body('duration_minutes').isInt({ min: 15, max: 240 }),
-        body('location').optional(),
-        body('meeting_link').optional().isURL()
+        body('duration_minutes').isInt({ min: 15, max: 240 })
     ]),
     hrController.scheduleInterview
 );
-
-router.get('/interviews', hrController.getUpcomingInterviews);
+router.get('/interviews/upcoming', hrController.getUpcomingInterviews);
 router.patch('/interviews/:id', hrController.updateInterview);
 router.post('/interviews/:id/feedback',
     validate([
@@ -87,7 +83,6 @@ router.post('/employee-relations',
     ]),
     hrController.createEmployeeRelation
 );
-
 router.get('/employee-relations', hrController.getEmployeeRelations);
 router.get('/employee-relations/:id', hrController.getRelationDetails);
 router.patch('/employee-relations/:id',
@@ -109,7 +104,6 @@ router.post('/documents',
     ]),
     hrController.uploadEmployeeDocument
 );
-
 router.get('/documents/:employeeId', hrController.getEmployeeDocuments);
 router.delete('/documents/:id', hrController.deleteEmployeeDocument);
 
@@ -118,14 +112,20 @@ router.post('/performance-reviews',
     validate([
         body('employee_id').isUUID(),
         body('review_period').notEmpty(),
-        body('review_date').isDate()
+        body('review_date').isDate(),
+        body('goals').optional().isArray()
     ]),
     hrController.createPerformanceReview
 );
-
 router.get('/performance-reviews', hrController.getPerformanceReviews);
 router.get('/performance-reviews/:id', hrController.getPerformanceReviewDetails);
 router.patch('/performance-reviews/:id',
+    validate([
+        body('strengths').optional().isArray(),
+        body('areas_for_improvement').optional().isArray(),
+        body('overall_rating').optional().isInt({ min: 1, max: 5 }),
+        body('comments').optional().trim()
+    ]),
     hrController.updatePerformanceReview
 );
 router.post('/performance-reviews/:id/submit', hrController.submitPerformanceReview);
@@ -144,9 +144,8 @@ router.post('/departments',
 );
 router.patch('/departments/:id', hrController.updateDepartment);
 
-// HR Dashboard
-router.get('/dashboard/stats', hrController.getHRDashboardStats);
-router.get('/dashboard/analytics/hiring', hrController.getHiringAnalytics);
-router.get('/dashboard/analytics/employee', hrController.getEmployeeAnalytics);
+// Analytics
+router.get('/analytics/hiring', hrController.getHiringAnalytics);
+router.get('/analytics/employee', hrController.getEmployeeAnalytics);
 
 module.exports = router;

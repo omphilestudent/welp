@@ -15,12 +15,22 @@ const AdminRoute = ({ children }) => {
     }, []);
 
     const checkAdminStatus = async () => {
+        console.log('Checking admin status for user:', user);
+
+        if (!user) {
+            console.log('No user found, redirecting to login');
+            setIsAdmin(false);
+            setLoading(false);
+            return;
+        }
+
         try {
-            // Check if user has admin access
+            // If the profile endpoint returns successfully, user is admin
             await api.get('/admin/profile');
+            console.log('Admin profile found - user is admin');
             setIsAdmin(true);
         } catch (error) {
-            console.log('Not an admin user');
+            console.log('Not an admin user:', error.response?.data || error.message);
             setIsAdmin(false);
         } finally {
             setLoading(false);
@@ -37,13 +47,16 @@ const AdminRoute = ({ children }) => {
     }
 
     if (!user) {
+        console.log('No user, redirecting to login');
         return <Navigate to="/login" />;
     }
 
     if (!isAdmin) {
+        console.log('User is not admin, redirecting to home');
         return <Navigate to="/" />;
     }
 
+    console.log('Admin access granted');
     return children;
 };
 

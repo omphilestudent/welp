@@ -1,6 +1,7 @@
-// frontend/src/components/common/Footer.jsx (Add Pricing link)
+// frontend/src/components/common/Footer.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { FaBriefcase, FaUsers, FaFileAlt, FaUserGraduate } from 'react-icons/fa';
 
 const Footer = () => {
     const currentYear = new Date().getFullYear();
@@ -23,6 +24,7 @@ const Footer = () => {
                             <li><Link to="/search">Search Companies</Link></li>
                             <li><Link to="/pricing">Pricing</Link></li>
                             <li><Link to="/about">About Us</Link></li>
+                            <li><Link to="/contact">Contact</Link></li>
                         </ul>
                     </div>
 
@@ -52,6 +54,33 @@ const Footer = () => {
                             <li><Link to="/faq">FAQ</Link></li>
                         </ul>
                     </div>
+
+                    {/* Career Section */}
+                    <div className="footer-section">
+                        <h4>Careers</h4>
+                        <ul className="footer-links">
+                            <li>
+                                <Link to="/careers" className="career-link">
+                                    <FaBriefcase /> Job Openings
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/careers/apply" className="career-link">
+                                    <FaFileAlt /> Submit Application
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/careers/benefits" className="career-link">
+                                    <FaUsers /> Benefits & Culture
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/careers/internships" className="career-link">
+                                    <FaUserGraduate /> Internships
+                                </Link>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
 
                 <div className="footer-bottom">
@@ -63,6 +92,18 @@ const Footer = () => {
                     </div>
                 </div>
             </div>
+
+            <style jsx>{`
+                .career-link {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                
+                .career-link svg {
+                    font-size: 0.9rem;
+                }
+            `}</style>
         </footer>
     );
 };

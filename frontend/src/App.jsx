@@ -32,8 +32,11 @@ import SubscriptionManagement from './pages/admin/SubscriptionManagement';
 import SystemSettings from './pages/admin/SystemSettings';
 
 // HR Pages
+import JobDetails from './pages/JobDetails';
 import HRDashboard from './pages/hr/HRDashboard';
 import JobPostings from './pages/hr/JobPostings';
+import Careers from './pages/Careers';
+
 import Applications from './pages/hr/Applications';
 import Interviews from './pages/hr/Interviews';
 import EmployeeRelations from './pages/hr/EmployeeRelations';
@@ -59,7 +62,12 @@ function App() {
                         <main className="main-content">
                             <Routes>
                                 {/* Public Routes */}
+                                <Route path="/careers/jobs/:id" element={<JobDetails />} />
+                                <Route path="/careers/apply/:id" element={<ApplyJob />} />
+                                <Route path="/careers/benefits" element={<Benefits />} />
+                                <Route path="/careers/internships" element={<Internships />} />
                                 <Route path="/" element={<Home />} />
+                                <Route path="/careers" element={<Careers />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
                                 <Route path="/search" element={<SearchPage />} />
