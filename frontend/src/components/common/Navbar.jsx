@@ -136,7 +136,7 @@ const Navbar = () => {
                                             <Link to="/hr/applications">Applications</Link>
                                             <Link to="/hr/interviews">Interviews</Link>
                                             <Link to="/hr/employees">Employee Relations</Link>
-                                            <Link to="/hr/departments">Departments</Link>
+                                            <Link to="/hr/Departments">Departments</Link>
                                         </div>
                                     </div>
                                 )}

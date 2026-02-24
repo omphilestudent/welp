@@ -18,18 +18,27 @@ import {
     FaShieldAlt,
     FaBars,
     FaTimes,
-    FaSignOutAlt
+    FaSignOutAlt,
+    FaBell,
+    FaSearch,
+    FaUserCircle
 } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 
 const AdminLayout = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const [adminInfo, setAdminInfo] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [loading, setLoading] = useState(true);
+    const [notifications, setNotifications] = useState([]);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [adminInfo, setAdminInfo] = useState({
+        role_name: 'admin',
+        department: 'Administration'
+    });
 
     useEffect(() => {
         fetchAdminInfo();
+        fetchNotifications();
     }, []);
 
     const fetchAdminInfo = async () => {
@@ -37,62 +46,73 @@ const AdminLayout = () => {
             const { data } = await api.get('/admin/profile');
             setAdminInfo(data);
         } catch (error) {
-            console.error('Failed to fetch admin info:', error);
-            navigate('/');
-        } finally {
-            setLoading(false);
+            console.log('Using default admin info');
         }
+    };
+
+    const fetchNotifications = async () => {
+        // Mock notifications for demo
+        setNotifications([
+            { id: 1, text: 'New user registered', time: '5 min ago', read: false },
+            { id: 2, text: 'Pending review moderation', time: '1 hour ago', read: false },
+            { id: 3, text: 'Subscription expiring soon', time: '2 hours ago', read: true },
+        ]);
     };
 
     const handleLogout = async () => {
         await logout();
+        toast.success('Logged out successfully');
         navigate('/login');
     };
 
-    if (loading) {
-        return (
-            <div className="loading-container">
-                <div className="spinner"></div>
-            </div>
-        );
-    }
+    const markAsRead = (id) => {
+        setNotifications(notifications.map(n =>
+            n.id === id ? { ...n, read: true } : n
+        ));
+    };
 
     const navItems = [
         {
             path: '/admin/dashboard',
             icon: <FaTachometerAlt />,
             label: 'Dashboard',
-            roles: ['super_admin', 'pricing_admin', 'hr_admin', 'support_admin']
+            color: '#4299e1'
         },
         {
             path: '/admin/users',
             icon: <FaUsers />,
             label: 'User Management',
-            roles: ['super_admin', 'support_admin']
+            color: '#48bb78'
         },
         {
             path: '/admin/pricing',
             icon: <FaDollarSign />,
             label: 'Pricing Management',
-            roles: ['super_admin', 'pricing_admin']
+            color: '#ed8936'
         },
         {
             path: '/admin/companies',
             icon: <FaBuilding />,
             label: 'Companies',
-            roles: ['super_admin', 'support_admin']
+            color: '#9f7aea'
         },
         {
             path: '/admin/reviews',
             icon: <FaStar />,
             label: 'Review Moderation',
-            roles: ['super_admin', 'support_admin']
+            color: '#f687b3'
         },
         {
             path: '/admin/subscriptions',
             icon: <FaClipboardList />,
             label: 'Subscriptions',
-            roles: ['super_admin', 'pricing_admin']
+            color: '#fc8181'
+        },
+        {
+            path: '/admin/settings',
+            icon: <FaCog />,
+            label: 'Settings',
+            color: '#a0aec0'
         }
     ];
 
@@ -101,48 +121,51 @@ const AdminLayout = () => {
             path: '/hr/dashboard',
             icon: <FaChartLine />,
             label: 'HR Dashboard',
-            roles: ['super_admin', 'hr_admin']
+            color: '#4299e1'
         },
         {
             path: '/hr/jobs',
             icon: <FaBriefcase />,
             label: 'Job Postings',
-            roles: ['super_admin', 'hr_admin']
+            color: '#48bb78'
         },
         {
             path: '/hr/applications',
             icon: <FaFileAlt />,
             label: 'Applications',
-            roles: ['super_admin', 'hr_admin']
+            color: '#ed8936'
         },
         {
             path: '/hr/interviews',
             icon: <FaCalendarAlt />,
             label: 'Interviews',
-            roles: ['super_admin', 'hr_admin']
+            color: '#9f7aea'
         },
         {
             path: '/hr/employees',
             icon: <FaUsers />,
             label: 'Employee Relations',
-            roles: ['super_admin', 'hr_admin']
+            color: '#f687b3'
         },
         {
             path: '/hr/departments',
             icon: <FaBuilding />,
             label: 'Departments',
-            roles: ['super_admin', 'hr_admin']
+            color: '#fc8181'
         }
     ];
 
-    const userRole = adminInfo?.role_name;
+    const unreadCount = notifications.filter(n => !n.read).length;
 
     return (
         <div className={`admin-layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
             {/* Sidebar */}
             <aside className="admin-sidebar">
                 <div className="sidebar-header">
-                    <h2>Welp Admin</h2>
+                    <div className="logo-area">
+                        <FaShieldAlt className="logo-icon" />
+                        <h2>Welp Admin</h2>
+                    </div>
                     <button className="sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
                         {sidebarOpen ? <FaTimes /> : <FaBars />}
                     </button>
@@ -154,73 +177,112 @@ const AdminLayout = () => {
                             <img src={user.avatar_url} alt={user.display_name} />
                         ) : (
                             <div className="avatar-placeholder">
-                                {user?.display_name?.charAt(0) || 'A'}
+                                <FaUserCircle />
                             </div>
                         )}
                     </div>
                     <div className="admin-info">
-                        <h4>{user?.display_name}</h4>
-                        <p className="admin-role">{adminInfo?.role_name?.replace('_', ' ').toUpperCase()}</p>
+                        <h4>{user?.display_name || 'Admin User'}</h4>
+                        <p className="admin-role">{adminInfo.role_name.replace('_', ' ').toUpperCase()}</p>
+                        <p className="admin-dept">{adminInfo.department}</p>
                     </div>
+                </div>
+
+                <div className="sidebar-search">
+                    <FaSearch className="search-icon" />
+                    <input type="text" placeholder="Search..." />
                 </div>
 
                 <nav className="sidebar-nav">
                     <div className="nav-section">
                         <h3>Administration</h3>
-                        {navItems.map(item =>
-                                item.roles.includes(userRole) && (
-                                    <NavLink
-                                        key={item.path}
-                                        to={item.path}
-                                        className={({ isActive }) =>
-                                            `nav-link ${isActive ? 'active' : ''}`
-                                        }
-                                    >
-                                        {item.icon}
-                                        {sidebarOpen && <span>{item.label}</span>}
-                                    </NavLink>
-                                )
-                        )}
+                        {navItems.map(item => (
+                            <NavLink
+                                key={item.path}
+                                to={item.path}
+                                className={({ isActive }) =>
+                                    `nav-link ${isActive ? 'active' : ''}`
+                                }
+                                style={{ '--item-color': item.color }}
+                            >
+                                <span className="nav-icon">{item.icon}</span>
+                                {sidebarOpen && <span className="nav-label">{item.label}</span>}
+                            </NavLink>
+                        ))}
                     </div>
-
-                    {(userRole === 'super_admin' || userRole === 'hr_admin') && (
-                        <div className="nav-section">
-                            <h3>Human Resources</h3>
-                            {hrNavItems.map(item =>
-                                    item.roles.includes(userRole) && (
-                                        <NavLink
-                                            key={item.path}
-                                            to={item.path}
-                                            className={({ isActive }) =>
-                                                `nav-link ${isActive ? 'active' : ''}`
-                                            }
-                                        >
-                                            {item.icon}
-                                            {sidebarOpen && <span>{item.label}</span>}
-                                        </NavLink>
-                                    )
-                            )}
-                        </div>
-                    )}
 
                     <div className="nav-section">
-                        <h3>System</h3>
-                        {userRole === 'super_admin' && (
-                            <NavLink to="/admin/settings" className="nav-link">
-                                <FaCog />
-                                {sidebarOpen && <span>Settings</span>}
+                        <h3>Human Resources</h3>
+                        {hrNavItems.map(item => (
+                            <NavLink
+                                key={item.path}
+                                to={item.path}
+                                className={({ isActive }) =>
+                                    `nav-link ${isActive ? 'active' : ''}`
+                                }
+                                style={{ '--item-color': item.color }}
+                            >
+                                <span className="nav-icon">{item.icon}</span>
+                                {sidebarOpen && <span className="nav-label">{item.label}</span>}
                             </NavLink>
-                        )}
-                        <button onClick={handleLogout} className="nav-link logout-btn">
-                            <FaSignOutAlt />
-                            {sidebarOpen && <span>Logout</span>}
-                        </button>
+                        ))}
                     </div>
                 </nav>
+
+                <div className="sidebar-footer">
+                    <button onClick={handleLogout} className="logout-btn">
+                        <FaSignOutAlt />
+                        {sidebarOpen && <span>Logout</span>}
+                    </button>
+                </div>
             </aside>
 
             {/* Main Content */}
             <main className="admin-main">
+                {/* Top Bar */}
+                <div className="admin-topbar">
+                    <div className="topbar-left">
+                        <h1>Welcome back, {user?.display_name || 'Admin'}!</h1>
+                    </div>
+                    <div className="topbar-right">
+                        <div className="notification-dropdown">
+                            <button
+                                className="notification-btn"
+                                onClick={() => setShowNotifications(!showNotifications)}
+                            >
+                                <FaBell />
+                                {unreadCount > 0 && (
+                                    <span className="notification-badge">{unreadCount}</span>
+                                )}
+                            </button>
+                            {showNotifications && (
+                                <div className="notification-menu">
+                                    <h4>Notifications</h4>
+                                    {notifications.map(n => (
+                                        <div
+                                            key={n.id}
+                                            className={`notification-item ${n.read ? 'read' : 'unread'}`}
+                                            onClick={() => markAsRead(n.id)}
+                                        >
+                                            <p>{n.text}</p>
+                                            <small>{n.time}</small>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="admin-date">
+                            {new Date().toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Content Area */}
                 <div className="admin-content">
                     <Outlet />
                 </div>

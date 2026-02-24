@@ -13,16 +13,36 @@ import SearchPage from './pages/SearchPage';
 import Dashboard from './pages/Dashboard';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
-import ClaimBusiness from './pages/ClaimBusiness'; // Make sure this import exists
-import KYCRegistration from './pages/KYCRegistration'; // Add this import
+import ClaimBusiness from './pages/ClaimBusiness';
+import KYCRegistration from './pages/KYCRegistration';
 import JoinPsychologist from './pages/JoinPsychologist';
 import ApplicationSuccess from './pages/ApplicationSuccess';
+import Pricing from './pages/Pricing';
 import PrivateRoute from './components/auth/PrivateRoute';
+import AdminRoute from './components/auth/AdminRoute';
+import AdminLayout from './components/admin/AdminLayout';
+
+// Admin Pages
+import AdminDashboard from './pages/admin/AdminDashboard';
+import PricingManagement from './pages/admin/PricingManagement';
+import UserManagement from './pages/admin/UserManagement.jsx';
+import CompanyManagement from './pages/admin/CompanyManagement.jsx';
+import ReviewModeration from './pages/admin/ReviewModeration';
+import SubscriptionManagement from './pages/admin/SubscriptionManagement';
+import SystemSettings from './pages/admin/SystemSettings';
+
+// HR Pages
+import HRDashboard from './pages/hr/HRDashboard';
+import JobPostings from './pages/hr/JobPostings';
+import Applications from './pages/hr/Applications';
+import Interviews from './pages/hr/Interviews';
+import EmployeeRelations from './pages/hr/EmployeeRelations';
+import Departments from './pages/hr/Departments.jsx';
+
 import './styles/global.css';
 import './styles/theme.css';
-import './styles/admin.css';
-import Pricing from './pages/Pricing';
 import './styles/components.css';
+import './styles/admin.css';
 
 function App() {
     return (
@@ -38,12 +58,17 @@ function App() {
                         <Navbar />
                         <main className="main-content">
                             <Routes>
-                                <Route path="/pricing" element={<Pricing />} />
+                                {/* Public Routes */}
                                 <Route path="/" element={<Home />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
                                 <Route path="/search" element={<SearchPage />} />
                                 <Route path="/companies/:id" element={<CompanyPage />} />
+                                <Route path="/pricing" element={<Pricing />} />
+                                <Route path="/psychologist/join" element={<JoinPsychologist />} />
+                                <Route path="/application-success" element={<ApplicationSuccess />} />
+
+                                {/* Protected Routes */}
                                 <Route
                                     path="/claim/:id"
                                     element={
@@ -60,8 +85,6 @@ function App() {
                                         </PrivateRoute>
                                     }
                                 />
-                                <Route path="/psychologist/join" element={<JoinPsychologist />} />
-                                <Route path="/application-success" element={<ApplicationSuccess />} />
                                 <Route
                                     path="/dashboard"
                                     element={
@@ -86,6 +109,43 @@ function App() {
                                         </PrivateRoute>
                                     }
                                 />
+
+                                {/* Admin Routes */}
+                                <Route
+                                    path="/admin"
+                                    element={
+                                        <AdminRoute>
+                                            <AdminLayout />
+                                        </AdminRoute>
+                                    }
+                                >
+                                    <Route index element={<AdminDashboard />} />
+                                    <Route path="dashboard" element={<AdminDashboard />} />
+                                    <Route path="users" element={<UserManagement />} />
+                                    <Route path="pricing" element={<PricingManagement />} />
+                                    <Route path="companies" element={<CompanyManagement />} />
+                                    <Route path="reviews" element={<ReviewModeration />} />
+                                    <Route path="subscriptions" element={<SubscriptionManagement />} />
+                                    <Route path="settings" element={<SystemSettings />} />
+                                </Route>
+
+                                {/* HR Routes */}
+                                <Route
+                                    path="/hr"
+                                    element={
+                                        <AdminRoute>
+                                            <AdminLayout />
+                                        </AdminRoute>
+                                    }
+                                >
+                                    <Route index element={<HRDashboard />} />
+                                    <Route path="dashboard" element={<HRDashboard />} />
+                                    <Route path="jobs" element={<JobPostings />} />
+                                    <Route path="applications" element={<Applications />} />
+                                    <Route path="interviews" element={<Interviews />} />
+                                    <Route path="employees" element={<EmployeeRelations />} />
+                                    <Route path="departments" element={<Departments />} />
+                                </Route>
                             </Routes>
                         </main>
                         <Footer />

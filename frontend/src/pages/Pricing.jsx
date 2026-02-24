@@ -11,8 +11,6 @@ import {
     FaGlobe,
     FaStar,
     FaInfinity,
-    FaVideo,
-    FaComment,
     FaUserMd,
     FaBuilding,
     FaCrown
@@ -27,25 +25,21 @@ const Pricing = () => {
     const [countries, setCountries] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Hardcoded countries
     const hardcodedCountries = [
-        { code: 'US', name: 'United States', currency: 'USD' },
-        { code: 'GB', name: 'United Kingdom', currency: 'GBP' },
-        { code: 'CA', name: 'Canada', currency: 'CAD' },
-        { code: 'AU', name: 'Australia', currency: 'AUD' },
-        { code: 'DE', name: 'Germany', currency: 'EUR' },
-        { code: 'FR', name: 'France', currency: 'EUR' },
-        { code: 'IT', name: 'Italy', currency: 'EUR' },
-        { code: 'ES', name: 'Spain', currency: 'EUR' },
-        { code: 'JP', name: 'Japan', currency: 'JPY' },
-        { code: 'SG', name: 'Singapore', currency: 'SGD' },
-        { code: 'ZA', name: 'South Africa', currency: 'ZAR' },
-        { code: 'NG', name: 'Nigeria', currency: 'NGN' },
-        { code: 'KE', name: 'Kenya', currency: 'KES' },
-        { code: 'BR', name: 'Brazil', currency: 'BRL' },
-        { code: 'IN', name: 'India', currency: 'INR' },
-        { code: 'CN', name: 'China', currency: 'CNY' },
-        { code: 'AE', name: 'UAE', currency: 'AED' }
+        { code: 'US', name: 'United States', currency: 'USD', symbol: '$' },
+        { code: 'GB', name: 'United Kingdom', currency: 'GBP', symbol: '£' },
+        { code: 'CA', name: 'Canada', currency: 'CAD', symbol: 'C$' },
+        { code: 'AU', name: 'Australia', currency: 'AUD', symbol: 'A$' },
+        { code: 'DE', name: 'Germany', currency: 'EUR', symbol: '€' },
+        { code: 'FR', name: 'France', currency: 'EUR', symbol: '€' },
+        { code: 'ZA', name: 'South Africa', currency: 'ZAR', symbol: 'R' },
+        { code: 'NG', name: 'Nigeria', currency: 'NGN', symbol: '₦' },
+        { code: 'KE', name: 'Kenya', currency: 'KES', symbol: 'KSh' },
+        { code: 'IN', name: 'India', currency: 'INR', symbol: '₹' },
+        { code: 'JP', name: 'Japan', currency: 'JPY', symbol: '¥' },
+        { code: 'CN', name: 'China', currency: 'CNY', symbol: '¥' },
+        { code: 'BR', name: 'Brazil', currency: 'BRL', symbol: 'R$' },
+        { code: 'AE', name: 'UAE', currency: 'AED', symbol: 'د.إ' }
     ];
 
     useEffect(() => {
@@ -59,16 +53,17 @@ const Pricing = () => {
     const fetchCountries = async () => {
         try {
             const { data } = await api.get('/pricing/countries');
-            setCountries(data);
+            setCountries(data.length ? data : hardcodedCountries);
         } catch (error) {
             console.error('Failed to fetch countries, using hardcoded:', error);
-            setCountries(hardcookedCountries);
+            setCountries(hardcodedCountries);
         }
     };
 
     const fetchPricing = async () => {
         setLoading(true);
         try {
+            console.log('Fetching pricing for:', selectedRole, selectedCountry);
             const { data } = await api.get('/pricing/plans', {
                 params: { role: selectedRole, country: selectedCountry }
             });
@@ -90,17 +85,18 @@ const Pricing = () => {
         }
 
         const country = countries.find(c => c.code === selectedCountry)?.name || selectedCountry;
-        const amount = pricing?.[plan]?.price;
-        const currency = pricing?.[plan]?.currency;
+        const planData = pricing?.[plan];
+        const amount = planData?.price || 0;
+        const currency = planData?.currency || 'ZAR';
+        const symbol = planData?.symbol || 'R';
 
-        toast.success(`Selected ${plan} plan for ${selectedRole}s in ${country} - ${currency} ${amount}/month`);
+        toast.success(`Selected ${plan} plan for ${selectedRole}s in ${country} - ${symbol} ${amount}/month`);
     };
 
     if (loading) return <Loading />;
 
     return (
         <div className="pricing-page">
-            {/* Header */}
             <div className="pricing-header">
                 <div className="container">
                     <h1>Simple, Transparent Pricing</h1>
@@ -136,7 +132,7 @@ const Pricing = () => {
                     >
                         {countries.map(country => (
                             <option key={country.code} value={country.code}>
-                                {country.name} ({country.currency})
+                                {country.name} ({country.currency} {country.symbol})
                             </option>
                         ))}
                     </select>
@@ -148,20 +144,18 @@ const Pricing = () => {
                         {/* Free Plan */}
                         <div className="pricing-card free">
                             <div className="pricing-card-header">
-                                <h3>{pricing[selectedRole]?.free?.name || 'Free Plan'}</h3>
+                                <h3>{pricing.free?.name || 'Free Plan'}</h3>
                                 <div className="price">
-                                    <span className="currency">{pricing[selectedRole]?.free?.currency || 'ZAR'}</span>
+                                    <span className="currency">{pricing.free?.symbol || pricing.free?.currency || 'R'}</span>
                                     <span className="amount">{
-                                        pricing[selectedRole]?.free?.price === 0
-                                            ? '0'
-                                            : pricing[selectedRole]?.free?.price?.toFixed(2) || '0'
+                                        pricing.free?.price === 0 ? '0' : pricing.free?.price?.toFixed(2) || '0'
                                     }</span>
                                     <span className="period">/month</span>
                                 </div>
                             </div>
 
                             <div className="pricing-card-features">
-                                {pricing[selectedRole]?.free?.features?.map((feature, index) => (
+                                {pricing.free?.features?.map((feature, index) => (
                                     <div key={index} className="feature">
                                         <FaCheckCircle className="check-icon" />
                                         <span>{feature}</span>
@@ -180,24 +174,31 @@ const Pricing = () => {
                         </div>
 
                         {/* Premium Plan */}
-                        {pricing[selectedRole]?.premium && (
+                        {pricing.premium && (
                             <div className="pricing-card premium">
                                 <div className="popular-badge">Most Popular</div>
                                 <div className="pricing-card-header">
-                                    <h3>{pricing[selectedRole]?.premium?.name || 'Premium Plan'}</h3>
+                                    <h3>{pricing.premium?.name || 'Premium Plan'}</h3>
                                     <div className="price">
-                                        <span className="currency">{pricing[selectedRole]?.premium?.currency || 'ZAR'}</span>
-                                        <span className="amount">{
-                                            pricing[selectedRole]?.premium?.price?.toFixed(2) || '499.00'
-                                        }</span>
+                                        <span className="currency">{pricing.premium?.symbol || pricing.premium?.currency || 'R'}</span>
+                                        <span className="amount">{pricing.premium?.price?.toFixed(2) || '0.00'}</span>
                                         <span className="period">/month</span>
                                     </div>
+                                    {pricing.premium?.originalPriceUSD && (
+                                        <div className="price-note">
+                                            (was ${pricing.premium.originalPriceUSD} USD)
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="pricing-card-features">
-                                    {pricing[selectedRole]?.premium?.features?.map((feature, index) => (
+                                    {pricing.premium?.features?.map((feature, index) => (
                                         <div key={index} className="feature">
-                                            <FaCheckCircle className="check-icon premium" />
+                                            {feature.includes('Everything') ? (
+                                                <FaCrown className="crown-icon" />
+                                            ) : (
+                                                <FaCheckCircle className="check-icon premium" />
+                                            )}
                                             <span>{feature}</span>
                                         </div>
                                     ))}
@@ -261,132 +262,9 @@ const Pricing = () => {
                                     <td>Weekly</td>
                                 </tr>
                                 <tr>
-                                    <td>Crisis Support Line</td>
-                                    <td>Basic</td>
-                                    <td>24/7 Priority</td>
-                                </tr>
-                                <tr>
                                     <td><strong>Monthly Price</strong></td>
                                     <td><strong>Free</strong></td>
-                                    <td><strong>{pricing?.employee?.premium?.currency} {pricing?.employee?.premium?.price?.toFixed(2)}/month</strong></td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-
-                {selectedRole === 'psychologist' && (
-                    <div className="comparison-section">
-                        <h2>Compare Plans</h2>
-                        <div className="comparison-table">
-                            <table>
-                                <thead>
-                                <tr>
-                                    <th>Feature</th>
-                                    <th>Free</th>
-                                    <th>Premium</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr>
-                                    <td>Profile Listing</td>
-                                    <td>Basic</td>
-                                    <td>Featured + Verified</td>
-                                </tr>
-                                <tr>
-                                    <td>Monthly Messages</td>
-                                    <td>5/month</td>
-                                    <td><FaInfinity className="infinity-icon" /> Unlimited</td>
-                                </tr>
-                                <tr>
-                                    <td>Lead Generation</td>
-                                    <td><FaTimesCircle className="times-icon" /></td>
-                                    <td><FaCheckCircle className="check-icon premium" /> Priority</td>
-                                </tr>
-                                <tr>
-                                    <td>Client Assignments</td>
-                                    <td><FaTimesCircle className="times-icon" /></td>
-                                    <td><FaCheckCircle className="check-icon premium" /> Regular</td>
-                                </tr>
-                                <tr>
-                                    <td>Analytics Dashboard</td>
-                                    <td><FaTimesCircle className="times-icon" /></td>
-                                    <td><FaCheckCircle className="check-icon premium" /> Advanced</td>
-                                </tr>
-                                <tr>
-                                    <td>Schedule Management</td>
-                                    <td>Basic</td>
-                                    <td>Advanced Tools</td>
-                                </tr>
-                                <tr>
-                                    <td>Payment Processing</td>
-                                    <td><FaTimesCircle className="times-icon" /></td>
-                                    <td><FaCheckCircle className="check-icon premium" /> Included</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Monthly Price</strong></td>
-                                    <td><strong>Free</strong></td>
-                                    <td><strong>{pricing?.psychologist?.premium?.currency} {pricing?.psychologist?.premium?.price?.toFixed(2)}/month</strong></td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-
-                {selectedRole === 'business' && (
-                    <div className="comparison-section">
-                        <h2>Compare Plans</h2>
-                        <div className="comparison-table">
-                            <table>
-                                <thead>
-                                <tr>
-                                    <th>Feature</th>
-                                    <th>Free</th>
-                                    <th>Premium</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr>
-                                    <td>Company Profile</td>
-                                    <td>Basic</td>
-                                    <td>Enhanced + Branding</td>
-                                </tr>
-                                <tr>
-                                    <td>Team Members</td>
-                                    <td>Up to 3</td>
-                                    <td><FaInfinity className="infinity-icon" /> Unlimited</td>
-                                </tr>
-                                <tr>
-                                    <td>Analytics Dashboard</td>
-                                    <td>Basic</td>
-                                    <td>Advanced</td>
-                                </tr>
-                                <tr>
-                                    <td>Employee Sentiment Tracking</td>
-                                    <td><FaTimesCircle className="times-icon" /></td>
-                                    <td><FaCheckCircle className="check-icon premium" /></td>
-                                </tr>
-                                <tr>
-                                    <td>Wellness Program Integration</td>
-                                    <td><FaTimesCircle className="times-icon" /></td>
-                                    <td><FaCheckCircle className="check-icon premium" /></td>
-                                </tr>
-                                <tr>
-                                    <td>API Access</td>
-                                    <td><FaTimesCircle className="times-icon" /></td>
-                                    <td><FaCheckCircle className="check-icon premium" /></td>
-                                </tr>
-                                <tr>
-                                    <td>Account Manager</td>
-                                    <td><FaTimesCircle className="times-icon" /></td>
-                                    <td><FaCheckCircle className="check-icon premium" /> Dedicated</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Monthly Price</strong></td>
-                                    <td><strong>Free</strong></td>
-                                    <td><strong>{pricing?.business?.premium?.currency} {pricing?.business?.premium?.price?.toFixed(2)}/month</strong></td>
+                                    <td><strong>{pricing?.premium?.symbol || 'R'} {pricing?.premium?.price?.toFixed(2) || '0.00'}/month</strong></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -397,38 +275,8 @@ const Pricing = () => {
                 {/* Country Pricing Note */}
                 <div className="pricing-note">
                     <p>✨ Prices are adjusted based on your country's economic factors to ensure fair access worldwide.</p>
-                    <p>Selected country: {countries.find(c => c.code === selectedCountry)?.name} ({countries.find(c => c.code === selectedCountry)?.currency})</p>
-                </div>
-
-                {/* FAQ Section */}
-                <div className="pricing-faq">
-                    <h2>Frequently Asked Questions</h2>
-                    <div className="faq-grid">
-                        <div className="faq-item">
-                            <h3>Can I switch plans anytime?</h3>
-                            <p>Yes, you can upgrade or downgrade at any time. Changes reflect in next billing cycle.</p>
-                        </div>
-                        <div className="faq-item">
-                            <h3>Is there a contract?</h3>
-                            <p>No, all plans are month-to-month. Cancel anytime with no penalties.</p>
-                        </div>
-                        <div className="faq-item">
-                            <h3>How does country pricing work?</h3>
-                            <p>We adjust prices based on local economic factors to make our service accessible globally.</p>
-                        </div>
-                        <div className="faq-item">
-                            <h3>What payment methods?</h3>
-                            <p>We accept all major credit cards, PayPal, and bank transfers in select countries.</p>
-                        </div>
-                        <div className="faq-item">
-                            <h3>Is my data secure?</h3>
-                            <p>Yes, we use enterprise-grade encryption and comply with GDPR and HIPAA regulations.</p>
-                        </div>
-                        <div className="faq-item">
-                            <h3>Can I get a refund?</h3>
-                            <p>We offer a 14-day money-back guarantee for all premium plans.</p>
-                        </div>
-                    </div>
+                    <p>Selected country: {countries.find(c => c.code === selectedCountry)?.name}
+                        ({countries.find(c => c.code === selectedCountry)?.currency} {countries.find(c => c.code === selectedCountry)?.symbol})</p>
                 </div>
             </div>
 
@@ -462,6 +310,7 @@ const Pricing = () => {
                     justify-content: center;
                     gap: 1rem;
                     margin: 2rem 0;
+                    flex-wrap: wrap;
                 }
 
                 .role-btn {
@@ -505,6 +354,7 @@ const Pricing = () => {
                     border-radius: 50px;
                     max-width: 500px;
                     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    flex-wrap: wrap;
                 }
 
                 .country-selector svg {
@@ -524,7 +374,7 @@ const Pricing = () => {
                     background: white;
                     font-size: 0.95rem;
                     cursor: pointer;
-                    flex: 1;
+                    min-width: 200px;
                 }
 
                 .pricing-grid {
@@ -550,11 +400,6 @@ const Pricing = () => {
 
                 .pricing-card.premium {
                     border: 2px solid #667eea;
-                    transform: scale(1.05);
-                }
-
-                .pricing-card.premium:hover {
-                    transform: scale(1.05) translateY(-5px);
                 }
 
                 .popular-badge {
@@ -568,7 +413,6 @@ const Pricing = () => {
                     border-radius: 30px;
                     font-size: 0.85rem;
                     font-weight: 600;
-                    white-space: nowrap;
                 }
 
                 .pricing-card-header {
@@ -604,6 +448,12 @@ const Pricing = () => {
                     color: #718096;
                 }
 
+                .price-note {
+                    font-size: 0.85rem;
+                    color: #718096;
+                    font-style: italic;
+                }
+
                 .pricing-card-features {
                     margin-bottom: 2rem;
                     min-height: 250px;
@@ -625,6 +475,12 @@ const Pricing = () => {
 
                 .check-icon.premium {
                     color: #667eea;
+                }
+
+                .crown-icon {
+                    color: #fbbf24;
+                    font-size: 1.1rem;
+                    flex-shrink: 0;
                 }
 
                 .times-icon {
@@ -683,10 +539,6 @@ const Pricing = () => {
                     color: #4a5568;
                 }
 
-                .comparison-table tr:last-child td {
-                    border-bottom: none;
-                }
-
                 .pricing-note {
                     text-align: center;
                     margin: 2rem 0;
@@ -696,55 +548,9 @@ const Pricing = () => {
                     color: #2d3748;
                 }
 
-                .pricing-faq {
-                    margin: 4rem 0;
-                }
-
-                .pricing-faq h2 {
-                    text-align: center;
-                    font-size: 2rem;
-                    color: #2d3748;
-                    margin-bottom: 2rem;
-                }
-
-                .faq-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 2rem;
-                }
-
-                .faq-item {
-                    background: white;
-                    padding: 1.5rem;
-                    border-radius: 12px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                }
-
-                .faq-item h3 {
-                    color: #2d3748;
-                    margin-bottom: 0.5rem;
-                    font-size: 1.1rem;
-                }
-
-                .faq-item p {
-                    color: #718096;
-                    line-height: 1.6;
-                }
-
                 @media (max-width: 768px) {
                     .pricing-header h1 {
                         font-size: 2rem;
-                    }
-
-                    .role-selector {
-                        flex-direction: column;
-                        padding: 0 1rem;
-                    }
-
-                    .country-selector {
-                        flex-direction: column;
-                        border-radius: 20px;
-                        padding: 1.5rem;
                     }
 
                     .pricing-grid {
@@ -752,17 +558,23 @@ const Pricing = () => {
                         padding: 0 1rem;
                     }
 
-                    .pricing-card.premium {
-                        transform: scale(1);
-                    }
-
-                    .pricing-card.premium:hover {
-                        transform: translateY(-5px);
-                    }
-
-                    .faq-grid {
-                        grid-template-columns: 1fr;
+                    .role-selector {
+                        flex-direction: column;
                         padding: 0 1rem;
+                    }
+
+                    .role-btn {
+                        width: 100%;
+                        justify-content: center;
+                    }
+
+                    .country-selector {
+                        flex-direction: column;
+                        border-radius: 20px;
+                    }
+
+                    .country-select {
+                        width: 100%;
                     }
                 }
             `}</style>
