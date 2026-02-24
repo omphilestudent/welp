@@ -1,30 +1,120 @@
 // backend/src/routes/userRoutes.js
 const express = require('express');
-const { authenticate, authorize } = require('../middleware/auth');
+const { body } = require('express-validator');
+const { authenticate } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
+const { validate } = require('../middleware/validation');
 const userController = require('../controllers/userController');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
 
-// Protected routes (all authenticated users)
+// Ensure upload directory exists
+const uploadDir = './uploads/avatars';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, `avatar-${req.user.id}-${uniqueSuffix}${ext}`);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed (jpeg, jpg, png, gif)'));
+        }
+    }
+});
+
+// Profile routes
 router.get('/profile', authenticate, apiLimiter, userController.getProfile);
 router.patch('/profile', authenticate, apiLimiter, userController.updateProfile);
 
-// Psychologist specific routes
-router.get('/psychologists', authenticate, apiLimiter, userController.getPsychologists);
-router.get('/employees/:employeeId',
+// Avatar upload route
+router.post('/upload-avatar',
     authenticate,
-    authorize('psychologist'),
-    apiLimiter,
-    userController.getEmployeeForPsychologist
+    upload.single('avatar'),
+    async (req, res) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ error: 'No file uploaded' });
+            }
+
+            // Generate URL for the uploaded file
+            const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+            // Update user in database
+            const { query } = require('../utils/database');
+            await query(
+                'UPDATE users SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                [avatarUrl, req.user.id]
+            );
+
+            res.json({
+                message: 'Avatar uploaded successfully',
+                avatarUrl
+            });
+        } catch (error) {
+            console.error('Upload error:', error);
+            res.status(500).json({ error: 'Failed to upload avatar' });
+        }
+    }
 );
 
-// Admin routes (you might want to add admin role later)
-router.patch('/psychologists/:userId/verify',
+// Password change
+router.post('/change-password',
     authenticate,
-    // authorize('admin'),
     apiLimiter,
-    userController.verifyPsychologist
+    validate([
+        body('currentPassword').notEmpty().withMessage('Current password is required'),
+        body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
+    ]),
+    userController.changePassword
+);
+
+// Settings routes
+router.get('/settings', authenticate, apiLimiter, userController.getSettings);
+router.patch('/settings', authenticate, apiLimiter, userController.updateSettings);
+
+// Psychologist profile routes
+router.post('/add-psychologist-profile',
+    authenticate,
+    apiLimiter,
+    validate([
+        body('licenseNumber').notEmpty().withMessage('License number is required'),
+        body('licenseIssuingBody').notEmpty().withMessage('License issuing body is required'),
+        body('yearsOfExperience').isInt({ min: 0 }).withMessage('Valid years of experience required')
+    ]),
+    userController.addPsychologistProfile
+);
+
+// Account management
+router.delete('/delete-account',
+    authenticate,
+    apiLimiter,
+    validate([
+        body('password').notEmpty().withMessage('Password is required')
+    ]),
+    userController.deleteAccount
 );
 
 module.exports = router;

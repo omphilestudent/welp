@@ -1,7 +1,8 @@
 // backend/src/routes/messageRoutes.js
 const express = require('express');
+const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
-const { messageLimiter } = require('../middleware/rateLimiter');
+const { messageLimiter, apiLimiter } = require('../middleware/rateLimiter');
 const { validate, messageValidation } = require('../middleware/validation');
 const messageController = require('../controllers/messageController');
 
@@ -26,6 +27,25 @@ router.patch('/conversations/:conversationId/status',
     authenticate,
     authorize('employee'),
     messageController.updateConversationStatus
+);
+
+// ✅ NEW Employee Routes
+
+router.post('/request-chat',
+    authenticate,
+    authorize('employee'),
+    validate([
+        body('psychologistId').isUUID(),
+        body('initialMessage').optional().trim()
+    ]),
+    messageController.requestChatWithPsychologist
+);
+
+router.get('/available-psychologists',
+    authenticate,
+    authorize('employee'),
+    apiLimiter,
+    messageController.getAvailablePsychologists
 );
 
 // Shared routes

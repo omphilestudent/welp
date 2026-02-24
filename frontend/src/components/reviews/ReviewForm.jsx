@@ -1,14 +1,40 @@
-// src/components/reviews/ReviewForm.jsx
-import React, { useState } from 'react';
+// frontend/src/components/reviews/ReviewForm.jsx (Updated)
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import api from '../../services/api';
 import StarRating from './StarRating';
+import { FaBuilding, FaBriefcase, FaUser } from 'react-icons/fa';
 
-const ReviewForm = ({ onSubmit, onCancel, initialData = {} }) => {
+const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         rating: initialData.rating || 0,
         content: initialData.content || '',
-        isPublic: initialData.isPublic !== undefined ? initialData.isPublic : true
+        isPublic: initialData.isPublic !== undefined ? initialData.isPublic : true,
+        occupation: user?.occupation || '',
+        workplaceId: user?.workplace_id || null
     });
+
+    const [userProfile, setUserProfile] = useState(null);
     const [errors, setErrors] = useState({});
+
+    useEffect(() => {
+        fetchUserProfile();
+    }, []);
+
+    const fetchUserProfile = async () => {
+        try {
+            const { data } = await api.get('/users/profile');
+            setUserProfile(data);
+            setFormData(prev => ({
+                ...prev,
+                occupation: data.occupation || '',
+                workplaceId: data.workplace_id
+            }));
+        } catch (error) {
+            console.error('Failed to fetch profile:', error);
+        }
+    };
 
     const validate = () => {
         const newErrors = {};
@@ -20,6 +46,12 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {} }) => {
         }
         if (formData.content.length > 2000) {
             newErrors.content = 'Review cannot exceed 2000 characters';
+        }
+        if (!formData.occupation) {
+            newErrors.occupation = 'Please add your occupation in your profile';
+        }
+        if (!formData.workplaceId) {
+            newErrors.workplace = 'Please add your workplace in your profile';
         }
         return newErrors;
     };
@@ -34,8 +66,39 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {} }) => {
         }
     };
 
+    if (!userProfile?.occupation || !userProfile?.workplace_id) {
+        return (
+            <div className="review-form warning">
+                <div className="alert alert-warning">
+                    <h3>Complete Your Profile First</h3>
+                    <p>Before writing a review, please add your occupation and workplace in your profile settings.</p>
+                    <button
+                        onClick={() => window.location.href = '/settings'}
+                        className="btn btn-primary"
+                    >
+                        Go to Profile Settings
+                    </button>
+                    {onCancel && (
+                        <button onClick={onCancel} className="btn btn-secondary">
+                            Cancel
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <form onSubmit={handleSubmit} className="review-form">
+            <div className="reviewer-info">
+                <div className="info-item">
+                    <FaBriefcase /> <strong>Occupation:</strong> {userProfile.occupation}
+                </div>
+                <div className="info-item">
+                    <FaBuilding /> <strong>Workplace:</strong> {userProfile.workplace?.name || 'Not set'}
+                </div>
+            </div>
+
             <div className="form-group">
                 <label className="form-label">Rating *</label>
                 <StarRating

@@ -58,6 +58,14 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // New method to update user state
+    const updateUser = (updatedUserData) => {
+        setUser(prev => ({
+            ...prev,
+            ...updatedUserData
+        }));
+    };
+
     const value = {
         user,
         loading,
@@ -65,6 +73,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         checkAuth,
+        updateUser // Added
     };
 
     return (

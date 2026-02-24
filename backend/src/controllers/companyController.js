@@ -34,16 +34,16 @@ const searchCompanies = async (req, res) => {
         const total = parseInt(countResult.rows[0]?.count || 0);
 
         const result = await query(
-            `SELECT 
-        c.*,
-        COALESCE(AVG(r.rating), 0) as avg_rating,
-        COUNT(r.id) as review_count
-       FROM companies c
-       LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
-       ${whereClause}
-       GROUP BY c.id
-       ORDER BY c.name
-       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+            `SELECT
+                 c.*,
+                 COALESCE(AVG(r.rating), 0) as avg_rating,
+                 COUNT(r.id) as review_count
+             FROM companies c
+                      LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
+                 ${whereClause}
+             GROUP BY c.id
+             ORDER BY c.name
+                 LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
             [...params, validLimit, offset]
         );
 
@@ -68,20 +68,29 @@ const searchCompanies = async (req, res) => {
     }
 };
 
-// Get single company by ID
+// Get single company by ID - UPDATED with UUID validation and owner information
 const getCompany = async (req, res) => {
     try {
         const { id } = req.params;
 
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(id)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
         const result = await query(
             `SELECT 
-        c.*,
-        COALESCE(AVG(r.rating), 0) as avg_rating,
-        COUNT(r.id) as review_count
-       FROM companies c
-       LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
-       WHERE c.id = $1
-       GROUP BY c.id`,
+                c.*,
+                COALESCE(AVG(r.rating), 0) as avg_rating,
+                COUNT(r.id) as review_count,
+                json_agg(DISTINCT jsonb_build_object('id', u.id, 'displayName', u.display_name)) FILTER (WHERE u.id IS NOT NULL) as owners
+             FROM companies c
+             LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
+             LEFT JOIN company_owners co ON c.id = co.company_id
+             LEFT JOIN users u ON co.user_id = u.id
+             WHERE c.id = $1
+             GROUP BY c.id`,
             [id]
         );
 
@@ -93,7 +102,8 @@ const getCompany = async (req, res) => {
         res.json({
             ...company,
             avg_rating: parseFloat(company.avg_rating || 0).toFixed(1),
-            review_count: parseInt(company.review_count || 0)
+            review_count: parseInt(company.review_count || 0),
+            owners: company.owners?.filter(o => o.id !== null) || []
         });
     } catch (error) {
         console.error('Get company error:', error);
@@ -121,8 +131,8 @@ const createCompany = async (req, res) => {
 
         const result = await query(
             `INSERT INTO companies (name, description, industry, website, email, phone, address, created_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 RETURNING *`,
             [name.trim(), description, industry, website, email, phone, address, req.user.id]
         );
 
@@ -200,23 +210,26 @@ const getIndustries = async (req, res) => {
 const getMyCompanies = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
-        c.*,
-        COALESCE(AVG(r.rating), 0) as avg_rating,
-        COUNT(r.id) as review_count
-       FROM companies c
-       LEFT JOIN company_owners co ON c.id = co.company_id
-       LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
-       WHERE co.user_id = $1
-       GROUP BY c.id
-       ORDER BY c.name`,
+            `SELECT
+                 c.*,
+                 COALESCE(AVG(r.rating), 0) as avg_rating,
+                 COUNT(r.id) as review_count,
+                 json_agg(DISTINCT jsonb_build_object('id', u.id, 'displayName', u.display_name)) FILTER (WHERE u.id IS NOT NULL) as owners
+             FROM companies c
+                      LEFT JOIN company_owners co ON c.id = co.company_id
+                      LEFT JOIN users u ON co.user_id = u.id
+                      LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
+             WHERE co.user_id = $1
+             GROUP BY c.id
+             ORDER BY c.name`,
             [req.user.id]
         );
 
         const companies = result.rows.map(company => ({
             ...company,
             avg_rating: parseFloat(company.avg_rating || 0).toFixed(1),
-            review_count: parseInt(company.review_count || 0)
+            review_count: parseInt(company.review_count || 0),
+            owners: company.owners?.filter(o => o.id !== null) || []
         }));
 
         res.json(companies);
@@ -242,15 +255,15 @@ const updateCompany = async (req, res) => {
         }
 
         const result = await query(
-            `UPDATE companies 
-       SET description = COALESCE($1, description),
-           website = COALESCE($2, website),
-           phone = COALESCE($3, phone),
-           address = COALESCE($4, address),
-           logo_url = COALESCE($5, logo_url),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6
-       RETURNING *`,
+            `UPDATE companies
+             SET description = COALESCE($1, description),
+                 website = COALESCE($2, website),
+                 phone = COALESCE($3, phone),
+                 address = COALESCE($4, address),
+                 logo_url = COALESCE($5, logo_url),
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $6
+                 RETURNING *`,
             [description, website, phone, address, logo_url, id]
         );
 
@@ -287,18 +300,18 @@ const getCompanyReviewsForBusiness = async (req, res) => {
         const total = parseInt(countResult.rows[0]?.count || 0);
 
         const result = await query(
-            `SELECT 
-        r.*,
-        json_build_object(
-          'id', u.id,
-          'displayName', u.display_name,
-          'isAnonymous', u.is_anonymous
-        ) as author
-       FROM reviews r
-       JOIN users u ON r.author_id = u.id
-       WHERE r.company_id = $1
-       ORDER BY r.created_at DESC
-       LIMIT $2 OFFSET $3`,
+            `SELECT
+                 r.*,
+                 json_build_object(
+                         'id', u.id,
+                         'displayName', u.display_name,
+                         'isAnonymous', u.is_anonymous
+                 ) as author
+             FROM reviews r
+                      JOIN users u ON r.author_id = u.id
+             WHERE r.company_id = $1
+             ORDER BY r.created_at DESC
+                 LIMIT $2 OFFSET $3`,
             [id, validLimit, offset]
         );
 
@@ -321,15 +334,15 @@ const getCompanyReviewsForBusiness = async (req, res) => {
 const getUnclaimedCompanies = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
-        c.*,
-        COUNT(r.id) as review_count
-       FROM companies c
-       LEFT JOIN reviews r ON c.id = r.company_id
-       WHERE c.is_claimed = false
-       GROUP BY c.id
-       ORDER BY review_count DESC
-       LIMIT 50`
+            `SELECT
+                 c.*,
+                 COUNT(r.id) as review_count
+             FROM companies c
+                      LEFT JOIN reviews r ON c.id = r.company_id
+             WHERE c.is_claimed = false
+             GROUP BY c.id
+             ORDER BY review_count DESC
+                 LIMIT 50`
         );
 
         res.json(result.rows);
@@ -364,20 +377,20 @@ const requestClaimCompany = async (req, res) => {
 
         // Create claim_requests table if not exists
         await query(`
-      CREATE TABLE IF NOT EXISTS claim_requests (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-        business_email VARCHAR(255) NOT NULL,
-        business_phone VARCHAR(50),
-        position VARCHAR(100),
-        message TEXT,
-        status VARCHAR(50) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(company_id, user_id)
-      )
-    `);
+            CREATE TABLE IF NOT EXISTS claim_requests (
+                                                          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                business_email VARCHAR(255) NOT NULL,
+                business_phone VARCHAR(50),
+                position VARCHAR(100),
+                message TEXT,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(company_id, user_id)
+                )
+        `);
 
         const existing = await query(
             'SELECT * FROM claim_requests WHERE company_id = $1 AND user_id = $2',
@@ -390,8 +403,8 @@ const requestClaimCompany = async (req, res) => {
 
         const result = await query(
             `INSERT INTO claim_requests (company_id, user_id, business_email, business_phone, position, message)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6)
+                 RETURNING *`,
             [id, req.user.id, businessEmail, businessPhone, position, message]
         );
 
@@ -409,18 +422,18 @@ const requestClaimCompany = async (req, res) => {
 const getMyClaimRequests = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
-        cr.*,
-        json_build_object(
-          'id', c.id,
-          'name', c.name,
-          'logo_url', c.logo_url,
-          'industry', c.industry
-        ) as company
-       FROM claim_requests cr
-       JOIN companies c ON cr.company_id = c.id
-       WHERE cr.user_id = $1
-       ORDER BY cr.created_at DESC`,
+            `SELECT
+                 cr.*,
+                 json_build_object(
+                         'id', c.id,
+                         'name', c.name,
+                         'logo_url', c.logo_url,
+                         'industry', c.industry
+                 ) as company
+             FROM claim_requests cr
+                      JOIN companies c ON cr.company_id = c.id
+             WHERE cr.user_id = $1
+             ORDER BY cr.created_at DESC`,
             [req.user.id]
         );
 
@@ -438,15 +451,15 @@ const verifyBusinessEmail = async (req, res) => {
 
         // Create email_verifications table if not exists
         await query(`
-      CREATE TABLE IF NOT EXISTS email_verifications (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        email VARCHAR(255) NOT NULL,
-        code VARCHAR(6) NOT NULL,
-        user_id UUID REFERENCES users(id),
-        expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP + INTERVAL '10 minutes',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+            CREATE TABLE IF NOT EXISTS email_verifications (
+                                                               id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                email VARCHAR(255) NOT NULL,
+                code VARCHAR(6) NOT NULL,
+                user_id UUID REFERENCES users(id),
+                expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP + INTERVAL '10 minutes',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+        `);
 
         // Generate verification code
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -479,9 +492,9 @@ const confirmEmailVerification = async (req, res) => {
         const { email, code } = req.body;
 
         const result = await query(
-            `SELECT * FROM email_verifications 
-       WHERE email = $1 AND code = $2 AND expires_at > CURRENT_TIMESTAMP
-       ORDER BY created_at DESC LIMIT 1`,
+            `SELECT * FROM email_verifications
+             WHERE email = $1 AND code = $2 AND expires_at > CURRENT_TIMESTAMP
+             ORDER BY created_at DESC LIMIT 1`,
             [email, code]
         );
 
@@ -502,11 +515,11 @@ const confirmEmailVerification = async (req, res) => {
 // Export ALL functions
 module.exports = {
     searchCompanies,
-    getCompany,
+    getCompany, // Updated version with UUID validation and owner information
     createCompany,
     claimCompany,
     getIndustries,
-    getMyCompanies,
+    getMyCompanies, // Also updated to include owners
     updateCompany,
     getCompanyReviewsForBusiness,
     getUnclaimedCompanies,

@@ -1,6 +1,6 @@
-// src/pages/CompanyPage.jsx
+// frontend/src/pages/CompanyPage.jsx
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import ReviewCard from '../components/reviews/ReviewCard';
@@ -10,6 +10,7 @@ import Loading from '../components/common/Loading';
 
 const CompanyPage = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
     const { user } = useAuth();
     const [company, setCompany] = useState(null);
     const [reviews, setReviews] = useState([]);
@@ -18,20 +19,40 @@ const CompanyPage = () => {
     const [showReviewForm, setShowReviewForm] = useState(false);
 
     useEffect(() => {
-        fetchCompanyData();
+        if (id) {
+            fetchCompanyData();
+        }
     }, [id]);
 
     const fetchCompanyData = async () => {
+        setLoading(true);
+        setError('');
         try {
+            console.log('Fetching company with ID:', id); // Debug log
+
             const [companyRes, reviewsRes] = await Promise.all([
-                api.get(`/companies/${id}`),
-                api.get(`/reviews/company/${id}`)
+                api.get(`/companies/${id}`).catch(err => {
+                    console.error('Company fetch error:', err);
+                    throw err;
+                }),
+                api.get(`/reviews/company/${id}`).catch(err => {
+                    console.error('Reviews fetch error:', err);
+                    throw err;
+                })
             ]);
+
+            console.log('Company data:', companyRes.data);
+            console.log('Reviews data:', reviewsRes.data);
+
             setCompany(companyRes.data);
             setReviews(reviewsRes.data.reviews || []);
         } catch (error) {
-            setError('Failed to load company data');
             console.error('Failed to fetch company data:', error);
+            if (error.response?.status === 404) {
+                setError('Company not found');
+            } else {
+                setError('Failed to load company data');
+            }
         } finally {
             setLoading(false);
         }
@@ -44,14 +65,27 @@ const CompanyPage = () => {
                 companyId: id
             });
             setShowReviewForm(false);
+            toast.success('Review posted successfully!');
             fetchCompanyData();
         } catch (error) {
-            alert(error.response?.data?.error || 'Failed to post review');
+            console.error('Failed to post review:', error);
+            toast.error(error.response?.data?.error || 'Failed to post review');
         }
     };
 
     if (loading) return <Loading />;
-    if (error) return <div className="alert alert-error">{error}</div>;
+
+    if (error) {
+        return (
+            <div className="error-container">
+                <h2>{error}</h2>
+                <button onClick={() => navigate('/search')} className="btn btn-primary">
+                    Back to Search
+                </button>
+            </div>
+        );
+    }
+
     if (!company) return <div className="empty-state">Company not found</div>;
 
     return (
@@ -116,7 +150,7 @@ const CompanyPage = () => {
                 <div className="company-content">
                     {showReviewForm && (
                         <div className="review-form-section">
-                            <ReviewForm onSubmit={handleReviewSubmit} />
+                            <ReviewForm onSubmit={handleReviewSubmit} onCancel={() => setShowReviewForm(false)} />
                         </div>
                     )}
 

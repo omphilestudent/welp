@@ -1,9 +1,33 @@
 // backend/src/controllers/reviewController.js
 const { query } = require('../utils/database');
 
+// Helper function to update reviews table schema (runs once at module load)
+const updateReviewsTable = async () => {
+    try {
+        await query(`
+            ALTER TABLE reviews 
+            ADD COLUMN IF NOT EXISTS author_occupation VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS author_workplace_id UUID REFERENCES companies(id)
+        `);
+        console.log('✅ Reviews table schema updated successfully');
+    } catch (error) {
+        console.error('Error updating reviews table:', error.message);
+    }
+};
+
+// Run the schema update
+updateReviewsTable();
+
+// UPDATED: Create review with author occupation and workplace
 const createReview = async (req, res) => {
     try {
         const { companyId, rating, content, isPublic = true } = req.body;
+
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
 
         // Check if company exists
         const company = await query(
@@ -25,18 +49,63 @@ const createReview = async (req, res) => {
             return res.status(400).json({ error: 'You have already reviewed this company' });
         }
 
+        // Get user's occupation and workplace
+        const user = await query(
+            `SELECT 
+                u.occupation, 
+                u.workplace_id,
+                json_build_object(
+                    'id', c.id,
+                    'name', c.name
+                ) as workplace
+             FROM users u
+             LEFT JOIN companies c ON u.workplace_id = c.id
+             WHERE u.id = $1`,
+            [req.user.id]
+        );
+
         const result = await query(
-            `INSERT INTO reviews (company_id, author_id, rating, content, is_public)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-            [companyId, req.user.id, rating, content, isPublic]
+            `INSERT INTO reviews (
+                company_id, 
+                author_id, 
+                rating, 
+                content, 
+                is_public, 
+                author_occupation, 
+                author_workplace_id
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING *`,
+            [
+                companyId,
+                req.user.id,
+                rating,
+                content,
+                isPublic,
+                user.rows[0]?.occupation,
+                user.rows[0]?.workplace_id
+            ]
         );
 
         const review = result.rows[0];
 
-        // Get author info
+        // Get complete author info with workplace
         const author = await query(
-            'SELECT id, display_name, is_anonymous FROM users WHERE id = $1',
+            `SELECT 
+                u.id, 
+                u.display_name, 
+                u.is_anonymous,
+                u.occupation,
+                u.avatar_url,
+                u.workplace_id,
+                json_build_object(
+                    'id', c.id,
+                    'name', c.name,
+                    'logo_url', c.logo_url
+                ) as workplace
+             FROM users u
+             LEFT JOIN companies c ON u.workplace_id = c.id
+             WHERE u.id = $1`,
             [req.user.id]
         );
 
@@ -50,11 +119,21 @@ const createReview = async (req, res) => {
     }
 };
 
+// UPDATED: Get company reviews with UUID validation and consistent pagination
 const getCompanyReviews = async (req, res) => {
     try {
         const { companyId } = req.params;
         const { page = 1, limit = 20, sort = 'newest' } = req.query;
-        const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        const validPage = Math.max(1, parseInt(page) || 1);
+        const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
+        const offset = (validPage - 1) * validLimit;
 
         let orderBy = 'r.created_at DESC';
         switch (sort) {
@@ -74,51 +153,64 @@ const getCompanyReviews = async (req, res) => {
             'SELECT COUNT(*) FROM reviews WHERE company_id = $1 AND is_public = true',
             [companyId]
         );
-        const total = parseInt(countResult.rows[0].count);
+        const total = parseInt(countResult.rows[0]?.count || 0);
 
-        // Get reviews with replies
+        // Get reviews with replies and author workplace info
         const result = await query(
-            `SELECT 
-        r.*,
-        json_build_object(
-          'id', u.id,
-          'displayName', u.display_name,
-          'isAnonymous', u.is_anonymous
-        ) as author,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'id', rep.id,
-              'content', rep.content,
-              'authorRole', rep.author_role,
-              'createdAt', rep.created_at,
-              'author', json_build_object(
-                'id', au.id,
-                'displayName', au.display_name,
-                'role', au.role
-              )
-            )
-            ORDER BY rep.created_at ASC
-          ) FILTER (WHERE rep.id IS NOT NULL), '[]'::json
-        ) as replies
-       FROM reviews r
-       JOIN users u ON r.author_id = u.id
-       LEFT JOIN replies rep ON r.id = rep.review_id
-       LEFT JOIN users au ON rep.author_id = au.id
-       WHERE r.company_id = $1 AND r.is_public = true
-       GROUP BY r.id, u.id
-       ORDER BY ${orderBy}
-       LIMIT $2 OFFSET $3`,
-            [companyId, parseInt(limit), offset]
+            `SELECT
+                 r.*,
+                 json_build_object(
+                         'id', u.id,
+                         'displayName', u.display_name,
+                         'isAnonymous', u.is_anonymous,
+                         'occupation', r.author_occupation,
+                         'avatarUrl', u.avatar_url,
+                         'workplace', CASE
+                                          WHEN r.author_workplace_id IS NOT NULL THEN
+                                              json_build_object(
+                                                      'id', c.id,
+                                                      'name', c.name,
+                                                      'logo_url', c.logo_url
+                                              )
+                                          ELSE NULL
+                             END
+                 ) as author,
+                 COALESCE(
+                         json_agg(
+                                 json_build_object(
+                                         'id', rep.id,
+                                         'content', rep.content,
+                                         'authorRole', rep.author_role,
+                                         'createdAt', rep.created_at,
+                                         'author', json_build_object(
+                                                 'id', au.id,
+                                                 'displayName', au.display_name,
+                                                 'role', au.role,
+                                                 'avatarUrl', au.avatar_url
+                                                   )
+                                 )
+                                     ORDER BY rep.created_at ASC
+                         ) FILTER (WHERE rep.id IS NOT NULL), '[]'::json
+                 ) as replies
+             FROM reviews r
+                      JOIN users u ON r.author_id = u.id
+                      LEFT JOIN companies c ON r.author_workplace_id = c.id
+                      LEFT JOIN replies rep ON r.id = rep.review_id
+                      LEFT JOIN users au ON rep.author_id = au.id
+             WHERE r.company_id = $1 AND r.is_public = true
+             GROUP BY r.id, u.id, c.id
+             ORDER BY ${orderBy}
+                 LIMIT $2 OFFSET $3`,
+            [companyId, validLimit, offset]
         );
 
         res.json({
             reviews: result.rows,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: validPage,
+                limit: validLimit,
                 total,
-                pages: Math.ceil(total / parseInt(limit))
+                pages: Math.ceil(total / validLimit)
             }
         });
     } catch (error) {
@@ -131,6 +223,12 @@ const updateReview = async (req, res) => {
     try {
         const { reviewId } = req.params;
         const { content, rating, isPublic } = req.body;
+
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(reviewId)) {
+            return res.status(400).json({ error: 'Invalid review ID format' });
+        }
 
         // Check if review exists and belongs to user
         const review = await query(
@@ -193,6 +291,12 @@ const deleteReview = async (req, res) => {
     try {
         const { reviewId } = req.params;
 
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(reviewId)) {
+            return res.status(400).json({ error: 'Invalid review ID format' });
+        }
+
         // Check if review exists and belongs to user
         const review = await query(
             'SELECT * FROM reviews WHERE id = $1',
@@ -230,6 +334,12 @@ const addReply = async (req, res) => {
         const { reviewId } = req.params;
         const { content } = req.body;
 
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(reviewId)) {
+            return res.status(400).json({ error: 'Invalid review ID format' });
+        }
+
         // Check if review exists
         const review = await query(
             'SELECT * FROM reviews WHERE id = $1',
@@ -254,14 +364,14 @@ const addReply = async (req, res) => {
 
         const result = await query(
             `INSERT INTO replies (review_id, author_id, author_role, content)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
+             VALUES ($1, $2, $3, $4)
+                 RETURNING *`,
             [reviewId, req.user.id, req.user.role, content]
         );
 
         // Get author info
         const author = await query(
-            'SELECT id, display_name, role FROM users WHERE id = $1',
+            'SELECT id, display_name, role, avatar_url FROM users WHERE id = $1',
             [req.user.id]
         );
 
@@ -275,72 +385,128 @@ const addReply = async (req, res) => {
     }
 };
 
-// Get user's own reviews
+// UPDATED: Get user's own reviews with workplace info
 const getMyReviews = async (req, res) => {
     try {
-        const result = await query(
-            `SELECT 
-        r.*,
-        json_build_object(
-          'id', c.id,
-          'name', c.name,
-          'logo_url', c.logo_url
-        ) as company
-       FROM reviews r
-       JOIN companies c ON r.company_id = c.id
-       WHERE r.author_id = $1
-       ORDER BY r.created_at DESC`,
+        const { page = 1, limit = 20 } = req.query;
+        const validPage = Math.max(1, parseInt(page) || 1);
+        const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
+        const offset = (validPage - 1) * validLimit;
+
+        const countResult = await query(
+            'SELECT COUNT(*) FROM reviews WHERE author_id = $1',
             [req.user.id]
         );
+        const total = parseInt(countResult.rows[0]?.count || 0);
 
-        res.json(result.rows);
+        const result = await query(
+            `SELECT
+                 r.*,
+                 json_build_object(
+                         'id', c.id,
+                         'name', c.name,
+                         'logo_url', c.logo_url
+                 ) as company,
+                 json_build_object(
+                         'id', u.id,
+                         'displayName', u.display_name,
+                         'occupation', u.occupation,
+                         'avatarUrl', u.avatar_url,
+                         'workplace', CASE
+                                          WHEN u.workplace_id IS NOT NULL THEN
+                                              json_build_object(
+                                                      'id', w.id,
+                                                      'name', w.name,
+                                                      'logo_url', w.logo_url
+                                              )
+                                          ELSE NULL
+                             END
+                 ) as author
+             FROM reviews r
+                      JOIN companies c ON r.company_id = c.id
+                      JOIN users u ON r.author_id = u.id
+                      LEFT JOIN companies w ON u.workplace_id = w.id
+             WHERE r.author_id = $1
+             ORDER BY r.created_at DESC
+                 LIMIT $2 OFFSET $3`,
+            [req.user.id, validLimit, offset]
+        );
+
+        res.json({
+            reviews: result.rows,
+            pagination: {
+                page: validPage,
+                limit: validLimit,
+                total,
+                pages: Math.ceil(total / validLimit)
+            }
+        });
     } catch (error) {
         console.error('Get my reviews error:', error);
         res.status(500).json({ error: 'Failed to fetch your reviews' });
     }
 };
 
-// Get review by ID
+// UPDATED: Get review by ID with workplace info
 const getReviewById = async (req, res) => {
     try {
         const { reviewId } = req.params;
 
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(reviewId)) {
+            return res.status(400).json({ error: 'Invalid review ID format' });
+        }
+
         const result = await query(
-            `SELECT 
-        r.*,
-        json_build_object(
-          'id', u.id,
-          'displayName', u.display_name,
-          'isAnonymous', u.is_anonymous
-        ) as author,
-        json_build_object(
-          'id', c.id,
-          'name', c.name,
-          'logo_url', c.logo_url
-        ) as company,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'id', rep.id,
-              'content', rep.content,
-              'authorRole', rep.author_role,
-              'createdAt', rep.created_at,
-              'author', json_build_object(
-                'id', au.id,
-                'displayName', au.display_name,
-                'role', au.role
-              )
-            )
-            ORDER BY rep.created_at ASC
-          ) FILTER (WHERE rep.id IS NOT NULL), '[]'::json
-        ) as replies
-       FROM reviews r
-       JOIN users u ON r.author_id = u.id
-       JOIN companies c ON r.company_id = c.id
-       LEFT JOIN replies rep ON r.id = rep.review_id
-       LEFT JOIN users au ON rep.author_id = au.id
-       WHERE r.id = $1
-       GROUP BY r.id, u.id, c.id`,
+            `SELECT
+                 r.*,
+                 json_build_object(
+                         'id', u.id,
+                         'displayName', u.display_name,
+                         'isAnonymous', u.is_anonymous,
+                         'occupation', r.author_occupation,
+                         'avatarUrl', u.avatar_url,
+                         'workplace', CASE
+                                          WHEN r.author_workplace_id IS NOT NULL THEN
+                                              json_build_object(
+                                                      'id', c.id,
+                                                      'name', c.name,
+                                                      'logo_url', c.logo_url
+                                              )
+                                          ELSE NULL
+                             END
+                 ) as author,
+                 json_build_object(
+                         'id', comp.id,
+                         'name', comp.name,
+                         'logo_url', comp.logo_url
+                 ) as company,
+                 COALESCE(
+                         json_agg(
+                                 json_build_object(
+                                         'id', rep.id,
+                                         'content', rep.content,
+                                         'authorRole', rep.author_role,
+                                         'createdAt', rep.created_at,
+                                         'author', json_build_object(
+                                                 'id', au.id,
+                                                 'displayName', au.display_name,
+                                                 'role', au.role,
+                                                 'avatarUrl', au.avatar_url
+                                                   )
+                                 )
+                                     ORDER BY rep.created_at ASC
+                         ) FILTER (WHERE rep.id IS NOT NULL), '[]'::json
+                 ) as replies
+             FROM reviews r
+                      JOIN users u ON r.author_id = u.id
+                      JOIN companies comp ON r.company_id = comp.id
+                      LEFT JOIN companies c ON r.author_workplace_id = c.id
+                      LEFT JOIN replies rep ON r.id = rep.review_id
+                      LEFT JOIN users au ON rep.author_id = au.id
+             WHERE r.id = $1
+             GROUP BY r.id, u.id, comp.id, c.id`,
             [reviewId]
         );
 
@@ -361,24 +527,30 @@ const reportReview = async (req, res) => {
         const { reviewId } = req.params;
         const { reason } = req.body;
 
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(reviewId)) {
+            return res.status(400).json({ error: 'Invalid review ID format' });
+        }
+
         // Create reports table if not exists
         await query(`
-      CREATE TABLE IF NOT EXISTS review_reports (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        review_id UUID REFERENCES reviews(id) ON DELETE CASCADE,
-        reporter_id UUID REFERENCES users(id) ON DELETE CASCADE,
-        reason TEXT NOT NULL,
-        status VARCHAR(50) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(review_id, reporter_id)
-      )
-    `);
+            CREATE TABLE IF NOT EXISTS review_reports (
+                                                          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                review_id UUID REFERENCES reviews(id) ON DELETE CASCADE,
+                reporter_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                reason TEXT NOT NULL,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(review_id, reporter_id)
+                )
+        `);
 
         await query(
             `INSERT INTO review_reports (review_id, reporter_id, reason)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (review_id, reporter_id) DO NOTHING
-       RETURNING id`,
+             VALUES ($1, $2, $3)
+                 ON CONFLICT (review_id, reporter_id) DO NOTHING
+             RETURNING id`,
             [reviewId, req.user.id, reason]
         );
 
@@ -394,18 +566,24 @@ const getCompanyReviewStats = async (req, res) => {
     try {
         const { companyId } = req.params;
 
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
         const result = await query(
-            `SELECT 
-        COUNT(*) as total_reviews,
-        COALESCE(AVG(rating), 0) as average_rating,
-        COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
-        COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
-        COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
-        COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
-        COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star,
-        COUNT(DISTINCT author_id) as unique_reviewers
-       FROM reviews
-       WHERE company_id = $1 AND is_public = true`,
+            `SELECT
+                 COUNT(*) as total_reviews,
+                 COALESCE(AVG(rating), 0) as average_rating,
+                 COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
+                 COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
+                 COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
+                 COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
+                 COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star,
+                 COUNT(DISTINCT author_id) as unique_reviewers
+             FROM reviews
+             WHERE company_id = $1 AND is_public = true`,
             [companyId]
         );
 
@@ -417,13 +595,13 @@ const getCompanyReviewStats = async (req, res) => {
 };
 
 module.exports = {
-    createReview,
-    getCompanyReviews,
-    getMyReviews,
-    getReviewById,
+    createReview, // Updated with occupation and workplace
+    getCompanyReviews, // Updated with workplace info in author object
+    getMyReviews, // Updated with workplace info
+    getReviewById, // Updated with workplace info
     updateReview,
     deleteReview,
-    addReply,
+    addReply, // Updated with avatar URL
     reportReview,
     getCompanyReviewStats
 };

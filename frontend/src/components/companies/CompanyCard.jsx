@@ -9,7 +9,12 @@ const CompanyCard = ({ company }) => {
     if (!company) return null;
 
     const handleClick = () => {
-        navigate(`/companies/${company.id}`);
+        // Ensure we have a valid ID before navigating
+        if (company.id) {
+            navigate(`/companies/${company.id}`);
+        } else {
+            console.error('Company has no ID:', company);
+        }
     };
 
     // Safely access properties with defaults

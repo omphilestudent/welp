@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const psychologistRoutes = require('./routes/psychologistRoutes');
+const userRoutes = require('./routes/userRoutes');
 require('dotenv').config();
 
 const { apiLimiter } = require('./middleware/rateLimiter');
@@ -13,7 +14,7 @@ const authRoutes = require('./routes/authRoutes');
 const companyRoutes = require('./routes/companyRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const messageRoutes = require('./routes/messageRoutes');
-
+const path = require('path');
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -39,10 +40,12 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/psychologists', psychologistRoutes);
+app.use('/api/users', userRoutes);
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date() });
 });
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Socket.io for real-time messaging
 io.use((socket, next) => {

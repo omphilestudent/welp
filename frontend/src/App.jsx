@@ -1,7 +1,6 @@
-// src/App.jsx
+// frontend/src/App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Navbar from './components/common/Navbar';
@@ -13,10 +12,11 @@ import CompanyPage from './pages/CompanyPage';
 import SearchPage from './pages/SearchPage';
 import Dashboard from './pages/Dashboard';
 import Messages from './pages/Messages';
-import JoinPsychologist from './pages/JoinPsychologist';
-import PrivateRoute from './components/auth/PrivateRoute';
+import Settings from './pages/Settings';
 import ClaimBusiness from './pages/ClaimBusiness';
+import JoinPsychologist from './pages/JoinPsychologist';
 import ApplicationSuccess from './pages/ApplicationSuccess';
+import PrivateRoute from './components/auth/PrivateRoute';
 import './styles/global.css';
 import './styles/theme.css';
 import './styles/components.css';
@@ -25,8 +25,12 @@ function App() {
     return (
         <ThemeProvider>
             <AuthProvider>
-                <Toaster position="top-right" />
-                <Router>
+                <Router
+                    future={{
+                        v7_startTransition: true,
+                        v7_relativeSplatPath: true
+                    }}
+                >
                     <div className="app">
                         <Navbar />
                         <main className="main-content">
@@ -47,35 +51,26 @@ function App() {
                                         </PrivateRoute>
                                     }
                                 />
-                                <Route path="/messages" element={<PrivateRoute><Messages /></PrivateRoute>} />
-                                <Route path="/psychologist-join" element={<JoinPsychologist />} />
+                                <Route
+                                    path="/messages"
+                                    element={
+                                        <PrivateRoute>
+                                            <Messages />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/settings"
+                                    element={
+                                        <PrivateRoute>
+                                            <Settings />
+                                        </PrivateRoute>
+                                    }
+                                />
                             </Routes>
                         </main>
                         <Footer />
                     </div>
-                    <Toaster
-                        position="top-right"
-                        toastOptions={{
-                            duration: 4000,
-                            style: {
-                                background: 'var(--card-bg)',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                            },
-                            success: {
-                                iconTheme: {
-                                    primary: 'var(--success-text)',
-                                    secondary: 'var(--success-bg)',
-                                },
-                            },
-                            error: {
-                                iconTheme: {
-                                    primary: 'var(--error-text)',
-                                    secondary: 'var(--error-bg)',
-                                },
-                            },
-                        }}
-                    />
                 </Router>
             </AuthProvider>
         </ThemeProvider>
