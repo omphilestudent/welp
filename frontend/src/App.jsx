@@ -18,6 +18,12 @@ import KYCRegistration from './pages/KYCRegistration';
 import JoinPsychologist from './pages/JoinPsychologist';
 import ApplicationSuccess from './pages/ApplicationSuccess';
 import Pricing from './pages/Pricing';
+import Careers from './pages/Careers';
+import JobDetails from './pages/JobDetails';
+import ApplyJob from './pages/ApplyJob';
+import Benefits from './pages/Benefits';
+import Internships from './pages/Internships';
+import GeneralApplication from './pages/GeneralApplication';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
@@ -25,22 +31,19 @@ import AdminLayout from './components/admin/AdminLayout';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import PricingManagement from './pages/admin/PricingManagement';
-import UserManagement from './pages/admin/UserManagement.jsx';
-import CompanyManagement from './pages/admin/CompanyManagement.jsx';
+import UserManagement from './pages/admin/UserManagement';
+import CompanyManagement from './pages/admin/CompanyManagement';
 import ReviewModeration from './pages/admin/ReviewModeration';
 import SubscriptionManagement from './pages/admin/SubscriptionManagement';
 import SystemSettings from './pages/admin/SystemSettings';
 
 // HR Pages
-import JobDetails from './pages/JobDetails';
 import HRDashboard from './pages/hr/HRDashboard';
 import JobPostings from './pages/hr/JobPostings';
-import Careers from './pages/Careers';
-
 import Applications from './pages/hr/Applications';
 import Interviews from './pages/hr/Interviews';
 import EmployeeRelations from './pages/hr/EmployeeRelations';
-import Departments from './pages/hr/Departments.jsx';
+import Departments from './pages/hr/Departments';
 
 import './styles/global.css';
 import './styles/theme.css';
@@ -62,12 +65,7 @@ function App() {
                         <main className="main-content">
                             <Routes>
                                 {/* Public Routes */}
-                                <Route path="/careers/jobs/:id" element={<JobDetails />} />
-                                <Route path="/careers/apply/:id" element={<ApplyJob />} />
-                                <Route path="/careers/benefits" element={<Benefits />} />
-                                <Route path="/careers/internships" element={<Internships />} />
                                 <Route path="/" element={<Home />} />
-                                <Route path="/careers" element={<Careers />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
                                 <Route path="/search" element={<SearchPage />} />
@@ -75,6 +73,14 @@ function App() {
                                 <Route path="/pricing" element={<Pricing />} />
                                 <Route path="/psychologist/join" element={<JoinPsychologist />} />
                                 <Route path="/application-success" element={<ApplicationSuccess />} />
+
+                                {/* Career Routes */}
+                                <Route path="/careers" element={<Careers />} />
+                                <Route path="/careers/jobs/:id" element={<JobDetails />} />
+                                <Route path="/careers/apply/:id" element={<ApplyJob />} />
+                                <Route path="/careers/benefits" element={<Benefits />} />
+                                <Route path="/careers/internships" element={<Internships />} />
+                                <Route path="/careers/apply/general" element={<GeneralApplication />} />
 
                                 {/* Protected Routes */}
                                 <Route
