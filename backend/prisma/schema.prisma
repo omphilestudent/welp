@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -24,6 +25,8 @@ model User {
   conversations ConversationParticipant[]
   companies     Company[] @relation("BusinessOwners")
   createdCompanies Company[] @relation("CompanyCreator")
+  employeeConversations Conversation[] @relation("EmployeeConversations")
+  psychologistConversations Conversation[] @relation("PsychologistConversations")
 }
 
 enum UserRole {
@@ -48,7 +51,7 @@ model Company {
   // Relations
   reviews     Review[]
   owners      User[]    @relation("BusinessOwners")
-  createdBy   User?     @relation("CompanyCreator", fields: [createdById], references: [id])
+  createdBy   User?     @relation("CompanyCreator")
   createdById String?
 }
 
@@ -92,7 +95,6 @@ model Conversation {
   psychologistId String
   psychologist  User   @relation("PsychologistConversations", fields: [psychologistId], references: [id])
   messages      Message[]
-  participants  ConversationParticipant[]
 }
 
 enum ConversationStatus {

@@ -1,0 +1,64 @@
+/* frontend/src/styles/theme.css */
+:root {
+    /* Light theme (default) */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f5;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --text-muted: #666666;
+    --border-color: #e0e0e0;
+    --card-bg: #ffffff;
+    --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --hover-bg: #f0f0f0;
+    --input-bg: #ffffff;
+    --input-border: #cccccc;
+    --button-bg: #000000;
+    --button-text: #ffffff;
+    --button-hover: #333333;
+    --error-bg: #ffeeee;
+    --error-text: #cc0000;
+    --success-bg: #eeffee;
+    --success-text: #006600;
+    --warning-bg: #fff3e0;
+    --warning-text: #cc7700;
+    --link-color: #000000;
+    --link-hover: #333333;
+    --rating-star: #000000;
+    --rating-star-empty: #cccccc;
+    --nav-bg: #ffffff;
+    --nav-border: #e0e0e0;
+}
+
+[data-theme="dark"] {
+    --bg-primary: #000000;
+    --bg-secondary: #1a1a1a;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-muted: #999999;
+    --border-color: #333333;
+    --card-bg: #1a1a1a;
+    --card-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+    --hover-bg: #333333;
+    --input-bg: #1a1a1a;
+    --input-border: #444444;
+    --button-bg: #ffffff;
+    --button-text: #000000;
+    --button-hover: #cccccc;
+    --error-bg: #331111;
+    --error-text: #ff6666;
+    --success-bg: #113311;
+    --success-text: #66cc66;
+    --warning-bg: #332211;
+    --warning-text: #ffaa66;
+    --link-color: #ffffff;
+    --link-hover: #cccccc;
+    --rating-star: #ffffff;
+    --rating-star-empty: #444444;
+    --nav-bg: #1a1a1a;
+    --nav-border: #333333;
+}
+
+/* Smooth transitions */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
