@@ -20,6 +20,7 @@ import ApplicationSuccess from './pages/ApplicationSuccess';
 import PrivateRoute from './components/auth/PrivateRoute';
 import './styles/global.css';
 import './styles/theme.css';
+import './styles/admin.css';
 import Pricing from './pages/Pricing';
 import './styles/components.css';
 
