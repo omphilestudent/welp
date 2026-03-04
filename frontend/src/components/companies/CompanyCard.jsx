@@ -1,7 +1,7 @@
 // frontend/src/components/companies/CompanyCard.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaStar, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaMapMarkerAlt } from 'react-icons/fa';
 
 const CompanyCard = ({ company }) => {
     const navigate = useNavigate();
@@ -25,14 +25,23 @@ const CompanyCard = ({ company }) => {
     const reviewCount = company.review_count || company.reviewCount || 0;
     const description = company.description || 'No description available';
     const isClaimed = company.is_claimed || false;
+    const logoUrl = company.logo_url || company.logoUrl;
+    const [showLogoFallback, setShowLogoFallback] = useState(false);
 
     return (
         <div className="company-card" onClick={handleClick}>
             <div className="company-card-header">
-                {company.logo_url ? (
-                    <img src={company.logo_url} alt={name} className="company-card-logo" />
+                {logoUrl && !showLogoFallback ? (
+                    <img
+                        src={logoUrl}
+                        alt={`${name} logo`}
+                        className="company-card-logo"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={() => setShowLogoFallback(true)}
+                    />
                 ) : (
-                    <div className="company-card-logo-placeholder">
+                    <div className="company-card-logo-placeholder" aria-label={`${name} initial`}>
                         {name.charAt(0)}
                     </div>
                 )}
