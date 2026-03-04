@@ -93,7 +93,7 @@ const Footer = () => {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .career-link {
                     display: flex;
                     align-items: center;

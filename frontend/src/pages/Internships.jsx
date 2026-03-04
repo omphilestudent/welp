@@ -375,7 +375,7 @@ const Internships = () => {
                 </div>
             </section>
 
-            <style jsx>{`
+            <style>{`
                 .internships-page {
                     overflow-x: hidden;
                 }

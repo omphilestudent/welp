@@ -502,7 +502,7 @@ const HRDashboard = () => {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .hr-dashboard {
                     padding: 2rem;
                     max-width: 1600px;

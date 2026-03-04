@@ -670,7 +670,7 @@ const CompanyManagement = () => {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
                 .company-management {
                     padding: 2rem;
                 }

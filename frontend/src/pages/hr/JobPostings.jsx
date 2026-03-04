@@ -573,7 +573,7 @@ const JobPostings = () => {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
                 .job-postings-page {
                     padding: 2rem;
                     max-width: 1600px;

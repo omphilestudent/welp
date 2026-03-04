@@ -592,7 +592,7 @@ const Careers = () => {
                 </div>
             </section>
 
-            <style jsx>{`
+            <style>{`
                 .careers-page {
                     overflow-x: hidden;
                 }
