@@ -23,6 +23,29 @@ const authLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+// Extra strict limiter for login using IP + email fingerprint
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5,
+    keyGenerator: (req) => `${req.ip}:${(req.body?.email || '').toLowerCase()}`,
+    message: {
+        error: 'Too many login attempts for this account. Please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Sensitive account actions limiter
+const accountSecurityLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: {
+        error: 'Too many sensitive account actions. Please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // Review creation limiter
 const reviewLimiter = rateLimit({
     windowMs: 24 * 60 * 60 * 1000, // 24 hours
@@ -48,6 +71,8 @@ const messageLimiter = rateLimit({
 module.exports = {
     apiLimiter,
     authLimiter,
+    loginLimiter,
+    accountSecurityLimiter,
     reviewLimiter,
     messageLimiter
 };

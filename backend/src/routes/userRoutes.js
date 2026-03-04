@@ -2,7 +2,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
-const { apiLimiter } = require('../middleware/rateLimiter');
+const { apiLimiter, accountSecurityLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
 const userController = require('../controllers/userController');
 const multer = require('multer');
@@ -83,10 +83,17 @@ router.post('/upload-avatar',
 // Password change
 router.post('/change-password',
     authenticate,
-    apiLimiter,
+    accountSecurityLimiter,
     validate([
         body('currentPassword').notEmpty().withMessage('Current password is required'),
-        body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
+        body('newPassword')
+            .isLength({ min: 10 }).withMessage('New password must be at least 10 characters long')
+            .matches(/[A-Z]/).withMessage('New password must contain at least one uppercase letter')
+            .matches(/[a-z]/).withMessage('New password must contain at least one lowercase letter')
+            .matches(/[0-9]/).withMessage('New password must contain at least one number')
+            .matches(/[^A-Za-z0-9]/).withMessage('New password must contain at least one special character')
+            .custom((value, { req }) => value !== req.body.currentPassword)
+            .withMessage('New password must be different from the current password')
     ]),
     userController.changePassword
 );
@@ -110,7 +117,7 @@ router.post('/add-psychologist-profile',
 // Account management
 router.delete('/delete-account',
     authenticate,
-    apiLimiter,
+    accountSecurityLimiter,
     validate([
         body('password').notEmpty().withMessage('Password is required')
     ]),
