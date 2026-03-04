@@ -1,0 +1,379 @@
+/* ===== Responsive Design ===== */
+@media (max-width: 1200px) {
+  .footer-content {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .psychologist-content {
+    gap: 2rem;
+  }
+
+  .psychologist-form {
+    padding: 2rem;
+  }
+
+  .featured-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .hero-title {
+    font-size: 3rem;
+  }
+
+  .hero-subtitle {
+    font-size: 2rem;
+  }
+
+  .claim-content,
+  .psychologist-content {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 992px) {
+  .psychologist-content {
+    grid-template-columns: 1fr;
+  }
+
+  .psychologist-sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .featured-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .global-stats {
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-divider {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar-menu {
+    display: none;
+  }
+
+  .hero-title {
+    font-size: 2.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.75rem;
+  }
+
+  .hero-description {
+    font-size: 1.1rem;
+  }
+
+  .company-info {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .company-rating {
+    margin: 0 auto;
+  }
+
+  .company-meta {
+    justify-content: center;
+  }
+
+  .review-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .reply {
+    margin-left: 0;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .messages-sidebar {
+    width: 100%;
+    position: absolute;
+    z-index: 10;
+    background: var(--bg-primary);
+    height: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .messages-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .auth-card {
+    padding: 2rem;
+  }
+
+  .request-card,
+  .company-dashboard-card {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-sidebar {
+    position: sticky;
+    top: 80px;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .settings-nav-item {
+    white-space: nowrap;
+  }
+
+  .theme-options {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-content {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .profile-avatar-container {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .reviewer-info {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .psychologist-hero {
+    padding: 4rem 0;
+  }
+
+  .psychologist-hero h1 {
+    font-size: 2rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .psychologist-steps {
+    padding: 0 1rem;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .psychologist-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .review-item {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .review-label {
+    width: 100%;
+  }
+
+  .search-wrapper {
+    flex-direction: column;
+    background: transparent;
+    box-shadow: none;
+    gap: 1rem;
+  }
+
+  .search-wrapper input {
+    background: white;
+    border-radius: 40px;
+  }
+
+  .search-wrapper .search-button {
+    width: 100%;
+  }
+
+  .global-stats {
+    flex-direction: column;
+    gap: 1.5rem;
+    border-radius: 30px;
+  }
+
+  .featured-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-tabs {
+    flex-direction: column;
+    padding: 0 1rem;
+  }
+
+  .filter-tab {
+    width: 100%;
+  }
+
+  .trust-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cta-section h2 {
+    font-size: 2rem;
+  }
+
+  .cta-content p {
+    font-size: 1rem;
+  }
+
+  .section-header.enhanced h2 {
+    font-size: 2rem;
+  }
+
+  .section-header.enhanced p {
+    font-size: 1rem;
+    padding: 0 1rem;
+  }
+
+  .category-pills {
+    padding: 0 1rem;
+  }
+
+  .category-pill {
+    font-size: 0.8rem;
+    padding: 0.4rem 1rem;
+  }
+
+  .scroll-top {
+    bottom: 1rem;
+    right: 1rem;
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+  }
+
+  .featured-slider {
+    padding: 0 1rem;
+  }
+
+  .slider-item {
+    flex: 0 0 250px;
+  }
+
+  .claim-header-content h1 {
+    font-size: 2rem;
+  }
+
+  .company-info-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .company-status {
+    margin: 0 auto;
+  }
+
+  .claim-steps,
+  .psychologist-steps {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .step-connector {
+    display: none;
+  }
+
+  .checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .verification-actions {
+    flex-direction: column;
+  }
+
+  .resend-timer {
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.5rem;
+  }
+
+  .search-input-wrapper {
+    flex-direction: column;
+  }
+
+  .search-button {
+    width: 100%;
+    padding: 1rem;
+  }
+
+  .cta-buttons {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .cta-buttons .btn {
+    width: 100%;
+  }
+
+  .role-options {
+    flex-direction: column;
+  }
+
+  .auth-card {
+    padding: 1.5rem;
+  }
+
+  .claim-header-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .claim-form,
+  .psychologist-form {
+    padding: 1.5rem;
+  }
+
+  .verification-actions {
+    flex-direction: column;
+  }
+}
+

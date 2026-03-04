@@ -1,0 +1,49 @@
+/* ===== Registration Steps ===== */
+.register-steps {
+  display: flex;
+  align-items: center;
+  margin: 2rem 0;
+}
+
+.register-steps .step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.register-steps .step-number {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.register-steps .step.active .step-number {
+  background: var(--accent-color);
+  color: white;
+}
+
+.register-steps .step-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.register-steps .step-connector {
+  width: 50px;
+  height: 2px;
+  background: var(--border-color);
+  margin: 0 0.5rem;
+}
+
+.step-title {
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  font-size: 1.2rem;
+}
+

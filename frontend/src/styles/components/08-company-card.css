@@ -1,0 +1,136 @@
+/* ===== Company Card ===== */
+.company-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  animation: scaleIn 0.5s ease-out;
+}
+
+.company-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.company-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.2);
+}
+
+.company-card:hover::before {
+  transform: scaleX(1);
+}
+
+.company-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.company-card-logo {
+  width: 70px;
+  height: 70px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.company-card:hover .company-card-logo {
+  transform: scale(1.05) rotate(2deg);
+}
+
+.company-card-logo-placeholder {
+  width: 70px;
+  height: 70px;
+  border-radius: 16px;
+  background: var(--gradient-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.company-card-info {
+  flex: 1;
+}
+
+.company-card-name {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+}
+
+.company-card:hover .company-card-name {
+  color: var(--accent-color);
+}
+
+.company-card-industry {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  display: inline-block;
+  background: var(--bg-secondary);
+  padding: 0.25rem 0.75rem;
+  border-radius: 30px;
+  font-weight: 500;
+}
+
+.company-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 30px;
+  width: fit-content;
+}
+
+.company-card-address {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.company-card-description {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.company-card-unclaimed {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: var(--gradient-warning);
+  color: white;
+  padding: 0.35rem 1rem;
+  border-radius: 30px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+

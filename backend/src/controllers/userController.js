@@ -96,6 +96,10 @@ const changePassword = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        if (!user.rows[0].password_hash) {
+            return res.status(400).json({ error: 'Password change is not available for this account type' });
+        }
+
         // Verify current password
         const validPassword = await bcrypt.compare(currentPassword, user.rows[0].password_hash);
         if (!validPassword) {
@@ -103,15 +107,21 @@ const changePassword = async (req, res) => {
         }
 
         // Hash new password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-        // Update password
+        // Update password + revoke existing sessions by incrementing token version
         await query(
-            'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            'UPDATE users SET password_hash = $1, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [hashedPassword, req.user.id]
         );
 
-        res.json({ message: 'Password changed successfully' });
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        });
+
+        res.json({ message: 'Password changed successfully. Please login again.' });
     } catch (error) {
         console.error('Change password error:', error);
         res.status(500).json({ error: 'Failed to change password' });
@@ -276,6 +286,10 @@ const deleteAccount = async (req, res) => {
 
         if (user.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (!user.rows[0].password_hash) {
+            return res.status(400).json({ error: 'Account deletion requires a password-based account' });
         }
 
         // Verify password
