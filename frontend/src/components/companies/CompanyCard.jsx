@@ -122,6 +122,20 @@ const CompanyCard = ({ company }) => {
     const reviewCount = company.review_count || company.reviewCount || 0;
     const description = company.description || 'No description available';
     const isClaimed = company.is_claimed || false;
+    const [logoStage, setLogoStage] = useState(0);
+
+    const primaryLogoUrl = useMemo(() => getPrimaryLogoUrl(company, name), [company, name]);
+    const secondaryLogoUrl = useMemo(() => getSecondaryLogoUrl(name), [name]);
+    const activeLogoUrl = logoStage === 0 ? primaryLogoUrl : (logoStage === 1 ? secondaryLogoUrl : null);
+
+    const handleLogoError = () => {
+        if (logoStage === 0 && secondaryLogoUrl) {
+            setLogoStage(1);
+            return;
+        }
+
+        setLogoStage(2);
+    };
 
     const primaryLogoUrl = useMemo(() => getPrimaryLogoUrl(company, name), [company, name]);
     const secondaryLogoUrl = useMemo(() => getSecondaryLogoUrl(name), [name]);
