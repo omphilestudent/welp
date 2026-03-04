@@ -98,16 +98,7 @@ const getDashboardStats = async (req, res) => {
         });
     } catch (error) {
         console.error('Get dashboard stats error:', error);
-        // Return mock data if database query fails
-        res.json({
-            users: { total_users: 15234, new_users_today: 127, employees: 12000, psychologists: 1800, businesses: 1434 },
-            companies: { total_companies: 892, claimed_companies: 456, verified_companies: 678 },
-            reviews: { total_reviews: 45321, pending_reviews: 234, avg_rating: 4.2 },
-            subscriptions: { total_subscriptions: 5678, active_subscriptions: 4321, total_revenue: 45890 },
-            recentActivity: [],
-            revenueGrowth: 12.5,
-            userGrowth: 8.3
-        });
+        res.status(500).json({ error: 'Failed to fetch dashboard stats' });
     }
 };
 

@@ -1,8 +1,8 @@
-// src/components/companies/CompanyList.jsx
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import CompanyCard from './CompanyCard';
 import Loading from '../common/Loading';
+import './CompanyList.css';
 
 /**
  * CompanyList component displays a grid/list of company cards
