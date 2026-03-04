@@ -1,64 +1,7 @@
 // frontend/src/components/companies/CompanyCard.jsx
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaMapMarkerAlt } from 'react-icons/fa';
-
-const COMPANY_DOMAIN_MAP = {
-    google: 'google.com',
-    'deepseek ai': 'deepseek.com',
-    meta: 'meta.com',
-    'capitec bank': 'capitecbank.co.za',
-    'standard bank': 'standardbank.co.za',
-    'apple inc.': 'apple.com',
-    apple: 'apple.com',
-    amazon: 'amazon.com',
-    microsoft: 'microsoft.com',
-    tesla: 'tesla.com',
-    netflix: 'netflix.com',
-    spotify: 'spotify.com',
-    airbnb: 'airbnb.com',
-    uber: 'uber.com',
-    linkedin: 'linkedin.com',
-    salesforce: 'salesforce.com',
-    oracle: 'oracle.com',
-    ibm: 'ibm.com',
-    intel: 'intel.com',
-    nvidia: 'nvidia.com',
-    adobe: 'adobe.com'
-};
-
-const getDomainFromWebsite = (website) => {
-    if (!website || typeof website !== 'string') {
-        return null;
-    }
-
-    const normalizedWebsite = website.startsWith('http') ? website : `https://${website}`;
-
-    try {
-        const parsedUrl = new URL(normalizedWebsite);
-        return parsedUrl.hostname.replace(/^www\./, '');
-    } catch (error) {
-        return null;
-    }
-};
-
-const getLogoUrl = (company, name) => {
-    if (company.logo_url || company.logoUrl) {
-        return company.logo_url || company.logoUrl;
-    }
-
-    const domainFromWebsite = getDomainFromWebsite(company.website);
-    if (domainFromWebsite) {
-        return `https://logo.clearbit.com/${domainFromWebsite}`;
-    }
-
-    const mappedDomain = COMPANY_DOMAIN_MAP[name.toLowerCase()];
-    if (mappedDomain) {
-        return `https://logo.clearbit.com/${mappedDomain}`;
-    }
-
-    return null;
-};
 
 const CompanyCard = ({ company }) => {
     const navigate = useNavigate();
@@ -80,15 +23,15 @@ const CompanyCard = ({ company }) => {
     const reviewCount = company.review_count || company.reviewCount || 0;
     const description = company.description || 'No description available';
     const isClaimed = company.is_claimed || false;
+    const logoUrl = company.logo_url || company.logoUrl;
     const [showLogoFallback, setShowLogoFallback] = useState(false);
-    const resolvedLogoUrl = useMemo(() => getLogoUrl(company, name), [company, name]);
 
     return (
         <div className="company-card" onClick={handleClick}>
             <div className="company-card-header">
-                {resolvedLogoUrl && !showLogoFallback ? (
+                {logoUrl && !showLogoFallback ? (
                     <img
-                        src={resolvedLogoUrl}
+                        src={logoUrl}
                         alt={`${name} logo`}
                         className="company-card-logo"
                         loading="lazy"
