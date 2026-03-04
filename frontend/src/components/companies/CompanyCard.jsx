@@ -9,7 +9,6 @@ const CompanyCard = ({ company }) => {
     if (!company) return null;
 
     const handleClick = () => {
-        // Ensure we have a valid ID before navigating
         if (company.id) {
             navigate(`/companies/${company.id}`);
         } else {
@@ -17,7 +16,6 @@ const CompanyCard = ({ company }) => {
         }
     };
 
-    // Safely access properties with defaults
     const name = company.name || 'Unknown Company';
     const industry = company.industry || 'General';
     const location = company.address || company.location || 'Location not specified';
