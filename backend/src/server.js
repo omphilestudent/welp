@@ -88,6 +88,17 @@ io.on('connection', (socket) => {
             const { conversationId, content } = data;
 
             const { query } = require('./utils/database');
+
+            const conversationAccess = await query(
+                `SELECT id FROM conversations
+                 WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
+                [conversationId, socket.userId]
+            );
+
+            if (conversationAccess.rows.length === 0) {
+                return socket.emit('error', { message: 'Unauthorized conversation access' });
+            }
+
             const result = await query(
                 `INSERT INTO messages (conversation_id, sender_id, content)
                  VALUES ($1, $2, $3)
