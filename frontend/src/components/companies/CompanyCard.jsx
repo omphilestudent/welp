@@ -92,6 +92,9 @@ const getSecondaryLogoUrl = (name) => {
 
     return `https://cdn.simpleicons.org/${iconSlug}`;
 };
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FaMapMarkerAlt } from 'react-icons/fa';
 
 const CompanyCard = ({ company }) => {
     const navigate = useNavigate();
@@ -127,6 +130,8 @@ const CompanyCard = ({ company }) => {
 
         setLogoStage(2);
     };
+    const logoUrl = company.logo_url || company.logoUrl;
+    const [showLogoFallback, setShowLogoFallback] = useState(false);
 
     return (
         <div className="company-card" onClick={handleClick}>
@@ -134,6 +139,9 @@ const CompanyCard = ({ company }) => {
                 {activeLogoUrl ? (
                     <img
                         src={activeLogoUrl}
+                {logoUrl && !showLogoFallback ? (
+                    <img
+                        src={logoUrl}
                         alt={`${name} logo`}
                         className="company-card-logo"
                         loading="lazy"
@@ -143,6 +151,11 @@ const CompanyCard = ({ company }) => {
                 ) : (
                     <div className="company-card-logo-placeholder" aria-label={`${name} logo placeholder`}>
                         <FaBuilding />
+                        onError={() => setShowLogoFallback(true)}
+                    />
+                ) : (
+                    <div className="company-card-logo-placeholder" aria-label={`${name} initial`}>
+                        {name.charAt(0)}
                     </div>
                 )}
                 <div className="company-card-info">

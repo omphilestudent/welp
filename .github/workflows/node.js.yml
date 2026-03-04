@@ -30,14 +30,8 @@ jobs:
         run: npm ci
         working-directory: ./backend
 
-      - name: Clean and install frontend dependencies (native bindings safe)
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install --include=optional
-        working-directory: ./frontend
-
-      - name: Rebuild native frontend modules
-        run: npm rebuild
+      - name: Install frontend dependencies
+        run: npm ci
         working-directory: ./frontend
 
       - name: Build backend (if present)
