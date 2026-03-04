@@ -18,6 +18,19 @@ const psychologistRoutes = require('./routes/psychologistRoutes');
 const pricingRoutes = require('./routes/pricingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const hrRoutes = require('./routes/hrRoutes');
+let rbacUserRoutes;
+let roleRoutes;
+let authV2Routes;
+let sequelize;
+
+try {
+    rbacUserRoutes = require('./routes/rbacUserRoutes');
+    roleRoutes = require('./routes/roleRoutes');
+    authV2Routes = require('./routes/authV2Routes');
+    ({ sequelize } = require('./models'));
+} catch (error) {
+    console.warn('⚠️ RBAC Sequelize module unavailable:', error.message);
+}
 
 const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
     .split(',')
@@ -67,6 +80,11 @@ app.use('/api/psychologists', psychologistRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hr', hrRoutes);
+if (authV2Routes && rbacUserRoutes && roleRoutes) {
+    app.use('/api/rbac/auth', authV2Routes);
+    app.use('/api/rbac/users', rbacUserRoutes);
+    app.use('/api/rbac/roles', roleRoutes);
+}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -152,8 +170,20 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+
+(async () => {
+    if (sequelize) {
+        try {
+            await sequelize.authenticate();
+            console.log('✅ Sequelize connection initialized');
+        } catch (error) {
+            console.warn('⚠️ Sequelize connection unavailable:', error.message);
+        }
+    }
+
+    httpServer.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+})();
 
 module.exports = { app, httpServer };
