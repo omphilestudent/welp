@@ -45,6 +45,7 @@ const createTables = async () => {
         occupation VARCHAR(255),
         workplace_id UUID REFERENCES companies(id),
         is_verified BOOLEAN DEFAULT false,
+        token_version INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -62,6 +63,7 @@ const createTables = async () => {
         logo_url TEXT,
         is_claimed BOOLEAN DEFAULT false,
         created_by_user_id UUID REFERENCES users(id),
+        token_version INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -81,6 +83,7 @@ const createTables = async () => {
         rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
         content TEXT NOT NULL,
         is_public BOOLEAN DEFAULT true,
+        token_version INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -92,6 +95,7 @@ const createTables = async () => {
         author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         author_role VARCHAR(50) NOT NULL,
         content TEXT NOT NULL,
+        token_version INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -200,6 +204,7 @@ const runMigrations = async () => {
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation VARCHAR(255);",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS workplace_id UUID REFERENCES companies(id);",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 0;",
             "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_system_message BOOLEAN DEFAULT false;",
             "ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP;",

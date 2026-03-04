@@ -1,0 +1,158 @@
+/* ===== Company Page ===== */
+.company-page {
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.company-header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 3rem 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.company-header::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
+  opacity: 0.05;
+  animation: rotate 60s linear infinite;
+}
+
+.company-info {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  position: relative;
+  z-index: 1;
+}
+
+.company-logo {
+  width: 120px;
+  height: 120px;
+  border-radius: 24px;
+  object-fit: cover;
+  box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.2);
+  border: 4px solid var(--card-bg);
+  animation: scaleIn 0.5s ease-out;
+}
+
+.company-logo-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 24px;
+  background: var(--gradient-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  font-weight: bold;
+  box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.2);
+  border: 4px solid var(--card-bg);
+}
+
+.company-details {
+  flex: 1;
+}
+
+.company-name {
+  font-size: 3rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.company-rating {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  background: var(--card-bg);
+  padding: 0.75rem 1.5rem;
+  border-radius: 50px;
+  width: fit-content;
+  box-shadow: var(--card-shadow);
+}
+
+.rating-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.review-count {
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.company-industry {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  display: inline-block;
+  padding: 0.5rem 1.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 30px;
+}
+
+.company-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.company-meta span, .company-meta a {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.company-description {
+  margin: 2rem 0;
+  padding: 2rem;
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  line-height: 1.8;
+}
+
+.reviews-section {
+  margin: 3rem 0;
+}
+
+.reviews-section h2 {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: var(--text-primary);
+  position: relative;
+  display: inline-block;
+}
+
+.reviews-section h2::after {
+  content: '';
+  position: absolute;
+  bottom: -0.5rem;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: var(--gradient-primary);
+}
+
+.no-reviews {
+  text-align: center;
+  padding: 4rem;
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  border: 2px dashed var(--border-color);
+}
+

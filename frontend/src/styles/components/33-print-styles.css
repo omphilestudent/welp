@@ -1,0 +1,15 @@
+/* ===== Print Styles ===== */
+@media print {
+  .scroll-top,
+  .newsletter-section,
+  .cta-section,
+  .app-download-section {
+    display: none;
+  }
+
+  .company-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
