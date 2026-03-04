@@ -19,6 +19,7 @@ const Home = () => {
             description: 'Leading technology company specializing in internet services and products.',
             rating: 4.5,
             reviewCount: 15234,
+            logo_url: 'https://logo.clearbit.com/google.com',
             is_claimed: true
         },
         {
@@ -29,6 +30,7 @@ const Home = () => {
             description: 'Cutting-edge AI research and development company.',
             rating: 4.8,
             reviewCount: 3456,
+            logo_url: 'https://logo.clearbit.com/deepseek.com',
             is_claimed: true
         },
         {
@@ -39,6 +41,7 @@ const Home = () => {
             description: 'Building the metaverse and connecting people through technology.',
             rating: 4.2,
             reviewCount: 12456,
+            logo_url: 'https://logo.clearbit.com/meta.com',
             is_claimed: true
         },
         {
@@ -49,6 +52,7 @@ const Home = () => {
             description: 'South Africas leading digital bank.',
             rating: 4.3,
             reviewCount: 5678,
+            logo_url: 'https://logo.clearbit.com/capitecbank.co.za',
             is_claimed: false
         },
         {
@@ -59,6 +63,7 @@ const Home = () => {
             description: 'Africas largest bank by assets.',
             rating: 4.1,
             reviewCount: 7890,
+            logo_url: 'https://logo.clearbit.com/standardbank.co.za',
             is_claimed: false
         },
         {
@@ -69,6 +74,7 @@ const Home = () => {
             description: 'Designing the worlds best consumer electronics.',
             rating: 4.7,
             reviewCount: 21345,
+            logo_url: 'https://logo.clearbit.com/apple.com',
             is_claimed: true
         },
         {
@@ -79,6 +85,7 @@ const Home = () => {
             description: 'Earths most customer-centric company.',
             rating: 4.0,
             reviewCount: 32456,
+            logo_url: 'https://logo.clearbit.com/amazon.com',
             is_claimed: true
         },
         {
@@ -89,6 +96,7 @@ const Home = () => {
             description: 'Empowering every person and organization.',
             rating: 4.4,
             reviewCount: 18765,
+            logo_url: 'https://logo.clearbit.com/microsoft.com',
             is_claimed: true
         },
         {
@@ -99,6 +107,7 @@ const Home = () => {
             description: 'Accelerating worlds transition to sustainable energy.',
             rating: 4.3,
             reviewCount: 15432,
+            logo_url: 'https://logo.clearbit.com/tesla.com',
             is_claimed: true
         },
         {
@@ -109,6 +118,7 @@ const Home = () => {
             description: 'Leading streaming entertainment service.',
             rating: 4.2,
             reviewCount: 12345,
+            logo_url: 'https://logo.clearbit.com/netflix.com',
             is_claimed: true
         },
         {
@@ -119,6 +129,7 @@ const Home = () => {
             description: 'Worlds most popular audio streaming service.',
             rating: 4.3,
             reviewCount: 9876,
+            logo_url: 'https://logo.clearbit.com/spotify.com',
             is_claimed: true
         },
         {
@@ -129,6 +140,7 @@ const Home = () => {
             description: 'Connecting travelers with unique accommodations.',
             rating: 4.1,
             reviewCount: 23456,
+            logo_url: 'https://logo.clearbit.com/airbnb.com',
             is_claimed: true
         },
         {
@@ -139,6 +151,7 @@ const Home = () => {
             description: 'Rethinking mobility through technology.',
             rating: 3.9,
             reviewCount: 34567,
+            logo_url: 'https://logo.clearbit.com/uber.com',
             is_claimed: true
         },
         {
@@ -149,6 +162,7 @@ const Home = () => {
             description: 'Worlds largest professional network.',
             rating: 4.2,
             reviewCount: 15678,
+            logo_url: 'https://logo.clearbit.com/linkedin.com',
             is_claimed: true
         },
         {
@@ -159,6 +173,7 @@ const Home = () => {
             description: 'Customer relationship management platform.',
             rating: 4.3,
             reviewCount: 14567,
+            logo_url: 'https://logo.clearbit.com/salesforce.com',
             is_claimed: true
         },
         {
@@ -169,6 +184,7 @@ const Home = () => {
             description: 'Integrated cloud applications and services.',
             rating: 4.0,
             reviewCount: 11234,
+            logo_url: 'https://logo.clearbit.com/oracle.com',
             is_claimed: true
         },
         {
@@ -179,6 +195,7 @@ const Home = () => {
             description: 'Leading hybrid cloud and AI services.',
             rating: 4.1,
             reviewCount: 22345,
+            logo_url: 'https://logo.clearbit.com/ibm.com',
             is_claimed: true
         },
         {
@@ -189,6 +206,7 @@ const Home = () => {
             description: 'Creating world-changing technology.',
             rating: 4.2,
             reviewCount: 13456,
+            logo_url: 'https://logo.clearbit.com/intel.com',
             is_claimed: true
         },
         {
@@ -199,6 +217,7 @@ const Home = () => {
             description: 'Pioneering accelerated computing and AI.',
             rating: 4.8,
             reviewCount: 17890,
+            logo_url: 'https://logo.clearbit.com/nvidia.com',
             is_claimed: true
         },
         {
@@ -209,6 +228,7 @@ const Home = () => {
             description: 'Changing the world through digital experiences.',
             rating: 4.4,
             reviewCount: 12345,
+            logo_url: 'https://logo.clearbit.com/adobe.com',
             is_claimed: true
         }
     ];

@@ -1,0 +1,180 @@
+/* ===== Settings Page ===== */
+.settings-page {
+  padding: 2rem 0;
+  min-height: 100vh;
+}
+
+.settings-title {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  color: var(--text-primary);
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 2rem;
+}
+
+.settings-sidebar {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  height: fit-content;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: none;
+  background: none;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.settings-nav-item:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.settings-nav-item.active {
+  background: var(--accent-color);
+  color: white;
+}
+
+.settings-nav-item svg {
+  font-size: 1.2rem;
+}
+
+.settings-content {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 2rem;
+  border: 1px solid var(--border-color);
+}
+
+.settings-section {
+  max-width: 600px;
+}
+
+.settings-section h2 {
+  font-size: 1.8rem;
+  margin-bottom: 2rem;
+  color: var(--text-primary);
+}
+
+.settings-section h3 {
+  font-size: 1.2rem;
+  margin: 1.5rem 0 1rem;
+  color: var(--text-primary);
+}
+
+.password-section {
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Danger Zone */
+.danger-zone {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: var(--error-bg);
+  border-radius: 12px;
+  border: 1px solid var(--error-border);
+}
+
+.danger-zone h3 {
+  color: var(--error-text);
+  margin-top: 0;
+}
+
+.danger-zone p {
+  color: var(--error-text);
+  margin-bottom: 1rem;
+  opacity: 0.9;
+}
+
+.delete-confirm {
+  margin-top: 1rem;
+}
+
+.warning-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--error-text);
+  margin-bottom: 1rem;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* Notification Options */
+.notification-options {
+  margin: 2rem 0;
+}
+
+.notification-options .checkbox-label {
+  margin-bottom: 1rem;
+}
+
+/* Theme Options */
+.theme-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.theme-option {
+  padding: 2rem;
+  border: 2px solid var(--border-color);
+  border-radius: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.theme-option:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--card-shadow);
+}
+
+.theme-option.active {
+  border-color: var(--accent-color);
+  background: var(--hover-bg);
+}
+
+.theme-icon {
+  font-size: 3rem;
+  color: var(--accent-color);
+  margin-bottom: 1rem;
+}
+
+.check-icon {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  color: var(--accent-color);
+  font-size: 1.2rem;
+}
+
