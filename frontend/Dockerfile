@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Expose frontend port
-EXPOSE 3000
+EXPOSE 5173
 
 # Use Next.js dev server by default for fast development with volumes
 ENV NODE_ENV=development

@@ -1,6 +1,14 @@
 // backend/src/middleware/validation.js
 const { body, validationResult } = require('express-validator');
 
+
+const passwordValidation = body('password')
+    .isLength({ min: 10 }).withMessage('Password must be at least 10 characters long')
+    .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+    .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
+    .matches(/[0-9]/).withMessage('Password must contain at least one number')
+    .matches(/[^A-Za-z0-9]/).withMessage('Password must contain at least one special character');
+
 const validate = (validations) => {
     return async (req, res, next) => {
         await Promise.all(validations.map(validation => validation.run(req)));
@@ -17,7 +25,12 @@ const validate = (validations) => {
 // Auth validations
 const registerValidation = [
     body('email').optional().isEmail().normalizeEmail(),
-    body('password').optional().isLength({ min: 6 }),
+    body('password').optional()
+        .isLength({ min: 10 }).withMessage('Password must be at least 10 characters long')
+        .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+        .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
+        .matches(/[0-9]/).withMessage('Password must contain at least one number')
+        .matches(/[^A-Za-z0-9]/).withMessage('Password must contain at least one special character'),
     body('role').isIn(['employee', 'psychologist', 'business']),
     body('isAnonymous').optional().isBoolean(),
     body('displayName').optional().trim().isLength({ min: 2, max: 50 })
@@ -84,5 +97,6 @@ module.exports = {
     messageValidation,
     claimRequestValidation,
     verifyEmailValidation,
-    confirmVerificationValidation
+    confirmVerificationValidation,
+    passwordValidation
 };

@@ -1,0 +1,36 @@
+/* ===== Alerts ===== */
+.alert {
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  animation: slideIn 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-left: 4px solid;
+}
+
+.alert-error {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-left-color: var(--error-text);
+}
+
+.alert-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-left-color: var(--success-text);
+}
+
+.alert-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-left-color: var(--warning-text);
+}
+
+.alert-info {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-left-color: var(--info-text);
+}
+
