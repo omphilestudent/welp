@@ -735,7 +735,7 @@ const ApplyJob = () => {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .apply-page {
                     padding: 2rem 0;
                     background: #f7fafc;

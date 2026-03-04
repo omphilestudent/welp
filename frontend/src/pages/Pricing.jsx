@@ -280,7 +280,7 @@ const Pricing = () => {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .pricing-page {
                     min-height: 100vh;
                     background: #f8fafc;

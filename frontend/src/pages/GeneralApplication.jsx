@@ -444,7 +444,7 @@ const GeneralApplication = () => {
                 </motion.div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .general-apply-page {
                     padding: 2rem 0;
                     background: #f7fafc;

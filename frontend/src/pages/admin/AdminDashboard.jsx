@@ -37,15 +37,15 @@ import {
 
 const AdminDashboard = () => {
     const [stats, setStats] = useState({
-        totalUsers: 15234,
-        newUsersToday: 127,
-        totalCompanies: 892,
-        totalReviews: 45321,
-        pendingReviews: 234,
-        activeSubscriptions: 5678,
-        monthlyRevenue: 45890,
-        revenueGrowth: 12.5,
-        userGrowth: 8.3
+        totalUsers: 0,
+        newUsersToday: 0,
+        totalCompanies: 0,
+        totalReviews: 0,
+        pendingReviews: 0,
+        activeSubscriptions: 0,
+        monthlyRevenue: 0,
+        revenueGrowth: 0,
+        userGrowth: 0
     });
     const [recentUsers, setRecentUsers] = useState([]);
     const [recentReviews, setRecentReviews] = useState([]);
@@ -61,70 +61,74 @@ const AdminDashboard = () => {
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
-            // In production, fetch from API
-            // const { data } = await api.get('/admin/dashboard/stats');
-            // setStats(data);
+            const [dashboardRes, usersRes, reviewsRes, revenueRes, userAnalyticsRes, subscriptionAnalyticsRes] = await Promise.all([
+                api.get('/admin/dashboard/stats'),
+                api.get('/admin/users', { params: { page: 1, limit: 5 } }),
+                api.get('/admin/reviews', { params: { page: 1, limit: 5 } }),
+                api.get('/admin/analytics/revenue', { params: { period: 'day' } }),
+                api.get('/admin/analytics/users'),
+                api.get('/admin/analytics/subscriptions')
+            ]);
 
-            // Mock data for demonstration
-            generateMockData();
+            const dashboard = dashboardRes.data || {};
+            setStats({
+                totalUsers: Number(dashboard.users?.total_users || 0),
+                newUsersToday: Number(dashboard.users?.new_users_today || 0),
+                totalCompanies: Number(dashboard.companies?.total_companies || 0),
+                totalReviews: Number(dashboard.reviews?.total_reviews || 0),
+                pendingReviews: Number(dashboard.reviews?.pending_reviews || 0),
+                activeSubscriptions: Number(dashboard.subscriptions?.active_subscriptions || 0),
+                monthlyRevenue: Number(dashboard.subscriptions?.total_revenue || 0),
+                revenueGrowth: Number(dashboard.revenueGrowth || 0),
+                userGrowth: Number(dashboard.userGrowth || 0)
+            });
+
+            const recentUsersRows = usersRes.data?.users || [];
+            setRecentUsers(recentUsersRows.map((user) => ({
+                id: user.id,
+                name: user.display_name || 'Unknown',
+                email: user.email,
+                role: user.role,
+                date: user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'
+            })));
+
+            const reviewRows = reviewsRes.data?.reviews || [];
+            setRecentReviews(reviewRows.map((review) => ({
+                id: review.id,
+                company: review.company_name || 'Unknown',
+                rating: Number(review.rating || 0),
+                content: review.content || '',
+                date: review.created_at ? new Date(review.created_at).toLocaleDateString() : '-'
+            })));
+
+            const revenueRows = (revenueRes.data || []).slice().reverse();
+            setRevenueData(revenueRows.map((row) => ({
+                date: new Date(row.date).toLocaleDateString(),
+                revenue: Number(row.revenue || 0),
+                subscriptions: Number(row.subscriptions || 0)
+            })));
+
+            const userAnalyticsRows = (userAnalyticsRes.data || []).slice().reverse();
+            setUserActivity(userAnalyticsRows.map((row) => ({
+                name: new Date(row.date).toLocaleDateString(undefined, { weekday: 'short' }),
+                users: Number(row.new_users || 0)
+            })));
+
+            const subscriptionRows = subscriptionAnalyticsRes.data || [];
+            setSubscriptionData(subscriptionRows.map((row) => ({
+                name: row.plan || 'unknown',
+                value: Number(row.active || row.total || 0)
+            })));
         } catch (error) {
-            console.error('Failed to fetch dashboard data');
-            generateMockData();
+            console.error('Failed to fetch dashboard data', error);
+            setRecentUsers([]);
+            setRecentReviews([]);
+            setRevenueData([]);
+            setUserActivity([]);
+            setSubscriptionData([]);
         } finally {
             setLoading(false);
         }
-    };
-
-    const generateMockData = () => {
-        // Generate revenue data for the last 30 days
-        const revenue = [];
-        for (let i = 0; i < 30; i++) {
-            revenue.push({
-                date: `Day ${i + 1}`,
-                revenue: Math.floor(Math.random() * 5000) + 2000,
-                subscriptions: Math.floor(Math.random() * 100) + 50
-            });
-        }
-        setRevenueData(revenue);
-
-        // User activity data
-        setUserActivity([
-            { name: 'Mon', users: 1200 },
-            { name: 'Tue', users: 1350 },
-            { name: 'Wed', users: 1500 },
-            { name: 'Thu', users: 1420 },
-            { name: 'Fri', users: 1680 },
-            { name: 'Sat', users: 1100 },
-            { name: 'Sun', users: 980 },
-        ]);
-
-        // Subscription distribution
-        setSubscriptionData([
-            { name: 'Employee Free', value: 3500 },
-            { name: 'Employee Premium', value: 1200 },
-            { name: 'Psychologist Free', value: 450 },
-            { name: 'Psychologist Premium', value: 280 },
-            { name: 'Business Free', value: 180 },
-            { name: 'Business Premium', value: 68 },
-        ]);
-
-        // Recent users
-        setRecentUsers([
-            { id: 1, name: 'John Doe', email: 'john@example.com', role: 'employee', date: '2024-01-15' },
-            { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'psychologist', date: '2024-01-14' },
-            { id: 3, name: 'Bob Johnson', email: 'bob@example.com', role: 'business', date: '2024-01-14' },
-            { id: 4, name: 'Alice Brown', email: 'alice@example.com', role: 'employee', date: '2024-01-13' },
-            { id: 5, name: 'Charlie Wilson', email: 'charlie@example.com', role: 'employee', date: '2024-01-13' },
-        ]);
-
-        // Recent reviews
-        setRecentReviews([
-            { id: 1, company: 'Google', rating: 5, content: 'Great place to work!', date: '2024-01-15' },
-            { id: 2, company: 'Meta', rating: 4, content: 'Good culture but long hours', date: '2024-01-14' },
-            { id: 3, company: 'Microsoft', rating: 5, content: 'Excellent benefits', date: '2024-01-14' },
-            { id: 4, company: 'Amazon', rating: 3, content: 'Fast-paced environment', date: '2024-01-13' },
-            { id: 5, company: 'Apple', rating: 5, content: 'Innovative company', date: '2024-01-13' },
-        ]);
     };
 
     const COLORS = ['#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#f687b3', '#fc8181'];

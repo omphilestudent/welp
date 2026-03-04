@@ -49,124 +49,31 @@ const JobPostings = () => {
     const fetchJobs = async () => {
         setLoading(true);
         try {
-            // Mock data
-            const mockJobs = [
-                {
-                    id: 1,
-                    title: 'Senior Frontend Developer',
-                    department: 'Engineering',
-                    location: 'San Francisco, CA (Remote)',
-                    type: 'full-time',
-                    experience: '5+ years',
-                    salary: '$120k - $150k',
-                    description: 'We are looking for an experienced Frontend Developer to join our team...',
-                    requirements: ['React', 'TypeScript', 'Next.js', 'Tailwind CSS'],
-                    benefits: ['Health Insurance', '401k', 'Remote Work', 'Unlimited PTO'],
-                    applications: 23,
-                    status: 'open',
-                    postedDate: '2024-01-15',
-                    deadline: '2024-02-15',
-                    postedBy: 'Sarah Johnson',
-                    views: 345,
-                    clicks: 89
-                },
-                {
-                    id: 2,
-                    title: 'Product Manager',
-                    department: 'Product',
-                    location: 'New York, NY (Hybrid)',
-                    type: 'full-time',
-                    experience: '3+ years',
-                    salary: '$110k - $140k',
-                    description: 'Seeking a Product Manager to lead our flagship product...',
-                    requirements: ['Product Strategy', 'Agile', 'User Research', 'Analytics'],
-                    benefits: ['Health Insurance', '401k', 'Gym Membership'],
-                    applications: 18,
-                    status: 'open',
-                    postedDate: '2024-01-14',
-                    deadline: '2024-02-14',
-                    postedBy: 'Mike Wilson',
-                    views: 267,
-                    clicks: 56
-                },
-                {
-                    id: 3,
-                    title: 'UX Designer',
-                    department: 'Design',
-                    location: 'Austin, TX (Remote)',
-                    type: 'full-time',
-                    experience: '3+ years',
-                    salary: '$90k - $120k',
-                    description: 'Join our design team to create beautiful and intuitive experiences...',
-                    requirements: ['Figma', 'UI/UX', 'User Testing', 'Prototyping'],
-                    benefits: ['Health Insurance', 'Remote Stipend', 'Learning Budget'],
-                    applications: 31,
-                    status: 'open',
-                    postedDate: '2024-01-14',
-                    deadline: '2024-02-14',
-                    postedBy: 'Emily Chen',
-                    views: 412,
-                    clicks: 102
-                },
-                {
-                    id: 4,
-                    title: 'DevOps Engineer',
-                    department: 'Engineering',
-                    location: 'Seattle, WA (Remote)',
-                    type: 'full-time',
-                    experience: '4+ years',
-                    salary: '$130k - $160k',
-                    description: 'Looking for a DevOps engineer to manage our cloud infrastructure...',
-                    requirements: ['AWS', 'Kubernetes', 'Terraform', 'CI/CD'],
-                    benefits: ['Health Insurance', '401k', 'Home Office Stipend'],
-                    applications: 12,
-                    status: 'closed',
-                    postedDate: '2024-01-10',
-                    deadline: '2024-01-31',
-                    postedBy: 'David Kim',
-                    views: 198,
-                    clicks: 34
-                },
-                {
-                    id: 5,
-                    title: 'HR Business Partner',
-                    department: 'HR',
-                    location: 'Chicago, IL (On-site)',
-                    type: 'full-time',
-                    experience: '5+ years',
-                    salary: '$95k - $120k',
-                    description: 'We are seeking an HR Business Partner to support our growing team...',
-                    requirements: ['Employee Relations', 'Recruitment', 'Performance Management'],
-                    benefits: ['Health Insurance', '401k', 'Professional Development'],
-                    applications: 9,
-                    status: 'draft',
-                    postedDate: '2024-01-12',
-                    deadline: '2024-02-12',
-                    postedBy: 'Lisa Brown',
-                    views: 76,
-                    clicks: 12
-                },
-                {
-                    id: 6,
-                    title: 'Backend Developer',
-                    department: 'Engineering',
-                    location: 'Remote (Global)',
-                    type: 'full-time',
-                    experience: '3+ years',
-                    salary: '$100k - $130k',
-                    description: 'Join our backend team to build scalable APIs and services...',
-                    requirements: ['Node.js', 'Python', 'PostgreSQL', 'Redis'],
-                    benefits: ['Health Insurance', 'Unlimited PTO', 'Home Office Budget'],
-                    applications: 27,
-                    status: 'open',
-                    postedDate: '2024-01-13',
-                    deadline: '2024-02-13',
-                    postedBy: 'James Wilson',
-                    views: 289,
-                    clicks: 67
-                }
-            ];
-            setJobs(mockJobs);
+            const { data } = await api.get('/hr/jobs');
+            const normalizedJobs = (data || []).map((job) => ({
+                id: job.id,
+                title: job.title,
+                department: job.department_name || 'Unassigned',
+                department_id: job.department_id || null,
+                location: job.location || 'Not specified',
+                type: job.employment_type || 'full-time',
+                experience: job.experience_level || 'N/A',
+                salary: job.salary_min && job.salary_max
+                    ? `$${job.salary_min} - $${job.salary_max}`
+                    : 'Not disclosed',
+                description: job.description || '',
+                requirements: Array.isArray(job.requirements) ? job.requirements : [],
+                benefits: Array.isArray(job.benefits) ? job.benefits : [],
+                applications: Number(job.applications_count || 0),
+                status: job.status || 'draft',
+                postedDate: job.created_at ? new Date(job.created_at).toLocaleDateString() : '-',
+                deadline: job.application_deadline ? new Date(job.application_deadline).toLocaleDateString() : '-',
+                postedBy: job.posted_by_name || 'Unknown',
+                views: Number(job.views_count || 0),
+                clicks: Number(job.clicks_count || 0)
+            }));
+
+            setJobs(normalizedJobs);
         } catch (error) {
             console.error('Failed to fetch jobs:', error);
             toast.error('Failed to load job postings');
@@ -177,19 +84,11 @@ const JobPostings = () => {
 
     const fetchDepartments = async () => {
         try {
-            // Mock departments
-            setDepartments([
-                'Engineering',
-                'Product',
-                'Design',
-                'HR',
-                'Marketing',
-                'Sales',
-                'Finance',
-                'Operations'
-            ]);
+            const { data } = await api.get('/hr/departments');
+            setDepartments((data || []).map((department) => department.name));
         } catch (error) {
             console.error('Failed to fetch departments:', error);
+            setDepartments([]);
         }
     };
 
@@ -232,7 +131,7 @@ const JobPostings = () => {
         if (!window.confirm('Are you sure you want to delete this job posting?')) return;
 
         try {
-            // API call would go here
+            await api.delete(`/hr/jobs/${id}`);
             toast.success('Job deleted successfully');
             fetchJobs();
         } catch (error) {
@@ -244,7 +143,7 @@ const JobPostings = () => {
         if (!window.confirm(`Are you sure you want to delete ${selectedJobs.length} jobs?`)) return;
 
         try {
-            // API call would go here
+            await Promise.all(selectedJobs.map((jobId) => api.delete(`/hr/jobs/${jobId}`)));
             toast.success(`${selectedJobs.length} jobs deleted successfully`);
             setSelectedJobs([]);
             fetchJobs();
@@ -253,18 +152,30 @@ const JobPostings = () => {
         }
     };
 
-    const handleDuplicate = (job) => {
-        // Create a copy of the job with a new title
-        const newJob = {
-            ...job,
-            id: Date.now(),
-            title: `${job.title} (Copy)`,
-            status: 'draft',
-            applications: 0,
-            postedDate: new Date().toISOString().split('T')[0]
-        };
-        setJobs(prev => [...prev, newJob]);
-        toast.success('Job duplicated successfully');
+    const handleDuplicate = async (job) => {
+        try {
+            await api.post('/hr/jobs', {
+                title: `${job.title} (Copy)`,
+                department_id: job.department_id,
+                employment_type: job.type,
+                location: job.location,
+                salary_min: null,
+                salary_max: null,
+                salary_currency: 'USD',
+                description: job.description,
+                requirements: job.requirements || [],
+                responsibilities: [],
+                benefits: job.benefits || [],
+                skills_required: [],
+                experience_level: job.experience || null,
+                education_required: null,
+                application_deadline: null
+            });
+            toast.success('Job duplicated successfully');
+            fetchJobs();
+        } catch (error) {
+            toast.error('Failed to duplicate job');
+        }
     };
 
     const handleShare = (job) => {
@@ -662,7 +573,7 @@ const JobPostings = () => {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
                 .job-postings-page {
                     padding: 2rem;
                     max-width: 1600px;

@@ -28,7 +28,8 @@ import {
     FaChevronRight,
     FaDownload,
     FaPrint,
-    FaCopy
+    FaCopy,
+    FaUsers
 } from 'react-icons/fa';
 
 const CompanyManagement = () => {
@@ -65,217 +66,38 @@ const CompanyManagement = () => {
     const fetchCompanies = async () => {
         setLoading(true);
         try {
-            // Mock data - replace with API call
-            const mockCompanies = [
-                {
-                    id: 1,
-                    name: 'Google',
-                    description: 'Leading technology company specializing in internet services and products.',
-                    industry: 'Technology',
-                    website: 'https://google.com',
-                    email: 'careers@google.com',
-                    phone: '+1-650-253-0000',
-                    address: '1600 Amphitheatre Parkway, Mountain View, CA 94043, USA',
-                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg',
-                    is_claimed: true,
-                    is_verified: true,
-                    verification_date: '2023-01-15',
-                    claimed_by: 'John Smith',
-                    claimed_date: '2023-01-10',
-                    employee_count: 150000,
-                    founded: 1998,
-                    reviews_count: 15234,
-                    avg_rating: 4.5,
-                    monthly_revenue: 50000000,
-                    status: 'active',
-                    created_at: '2023-01-01',
-                    updated_at: '2024-01-15'
-                },
-                {
-                    id: 2,
-                    name: 'Meta',
-                    description: 'Building the metaverse and connecting people through technology.',
-                    industry: 'Social Media',
-                    website: 'https://meta.com',
-                    email: 'careers@meta.com',
-                    phone: '+1-650-543-4800',
-                    address: '1 Hacker Way, Menlo Park, CA 94025, USA',
-                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Meta_Platforms_Inc._logo.svg',
-                    is_claimed: true,
-                    is_verified: true,
-                    verification_date: '2023-02-20',
-                    claimed_by: 'Jane Doe',
-                    claimed_date: '2023-02-15',
-                    employee_count: 86000,
-                    founded: 2004,
-                    reviews_count: 12456,
-                    avg_rating: 4.2,
-                    monthly_revenue: 35000000,
-                    status: 'active',
-                    created_at: '2023-01-15',
-                    updated_at: '2024-01-14'
-                },
-                {
-                    id: 3,
-                    name: 'Microsoft',
-                    description: 'Empowering every person and organization on the planet to achieve more.',
-                    industry: 'Technology',
-                    website: 'https://microsoft.com',
-                    email: 'careers@microsoft.com',
-                    phone: '+1-425-882-8080',
-                    address: 'One Microsoft Way, Redmond, WA 98052, USA',
-                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg',
-                    is_claimed: true,
-                    is_verified: true,
-                    verification_date: '2023-03-10',
-                    claimed_by: 'Bob Johnson',
-                    claimed_date: '2023-03-05',
-                    employee_count: 221000,
-                    founded: 1975,
-                    reviews_count: 18765,
-                    avg_rating: 4.4,
-                    monthly_revenue: 60000000,
-                    status: 'active',
-                    created_at: '2023-02-01',
-                    updated_at: '2024-01-13'
-                },
-                {
-                    id: 4,
-                    name: 'Capitec Bank',
-                    description: 'South Africa\'s leading digital bank, making banking simple and affordable.',
-                    industry: 'Banking & Finance',
-                    website: 'https://capitecbank.co.za',
-                    email: 'careers@capitecbank.co.za',
-                    phone: '+27-21-007-1000',
-                    address: '10 Quantum Street, Techno Park, Stellenbosch, 7600, South Africa',
-                    logo_url: null,
-                    is_claimed: false,
-                    is_verified: false,
-                    verification_date: null,
-                    claimed_by: null,
-                    claimed_date: null,
-                    employee_count: 15000,
-                    founded: 2001,
-                    reviews_count: 5678,
-                    avg_rating: 4.3,
-                    monthly_revenue: 15000000,
-                    status: 'pending',
-                    created_at: '2023-04-01',
-                    updated_at: '2024-01-12'
-                },
-                {
-                    id: 5,
-                    name: 'Standard Bank',
-                    description: 'Africa\'s largest bank by assets, serving customers across the continent.',
-                    industry: 'Banking & Finance',
-                    website: 'https://standardbank.com',
-                    email: 'careers@standardbank.co.za',
-                    phone: '+27-11-636-9111',
-                    address: '9 Simmonds Street, Johannesburg, 2001, South Africa',
-                    logo_url: null,
-                    is_claimed: false,
-                    is_verified: false,
-                    verification_date: null,
-                    claimed_by: null,
-                    claimed_date: null,
-                    employee_count: 50000,
-                    founded: 1862,
-                    reviews_count: 7890,
-                    avg_rating: 4.1,
-                    monthly_revenue: 25000000,
-                    status: 'pending',
-                    created_at: '2023-05-01',
-                    updated_at: '2024-01-11'
-                },
-                {
-                    id: 6,
-                    name: 'Amazon',
-                    description: 'Earth\'s most customer-centric company.',
-                    industry: 'E-commerce',
-                    website: 'https://amazon.com',
-                    email: 'careers@amazon.com',
-                    phone: '+1-206-266-1000',
-                    address: '410 Terry Ave N, Seattle, WA 98109, USA',
-                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg',
-                    is_claimed: true,
-                    is_verified: true,
-                    verification_date: '2023-04-15',
-                    claimed_by: 'Alice Brown',
-                    claimed_date: '2023-04-10',
-                    employee_count: 1500000,
-                    founded: 1994,
-                    reviews_count: 32456,
-                    avg_rating: 4.0,
-                    monthly_revenue: 120000000,
-                    status: 'active',
-                    created_at: '2023-03-01',
-                    updated_at: '2024-01-10'
-                },
-                {
-                    id: 7,
-                    name: 'Tesla',
-                    description: 'Accelerating the world\'s transition to sustainable energy.',
-                    industry: 'Automotive',
-                    website: 'https://tesla.com',
-                    email: 'careers@tesla.com',
-                    phone: '+1-510-249-3000',
-                    address: '3500 Deer Creek Road, Palo Alto, CA 94304, USA',
-                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/e/e8/Tesla_logo.png',
-                    is_claimed: true,
-                    is_verified: true,
-                    verification_date: '2023-05-20',
-                    claimed_by: 'Charlie Wilson',
-                    claimed_date: '2023-05-15',
-                    employee_count: 140000,
-                    founded: 2003,
-                    reviews_count: 15432,
-                    avg_rating: 4.3,
-                    monthly_revenue: 45000000,
-                    status: 'active',
-                    created_at: '2023-04-01',
-                    updated_at: '2024-01-09'
-                },
-                {
-                    id: 8,
-                    name: 'Netflix',
-                    description: 'Leading streaming entertainment service with 230+ million subscribers.',
-                    industry: 'Entertainment',
-                    website: 'https://netflix.com',
-                    email: 'careers@netflix.com',
-                    phone: '+1-408-540-3700',
-                    address: '100 Winchester Circle, Los Gatos, CA 95032, USA',
-                    logo_url: 'https://upload.wikimedia.org/wikipedia/commons/7/75/Netflix_icon.svg',
-                    is_claimed: true,
-                    is_verified: true,
-                    verification_date: '2023-06-10',
-                    claimed_by: 'Diana Prince',
-                    claimed_date: '2023-06-05',
-                    employee_count: 12800,
-                    founded: 1997,
-                    reviews_count: 12345,
-                    avg_rating: 4.2,
-                    monthly_revenue: 30000000,
-                    status: 'active',
-                    created_at: '2023-05-01',
-                    updated_at: '2024-01-08'
+            const { data } = await api.get('/admin/companies', {
+                params: {
+                    page: 1,
+                    limit: 200,
+                    search: searchTerm || undefined,
+                    status: filterStatus !== 'all' ? filterStatus : undefined,
+                    industry: filterIndustry !== 'all' ? filterIndustry : undefined
                 }
-            ];
+            });
 
-            setCompanies(mockCompanies);
+            const companyRows = data.companies || [];
+            const normalizedCompanies = companyRows.map((company) => ({
+                ...company,
+                reviews_count: Number(company.review_count || 0),
+                avg_rating: Number(company.avg_rating || 0),
+                employee_count: Number(company.employee_count || 0),
+                claimed_by: company.claimed_by_name || company.claimed_by
+            }));
 
-            // Calculate stats
-            const stats = {
-                total: mockCompanies.length,
-                verified: mockCompanies.filter(c => c.is_verified).length,
-                pending: mockCompanies.filter(c => !c.is_verified).length,
-                claimed: mockCompanies.filter(c => c.is_claimed).length,
-                unclaimed: mockCompanies.filter(c => !c.is_claimed).length
-            };
-            setStats(stats);
+            setCompanies(normalizedCompanies);
 
+            setStats({
+                total: normalizedCompanies.length,
+                verified: normalizedCompanies.filter((company) => company.is_verified).length,
+                pending: normalizedCompanies.filter((company) => !company.is_verified).length,
+                claimed: normalizedCompanies.filter((company) => company.is_claimed).length,
+                unclaimed: normalizedCompanies.filter((company) => !company.is_claimed).length
+            });
         } catch (error) {
             console.error('Failed to fetch companies:', error);
             toast.error('Failed to load companies');
+            setCompanies([]);
         } finally {
             setLoading(false);
         }
@@ -312,7 +134,7 @@ const CompanyManagement = () => {
 
     const handleVerify = async (id) => {
         try {
-            // API call would go here
+            await api.patch(`/admin/companies/${id}/verify`);
             toast.success('Company verified successfully');
             fetchCompanies();
         } catch (error) {
@@ -324,7 +146,7 @@ const CompanyManagement = () => {
         if (!window.confirm('Are you sure you want to delete this company?')) return;
 
         try {
-            // API call would go here
+            await api.delete(`/admin/companies/${id}`);
             toast.success('Company deleted successfully');
             fetchCompanies();
         } catch (error) {
@@ -351,6 +173,7 @@ const CompanyManagement = () => {
     };
 
     const convertToCSV = (data) => {
+        if (!data.length) return '';
         const headers = Object.keys(data[0]).join(',');
         const rows = data.map(obj => Object.values(obj).join(','));
         return [headers, ...rows].join('\n');
@@ -847,7 +670,7 @@ const CompanyManagement = () => {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
                 .company-management {
                     padding: 2rem;
                 }

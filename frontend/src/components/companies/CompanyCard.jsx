@@ -99,6 +99,14 @@ const CompanyCard = ({ company }) => {
 
     if (!company) return null;
 
+    const name = company.name || 'Unknown Company';
+    const industry = company.industry || 'General';
+    const location = company.address || company.location || 'Location not specified';
+    const rating = parseFloat(company.avg_rating || company.rating || 0);
+    const reviewCount = company.review_count || company.reviewCount || 0;
+    const description = company.description || 'No description available';
+    const isClaimed = company.is_claimed || false;
+
     const handleClick = () => {
         if (company.id) {
             navigate(`/companies/${company.id}`);
@@ -107,23 +115,6 @@ const CompanyCard = ({ company }) => {
         }
     };
 
-    const handleLogoError = () => {
-        if (logoStage === 0 && secondaryLogoUrl) {
-            setLogoStage(1);
-            return;
-        }
-        setLogoStage(2);
-    };
-
-    const name = company.name || 'Unknown Company';
-    const industry = company.industry || 'General';
-    const location = company.address || company.location || 'Location not specified';
-    const rating = parseFloat(company.avg_rating || company.rating || 0);
-    const reviewCount = company.review_count || company.reviewCount || 0;
-    const description = company.description || 'No description available';
-    const isClaimed = company.is_claimed || false;
-    const [logoStage, setLogoStage] = useState(0);
-
     const primaryLogoUrl = useMemo(() => getPrimaryLogoUrl(company, name), [company, name]);
     const secondaryLogoUrl = useMemo(() => getSecondaryLogoUrl(name), [name]);
     const activeLogoUrl = logoStage === 0 ? primaryLogoUrl : (logoStage === 1 ? secondaryLogoUrl : null);
@@ -136,10 +127,6 @@ const CompanyCard = ({ company }) => {
 
         setLogoStage(2);
     };
-
-    const primaryLogoUrl = useMemo(() => getPrimaryLogoUrl(company, name), [company, name]);
-    const secondaryLogoUrl = useMemo(() => getSecondaryLogoUrl(name), [name]);
-    const activeLogoUrl = logoStage === 0 ? primaryLogoUrl : (logoStage === 1 ? secondaryLogoUrl : null);
 
     return (
         <div className="company-card" onClick={handleClick} role="button" tabIndex={0} onKeyPress={(e) => e.key === 'Enter' && handleClick()}>

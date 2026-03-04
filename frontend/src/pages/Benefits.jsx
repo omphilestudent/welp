@@ -346,7 +346,7 @@ const Benefits = () => {
                 </div>
             </section>
 
-            <style jsx>{`
+            <style>{`
                 .benefits-page {
                     overflow-x: hidden;
                 }

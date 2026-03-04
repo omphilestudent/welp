@@ -318,7 +318,7 @@ const JobDetails = () => {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .job-details-page {
                     padding: 2rem 0;
                     background: #f7fafc;
