@@ -1,0 +1,24 @@
+/* ===== Dark Mode Specific ===== */
+[data-theme="dark"] .showcase-logo {
+  opacity: 0.8;
+  filter: grayscale(50%);
+}
+
+[data-theme="dark"] .showcase-logo:hover {
+  filter: grayscale(0%);
+}
+
+[data-theme="dark"] .newsletter-input {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .app-button {
+  background: rgba(0,0,0,0.3);
+}
+
+[data-theme="dark"] .testimonial-card {
+  background: var(--bg-secondary);
+}
+
