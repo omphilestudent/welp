@@ -92,9 +92,6 @@ const getSecondaryLogoUrl = (name) => {
 
     return `https://cdn.simpleicons.org/${iconSlug}`;
 };
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaMapMarkerAlt } from 'react-icons/fa';
 
 const CompanyCard = ({ company }) => {
     const navigate = useNavigate();
@@ -127,7 +124,6 @@ const CompanyCard = ({ company }) => {
             setLogoStage(1);
             return;
         }
-
         setLogoStage(2);
     };
     const logoUrl = company.logo_url || company.logoUrl;
@@ -136,25 +132,27 @@ const CompanyCard = ({ company }) => {
     return (
         <div className="company-card" onClick={handleClick}>
             <div className="company-card-header">
-                {activeLogoUrl ? (
+                {(activeLogoUrl && logoStage !== 2) ? (
                     <img
                         src={activeLogoUrl}
-                {logoUrl && !showLogoFallback ? (
-                    <img
-                        src={logoUrl}
                         alt={`${name} logo`}
                         className="company-card-logo"
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={handleLogoError}
                     />
-                ) : (
-                    <div className="company-card-logo-placeholder" aria-label={`${name} logo placeholder`}>
-                        <FaBuilding />
+                ) : logoUrl && !showLogoFallback ? (
+                    <img
+                        src={logoUrl}
+                        alt={`${name} logo`}
+                        className="company-card-logo"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
                         onError={() => setShowLogoFallback(true)}
                     />
                 ) : (
-                    <div className="company-card-logo-placeholder" aria-label={`${name} initial`}>
+                    <div className="company-card-logo-placeholder" aria-label={`${name} logo placeholder`}>
+                        <FaBuilding />
                         {name.charAt(0)}
                     </div>
                 )}
@@ -171,13 +169,13 @@ const CompanyCard = ({ company }) => {
                             key={star}
                             className={star <= rating ? 'star-filled' : 'star-empty'}
                         >
-              ★
-            </span>
+                          ★
+                        </span>
                     ))}
                 </div>
                 <span className="company-card-rating-value">
-          {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
-        </span>
+              {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
+            </span>
             </div>
 
             {location && (
