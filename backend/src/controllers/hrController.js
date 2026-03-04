@@ -85,22 +85,7 @@ const getHRDashboardStats = async (req, res) => {
         });
     } catch (error) {
         console.error('Get HR dashboard stats error:', error);
-        // Return mock data
-        res.json({
-            jobs: { total_jobs: 45, open_jobs: 18, closed_jobs: 12, draft_jobs: 15 },
-            applications: {
-                total_applications: 342,
-                pending_applications: 123,
-                reviewed_applications: 89,
-                shortlisted_applications: 45,
-                interviewed_applications: 56,
-                hired_applications: 12,
-                rejected_applications: 17
-            },
-            interviews: { total_interviews: 67, scheduled_interviews: 23, completed_interviews: 38, cancelled_interviews: 6 },
-            departments: { total_departments: 12, departments_with_manager: 10 },
-            employees: { total_employees: 245, active_employees: 238 }
-        });
+        res.status(500).json({ error: 'Failed to fetch HR dashboard stats' });
     }
 };
 

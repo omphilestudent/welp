@@ -50,6 +50,7 @@ const HRDashboard = () => {
     const [recentJobs, setRecentJobs] = useState([]);
     const [recentApplications, setRecentApplications] = useState([]);
     const [upcomingInterviews, setUpcomingInterviews] = useState([]);
+    const [hiringTrend, setHiringTrend] = useState([]);
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState('week');
     const [selectedDepartment, setSelectedDepartment] = useState('all');
@@ -61,84 +62,102 @@ const HRDashboard = () => {
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
-            // In production, fetch from API
-            // const { data } = await api.get('/hr/dashboard/stats');
-            // setStats(data);
+            const [statsRes, jobsRes, interviewsRes, hiringRes] = await Promise.all([
+                api.get('/hr/dashboard/stats'),
+                api.get('/hr/jobs'),
+                api.get('/hr/interviews/upcoming'),
+                api.get('/hr/analytics/hiring')
+            ]);
 
-            // Mock data for demonstration
-            generateMockData();
+            const dashboard = statsRes.data || {};
+            setStats({
+                jobs: {
+                    total: Number(dashboard.jobs?.total_jobs || 0),
+                    open: Number(dashboard.jobs?.open_jobs || 0),
+                    closed: Number(dashboard.jobs?.closed_jobs || 0),
+                    draft: Number(dashboard.jobs?.draft_jobs || 0)
+                },
+                applications: {
+                    total: Number(dashboard.applications?.total_applications || 0),
+                    pending: Number(dashboard.applications?.pending_applications || 0),
+                    reviewed: Number(dashboard.applications?.reviewed_applications || 0),
+                    shortlisted: Number(dashboard.applications?.shortlisted_applications || 0),
+                    interviewed: Number(dashboard.applications?.interviewed_applications || 0),
+                    hired: Number(dashboard.applications?.hired_applications || 0),
+                    rejected: Number(dashboard.applications?.rejected_applications || 0)
+                },
+                interviews: {
+                    total: Number(dashboard.interviews?.total_interviews || 0),
+                    scheduled: Number(dashboard.interviews?.scheduled_interviews || 0),
+                    completed: Number(dashboard.interviews?.completed_interviews || 0),
+                    cancelled: Number(dashboard.interviews?.cancelled_interviews || 0),
+                    today: (interviewsRes.data || []).filter((i) => {
+                        const dt = new Date(i.scheduled_at);
+                        const now = new Date();
+                        return dt.toDateString() === now.toDateString();
+                    }).length
+                },
+                employees: {
+                    total: Number(dashboard.employees?.total_employees || 0),
+                    active: Number(dashboard.employees?.active_employees || 0),
+                    newThisMonth: 0
+                },
+                timeToHire: 0,
+                acceptanceRate: Number(dashboard.applications?.total_applications || 0)
+                    ? Math.round((Number(dashboard.applications?.hired_applications || 0) / Number(dashboard.applications?.total_applications || 1)) * 100)
+                    : 0
+            });
+
+            const jobs = jobsRes.data || [];
+            const recentJobsRows = jobs.slice(0, 5).map((job) => ({
+                id: job.id,
+                title: job.title,
+                department: job.department_name || '-',
+                applications: Number(job.applications_count || 0),
+                status: job.status,
+                daysLeft: job.application_deadline
+                    ? Math.max(0, Math.ceil((new Date(job.application_deadline) - new Date()) / (1000 * 60 * 60 * 24)))
+                    : 0
+            }));
+            setRecentJobs(recentJobsRows);
+
+            const applicationLists = await Promise.all(
+                jobs.slice(0, 5).map((job) => api.get(`/hr/jobs/${job.id}/applications`).then((r) => r.data).catch(() => []))
+            );
+            const mergedApplications = applicationLists.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+            setRecentApplications(mergedApplications.map((app) => ({
+                id: app.id,
+                name: `${app.first_name || ''} ${app.last_name || ''}`.trim() || app.email,
+                position: app.job_title || '-',
+                status: app.status,
+                date: app.created_at ? new Date(app.created_at).toLocaleDateString() : '-',
+                experience: app.experience_years ? `${app.experience_years} years` : 'N/A'
+            })));
+
+            setUpcomingInterviews((interviewsRes.data || []).slice(0, 4).map((interview) => ({
+                id: interview.id,
+                candidate: `${interview.first_name || ''} ${interview.last_name || ''}`.trim() || interview.email,
+                position: interview.job_title || '-',
+                time: interview.scheduled_at ? new Date(interview.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
+                type: interview.interview_type,
+                interviewer: interview.interviewer_name || '-'
+            })));
+
+            setHiringTrend((hiringRes.data || []).slice().reverse().map((row) => ({
+                week: new Date(row.month).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }),
+                applications: Number(row.applications || 0),
+                interviews: Number(row.hires || 0)
+            })));
         } catch (error) {
-            console.error('Failed to fetch dashboard data');
-            generateMockData();
+            console.error('Failed to fetch dashboard data', error);
+            setStats(null);
+            setRecentJobs([]);
+            setRecentApplications([]);
+            setUpcomingInterviews([]);
+            setHiringTrend([]);
         } finally {
             setLoading(false);
         }
-    };
-
-    const generateMockData = () => {
-        // Stats
-        setStats({
-            jobs: {
-                total: 45,
-                open: 18,
-                closed: 12,
-                draft: 15,
-                newThisMonth: 8
-            },
-            applications: {
-                total: 342,
-                pending: 123,
-                reviewed: 89,
-                shortlisted: 45,
-                interviewed: 56,
-                hired: 12,
-                rejected: 17,
-                newToday: 23
-            },
-            interviews: {
-                total: 67,
-                scheduled: 23,
-                completed: 38,
-                cancelled: 6,
-                today: 5
-            },
-            employees: {
-                total: 245,
-                active: 238,
-                onLeave: 7,
-                newThisMonth: 12,
-                departments: 8
-            },
-            timeToHire: 18.5,
-            acceptanceRate: 68,
-            costPerHire: 4500
-        });
-
-        // Recent jobs
-        setRecentJobs([
-            { id: 1, title: 'Senior Frontend Developer', department: 'Engineering', applications: 23, status: 'open', daysLeft: 12 },
-            { id: 2, title: 'Product Manager', department: 'Product', applications: 18, status: 'open', daysLeft: 5 },
-            { id: 3, title: 'UX Designer', department: 'Design', applications: 31, status: 'open', daysLeft: 8 },
-            { id: 4, title: 'DevOps Engineer', department: 'Engineering', applications: 12, status: 'closed', daysLeft: 0 },
-            { id: 5, title: 'HR Business Partner', department: 'HR', applications: 9, status: 'draft', daysLeft: 0 }
-        ]);
-
-        // Recent applications
-        setRecentApplications([
-            { id: 1, name: 'John Doe', position: 'Senior Frontend Developer', status: 'pending', date: '2024-01-15', experience: '5 years' },
-            { id: 2, name: 'Jane Smith', position: 'Product Manager', status: 'reviewed', date: '2024-01-14', experience: '7 years' },
-            { id: 3, name: 'Mike Johnson', position: 'UX Designer', status: 'shortlisted', date: '2024-01-14', experience: '4 years' },
-            { id: 4, name: 'Sarah Williams', position: 'DevOps Engineer', status: 'interviewed', date: '2024-01-13', experience: '6 years' },
-            { id: 5, name: 'Tom Brown', position: 'Senior Frontend Developer', status: 'hired', date: '2024-01-12', experience: '8 years' }
-        ]);
-
-        // Upcoming interviews
-        setUpcomingInterviews([
-            { id: 1, candidate: 'Alice Cooper', position: 'Senior Frontend Developer', time: '10:00 AM', type: 'Technical', interviewer: 'Mike Wilson' },
-            { id: 2, candidate: 'Bob Martin', position: 'Product Manager', time: '11:30 AM', type: 'HR', interviewer: 'Sarah Lee' },
-            { id: 3, candidate: 'Carol White', position: 'UX Designer', time: '2:00 PM', type: 'Portfolio Review', interviewer: 'David Kim' },
-            { id: 4, candidate: 'David Chen', position: 'DevOps Engineer', time: '3:30 PM', type: 'Technical', interviewer: 'James Brown' }
-        ]);
     };
 
     const getStatusBadge = (status) => {
@@ -297,14 +316,7 @@ const HRDashboard = () => {
                 <div className="chart-card">
                     <h3>Application Trends</h3>
                     <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={[
-                            { week: 'Week 1', applications: 45, interviews: 12 },
-                            { week: 'Week 2', applications: 52, interviews: 15 },
-                            { week: 'Week 3', applications: 48, interviews: 14 },
-                            { week: 'Week 4', applications: 63, interviews: 18 },
-                            { week: 'Week 5', applications: 58, interviews: 16 },
-                            { week: 'Week 6', applications: 71, interviews: 22 }
-                        ]}>
+                        <AreaChart data={hiringTrend}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="week" />
                             <YAxis />
