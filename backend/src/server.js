@@ -19,22 +19,40 @@ const pricingRoutes = require('./routes/pricingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const hrRoutes = require('./routes/hrRoutes');
 
+const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const weakJwtSecret = !process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET.includes('change-in-production');
+if (weakJwtSecret && process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET is missing or too weak. Use at least 32 characters and never use placeholders.');
+}
+if (weakJwtSecret) {
+    console.warn('⚠️ Weak JWT_SECRET detected. Update it before production deployment.');
+}
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || frontendOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(new Error('CORS policy violation'));
+    },
+    credentials: true
+};
+
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-    cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-        credentials: true
-    }
-});
+const io = new Server(httpServer, { cors: corsOptions });
 
 // Middleware
-app.use(helmet());
-app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    credentials: true
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
-app.use(express.json());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/', apiLimiter);
