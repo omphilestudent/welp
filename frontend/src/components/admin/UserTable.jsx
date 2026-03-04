@@ -50,7 +50,7 @@ const UserTable = ({ users, selectedUsers, setSelectedUsers, onEdit, onDelete, o
                                 </div>
                             </td>
                             <td>{user.phoneNumber || '—'}</td>
-                            <td><span className="role-badge">{user.role || user.Role?.name || 'Unknown'}</span></td>
+                            <td><span className="role-badge">{user.Role?.name || 'Unknown'}</span></td>
                             <td>{user.department || '—'}</td>
                             <td>
                                 <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>{user.isActive ? 'Active' : 'Inactive'}</span>

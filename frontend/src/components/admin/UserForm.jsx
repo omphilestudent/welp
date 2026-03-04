@@ -7,7 +7,7 @@ const UserForm = ({ user, roles, onSubmit, onCancel }) => {
         password: '',
         firstName: user?.firstName || '',
         lastName: user?.lastName || '',
-        role: user?.role || user?.roleId || '',
+        roleId: user?.roleId || '',
         department: user?.department || '',
         phoneNumber: user?.phoneNumber || '',
         isActive: user?.isActive ?? true
@@ -32,7 +32,7 @@ const UserForm = ({ user, roles, onSubmit, onCancel }) => {
 
         if (!formData.firstName) newErrors.firstName = 'First name is required';
         if (!formData.lastName) newErrors.lastName = 'Last name is required';
-        if (!formData.role) newErrors.role = 'Role is required';
+        if (!formData.roleId) newErrors.roleId = 'Role is required';
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -84,14 +84,14 @@ const UserForm = ({ user, roles, onSubmit, onCancel }) => {
 
             <div className="form-row">
                 <div className="form-group">
-                    <label htmlFor="role">Role *</label>
-                    <select id="role" name="role" value={formData.role} onChange={handleChange} className={errors.role ? 'error' : ''}>
+                    <label htmlFor="roleId">Role *</label>
+                    <select id="roleId" name="roleId" value={formData.roleId} onChange={handleChange} className={errors.roleId ? 'error' : ''}>
                         <option value="">Select a role</option>
                         {roles.map((role) => (
-                            <option key={role.name || role.id} value={role.name || role.id}>{role.name} - {role.description || ''}</option>
+                            <option key={role.id} value={role.id}>{role.name} - {role.description}</option>
                         ))}
                     </select>
-                    {errors.role && <span className="error-message">{errors.role}</span>}
+                    {errors.roleId && <span className="error-message">{errors.roleId}</span>}
                 </div>
 
                 <div className="form-group">

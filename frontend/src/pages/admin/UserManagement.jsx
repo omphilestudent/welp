@@ -16,46 +16,22 @@ const UserManagement = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [selectedUsers, setSelectedUsers] = useState([]);
-    const [filters, setFilters] = useState({ search: '', role: '', status: '' });
+    const [filters, setFilters] = useState({ search: '', roleId: '', department: '', isActive: '' });
     const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
 
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get('/admin/users', {
+            const { data } = await api.get('/rbac/users', {
                 params: {
                     page: pagination.page,
                     limit: pagination.limit,
-                    search: filters.search,
-                    role: filters.role || undefined,
-                    status: filters.status || undefined
+                    ...filters
                 }
             });
 
-            const mappedUsers = (data.users || []).map((u) => {
-                const parts = (u.display_name || '').trim().split(/\s+/);
-                return {
-                    id: u.id,
-                    email: u.email,
-                    firstName: parts[0] || 'User',
-                    lastName: parts.slice(1).join(' ') || '',
-                    role: u.role,
-                    department: u.department || '',
-                    phoneNumber: u.phone_number || '',
-                    profilePicture: u.avatar_url || '',
-                    isActive: true,
-                    emailVerified: Boolean(u.is_verified),
-                    lastLogin: null
-                };
-            });
-
-            setUsers(mappedUsers);
-            const paginationData = data.pagination || {};
-            setPagination((prev) => ({
-                ...prev,
-                total: Number(paginationData.total || 0),
-                totalPages: Number(paginationData.pages || 0)
-            }));
+            setUsers(data.users || []);
+            setPagination((prev) => ({ ...prev, total: data.total || 0, totalPages: data.totalPages || 0 }));
         } catch (error) {
             console.error('Error fetching users:', error);
             toast.error('Failed to fetch users');
@@ -66,10 +42,8 @@ const UserManagement = () => {
 
     const fetchRoles = async () => {
         try {
-            const { data } = await api.get('/admin/users', { params: { page: 1, limit: 100 } });
-            const roleSet = new Set((data.users || []).map((u) => u.role).filter(Boolean));
-            const derivedRoles = [...roleSet].map((name, idx) => ({ id: idx + 1, name }));
-            setRoles(derivedRoles);
+            const { data } = await api.get('/rbac/users/roles/available');
+            setRoles(data || []);
         } catch (error) {
             console.error('Error fetching roles:', error);
             toast.error('Failed to fetch roles');
@@ -84,20 +58,10 @@ const UserManagement = () => {
     const handleSaveUser = async (userData) => {
         try {
             if (selectedUser) {
-                await api.patch(`/admin/users/${selectedUser.id}`, {
-                    role: userData.role || selectedUser.role,
-                    displayName: `${userData.firstName} ${userData.lastName}`.trim(),
-                    isVerified: Boolean(userData.isActive)
-                });
+                await api.put(`/rbac/users/${selectedUser.id}`, userData);
                 toast.success('User updated successfully');
             } else {
-                await api.post('/admin/users', {
-                    email: userData.email,
-                    password: userData.password,
-                    role: userData.role || 'employee',
-                    displayName: `${userData.firstName} ${userData.lastName}`.trim(),
-                    isAnonymous: false
-                });
+                await api.post('/rbac/users', userData);
                 toast.success('User created successfully');
             }
 
@@ -113,11 +77,11 @@ const UserManagement = () => {
     const handleDeleteUser = async () => {
         try {
             if (selectedUsers.length > 0) {
-                await Promise.all(selectedUsers.map((id) => api.delete(`/admin/users/${id}`)));
+                await api.post('/rbac/users/bulk-delete', { userIds: selectedUsers });
                 toast.success(`${selectedUsers.length} users deleted successfully`);
                 setSelectedUsers([]);
             } else if (selectedUser) {
-                await api.delete(`/admin/users/${selectedUser.id}`);
+                await api.delete(`/rbac/users/${selectedUser.id}`);
                 toast.success('User deleted successfully');
             }
 
@@ -130,14 +94,36 @@ const UserManagement = () => {
         }
     };
 
-    const handleResetPassword = async () => {
-        toast.error('Password reset endpoint is not available on current admin API');
+    const handleResetPassword = async (userId) => {
+        const newPassword = window.prompt('Enter new password (min 8 characters):');
+
+        if (!newPassword || newPassword.length < 8) {
+            toast.error('Password must be at least 8 characters long');
+            return;
+        }
+
+        try {
+            await api.post(`/rbac/users/${userId}/reset-password`, { newPassword });
+            toast.success('Password reset successfully');
+        } catch (error) {
+            console.error('Error resetting password:', error);
+            toast.error(error.response?.data?.error || 'Failed to reset password');
+        }
     };
 
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         setFilters((prev) => ({ ...prev, [name]: value }));
         setPagination((prev) => ({ ...prev, page: 1 }));
+    };
+
+    const handleBulkAction = (action) => {
+        if (selectedUsers.length === 0) {
+            toast('Please select users first');
+            return;
+        }
+
+        if (action === 'delete') setShowDeleteConfirm(true);
     };
 
     return (
@@ -155,24 +141,24 @@ const UserManagement = () => {
                 </div>
 
                 <div className="filter-group">
-                    <select name="role" value={filters.role} onChange={handleFilterChange} className="filter-select">
+                    <select name="roleId" value={filters.roleId} onChange={handleFilterChange} className="filter-select">
                         <option value="">All Roles</option>
-                        {roles.map((role) => <option key={role.name} value={role.name}>{role.name}</option>)}
+                        {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
                     </select>
                 </div>
 
                 <div className="filter-group">
-                    <select name="status" value={filters.status} onChange={handleFilterChange} className="filter-select">
+                    <select name="isActive" value={filters.isActive} onChange={handleFilterChange} className="filter-select">
                         <option value="">All Status</option>
-                        <option value="verified">Verified</option>
-                        <option value="pending">Pending</option>
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
                     </select>
                 </div>
 
                 {selectedUsers.length > 0 && (
                     <div className="bulk-actions">
                         <span className="selected-count">{selectedUsers.length} selected</span>
-                        <button className="btn-danger" onClick={() => setShowDeleteConfirm(true)}>
+                        <button className="btn-danger" onClick={() => handleBulkAction('delete')}>
                             <i className="fas fa-trash" /> Delete Selected
                         </button>
                     </div>
