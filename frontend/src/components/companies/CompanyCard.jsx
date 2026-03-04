@@ -31,8 +31,8 @@ const COMPANY_SIMPLE_ICON_MAP = {
     google: 'google',
     'deepseek ai': 'openai',
     meta: 'meta',
-    'capitec bank': 'bankofamerica',
-    'standard bank': 'bankofamerica',
+    'capitec bank': 'capitecbank',
+    'standard bank': 'standardbank',
     'apple inc.': 'apple',
     apple: 'apple',
     amazon: 'amazon',
@@ -95,6 +95,7 @@ const getSecondaryLogoUrl = (name) => {
 
 const CompanyCard = ({ company }) => {
     const navigate = useNavigate();
+    const [logoStage, setLogoStage] = useState(0);
 
     if (!company) return null;
 
@@ -104,6 +105,14 @@ const CompanyCard = ({ company }) => {
         } else {
             console.error('Company has no ID:', company);
         }
+    };
+
+    const handleLogoError = () => {
+        if (logoStage === 0 && secondaryLogoUrl) {
+            setLogoStage(1);
+            return;
+        }
+        setLogoStage(2);
     };
 
     const name = company.name || 'Unknown Company';
@@ -128,8 +137,12 @@ const CompanyCard = ({ company }) => {
         setLogoStage(2);
     };
 
+    const primaryLogoUrl = useMemo(() => getPrimaryLogoUrl(company, name), [company, name]);
+    const secondaryLogoUrl = useMemo(() => getSecondaryLogoUrl(name), [name]);
+    const activeLogoUrl = logoStage === 0 ? primaryLogoUrl : (logoStage === 1 ? secondaryLogoUrl : null);
+
     return (
-        <div className="company-card" onClick={handleClick}>
+        <div className="company-card" onClick={handleClick} role="button" tabIndex={0} onKeyPress={(e) => e.key === 'Enter' && handleClick()}>
             <div className="company-card-header">
                 {activeLogoUrl ? (
                     <img
@@ -141,8 +154,8 @@ const CompanyCard = ({ company }) => {
                         onError={handleLogoError}
                     />
                 ) : (
-                    <div className="company-card-logo-placeholder" aria-label={`${name} logo placeholder`}>
-                        <FaBuilding />
+                    <div className="company-card-logo-placeholder" aria-label={`${name} initial`}>
+                        {name.charAt(0).toUpperCase()}
                     </div>
                 )}
                 <div className="company-card-info">
@@ -156,15 +169,15 @@ const CompanyCard = ({ company }) => {
                     {[1, 2, 3, 4, 5].map((star) => (
                         <span
                             key={star}
-                            className={star <= rating ? 'star-filled' : 'star-empty'}
+                            className={star <= Math.round(rating) ? 'star-filled' : 'star-empty'}
                         >
-              ★
-            </span>
+                            ★
+                        </span>
                     ))}
                 </div>
                 <span className="company-card-rating-value">
-          {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
-        </span>
+                    {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
+                </span>
             </div>
 
             {location && (
