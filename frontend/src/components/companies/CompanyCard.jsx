@@ -31,8 +31,8 @@ const COMPANY_SIMPLE_ICON_MAP = {
     google: 'google',
     'deepseek ai': 'openai',
     meta: 'meta',
-    'capitec bank': 'bankofamerica',
-    'standard bank': 'bankofamerica',
+    'capitec bank': 'capitecbank',
+    'standard bank': 'standardbank',
     'apple inc.': 'apple',
     apple: 'apple',
     amazon: 'amazon',
@@ -95,16 +95,9 @@ const getSecondaryLogoUrl = (name) => {
 
 const CompanyCard = ({ company }) => {
     const navigate = useNavigate();
+    const [logoStage, setLogoStage] = useState(0);
 
     if (!company) return null;
-
-    const handleClick = () => {
-        if (company.id) {
-            navigate(`/companies/${company.id}`);
-        } else {
-            console.error('Company has no ID:', company);
-        }
-    };
 
     const name = company.name || 'Unknown Company';
     const industry = company.industry || 'General';
@@ -113,7 +106,14 @@ const CompanyCard = ({ company }) => {
     const reviewCount = company.review_count || company.reviewCount || 0;
     const description = company.description || 'No description available';
     const isClaimed = company.is_claimed || false;
-    const [logoStage, setLogoStage] = useState(0);
+
+    const handleClick = () => {
+        if (company.id) {
+            navigate(`/companies/${company.id}`);
+        } else {
+            console.error('Company has no ID:', company);
+        }
+    };
 
     const primaryLogoUrl = useMemo(() => getPrimaryLogoUrl(company, name), [company, name]);
     const secondaryLogoUrl = useMemo(() => getSecondaryLogoUrl(name), [name]);
@@ -124,15 +124,14 @@ const CompanyCard = ({ company }) => {
             setLogoStage(1);
             return;
         }
+
         setLogoStage(2);
     };
-    const logoUrl = company.logo_url || company.logoUrl;
-    const [showLogoFallback, setShowLogoFallback] = useState(false);
 
     return (
-        <div className="company-card" onClick={handleClick}>
+        <div className="company-card" onClick={handleClick} role="button" tabIndex={0} onKeyPress={(e) => e.key === 'Enter' && handleClick()}>
             <div className="company-card-header">
-                {(activeLogoUrl && logoStage !== 2) ? (
+                {activeLogoUrl ? (
                     <img
                         src={activeLogoUrl}
                         alt={`${name} logo`}
@@ -141,19 +140,9 @@ const CompanyCard = ({ company }) => {
                         referrerPolicy="no-referrer"
                         onError={handleLogoError}
                     />
-                ) : logoUrl && !showLogoFallback ? (
-                    <img
-                        src={logoUrl}
-                        alt={`${name} logo`}
-                        className="company-card-logo"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        onError={() => setShowLogoFallback(true)}
-                    />
                 ) : (
-                    <div className="company-card-logo-placeholder" aria-label={`${name} logo placeholder`}>
-                        <FaBuilding />
-                        {name.charAt(0)}
+                    <div className="company-card-logo-placeholder" aria-label={`${name} initial`}>
+                        {name.charAt(0).toUpperCase()}
                     </div>
                 )}
                 <div className="company-card-info">
@@ -167,15 +156,15 @@ const CompanyCard = ({ company }) => {
                     {[1, 2, 3, 4, 5].map((star) => (
                         <span
                             key={star}
-                            className={star <= rating ? 'star-filled' : 'star-empty'}
+                            className={star <= Math.round(rating) ? 'star-filled' : 'star-empty'}
                         >
-                          ★
+                            ★
                         </span>
                     ))}
                 </div>
                 <span className="company-card-rating-value">
-              {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
-            </span>
+                    {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
+                </span>
             </div>
 
             {location && (
