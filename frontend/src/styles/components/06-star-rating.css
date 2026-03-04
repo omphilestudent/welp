@@ -1,0 +1,29 @@
+/* ===== Star Rating ===== */
+.star-rating {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.star-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: transform 0.2s ease;
+}
+
+.star-button:hover {
+  transform: scale(1.2);
+}
+
+.star-filled {
+  color: var(--rating-star);
+  filter: drop-shadow(0 2px 4px rgba(251, 191, 36, 0.3));
+  transition: all 0.2s ease;
+}
+
+.star-empty {
+  color: var(--rating-star-empty);
+  transition: all 0.2s ease;
+}
+
