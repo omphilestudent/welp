@@ -1,0 +1,517 @@
+/* ===== Join Psychologist Page ===== */
+.join-psychologist-page {
+  padding-bottom: 4rem;
+}
+
+.psychologist-hero {
+  background: var(--gradient-primary);
+  color: white;
+  padding: 6rem 0;
+  margin-bottom: -4rem;
+  text-align: center;
+}
+
+.psychologist-hero h1 {
+  font-size: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  font-weight: 800;
+}
+
+.hero-icon {
+  font-size: 4rem;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  margin-bottom: 4rem;
+  position: relative;
+  z-index: 10;
+}
+
+.stat-card {
+  background: var(--card-bg);
+  padding: 2.5rem 1.5rem;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
+  transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-10px);
+}
+
+.stat-icon {
+  font-size: 3rem;
+  color: var(--accent-color);
+  margin-bottom: 1rem;
+  background: var(--bg-tertiary);
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.stat-label {
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* Psychologist Steps */
+.psychologist-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4rem;
+  padding: 0 4rem;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+.step-number {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border: 2px solid var(--border-color);
+  transition: all 0.4s ease;
+  font-size: 1.25rem;
+}
+
+.step.active .step-number {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.15);
+  transform: scale(1.1);
+}
+
+.step.completed .step-number {
+  background: var(--success-text);
+  color: white;
+  border-color: var(--success-text);
+}
+
+.step-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.step.active .step-label {
+  color: var(--text-primary);
+}
+
+.step-connector {
+  flex: 1;
+  height: 3px;
+  background: var(--border-color);
+  margin: 0 1.5rem;
+  margin-top: -2.25rem;
+  border-radius: 2px;
+}
+
+/* Psychologist Content */
+.psychologist-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 3rem;
+  margin-bottom: 4rem;
+}
+
+.psychologist-form {
+  background: var(--card-bg);
+  padding: 3rem;
+  border-radius: 24px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+}
+
+.psychologist-form h2 {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.step-description {
+  font-size: 1.125rem;
+  color: var(--text-muted);
+  margin-bottom: 3rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.input-icon {
+  margin-right: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Tags Input */
+.tags-input {
+  display: flex;
+  gap: 1rem;
+}
+
+.tags-input input {
+  flex: 1;
+  padding: 1rem;
+  border: 2px solid var(--input-border);
+  border-radius: 12px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.tags-input input:focus {
+  border-color: var(--accent-color);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.tag {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 0.5rem 1.25rem;
+  border-radius: 30px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.tag:hover {
+  border-color: var(--accent-color);
+  background: var(--hover-bg);
+}
+
+.tag button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.tag button:hover {
+  color: var(--error-text);
+}
+
+/* Checkbox Grid */
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+  background: var(--bg-secondary);
+  padding: 2.5rem;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.section-subtitle {
+  font-size: 1.5rem;
+  margin: 3rem 0 1rem;
+  color: var(--text-primary);
+}
+
+.section-description {
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+
+/* Upload Section */
+.upload-section {
+  background: var(--bg-secondary);
+  padding: 3.5rem 2rem;
+  border-radius: 20px;
+  border: 2px dashed var(--border-color);
+  text-align: center;
+  margin-bottom: 3rem;
+  transition: all 0.3s ease;
+}
+
+.upload-section:hover {
+  border-color: var(--accent-color);
+  background: var(--hover-bg);
+}
+
+.upload-area {
+  margin-top: 2rem;
+}
+
+.upload-label {
+  cursor: pointer;
+  display: block;
+}
+
+.upload-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upload-icon {
+  font-size: 4rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.upload-prompt span:first-of-type {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.upload-hint {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.upload-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--success-text);
+}
+
+.success-icon {
+  font-size: 4rem;
+}
+
+.upload-progress {
+  margin-top: 2.5rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.progress-bar {
+  height: 10px;
+  background: var(--border-color);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--gradient-primary);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 1rem;
+  display: block;
+  font-weight: 500;
+}
+
+/* Review Summary */
+.review-summary {
+  margin-bottom: 3rem;
+}
+
+.review-section {
+  margin-top: 2rem;
+  padding: 2rem;
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.review-section h4 {
+  margin-bottom: 1.5rem;
+  color: var(--accent-color);
+  font-size: 1.25rem;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.75rem;
+}
+
+.review-item {
+  display: flex;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.review-label {
+  font-weight: 600;
+  width: 200px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.review-value {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+/* Terms Agreement */
+.terms-agreement {
+  margin-bottom: 3rem;
+  padding: 2rem;
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  border-left: 6px solid var(--accent-color);
+  box-shadow: var(--card-shadow);
+}
+
+.terms-agreement .checkbox-label {
+  align-items: flex-start;
+}
+
+.terms-agreement span {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.terms-agreement a {
+  color: var(--accent-color);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Verification Notice */
+.verification-notice {
+  display: flex;
+  gap: 1.5rem;
+  padding: 2rem;
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-radius: 20px;
+  margin-bottom: 3rem;
+  border: 1px solid var(--info-border);
+}
+
+.notice-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.notice-content h4 {
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+}
+
+.notice-content p {
+  font-size: 1rem;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+/* Psychologist Sidebar */
+.psychologist-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.info-card {
+  background: var(--card-bg);
+  padding: 2rem;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+}
+
+.info-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.info-card.testimonial {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+  padding: 2.5rem 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.info-card.testimonial::after {
+  content: '"';
+  position: absolute;
+  top: -20px;
+  right: 20px;
+  font-size: 10rem;
+  opacity: 0.1;
+  font-family: serif;
+}
+
+.testimonial-icon {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.testimonial-text {
+  font-style: italic;
+  font-size: 1.125rem;
+  line-height: 1.8;
+  margin-bottom: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.testimonial-author {
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
