@@ -1,4 +1,4 @@
-// backend/src/routes/authRoutes.js
+
 const express = require('express');
 const { authenticate } = require('../middleware/auth');
 const { authLimiter, loginLimiter } = require('../middleware/rateLimiter');

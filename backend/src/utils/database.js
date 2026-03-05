@@ -1,34 +1,34 @@
-// backend/src/utils/database.js
+
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Configure pool with proper SSL settings for Neon
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
-        rejectUnauthorized: false, // Required for Neon
+        rejectUnauthorized: false,
         require: true
     },
-    // Add connection timeout
+
     connectionTimeoutMillis: 10000,
 });
 
-// Test database connection with better error handling
+
 pool.connect((err, client, release) => {
     if (err) {
         console.error('Error connecting to database:', err.message);
         console.error('Please check your DATABASE_URL in .env file');
         console.error('Make sure you are connected to the internet');
     } else {
-        console.log('✅ Successfully connected to Neon PostgreSQL database');
+        console.log(' Successfully connected to Neon PostgreSQL database');
         release();
     }
 });
 
-// Create tables if they don't exist - with better error handling
+
 const createTables = async () => {
     try {
-        // Test connection first
+
         await pool.query('SELECT NOW()');
         console.log('Database connection test successful');
 
@@ -186,20 +186,20 @@ const createTables = async () => {
     `;
 
         await pool.query(queries);
-        console.log('✅ Database tables initialized successfully');
+        console.log(' Database tables initialized successfully');
     } catch (error) {
-        console.error('❌ Error creating tables:', error.message);
+        console.error(' Error creating tables:', error.message);
         console.error('Please check your database connection and permissions');
     }
 };
 
-// Initialize tables
+
 createTables();
 
-// Helper function to run migrations/add columns
+
 const runMigrations = async () => {
     try {
-        // Add new columns if they don't exist (safe to run multiple times)
+
         const migrations = [
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation VARCHAR(255);",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS workplace_id UUID REFERENCES companies(id);",
@@ -215,17 +215,17 @@ const runMigrations = async () => {
             try {
                 await pool.query(migration);
             } catch (err) {
-                // Ignore errors if column already exists
+
                 console.log(`Migration note: ${err.message}`);
             }
         }
-        console.log('✅ Database migrations completed');
+        console.log(' Database migrations completed');
     } catch (error) {
-        console.error('❌ Error running migrations:', error.message);
+        console.error(' Error running migrations:', error.message);
     }
 };
 
-// Run migrations after tables are created
+
 setTimeout(() => {
     runMigrations();
 }, 1000);

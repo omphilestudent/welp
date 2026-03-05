@@ -1,4 +1,4 @@
-/* ===== Join Psychologist Page ===== */
+
 .join-psychologist-page {
   padding-bottom: 4rem;
 }
@@ -25,7 +25,7 @@
   font-size: 4rem;
 }
 
-/* Stats Grid */
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -77,7 +77,7 @@
   font-weight: 500;
 }
 
-/* Psychologist Steps */
+
 .psychologist-steps {
   display: flex;
   align-items: center;
@@ -144,7 +144,7 @@
   border-radius: 2px;
 }
 
-/* Psychologist Content */
+
 .psychologist-content {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -183,7 +183,7 @@
   color: var(--text-muted);
 }
 
-/* Tags Input */
+
 .tags-input {
   display: flex;
   gap: 1rem;
@@ -246,7 +246,7 @@
   color: var(--error-text);
 }
 
-/* Checkbox Grid */
+
 .checkbox-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -268,7 +268,7 @@
   margin-bottom: 2rem;
 }
 
-/* Upload Section */
+
 .upload-section {
   background: var(--bg-secondary);
   padding: 3.5rem 2rem;
@@ -357,7 +357,7 @@
   font-weight: 500;
 }
 
-/* Review Summary */
+
 .review-summary {
   margin-bottom: 3rem;
 }
@@ -397,7 +397,7 @@
   word-break: break-word;
 }
 
-/* Terms Agreement */
+
 .terms-agreement {
   margin-bottom: 3rem;
   padding: 2rem;
@@ -422,7 +422,7 @@
   text-decoration: underline;
 }
 
-/* Verification Notice */
+
 .verification-notice {
   display: flex;
   gap: 1.5rem;
@@ -451,7 +451,7 @@
   opacity: 0.9;
 }
 
-/* Psychologist Sidebar */
+
 .psychologist-sidebar {
   display: flex;
   flex-direction: column;

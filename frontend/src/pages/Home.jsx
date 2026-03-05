@@ -1,4 +1,4 @@
-// frontend/src/pages/Home.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CompanyCard from '../components/companies/CompanyCard';
@@ -9,7 +9,7 @@ const Home = () => {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Sample global companies data
+
     const globalCompanies = [
         {
             id: '1',
@@ -234,7 +234,7 @@ const Home = () => {
     ];
 
     useEffect(() => {
-        // Simulate loading
+
         setTimeout(() => {
             setCompanies(globalCompanies);
             setLoading(false);
@@ -259,7 +259,7 @@ const Home = () => {
 
     return (
         <div className="home-page">
-            {/* Hero Section */}
+            {}
             <section className="hero-section">
                 <div className="container">
                     <h1 className="hero-title">
@@ -271,7 +271,7 @@ const Home = () => {
                         Join millions of employees sharing honest reviews about the world's leading companies.
                     </p>
 
-                    {/* Search Form */}
+                    {}
                     <form onSubmit={handleSearch} className="hero-search">
                         <input
                             type="text"
@@ -285,7 +285,7 @@ const Home = () => {
                         </button>
                     </form>
 
-                    {/* Popular Companies */}
+                    {}
                     <div className="popular-searches">
                         <span>Popular:</span>
                         {['Google', 'Meta', 'Amazon', 'Tesla'].map(company => (
@@ -304,7 +304,7 @@ const Home = () => {
                 </div>
             </section>
 
-            {/* Companies Grid */}
+            {}
             <section className="companies-section">
                 <div className="container">
                     <h2 className="section-title">Featured Companies</h2>
@@ -329,7 +329,7 @@ const Home = () => {
                 </div>
             </section>
 
-            {/* CTA Section */}
+            {}
             <section className="cta-section">
                 <div className="container">
                     <h2>Ready to Share Your Experience?</h2>

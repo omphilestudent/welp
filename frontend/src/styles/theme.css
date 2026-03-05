@@ -1,6 +1,6 @@
-/* src/styles/theme.css */
+
 :root {
-    /* Light mode: white surfaces + black text */
+
     --bg-primary: #ffffff;
     --bg-secondary: #f7f7f7;
     --bg-tertiary: #ededed;
@@ -52,7 +52,7 @@
 }
 
 [data-theme="dark"] {
-    /* Dark mode: black surfaces + white text */
+
     --bg-primary: #000000;
     --bg-secondary: #0f0f0f;
     --bg-tertiary: #1a1a1a;

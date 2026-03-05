@@ -4,15 +4,7 @@ import CompanyCard from './CompanyCard';
 import Loading from '../common/Loading';
 import './CompanyList.css';
 
-/**
- * CompanyList component displays a grid/list of company cards
- * @param {Object} props - Component props
- * @param {Array} props.companies - Array of company objects
- * @param {boolean} props.loading - Loading state
- * @param {string|null} props.error - Error message if any
- * @param {Function} props.onRetry - Optional retry function for error cases
- * @param {boolean} props.isGridView - Toggle between grid and list view (default: true)
- */
+
 const CompanyList = ({
                          companies,
                          loading,
@@ -23,13 +15,13 @@ const CompanyList = ({
                          className = ''
                      }) => {
 
-    // Memoize the companies array to prevent unnecessary re-renders
+
     const validCompanies = useMemo(() => {
         if (!Array.isArray(companies)) return [];
         return companies.filter(company => company && company.id);
     }, [companies]);
 
-    // Loading state with skeleton loading for better UX
+
     if (loading) {
         return (
             <div className="company-list-loading" aria-label="Loading companies">
@@ -38,7 +30,7 @@ const CompanyList = ({
                     text="Fetching companies..."
                     fullPage={false}
                 />
-                {/* Skeleton loading for visual feedback */}
+                {}
                 <div className="company-list-skeleton" aria-hidden="true">
                     {[...Array(6)].map((_, index) => (
                         <div key={index} className="company-card-skeleton">
@@ -55,7 +47,7 @@ const CompanyList = ({
         );
     }
 
-    // Error state with retry option
+
     if (error) {
         return (
             <div className="company-list-error" role="alert">
@@ -88,7 +80,7 @@ const CompanyList = ({
         );
     }
 
-    // Empty state with helpful message
+
     if (validCompanies.length === 0) {
         return (
             <div className="company-list-empty" role="status">
@@ -115,52 +107,47 @@ const CompanyList = ({
             </div>
         );
     }
-
-    // Main content with companies
     const listClassName = `company-list ${isGridView ? 'grid-view' : 'list-view'} ${className}`.trim();
 
     return (
         <div className={listClassName}>
-            {/* Optional: Show result count for better context */}
+            
             <div className="company-list-header" aria-live="polite">
                 <p className="result-count">
                     Showing <strong>{validCompanies.length}</strong> {validCompanies.length === 1 ? 'company' : 'companies'}
                 </p>
             </div>
 
-            {/* Companies grid/list */}
+            
             <div className="company-list-container" role="feed" aria-busy={loading}>
                 {validCompanies.map((company, index) => (
                     <CompanyCard
                         key={company.id}
                         company={company}
-                        priority={index < 4} // Prioritize loading first 4 images
+                        priority={index < 4}
                     />
                 ))}
             </div>
 
-            {/* Optional: Scroll to top button when many items */}
+            
             {validCompanies.length > 20 && (
                 <button
                     className="scroll-to-top"
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                     aria-label="Scroll to top"
                 >
-                    ↑
+                    Up
                 </button>
             )}
         </div>
     );
 };
-
-// PropTypes for better type checking and documentation
 CompanyList.propTypes = {
     companies: PropTypes.arrayOf(
         PropTypes.shape({
             id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
             name: PropTypes.string,
             industry: PropTypes.string,
-            // Add other expected company properties
         })
     ),
     loading: PropTypes.bool,
@@ -170,8 +157,6 @@ CompanyList.propTypes = {
     emptyMessage: PropTypes.string,
     className: PropTypes.string
 };
-
-// Default props
 CompanyList.defaultProps = {
     companies: [],
     loading: false,

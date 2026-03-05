@@ -1,4 +1,4 @@
-// src/components/auth/RegisterForm.jsx
+
 import React, { useState } from 'react';
 
 const RegisterForm = ({ onSubmit, loading }) => {

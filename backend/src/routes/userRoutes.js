@@ -1,4 +1,4 @@
-// backend/src/routes/userRoutes.js
+
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
@@ -11,13 +11,13 @@ const fs = require('fs');
 
 const router = express.Router();
 
-// Ensure upload directory exists
+
 const uploadDir = './uploads/avatars';
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Configure multer for file uploads
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadDir);
@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+    limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|gif/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -45,11 +45,11 @@ const upload = multer({
     }
 });
 
-// Profile routes
+
 router.get('/profile', authenticate, apiLimiter, userController.getProfile);
 router.patch('/profile', authenticate, apiLimiter, userController.updateProfile);
 
-// Avatar upload route
+
 router.post('/upload-avatar',
     authenticate,
     upload.single('avatar'),
@@ -59,10 +59,10 @@ router.post('/upload-avatar',
                 return res.status(400).json({ error: 'No file uploaded' });
             }
 
-            // Generate URL for the uploaded file
+
             const avatarUrl = `/uploads/avatars/${req.file.filename}`;
 
-            // Update user in database
+
             const { query } = require('../utils/database');
             await query(
                 'UPDATE users SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
@@ -80,7 +80,7 @@ router.post('/upload-avatar',
     }
 );
 
-// Password change
+
 router.post('/change-password',
     authenticate,
     accountSecurityLimiter,
@@ -98,11 +98,11 @@ router.post('/change-password',
     userController.changePassword
 );
 
-// Settings routes
+
 router.get('/settings', authenticate, apiLimiter, userController.getSettings);
 router.patch('/settings', authenticate, apiLimiter, userController.updateSettings);
 
-// Psychologist profile routes
+
 router.post('/add-psychologist-profile',
     authenticate,
     apiLimiter,
@@ -114,7 +114,7 @@ router.post('/add-psychologist-profile',
     userController.addPsychologistProfile
 );
 
-// Account management
+
 router.delete('/delete-account',
     authenticate,
     accountSecurityLimiter,

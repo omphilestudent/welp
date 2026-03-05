@@ -1,4 +1,4 @@
-// frontend/src/pages/SearchPage.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -39,7 +39,7 @@ const SearchPage = () => {
                 limit: 12
             };
 
-            // Add filter for unclaimed companies
+
             if (filter === 'unclaimed') {
                 params.unclaimed = true;
             }
@@ -78,7 +78,7 @@ const SearchPage = () => {
                     navigate(`/search?q=${encodeURIComponent(q)}${filter === 'unclaimed' ? '&unclaimed=true' : ''}`);
                 }} />
 
-                {/* Filter Tabs */}
+                {}
                 <div className="filter-tabs">
                     <button
                         className={`filter-tab ${filter === 'all' ? 'active' : ''}`}

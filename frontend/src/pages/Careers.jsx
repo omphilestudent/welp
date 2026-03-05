@@ -1,4 +1,4 @@
-// frontend/src/pages/Careers.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -80,7 +80,7 @@ const Careers = () => {
     const fetchJobs = async () => {
         setLoading(true);
         try {
-            // Mock data - replace with API call
+
             const mockJobs = [
                 {
                     id: 1,
@@ -251,7 +251,7 @@ const Careers = () => {
 
     return (
         <div className="careers-page">
-            {/* Hero Section */}
+            {}
             <section className="careers-hero">
                 <div className="hero-particles"></div>
                 <div className="container">
@@ -263,7 +263,7 @@ const Careers = () => {
                     >
                         <h1>
                             Join Us in Building the Future of Work
-                            <span className="gradient-text"> 🚀</span>
+                            <span className="gradient-text"> </span>
                         </h1>
                         <p className="hero-description">
                             We're on a mission to make workplaces better through honest reviews and wellbeing support.
@@ -301,7 +301,7 @@ const Careers = () => {
                 </div>
             </section>
 
-            {/* Benefits Section */}
+            
             <section className="benefits-section" id="culture">
                 <div className="container">
                     <motion.div
@@ -335,7 +335,7 @@ const Careers = () => {
                 </div>
             </section>
 
-            {/* Culture Section */}
+            
             <section className="culture-section">
                 <div className="container">
                     <motion.div
@@ -425,7 +425,7 @@ const Careers = () => {
                 </div>
             </section>
 
-            {/* Job Openings Section */}
+            
             <section className="jobs-section" id="openings">
                 <div className="container">
                     <motion.div
@@ -439,7 +439,7 @@ const Careers = () => {
                         <p>Find your next role at Welp</p>
                     </motion.div>
 
-                    {/* Search and Filters */}
+                    
                     <div className="job-filters">
                         <div className="search-box">
                             <FaSearch className="search-icon" />
@@ -487,7 +487,7 @@ const Careers = () => {
                         </div>
                     </div>
 
-                    {/* Featured Jobs */}
+                    
                     {featuredJobs.length > 0 && (
                         <div className="featured-jobs">
                             <h3>Featured Opportunities</h3>
@@ -525,7 +525,7 @@ const Careers = () => {
                         </div>
                     )}
 
-                    {/* All Jobs */}
+                    
                     <div className="all-jobs">
                         <h3>All Openings</h3>
                         <div className="jobs-list">
@@ -568,7 +568,7 @@ const Careers = () => {
                 </div>
             </section>
 
-            {/* CTA Section */}
+            
             <section className="careers-cta">
                 <div className="container">
                     <motion.div
@@ -597,7 +597,7 @@ const Careers = () => {
                     overflow-x: hidden;
                 }
 
-                /* Hero Section */
+                
                 .careers-hero {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
@@ -612,7 +612,7 @@ const Careers = () => {
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background-image: 
+                    background-image:
                         radial-gradient(circle at 20% 30%, rgba(255,255,255,0.1) 0%, transparent 20%),
                         radial-gradient(circle at 80% 70%, rgba(255,255,255,0.1) 0%, transparent 20%),
                         radial-gradient(circle at 40% 80%, rgba(255,255,255,0.1) 0%, transparent 30%);
@@ -674,7 +674,7 @@ const Careers = () => {
                     justify-content: center;
                 }
 
-                /* Section Header */
+                
                 .section-header {
                     text-align: center;
                     margin-bottom: 3rem;
@@ -691,7 +691,7 @@ const Careers = () => {
                     font-size: 1.2rem;
                 }
 
-                /* Benefits Section */
+                
                 .benefits-section {
                     padding: 5rem 0;
                     background: #f7fafc;
@@ -728,7 +728,7 @@ const Careers = () => {
                     line-height: 1.6;
                 }
 
-                /* Culture Section */
+                
                 .culture-section {
                     padding: 5rem 0;
                 }
@@ -768,7 +768,7 @@ const Careers = () => {
                     line-height: 1.6;
                 }
 
-                /* Jobs Section */
+                
                 .jobs-section {
                     padding: 5rem 0;
                     background: #f7fafc;
@@ -983,7 +983,7 @@ const Careers = () => {
                     color: #718096;
                 }
 
-                /* CTA Section */
+                
                 .careers-cta {
                     padding: 5rem 0;
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1013,7 +1013,7 @@ const Careers = () => {
                     justify-content: center;
                 }
 
-                /* Buttons */
+                
                 .btn {
                     padding: 0.75rem 1.5rem;
                     border-radius: 8px;
@@ -1048,13 +1048,13 @@ const Careers = () => {
                     font-size: 1.1rem;
                 }
 
-                /* Animations */
+                
                 @keyframes float {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(-20px); }
                 }
 
-                /* Responsive */
+                
                 @media (max-width: 768px) {
                     .hero-content h1 {
                         font-size: 2rem;

@@ -1,14 +1,14 @@
-// backend/src/controllers/adminController.js
+
 const { query } = require('../utils/database');
 const bcrypt = require('bcryptjs');
 
-// Get admin profile
+
 const getAdminProfile = async (req, res) => {
     try {
         console.log('Getting admin profile for user:', req.user.id);
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 au.*,
                 u.email,
                 u.display_name,
@@ -35,12 +35,12 @@ const getAdminProfile = async (req, res) => {
     }
 };
 
-// Get dashboard stats
+
 const getDashboardStats = async (req, res) => {
     try {
-        // Get real stats from database
+
         const userStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_users,
                 COUNT(CASE WHEN created_at >= CURRENT_DATE THEN 1 END) as new_users_today,
                 COUNT(CASE WHEN role = 'employee' THEN 1 END) as employees,
@@ -50,7 +50,7 @@ const getDashboardStats = async (req, res) => {
         );
 
         const companyStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_companies,
                 COUNT(CASE WHEN is_claimed = true THEN 1 END) as claimed_companies,
                 COUNT(CASE WHEN is_verified = true THEN 1 END) as verified_companies
@@ -58,7 +58,7 @@ const getDashboardStats = async (req, res) => {
         );
 
         const reviewStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_reviews,
                 COUNT(CASE WHEN is_public = false THEN 1 END) as pending_reviews,
                 COALESCE(AVG(rating), 0) as avg_rating
@@ -66,7 +66,7 @@ const getDashboardStats = async (req, res) => {
         );
 
         const subscriptionStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_subscriptions,
                 COUNT(CASE WHEN status = 'active' THEN 1 END) as active_subscriptions,
                 COALESCE(SUM(price), 0) as total_revenue
@@ -74,7 +74,7 @@ const getDashboardStats = async (req, res) => {
         );
 
         const recentActivity = await query(
-            `SELECT 
+            `SELECT
                 'user' as type, id, 'New user registered' as description, created_at
             FROM users
             UNION ALL
@@ -102,15 +102,15 @@ const getDashboardStats = async (req, res) => {
     }
 };
 
-// Get all users with pagination and filters
+
 const getUsers = async (req, res) => {
     try {
         const { page = 1, limit = 20, search = '', role = '', status = '' } = req.query;
         const offset = (page - 1) * limit;
 
         let queryText = `
-            SELECT 
-                u.id, u.email, u.display_name, u.role, u.is_anonymous, 
+            SELECT
+                u.id, u.email, u.display_name, u.role, u.is_anonymous,
                 u.is_verified, u.created_at, u.updated_at,
                 COUNT(r.id) as review_count,
                 COALESCE(AVG(r.rating), 0) as avg_rating
@@ -144,7 +144,7 @@ const getUsers = async (req, res) => {
 
         const result = await query(queryText, params);
 
-        // Get total count
+
         const countResult = await query('SELECT COUNT(*) FROM users');
         const total = parseInt(countResult.rows[0].count);
 
@@ -163,13 +163,13 @@ const getUsers = async (req, res) => {
     }
 };
 
-// Get single user details
+
 const getUserDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 u.*,
                 COUNT(r.id) as review_count,
                 COALESCE(AVG(r.rating), 0) as avg_rating,
@@ -198,12 +198,12 @@ const getUserDetails = async (req, res) => {
     }
 };
 
-// Create new user (admin)
+
 const createUser = async (req, res) => {
     try {
         const { email, password, role, displayName, isAnonymous } = req.body;
 
-        // Check if user exists
+
         const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
         if (existing.rows.length > 0) {
             return res.status(400).json({ error: 'Email already exists' });
@@ -218,7 +218,7 @@ const createUser = async (req, res) => {
             [email, hashedPassword, role, displayName, isAnonymous || false]
         );
 
-        // Log admin action
+
         await logAdminAction(req.user.id, 'CREATE_USER', 'users', result.rows[0].id, null, result.rows[0]);
 
         res.status(201).json(result.rows[0]);
@@ -228,17 +228,17 @@ const createUser = async (req, res) => {
     }
 };
 
-// Update user
+
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
         const { displayName, role, isVerified, isAnonymous } = req.body;
 
-        // Get old values for audit log
+
         const oldUser = await query('SELECT * FROM users WHERE id = $1', [id]);
 
         const result = await query(
-            `UPDATE users 
+            `UPDATE users
              SET display_name = COALESCE($1, display_name),
                  role = COALESCE($2, role),
                  is_verified = COALESCE($3, is_verified),
@@ -253,7 +253,7 @@ const updateUser = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Log admin action
+
         await logAdminAction(req.user.id, 'UPDATE_USER', 'users', id, oldUser.rows[0], result.rows[0]);
 
         res.json(result.rows[0]);
@@ -263,17 +263,17 @@ const updateUser = async (req, res) => {
     }
 };
 
-// Delete user
+
 const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Get user for audit log
+
         const user = await query('SELECT * FROM users WHERE id = $1', [id]);
 
         await query('DELETE FROM users WHERE id = $1', [id]);
 
-        // Log admin action
+
         await logAdminAction(req.user.id, 'DELETE_USER', 'users', id, user.rows[0], null);
 
         res.json({ message: 'User deleted successfully' });
@@ -283,14 +283,14 @@ const deleteUser = async (req, res) => {
     }
 };
 
-// Get all companies with pagination and filters
+
 const getCompanies = async (req, res) => {
     try {
         const { page = 1, limit = 20, search = '', industry = '', status = '' } = req.query;
         const offset = (page - 1) * limit;
 
         let queryText = `
-            SELECT 
+            SELECT
                 c.*,
                 COUNT(r.id) as review_count,
                 COALESCE(AVG(r.rating), 0) as avg_rating,
@@ -330,7 +330,7 @@ const getCompanies = async (req, res) => {
 
         const result = await query(queryText, params);
 
-        // Get total count
+
         const countResult = await query('SELECT COUNT(*) FROM companies');
         const total = parseInt(countResult.rows[0].count);
 
@@ -349,13 +349,13 @@ const getCompanies = async (req, res) => {
     }
 };
 
-// Get single company details
+
 const getCompanyDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 c.*,
                 COUNT(r.id) as review_count,
                 COALESCE(AVG(r.rating), 0) as avg_rating,
@@ -386,15 +386,15 @@ const getCompanyDetails = async (req, res) => {
     }
 };
 
-// Verify company
+
 const verifyCompany = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `UPDATE companies 
-             SET is_verified = true, 
-                 verified_by = $1, 
+            `UPDATE companies
+             SET is_verified = true,
+                 verified_by = $1,
                  verified_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
@@ -406,7 +406,7 @@ const verifyCompany = async (req, res) => {
             return res.status(404).json({ error: 'Company not found' });
         }
 
-        // Log admin action
+
         await logAdminAction(req.user.id, 'VERIFY_COMPANY', 'companies', id, null, result.rows[0]);
 
         res.json({ message: 'Company verified successfully', company: result.rows[0] });
@@ -416,14 +416,14 @@ const verifyCompany = async (req, res) => {
     }
 };
 
-// Update company status
+
 const updateCompanyStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
 
         const result = await query(
-            `UPDATE companies 
+            `UPDATE companies
              SET status = $1, updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
              RETURNING *`,
@@ -441,17 +441,17 @@ const updateCompanyStatus = async (req, res) => {
     }
 };
 
-// Delete company
+
 const deleteCompany = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Get company for audit log
+
         const company = await query('SELECT * FROM companies WHERE id = $1', [id]);
 
         await query('DELETE FROM companies WHERE id = $1', [id]);
 
-        // Log admin action
+
         await logAdminAction(req.user.id, 'DELETE_COMPANY', 'companies', id, company.rows[0], null);
 
         res.json({ message: 'Company deleted successfully' });
@@ -461,14 +461,14 @@ const deleteCompany = async (req, res) => {
     }
 };
 
-// Get all reviews with pagination and filters
+
 const getReviews = async (req, res) => {
     try {
         const { page = 1, limit = 20, status = 'all' } = req.query;
         const offset = (page - 1) * limit;
 
         let queryText = `
-            SELECT 
+            SELECT
                 r.*,
                 u.display_name as author_name,
                 u.email as author_email,
@@ -490,7 +490,7 @@ const getReviews = async (req, res) => {
 
         const result = await query(queryText, [limit, offset]);
 
-        // Get total count
+
         const countResult = await query('SELECT COUNT(*) FROM reviews');
         const total = parseInt(countResult.rows[0].count);
 
@@ -509,11 +509,11 @@ const getReviews = async (req, res) => {
     }
 };
 
-// Get pending reviews
+
 const getPendingReviews = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 r.*,
                 u.display_name as author_name,
                 u.email as author_email,
@@ -532,7 +532,7 @@ const getPendingReviews = async (req, res) => {
     }
 };
 
-// Moderate review
+
 const moderateReview = async (req, res) => {
     try {
         const { id } = req.params;
@@ -560,17 +560,17 @@ const moderateReview = async (req, res) => {
     }
 };
 
-// Delete review
+
 const deleteReview = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Get review for audit log
+
         const review = await query('SELECT * FROM reviews WHERE id = $1', [id]);
 
         await query('DELETE FROM reviews WHERE id = $1', [id]);
 
-        // Log admin action
+
         await logAdminAction(req.user.id, 'DELETE_REVIEW', 'reviews', id, review.rows[0], null);
 
         res.json({ message: 'Review deleted successfully' });
@@ -580,11 +580,11 @@ const deleteReview = async (req, res) => {
     }
 };
 
-// Get all subscriptions
+
 const getSubscriptions = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 s.*,
                 u.email as user_email,
                 u.display_name as user_name
@@ -600,13 +600,13 @@ const getSubscriptions = async (req, res) => {
     }
 };
 
-// Get subscription details
+
 const getSubscriptionDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 s.*,
                 u.email as user_email,
                 u.display_name as user_name
@@ -627,15 +627,15 @@ const getSubscriptionDetails = async (req, res) => {
     }
 };
 
-// Cancel subscription
+
 const cancelSubscription = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `UPDATE subscriptions 
-             SET status = 'cancelled', 
-                 cancelled_by = $1, 
+            `UPDATE subscriptions
+             SET status = 'cancelled',
+                 cancelled_by = $1,
                  cancelled_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
@@ -654,14 +654,14 @@ const cancelSubscription = async (req, res) => {
     }
 };
 
-// Get pricing configuration
+
 const getPricingConfig = async (req, res) => {
     try {
         const result = await query(
             `SELECT * FROM pricing_config WHERE is_active = true ORDER BY role, plan`
         );
 
-        // Group by role
+
         const pricing = {};
         result.rows.forEach(item => {
             if (!pricing[item.role]) {
@@ -677,17 +677,17 @@ const getPricingConfig = async (req, res) => {
     }
 };
 
-// Update pricing
+
 const updatePricing = async (req, res) => {
     try {
         const { role, plan } = req.params;
         const { base_price_usd, features, limits } = req.body;
 
         const result = await query(
-            `UPDATE pricing_config 
-             SET base_price_usd = $1, 
-                 features = $2, 
-                 limits = $3, 
+            `UPDATE pricing_config
+             SET base_price_usd = $1,
+                 features = $2,
+                 limits = $3,
                  updated_by = $4,
                  updated_at = CURRENT_TIMESTAMP
              WHERE role = $5 AND plan = $6
@@ -706,7 +706,7 @@ const updatePricing = async (req, res) => {
     }
 };
 
-// Get country pricing
+
 const getCountryPricing = async (req, res) => {
     try {
         const result = await query(
@@ -720,7 +720,7 @@ const getCountryPricing = async (req, res) => {
     }
 };
 
-// Add country pricing
+
 const addCountryPricing = async (req, res) => {
     try {
         const { country_code, country_name, multiplier, currency, currency_symbol } = req.body;
@@ -739,14 +739,14 @@ const addCountryPricing = async (req, res) => {
     }
 };
 
-// Update country pricing
+
 const updateCountryPricing = async (req, res) => {
     try {
         const { countryCode } = req.params;
         const { multiplier, currency, currency_symbol } = req.body;
 
         const result = await query(
-            `UPDATE country_pricing 
+            `UPDATE country_pricing
              SET multiplier = COALESCE($1, multiplier),
                  currency = COALESCE($2, currency),
                  currency_symbol = COALESCE($3, currency_symbol),
@@ -768,7 +768,7 @@ const updateCountryPricing = async (req, res) => {
     }
 };
 
-// Get system settings
+
 const getSystemSettings = async (req, res) => {
     try {
         const result = await query(`SELECT * FROM system_settings ORDER BY key`);
@@ -785,7 +785,7 @@ const getSystemSettings = async (req, res) => {
     }
 };
 
-// Update system settings
+
 const updateSystemSettings = async (req, res) => {
     try {
         const { key, value } = req.body;
@@ -793,7 +793,7 @@ const updateSystemSettings = async (req, res) => {
         const result = await query(
             `INSERT INTO system_settings (key, value, updated_by)
              VALUES ($1, $2, $3)
-             ON CONFLICT (key) DO UPDATE 
+             ON CONFLICT (key) DO UPDATE
              SET value = EXCLUDED.value,
                  updated_by = EXCLUDED.updated_by,
                  updated_at = CURRENT_TIMESTAMP
@@ -808,14 +808,14 @@ const updateSystemSettings = async (req, res) => {
     }
 };
 
-// Get audit logs
+
 const getAuditLogs = async (req, res) => {
     try {
         const { page = 1, limit = 50 } = req.query;
         const offset = (page - 1) * limit;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 al.*,
                 u_admin.email as admin_email,
                 u_admin.display_name as admin_name,
@@ -846,7 +846,7 @@ const getAuditLogs = async (req, res) => {
     }
 };
 
-// Get revenue analytics
+
 const getRevenueAnalytics = async (req, res) => {
     try {
         const { period = 'month' } = req.query;
@@ -861,7 +861,7 @@ const getRevenueAnalytics = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 DATE_TRUNC($1, created_at) as date,
                 COUNT(*) as subscriptions,
                 SUM(price) as revenue
@@ -880,11 +880,11 @@ const getRevenueAnalytics = async (req, res) => {
     }
 };
 
-// Get user analytics
+
 const getUserAnalytics = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 DATE_TRUNC('day', created_at) as date,
                 COUNT(*) as new_users,
                 COUNT(CASE WHEN role = 'employee' THEN 1 END) as employees,
@@ -903,11 +903,11 @@ const getUserAnalytics = async (req, res) => {
     }
 };
 
-// Get subscription analytics
+
 const getSubscriptionAnalytics = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 plan,
                 COUNT(*) as total,
                 COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
@@ -923,7 +923,7 @@ const getSubscriptionAnalytics = async (req, res) => {
     }
 };
 
-// Helper function to log admin actions
+
 const logAdminAction = async (adminId, action, entityType, entityId, oldValues, newValues) => {
     try {
         await query(

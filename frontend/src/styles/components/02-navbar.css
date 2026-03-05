@@ -1,4 +1,4 @@
-/* ===== Navbar ===== */
+
 .navbar {
   background: var(--nav-bg);
   backdrop-filter: blur(10px);
@@ -16,9 +16,9 @@
 }
 
 .navbar-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -69,4 +69,3 @@
 .navbar-link:hover::after {
   width: 100%;
 }
-

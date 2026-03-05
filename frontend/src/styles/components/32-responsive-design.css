@@ -1,4 +1,4 @@
-/* ===== Responsive Design ===== */
+
 @media (max-width: 1200px) {
   .footer-content {
     grid-template-columns: repeat(3, 1fr);

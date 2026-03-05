@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/SubscriptionManagement.jsx
+
 import React from 'react';
 
 const SubscriptionManagement = () => {

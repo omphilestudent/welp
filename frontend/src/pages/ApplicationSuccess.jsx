@@ -1,4 +1,4 @@
-// frontend/src/pages/ApplicationSuccess.jsx
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -17,7 +17,7 @@ const ApplicationSuccess = () => {
                 }
                 return prev - 1;
             });
-        }, 86400000); // Update every day
+        }, 86400000);
 
         return () => clearInterval(timer);
     }, []);

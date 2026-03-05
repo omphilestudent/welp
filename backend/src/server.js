@@ -1,4 +1,4 @@
-// backend/src/server.js
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -29,7 +29,7 @@ try {
     authV2Routes = require('./routes/authV2Routes');
     ({ sequelize } = require('./models'));
 } catch (error) {
-    console.warn('⚠️ RBAC Sequelize module unavailable:', error.message);
+    console.warn(' RBAC Sequelize module unavailable:', error.message);
 }
 
 const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
@@ -42,7 +42,7 @@ if (weakJwtSecret && process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET is missing or too weak. Use at least 32 characters and never use placeholders.');
 }
 if (weakJwtSecret) {
-    console.warn('⚠️ Weak JWT_SECRET detected. Update it before production deployment.');
+    console.warn(' Weak JWT_SECRET detected. Update it before production deployment.');
 }
 
 const corsOptions = {
@@ -60,7 +60,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: corsOptions });
 
-// Middleware
+
 app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
@@ -70,7 +70,7 @@ app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/', apiLimiter);
 
-// Routes
+
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/reviews', reviewRoutes);
@@ -86,12 +86,12 @@ if (authV2Routes && rbacUserRoutes && roleRoutes) {
     app.use('/api/rbac/roles', roleRoutes);
 }
 
-// Health check
+
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date() });
 });
 
-// Socket.io for real-time messaging
+
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) {
@@ -175,9 +175,9 @@ const PORT = process.env.PORT || 5000;
     if (sequelize) {
         try {
             await sequelize.authenticate();
-            console.log('✅ Sequelize connection initialized');
+            console.log(' Sequelize connection initialized');
         } catch (error) {
-            console.warn('⚠️ Sequelize connection unavailable:', error.message);
+            console.warn(' Sequelize connection unavailable:', error.message);
         }
     }
 

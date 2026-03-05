@@ -1,4 +1,4 @@
-// src/components/messages/ConversationList.jsx
+
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
@@ -47,7 +47,7 @@ const ConversationList = ({ conversations, activeId, onSelect }) => {
                             <h4 className="conversation-name">
                                 {other?.display_name || 'Unknown'}
                                 {conv.psychologist?.is_verified && (
-                                    <span className="verified-badge" title="Verified Psychologist">✓</span>
+                                    <span className="verified-badge" title="Verified Psychologist">Verified</span>
                                 )}
                             </h4>
 

@@ -1,4 +1,4 @@
-// frontend/src/components/messages/ChatRequestModal.jsx
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';

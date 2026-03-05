@@ -1,4 +1,4 @@
-// frontend/src/pages/hr/Applications.jsx
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
 
@@ -26,7 +26,7 @@ const Applications = () => {
     const [applications, setApplications] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedApplication, setSelectedApplication] = useState(null);
-    const [viewMode, setViewMode] = useState('create'); // create | edit | view
+    const [viewMode, setViewMode] = useState('create');
     const [formData, setFormData] = useState(EMPTY_FORM);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');

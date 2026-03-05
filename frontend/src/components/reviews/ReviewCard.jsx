@@ -1,4 +1,4 @@
-// src/components/reviews/ReviewCard.jsx
+
 import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
@@ -48,7 +48,7 @@ const ReviewCard = ({ review, onReplyAdded }) => {
 
         try {
             await api.delete(`/reviews/${review.id}`);
-            onReplyAdded?.(); // Refresh
+            onReplyAdded?.();
         } catch (error) {
             alert(error.response?.data?.error || 'Failed to delete review');
         }

@@ -1,7 +1,7 @@
-// frontend/src/components/companies/CompanyCard.jsx
+
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaMapMarkerAlt, FaBuilding } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaBuilding, FaStar, FaRegStar } from 'react-icons/fa';
 
 const COMPANY_DOMAIN_MAP = {
     google: 'google.com',
@@ -158,7 +158,7 @@ const CompanyCard = ({ company }) => {
                             key={star}
                             className={star <= Math.round(rating) ? 'star-filled' : 'star-empty'}
                         >
-                            ★
+                            {star <= Math.round(rating) ? <FaStar /> : <FaRegStar />}
                         </span>
                     ))}
                 </div>

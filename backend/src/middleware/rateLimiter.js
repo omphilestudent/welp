@@ -1,10 +1,10 @@
-// backend/src/middleware/rateLimiter.js
+
 const rateLimit = require('express-rate-limit');
 
-// General API rate limiter
+
 const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 100,
     message: {
         error: 'Too many requests, please try again later.'
     },
@@ -12,10 +12,10 @@ const apiLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Strict limiter for auth endpoints
+
 const authLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5, // Limit each IP to 5 login/register attempts per hour
+    windowMs: 60 * 60 * 1000,
+    max: 5,
     message: {
         error: 'Too many authentication attempts, please try again later.'
     },
@@ -23,9 +23,9 @@ const authLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Extra strict limiter for login using IP + email fingerprint
+
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 15 * 60 * 1000,
     max: 5,
     keyGenerator: (req) => `${req.ip}:${(req.body?.email || '').toLowerCase()}`,
     message: {
@@ -35,7 +35,7 @@ const loginLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Sensitive account actions limiter
+
 const accountSecurityLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,
@@ -46,10 +46,10 @@ const accountSecurityLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Review creation limiter
+
 const reviewLimiter = rateLimit({
-    windowMs: 24 * 60 * 60 * 1000, // 24 hours
-    max: 3, // Limit each IP to 3 reviews per day
+    windowMs: 24 * 60 * 60 * 1000,
+    max: 3,
     message: {
         error: 'You have reached the maximum number of reviews for today.'
     },
@@ -57,10 +57,10 @@ const reviewLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Message limiter
+
 const messageLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 10, // Limit each IP to 10 messages per minute
+    windowMs: 60 * 1000,
+    max: 10,
     message: {
         error: 'Too many messages sent, please slow down.'
     },

@@ -1,4 +1,4 @@
-// frontend/src/components/common/Footer.jsx
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaBriefcase, FaUsers, FaFileAlt, FaUserGraduate } from 'react-icons/fa';
@@ -55,7 +55,7 @@ const Footer = () => {
                         </ul>
                     </div>
 
-                    {/* Career Section */}
+                    {}
                     <div className="footer-section">
                         <h4>Careers</h4>
                         <ul className="footer-links">
@@ -86,7 +86,7 @@ const Footer = () => {
                 <div className="footer-bottom">
                     <p>&copy; {currentYear} Welp. All rights reserved.</p>
                     <div className="social-links">
-                        <a href="#" aria-label="Twitter">𝕏</a>
+                        <a href="#" aria-label="Twitter">X</a>
                         <a href="#" aria-label="LinkedIn">in</a>
                         <a href="#" aria-label="Facebook">f</a>
                     </div>
@@ -99,7 +99,7 @@ const Footer = () => {
                     align-items: center;
                     gap: 0.5rem;
                 }
-                
+
                 .career-link svg {
                     font-size: 0.9rem;
                 }

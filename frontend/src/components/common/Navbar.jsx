@@ -1,15 +1,13 @@
-// frontend/src/components/common/Navbar.jsx (Add after business section)
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaComment, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
-import { useTheme } from '../../hooks/useTheme';
 import api from '../../services/api';
 import ChatRequestModal from '../messages/ChatRequestModal';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
-    const { isDarkMode, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [showChatModal, setShowChatModal] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -104,7 +102,7 @@ const Navbar = () => {
                                     </>
                                 )}
 
-                                {/* Admin Links */}
+                                {}
                                 {isAdmin && (
                                     <div className="nav-dropdown">
                                         <button className="nav-dropdown-btn">
@@ -124,7 +122,7 @@ const Navbar = () => {
                                     </div>
                                 )}
 
-                                {/* HR Links */}
+                                {}
                                 {isHR && (
                                     <div className="nav-dropdown">
                                         <button className="nav-dropdown-btn">
@@ -154,10 +152,6 @@ const Navbar = () => {
                                     </button>
                                 )}
 
-                                <button onClick={toggleTheme} className="btn btn-secondary">
-                                    {isDarkMode ? '☀️' : '🌙'}
-                                </button>
-
                                 <button onClick={handleLogout} className="btn btn-primary">
                                     Logout
                                 </button>
@@ -167,9 +161,6 @@ const Navbar = () => {
                                 <Link to="/pricing" className="navbar-link">
                                     Pricing
                                 </Link>
-                                <button onClick={toggleTheme} className="btn btn-secondary">
-                                    {isDarkMode ? '☀️' : '🌙'}
-                                </button>
                                 <Link to="/login" className="btn btn-primary">
                                     Login
                                 </Link>
@@ -182,7 +173,7 @@ const Navbar = () => {
                 </div>
             </nav>
 
-            {/* Chat Request Modal */}
+            {}
             <ChatRequestModal
                 isOpen={showChatModal}
                 onClose={() => setShowChatModal(false)}

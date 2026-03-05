@@ -1,4 +1,4 @@
-/* ===== Forms ===== */
+
 .form-group {
   margin-bottom: 1.5rem;
   animation: fadeIn 0.5s ease-out;
@@ -56,7 +56,7 @@
   margin-top: 0.5rem;
 }
 
-/* Role Options */
+
 .role-options {
   display: flex;
   gap: 1rem;
@@ -94,7 +94,7 @@
   font-weight: 600;
 }
 
-/* Checkbox */
+
 .checkbox-label {
   display: flex;
   align-items: center;

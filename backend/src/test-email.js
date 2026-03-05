@@ -1,4 +1,4 @@
-// backend/src/test-email.js
+
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
@@ -15,18 +15,18 @@ async function testEmail() {
 
     try {
         await transporter.verify();
-        console.log('✅ Email configuration is valid!');
+        console.log(' Email configuration is valid!');
 
-        // Send a test email
+
         const info = await transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: process.env.EMAIL_USER,
             subject: 'Test Email from Welp',
             text: 'If you receive this, your email configuration is working!'
         });
-        console.log('✅ Test email sent:', info.messageId);
+        console.log(' Test email sent:', info.messageId);
     } catch (error) {
-        console.error('❌ Email error:', error.message);
+        console.error(' Email error:', error.message);
     }
 }
 

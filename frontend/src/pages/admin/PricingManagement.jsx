@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/PricingManagement.jsx
+
 import React from 'react';
 
 const PricingManagement = () => {

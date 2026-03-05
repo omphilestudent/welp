@@ -1,4 +1,4 @@
-// frontend/src/pages/hr/HRDashboard.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
@@ -237,7 +237,7 @@ const HRDashboard = () => {
 
     return (
         <div className="hr-dashboard">
-            {/* Header */}
+            {}
             <div className="dashboard-header">
                 <div className="header-left">
                     <h1>
@@ -266,7 +266,7 @@ const HRDashboard = () => {
                 </div>
             </div>
 
-            {/* Stats Grid */}
+            {}
             <div className="stats-grid">
                 {statCards.map((stat, index) => (
                     <Link to={stat.link} key={index} className="stat-card">
@@ -284,7 +284,7 @@ const HRDashboard = () => {
                 ))}
             </div>
 
-            {/* Quick Actions */}
+            {}
             <div className="quick-actions">
                 <h2>Quick Actions</h2>
                 <div className="action-grid">
@@ -311,7 +311,7 @@ const HRDashboard = () => {
                 </div>
             </div>
 
-            {/* Charts Section */}
+            {}
             <div className="charts-section">
                 <div className="chart-card">
                     <h3>Application Trends</h3>
@@ -360,9 +360,9 @@ const HRDashboard = () => {
                 </div>
             </div>
 
-            {/* Tables Section */}
+            {}
             <div className="tables-section">
-                {/* Recent Jobs */}
+                {}
                 <div className="table-card">
                     <div className="table-header">
                         <h3>
@@ -418,7 +418,7 @@ const HRDashboard = () => {
                     </div>
                 </div>
 
-                {/* Recent Applications */}
+                {}
                 <div className="table-card">
                     <div className="table-header">
                         <h3>
@@ -472,7 +472,7 @@ const HRDashboard = () => {
                 </div>
             </div>
 
-            {/* Upcoming Interviews */}
+            {}
             <div className="interviews-section">
                 <div className="section-header">
                     <h2>

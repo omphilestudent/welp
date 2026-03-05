@@ -1,4 +1,4 @@
-// frontend/src/pages/JoinPsychologist.jsx
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,13 +32,13 @@ const JoinPsychologist = () => {
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [formData, setFormData] = useState({
-        // Personal Information
+
         fullName: '',
         email: '',
         phoneNumber: '',
         address: '',
 
-        // Professional Information
+
         licenseNumber: '',
         licenseIssuingBody: '',
         yearsOfExperience: '',
@@ -46,27 +46,27 @@ const JoinPsychologist = () => {
         qualifications: [],
         biography: '',
 
-        // Practice Information
+
         consultationModes: [],
         languages: ['English'],
         acceptedAgeGroups: [],
 
-        // Online Presence
+
         website: '',
         linkedin: '',
 
-        // Emergency Contact
+
         emergencyContact: {
             name: '',
             relationship: '',
             phone: ''
         },
 
-        // Documents
+
         licenseDocument: null,
         avatarUrl: '',
 
-        // Terms
+
         agreeToTerms: false
     });
 
@@ -208,14 +208,14 @@ const JoinPsychologist = () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file type
+
         const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
         if (!allowedTypes.includes(file.type)) {
             toast.error('Please upload a PDF, JPEG, or PNG file');
             return;
         }
 
-        // Validate file size (max 5MB)
+
         if (file.size > 5 * 1024 * 1024) {
             toast.error('File size must be less than 5MB');
             return;
@@ -224,7 +224,7 @@ const JoinPsychologist = () => {
         setUploading(true);
         setFileUploadProgress(0);
 
-        // Simulate upload progress
+
         const interval = setInterval(() => {
             setFileUploadProgress(prev => {
                 if (prev >= 100) {
@@ -236,8 +236,8 @@ const JoinPsychologist = () => {
         }, 200);
 
         try {
-            // Here you would actually upload to your server/S3
-            // For now, we'll create a fake URL
+
+
             const fakeUrl = URL.createObjectURL(file);
             setFormData({
                 ...formData,
@@ -260,7 +260,7 @@ const JoinPsychologist = () => {
     };
 
     const handleSubmit = async () => {
-        // Validate all steps
+
         const step1Errors = validateStep1();
         const step2Errors = validateStep2();
         const step3Errors = validateStep3();
@@ -279,7 +279,7 @@ const JoinPsychologist = () => {
 
         setLoading(true);
         try {
-            console.log('Submitting application:', formData); // Debug log
+            console.log('Submitting application:', formData);
 
             const response = await api.post('/psychologists/apply', {
                 fullName: formData.fullName,
@@ -301,7 +301,7 @@ const JoinPsychologist = () => {
                 avatarUrl: formData.avatarUrl
             });
 
-            console.log('Application response:', response.data); // Debug log
+            console.log('Application response:', response.data);
             toast.success('Application submitted successfully!');
             navigate('/application-success');
         } catch (error) {
@@ -314,7 +314,7 @@ const JoinPsychologist = () => {
 
     return (
         <div className="join-psychologist-page">
-            {/* Hero Section */}
+            {}
             <div className="psychologist-hero">
                 <div className="container">
                     <motion.div
@@ -332,7 +332,7 @@ const JoinPsychologist = () => {
             </div>
 
             <div className="container">
-                {/* Stats Section */}
+                {}
                 <div className="stats-grid">
                     <motion.div
                         className="stat-card"
@@ -366,7 +366,7 @@ const JoinPsychologist = () => {
                     </motion.div>
                 </div>
 
-                {/* Progress Steps */}
+                {}
                 <div className="psychologist-steps">
                     <div className={`step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}>
                         <div className="step-number">{step > 1 ? <FaCheckCircle /> : 1}</div>
@@ -391,7 +391,7 @@ const JoinPsychologist = () => {
 
                 <div className="psychologist-content">
                     <AnimatePresence mode="wait">
-                        {/* Step 1: Personal Information */}
+                        {}
                         {step === 1 && (
                             <motion.div
                                 key="step1"
@@ -485,7 +485,7 @@ const JoinPsychologist = () => {
                             </motion.div>
                         )}
 
-                        {/* Step 2: Professional Information */}
+                        {}
                         {step === 2 && (
                             <motion.div
                                 key="step2"
@@ -656,7 +656,7 @@ const JoinPsychologist = () => {
                             </motion.div>
                         )}
 
-                        {/* Step 3: Practice Information */}
+                        {}
                         {step === 3 && (
                             <motion.div
                                 key="step3"
@@ -867,7 +867,7 @@ const JoinPsychologist = () => {
                             </motion.div>
                         )}
 
-                        {/* Step 4: Documents & Review */}
+                        {}
                         {step === 4 && (
                             <motion.div
                                 key="step4"
@@ -1052,17 +1052,17 @@ const JoinPsychologist = () => {
                         )}
                     </AnimatePresence>
 
-                    {/* Sidebar */}
+                    
                     <div className="psychologist-sidebar">
                         <div className="info-card">
                             <h3><FaShieldAlt /> Why Join Welp?</h3>
                             <ul>
-                                <li>✓ Help employees in need</li>
-                                <li>✓ Flexible schedule</li>
-                                <li>✓ Competitive compensation</li>
-                                <li>✓ Professional community</li>
-                                <li>✓ Continuing education credits</li>
-                                <li>✓ Malpractice insurance coverage</li>
+                                <li>- Help employees in need</li>
+                                <li>- Flexible schedule</li>
+                                <li>- Competitive compensation</li>
+                                <li>- Professional community</li>
+                                <li>- Continuing education credits</li>
+                                <li>- Malpractice insurance coverage</li>
                             </ul>
                         </div>
 

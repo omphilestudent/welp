@@ -1,13 +1,13 @@
-/* frontend/src/styles/admin.css */
 
-/* Admin Layout */
+
+
 .admin-layout {
     display: flex;
     min-height: 100vh;
     background: #f7fafc;
 }
 
-/* Sidebar */
+
 .admin-sidebar {
     width: 280px;
     background: white;
@@ -39,7 +39,7 @@
     display: none;
 }
 
-/* Sidebar Header */
+
 .sidebar-header {
     padding: 1.5rem;
     display: flex;
@@ -82,7 +82,7 @@
     color: #667eea;
 }
 
-/* Admin Profile */
+
 .admin-profile {
     padding: 1.5rem;
     display: flex;
@@ -135,7 +135,7 @@
     font-size: 0.7rem;
 }
 
-/* Sidebar Search */
+
 .sidebar-search {
     padding: 1rem 1.5rem;
     position: relative;
@@ -167,7 +167,7 @@
     background: white;
 }
 
-/* Sidebar Navigation */
+
 .sidebar-nav {
     flex: 1;
     padding: 1.5rem 1rem;
@@ -238,7 +238,7 @@
     justify-content: center;
 }
 
-/* Sidebar Footer */
+
 .sidebar-footer {
     padding: 1.5rem;
     border-top: 1px solid #e2e8f0;
@@ -263,7 +263,7 @@
     background: #fff5f5;
 }
 
-/* Admin Main Content */
+
 .admin-main {
     flex: 1;
     margin-left: 280px;
@@ -276,7 +276,7 @@
     margin-left: 80px;
 }
 
-/* Top Bar */
+
 .admin-topbar {
     background: white;
     padding: 1rem 2rem;
@@ -369,12 +369,12 @@
     font-size: 0.9rem;
 }
 
-/* Admin Content */
+
 .admin-content {
     padding: 2rem;
 }
 
-/* Dashboard */
+
 .admin-dashboard {
     max-width: 1600px;
     margin: 0 auto;
@@ -394,7 +394,7 @@
     color: #718096;
 }
 
-/* Stats Grid */
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -453,7 +453,7 @@
     font-size: 0.85rem;
 }
 
-/* Charts Section */
+
 .charts-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
@@ -474,7 +474,7 @@
     font-size: 1.1rem;
 }
 
-/* Activity List */
+
 .activity-list {
     display: flex;
     flex-direction: column;
@@ -513,7 +513,7 @@
     color: #a0aec0;
 }
 
-/* Tables Section */
+
 .tables-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
@@ -592,7 +592,7 @@
     font-size: 1.1rem;
 }
 
-/* Loading */
+
 .dashboard-loading {
     display: flex;
     flex-direction: column;
@@ -615,7 +615,7 @@
     to { transform: rotate(360deg); }
 }
 
-/* Responsive */
+
 @media (max-width: 1024px) {
     .charts-section,
     .tables-section {

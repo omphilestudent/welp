@@ -1,4 +1,4 @@
-// frontend/src/pages/hr/JobPostings.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
@@ -39,7 +39,7 @@ const JobPostings = () => {
     const [sortBy, setSortBy] = useState('created_at');
     const [sortOrder, setSortOrder] = useState('desc');
     const [selectedJobs, setSelectedJobs] = useState([]);
-    const [viewMode, setViewMode] = useState('grid'); // grid or table
+    const [viewMode, setViewMode] = useState('grid');
 
     useEffect(() => {
         fetchJobs();
@@ -179,7 +179,7 @@ const JobPostings = () => {
     };
 
     const handleShare = (job) => {
-        // Copy job link to clipboard
+
         const link = `${window.location.origin}/careers/jobs/${job.id}`;
         navigator.clipboard.writeText(link);
         toast.success('Job link copied to clipboard');
@@ -205,7 +205,7 @@ const JobPostings = () => {
         return badges[type] || badges['full-time'];
     };
 
-    // Filter and sort jobs
+
     const filteredJobs = jobs
         .filter(job => {
             const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -235,7 +235,7 @@ const JobPostings = () => {
 
     return (
         <div className="job-postings-page">
-            {/* Header */}
+            {}
             <div className="page-header">
                 <div className="header-left">
                     <h1>
@@ -272,7 +272,7 @@ const JobPostings = () => {
                 </div>
             </div>
 
-            {/* Filters */}
+            {}
             <div className="filters-section">
                 <div className="search-box">
                     <FaSearch className="search-icon" />
@@ -313,7 +313,7 @@ const JobPostings = () => {
                 </div>
             </div>
 
-            {/* Stats Cards */}
+            {}
             <div className="stats-grid">
                 <div className="stat-card">
                     <div className="stat-icon" style={{ backgroundColor: '#4299e120', color: '#4299e1' }}>
@@ -375,7 +375,7 @@ const JobPostings = () => {
                 </div>
             </div>
 
-            {/* Bulk Actions Bar */}
+            {}
             {selectedJobs.length > 0 && (
                 <div className="bulk-actions">
                     <span>{selectedJobs.length} jobs selected</span>
@@ -385,7 +385,7 @@ const JobPostings = () => {
                 </div>
             )}
 
-            {/* Jobs Display */}
+            {}
             {viewMode === 'grid' ? (
                 <div className="jobs-grid">
                     {filteredJobs.map(job => {
@@ -466,7 +466,7 @@ const JobPostings = () => {
                                         {statusBadge.icon} {statusBadge.label}
                                     </span>
                                     <Link to={`/hr/jobs/${job.id}`} className="view-details">
-                                        View Details →
+                                        View Details
                                     </Link>
                                 </div>
                             </div>
@@ -486,25 +486,25 @@ const JobPostings = () => {
                                 />
                             </th>
                             <th onClick={() => handleSort('title')}>
-                                Job Title {sortBy === 'title' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                Job Title {sortBy === 'title' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                             </th>
                             <th onClick={() => handleSort('department')}>
-                                Department {sortBy === 'department' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                Department {sortBy === 'department' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                             </th>
                             <th onClick={() => handleSort('location')}>
-                                Location {sortBy === 'location' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                Location {sortBy === 'location' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                             </th>
                             <th onClick={() => handleSort('type')}>
                                 Type
                             </th>
                             <th onClick={() => handleSort('applications')}>
-                                Applications {sortBy === 'applications' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                Applications {sortBy === 'applications' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                             </th>
                             <th onClick={() => handleSort('status')}>
                                 Status
                             </th>
                             <th onClick={() => handleSort('postedDate')}>
-                                Posted Date {sortBy === 'postedDate' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                Posted Date {sortBy === 'postedDate' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                             </th>
                             <th>Actions</th>
                         </tr>

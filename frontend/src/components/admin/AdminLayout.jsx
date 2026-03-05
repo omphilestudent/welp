@@ -1,4 +1,4 @@
-// frontend/src/components/admin/AdminLayout.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -51,7 +51,7 @@ const AdminLayout = () => {
     };
 
     const fetchNotifications = async () => {
-        // Mock notifications for demo
+
         setNotifications([
             { id: 1, text: 'New user registered', time: '5 min ago', read: false },
             { id: 2, text: 'Pending review moderation', time: '1 hour ago', read: false },
@@ -159,7 +159,7 @@ const AdminLayout = () => {
 
     return (
         <div className={`admin-layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-            {/* Sidebar */}
+            {}
             <aside className="admin-sidebar">
                 <div className="sidebar-header">
                     <div className="logo-area">
@@ -237,9 +237,9 @@ const AdminLayout = () => {
                 </div>
             </aside>
 
-            {/* Main Content */}
+            {}
             <main className="admin-main">
-                {/* Top Bar */}
+                {}
                 <div className="admin-topbar">
                     <div className="topbar-left">
                         <h1>Welcome back, {user?.display_name || 'Admin'}!</h1>
@@ -282,7 +282,7 @@ const AdminLayout = () => {
                     </div>
                 </div>
 
-                {/* Content Area */}
+                {}
                 <div className="admin-content">
                     <Outlet />
                 </div>

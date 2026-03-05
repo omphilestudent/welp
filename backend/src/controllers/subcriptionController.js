@@ -1,7 +1,7 @@
-// backend/src/controllers/subscriptionController.js
+
 const { query } = require('../utils/database');
 
-// Create subscription table
+
 const initSubscriptions = async () => {
     await query(`
         CREATE TABLE IF NOT EXISTS subscriptions (
@@ -13,36 +13,36 @@ const initSubscriptions = async () => {
             price DECIMAL(10,2) NOT NULL,
             currency_symbol VARCHAR(5) NOT NULL,
             currency_code VARCHAR(3) NOT NULL,
-            
+
             -- Employee benefits
             chat_hours_per_day INT,
             video_calls_per_week INT,
             assigned_psychologist_id UUID REFERENCES users(id),
-            
+
             -- Psychologist benefits
             leads_per_month INT,
             accepts_assignments BOOLEAN DEFAULT false,
-            
+
             start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             end_date TIMESTAMP,
             auto_renew BOOLEAN DEFAULT true,
             status VARCHAR(50) DEFAULT 'active',
-            
+
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `);
-    console.log('✅ Subscriptions table initialized');
+    console.log(' Subscriptions table initialized');
 };
 
 initSubscriptions();
 
-// Subscribe to premium plan
+
 const subscribePremium = async (req, res) => {
     try {
         const { planType, countryCode, autoRenew = true } = req.body;
 
-        // Get pricing for the country
+
         const pricing = await query(
             'SELECT * FROM pricing WHERE country_code = $1',
             [countryCode]
@@ -56,18 +56,18 @@ const subscribePremium = async (req, res) => {
             ? pricing.rows[0].employee_premium_price
             : pricing.rows[0].psychologist_premium_price;
 
-        // Check if user already has an active subscription
+
         const existing = await query(
-            `SELECT * FROM subscriptions 
+            `SELECT * FROM subscriptions
              WHERE user_id = $1 AND status = 'active'`,
             [req.user.id]
         );
 
         if (existing.rows.length > 0) {
-            // Update existing subscription
+
             await query(
-                `UPDATE subscriptions 
-                 SET plan_type = $1, 
+                `UPDATE subscriptions
+                 SET plan_type = $1,
                      price = $2,
                      country_code = $3,
                      auto_renew = $4,
@@ -76,10 +76,10 @@ const subscribePremium = async (req, res) => {
                 [planType, price, countryCode, autoRenew, req.user.id]
             );
         } else {
-            // Create new subscription
+
             await query(
                 `INSERT INTO subscriptions (
-                    user_id, plan_type, role, country_code, 
+                    user_id, plan_type, role, country_code,
                     price, currency_symbol, currency_code, auto_renew
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                 [
@@ -102,7 +102,7 @@ const subscribePremium = async (req, res) => {
     }
 };
 
-// Get user's subscription
+
 const getMySubscription = async (req, res) => {
     try {
         const result = await query(
@@ -111,7 +111,7 @@ const getMySubscription = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            // Return free plan details
+
             const pricing = await query(
                 'SELECT * FROM pricing WHERE country_code = $1',
                 ['US']
@@ -133,12 +133,12 @@ const getMySubscription = async (req, res) => {
     }
 };
 
-// Cancel subscription
+
 const cancelSubscription = async (req, res) => {
     try {
         await query(
-            `UPDATE subscriptions 
-             SET status = 'cancelled', auto_renew = false 
+            `UPDATE subscriptions
+             SET status = 'cancelled', auto_renew = false
              WHERE user_id = $1`,
             [req.user.id]
         );

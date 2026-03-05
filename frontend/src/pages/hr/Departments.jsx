@@ -1,4 +1,4 @@
-// frontend/src/pages/hr/Departments.jsx
+
 import React from 'react';
 
 const Departments = () => {

@@ -1,4 +1,4 @@
-// backend/src/routes/pricingRoutes.js
+
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
@@ -8,11 +8,11 @@ const pricingController = require('../controllers/pricingController');
 
 const router = express.Router();
 
-// Public routes
+
 router.get('/plans', apiLimiter, pricingController.getPricing);
 router.get('/countries', apiLimiter, pricingController.getCountries);
 
-// Protected routes
+
 router.post('/subscribe',
     authenticate,
     apiLimiter,

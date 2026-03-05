@@ -54,14 +54,14 @@ const UserTable = ({ users, selectedUsers, setSelectedUsers, onEdit, onDelete, o
                             <td>{user.department || '—'}</td>
                             <td>
                                 <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>{user.isActive ? 'Active' : 'Inactive'}</span>
-                                {!user.emailVerified && <span className="unverified-badge" title="Email not verified">⚠️</span>}
+                                {!user.emailVerified && <span className="unverified-badge" title="Email not verified">Unverified</span>}
                             </td>
                             <td>{user.lastLogin ? formatDate(user.lastLogin) : 'Never'}</td>
                             <td>
                                 <div className="action-buttons">
-                                    <button onClick={() => onEdit(user)} className="action-btn edit" title="Edit user">✏️</button>
-                                    <button onClick={() => onResetPassword(user.id)} className="action-btn reset" title="Reset password">🔑</button>
-                                    <button onClick={() => onDelete(user)} className="action-btn delete" title="Delete user">🗑️</button>
+                                    <button onClick={() => onEdit(user)} className="action-btn edit" title="Edit user">Edit</button>
+                                    <button onClick={() => onResetPassword(user.id)} className="action-btn reset" title="Reset password">Reset</button>
+                                    <button onClick={() => onDelete(user)} className="action-btn delete" title="Delete user">Delete</button>
                                 </div>
                             </td>
                         </tr>

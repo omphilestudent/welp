@@ -1,4 +1,4 @@
-// src/components/companies/CompanySearch.jsx
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,7 +28,7 @@ const CompanySearch = ({ onSearch, initialQuery = '' }) => {
                     className="search-input"
                 />
                 <button type="submit" className="search-button">
-                    🔍 Search
+                    Search
                 </button>
             </div>
         </form>

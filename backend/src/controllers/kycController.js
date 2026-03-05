@@ -1,8 +1,8 @@
-// backend/src/controllers/kycController.js
+
 const { query } = require('../utils/database');
 const { sendKYCApprovalEmail, sendKYCRejectionEmail } = require('../utils/emailService');
 
-// Submit KYC application for company claim
+
 const submitKYC = async (req, res) => {
     try {
         const {
@@ -30,7 +30,7 @@ const submitKYC = async (req, res) => {
             agreeToTerms
         } = req.body;
 
-        // Validate required fields
+
         if (!companyId || !businessName || !registrationNumber || !businessType) {
             return res.status(400).json({ error: 'Missing required company information' });
         }
@@ -43,7 +43,7 @@ const submitKYC = async (req, res) => {
             return res.status(400).json({ error: 'You must agree to the terms and conditions' });
         }
 
-        // Check if company exists
+
         const company = await query(
             'SELECT * FROM companies WHERE id = $1',
             [companyId]
@@ -57,13 +57,13 @@ const submitKYC = async (req, res) => {
             return res.status(400).json({ error: 'Company already claimed' });
         }
 
-        // Create KYC table if not exists
+
         await query(`
             CREATE TABLE IF NOT EXISTS kyc_applications (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
                 user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-                
+
                 -- Business Information
                 business_name VARCHAR(255) NOT NULL,
                 registration_number VARCHAR(100) NOT NULL,
@@ -74,13 +74,13 @@ const submitKYC = async (req, res) => {
                 business_phone VARCHAR(50),
                 business_email VARCHAR(255),
                 website VARCHAR(255),
-                
+
                 -- Legal Representative
                 legal_representative VARCHAR(255) NOT NULL,
                 representative_id VARCHAR(100) NOT NULL,
                 representative_id_number VARCHAR(100) NOT NULL,
                 representative_id_expiry DATE,
-                
+
                 -- Document URLs
                 proof_of_registration TEXT[],
                 tax_document TEXT[],
@@ -89,22 +89,22 @@ const submitKYC = async (req, res) => {
                 utility_bill TEXT[],
                 bank_statement TEXT[],
                 additional_docs JSONB,
-                
+
                 -- Status
                 status VARCHAR(50) DEFAULT 'pending',
                 admin_notes TEXT,
                 reviewed_by UUID REFERENCES users(id),
                 reviewed_at TIMESTAMP,
-                
+
                 -- Metadata
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                
+
                 UNIQUE(company_id, user_id)
             )
         `);
 
-        // Check if application already exists
+
         const existing = await query(
             'SELECT * FROM kyc_applications WHERE company_id = $1 AND user_id = $2',
             [companyId, req.user.id]
@@ -114,7 +114,7 @@ const submitKYC = async (req, res) => {
             return res.status(400).json({ error: 'KYC application already submitted' });
         }
 
-        // Insert KYC application
+
         const result = await query(
             `INSERT INTO kyc_applications (
                 company_id, user_id, business_name, registration_number, tax_id,
@@ -135,7 +135,7 @@ const submitKYC = async (req, res) => {
             ]
         );
 
-        // Send confirmation email
+
         await sendKYCApprovalEmail(businessEmail, businessName, 'pending');
 
         res.status(201).json({
@@ -148,13 +148,13 @@ const submitKYC = async (req, res) => {
     }
 };
 
-// Get KYC status
+
 const getKYCStatus = async (req, res) => {
     try {
         const { companyId } = req.params;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 k.*,
                 json_build_object(
                     'id', c.id,
@@ -180,11 +180,11 @@ const getKYCStatus = async (req, res) => {
     }
 };
 
-// Get user's KYC applications
+
 const getMyKYCs = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 k.*,
                 json_build_object(
                     'id', c.id,
@@ -206,11 +206,11 @@ const getMyKYCs = async (req, res) => {
     }
 };
 
-// Admin: Get all pending KYC applications
+
 const getPendingKYCs = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 k.*,
                 json_build_object(
                     'id', u.id,
@@ -237,7 +237,7 @@ const getPendingKYCs = async (req, res) => {
     }
 };
 
-// Admin: Review KYC application
+
 const reviewKYC = async (req, res) => {
     try {
         const { applicationId } = req.params;
@@ -247,7 +247,7 @@ const reviewKYC = async (req, res) => {
             return res.status(400).json({ error: 'Invalid status' });
         }
 
-        // Get application details
+
         const application = await query(
             `SELECT k.*, c.name as company_name, u.email, u.display_name
             FROM kyc_applications k
@@ -261,15 +261,15 @@ const reviewKYC = async (req, res) => {
             return res.status(404).json({ error: 'KYC application not found' });
         }
 
-        // Update application status
+
         await query(
-            `UPDATE kyc_applications 
+            `UPDATE kyc_applications
             SET status = $1, admin_notes = $2, reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP
             WHERE id = $4`,
             [status, adminNotes, req.user.id, applicationId]
         );
 
-        // If approved, claim the company
+
         if (status === 'approved') {
             await query('BEGIN');
 
@@ -285,13 +285,13 @@ const reviewKYC = async (req, res) => {
 
             await query('COMMIT');
 
-            // Send approval email
+
             await sendKYCApprovalEmail(
                 application.rows[0].business_email,
                 application.rows[0].company_name
             );
         } else {
-            // Send rejection email
+
             await sendKYCRejectionEmail(
                 application.rows[0].business_email,
                 application.rows[0].company_name,

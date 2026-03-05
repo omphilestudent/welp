@@ -1,4 +1,4 @@
-// frontend/src/pages/Benefits.jsx
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -169,7 +169,7 @@ const Benefits = () => {
 
     return (
         <div className="benefits-page">
-            {/* Hero Section */}
+            {}
             <section className="benefits-hero">
                 <div className="container">
                     <motion.div
@@ -180,7 +180,7 @@ const Benefits = () => {
                     >
                         <h1>
                             Benefits & Perks
-                            <span className="gradient-text"> ❤️</span>
+                            <span className="gradient-text"> </span>
                         </h1>
                         <p className="hero-description">
                             We take care of our team so they can focus on what matters most -
@@ -205,7 +205,7 @@ const Benefits = () => {
                 </div>
             </section>
 
-            {/* Benefits Grid */}
+            {}
             <section className="benefits-grid-section">
                 <div className="container">
                     <motion.div
@@ -235,7 +235,7 @@ const Benefits = () => {
                                 <p className="benefit-description">{benefit.description}</p>
                                 <ul className="benefit-details">
                                     {benefit.details.map((detail, i) => (
-                                        <li key={i}>✓ {detail}</li>
+                                        <li key={i}>- {detail}</li>
                                     ))}
                                 </ul>
                             </motion.div>
@@ -244,7 +244,7 @@ const Benefits = () => {
                 </div>
             </section>
 
-            {/* Testimonials */}
+            
             <section className="testimonials-section">
                 <div className="container">
                     <motion.div
@@ -322,7 +322,7 @@ const Benefits = () => {
                 </div>
             </section>
 
-            {/* CTA Section */}
+            
             <section className="benefits-cta">
                 <div className="container">
                     <motion.div
@@ -351,7 +351,7 @@ const Benefits = () => {
                     overflow-x: hidden;
                 }
 
-                /* Hero Section */
+                
                 .benefits-hero {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
@@ -403,7 +403,7 @@ const Benefits = () => {
                     opacity: 0.9;
                 }
 
-                /* Benefits Grid */
+                
                 .benefits-grid-section {
                     padding: 5rem 0;
                 }
@@ -471,7 +471,7 @@ const Benefits = () => {
                     font-size: 0.95rem;
                 }
 
-                /* Testimonials */
+                
                 .testimonials-section {
                     padding: 5rem 0;
                     background: #f7fafc;
@@ -525,7 +525,7 @@ const Benefits = () => {
                     font-size: 0.9rem;
                 }
 
-                /* CTA Section */
+                
                 .benefits-cta {
                     padding: 5rem 0;
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

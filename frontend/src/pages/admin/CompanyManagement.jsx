@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/CompanyManagement.jsx
+
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import Loading from '../../components/common/Loading';
@@ -155,7 +155,7 @@ const CompanyManagement = () => {
     };
 
     const handleExport = () => {
-        // Export functionality
+
         const data = companies.map(c => ({
             Name: c.name,
             Industry: c.industry,
@@ -188,7 +188,7 @@ const CompanyManagement = () => {
         a.click();
     };
 
-    // Filter and sort companies
+
     const filteredCompanies = companies
         .filter(company => {
             const matchesSearch = company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -221,7 +221,7 @@ const CompanyManagement = () => {
             }
         });
 
-    // Pagination
+
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = filteredCompanies.slice(indexOfFirstItem, indexOfLastItem);
@@ -231,7 +231,7 @@ const CompanyManagement = () => {
 
     return (
         <div className="company-management">
-            {/* Header */}
+            {}
             <div className="page-header">
                 <div className="header-left">
                     <h1>
@@ -252,7 +252,7 @@ const CompanyManagement = () => {
                 </div>
             </div>
 
-            {/* Stats Cards */}
+            {}
             <div className="stats-grid">
                 <div className="stat-card">
                     <div className="stat-icon" style={{ backgroundColor: '#4299e120', color: '#4299e1' }}>
@@ -299,7 +299,7 @@ const CompanyManagement = () => {
                 </div>
             </div>
 
-            {/* Filters */}
+            {}
             <div className="filters-section">
                 <div className="search-box">
                     <FaSearch className="search-icon" />
@@ -340,16 +340,16 @@ const CompanyManagement = () => {
                 </div>
             </div>
 
-            {/* Companies Table */}
+            {}
             <div className="table-container">
                 <table className="data-table">
                     <thead>
                     <tr>
                         <th onClick={() => handleSort('name')}>
-                            Company {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                            Company {sortBy === 'name' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                         </th>
                         <th onClick={() => handleSort('industry')}>
-                            Industry {sortBy === 'industry' && (sortOrder === 'asc' ? '↑' : '↓')}
+                            Industry {sortBy === 'industry' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                         </th>
                         <th onClick={() => handleSort('is_verified')}>
                             Status
@@ -358,13 +358,13 @@ const CompanyManagement = () => {
                             Claimed
                         </th>
                         <th onClick={() => handleSort('reviews_count')}>
-                            Reviews {sortBy === 'reviews_count' && (sortOrder === 'asc' ? '↑' : '↓')}
+                            Reviews {sortBy === 'reviews_count' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                         </th>
                         <th onClick={() => handleSort('avg_rating')}>
-                            Rating {sortBy === 'avg_rating' && (sortOrder === 'asc' ? '↑' : '↓')}
+                            Rating {sortBy === 'avg_rating' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                         </th>
                         <th onClick={() => handleSort('employee_count')}>
-                            Employees {sortBy === 'employee_count' && (sortOrder === 'asc' ? '↑' : '↓')}
+                            Employees {sortBy === 'employee_count' && (sortOrder === 'asc' ? 'Up' : 'Down')}
                         </th>
                         <th>Actions</th>
                     </tr>
@@ -415,10 +415,7 @@ const CompanyManagement = () => {
                             <td>{company.reviews_count.toLocaleString()}</td>
                             <td>
                                 <div className="rating-cell">
-                                        <span className="rating-stars">
-                                            {'★'.repeat(Math.floor(company.avg_rating))}
-                                            {'☆'.repeat(5 - Math.floor(company.avg_rating))}
-                                        </span>
+                                        <span className="rating-stars">{Math.floor(company.avg_rating)}/5</span>
                                     <span className="rating-value">{company.avg_rating}</span>
                                 </div>
                             </td>
@@ -471,7 +468,7 @@ const CompanyManagement = () => {
                 )}
             </div>
 
-            {/* Pagination */}
+            {}
             {filteredCompanies.length > 0 && (
                 <div className="pagination">
                     <button
@@ -507,7 +504,7 @@ const CompanyManagement = () => {
                 </div>
             )}
 
-            {/* Company Details Modal */}
+            {}
             {showDetails && selectedCompany && (
                 <div className="modal-overlay" onClick={() => setShowDetails(false)}>
                     <div className="modal-content large" onClick={e => e.stopPropagation()}>
@@ -593,10 +590,7 @@ const CompanyManagement = () => {
                                     <div className="detail-item">
                                         <FaStar /> <strong>Average Rating:</strong>
                                         <span className="rating-value">{selectedCompany.avg_rating}</span>
-                                        <span className="rating-stars">
-                                            {'★'.repeat(Math.floor(selectedCompany.avg_rating))}
-                                            {'☆'.repeat(5 - Math.floor(selectedCompany.avg_rating))}
-                                        </span>
+                                        <span className="rating-stars">{Math.floor(selectedCompany.avg_rating)}/5</span>
                                     </div>
                                     <div className="detail-item">
                                         <FaBuilding /> <strong>Total Reviews:</strong> {selectedCompany.reviews_count.toLocaleString()}
@@ -1023,7 +1017,7 @@ const CompanyManagement = () => {
                     margin-left: 1rem;
                 }
 
-                /* Modal Styles */
+                
                 .modal-overlay {
                     position: fixed;
                     top: 0;

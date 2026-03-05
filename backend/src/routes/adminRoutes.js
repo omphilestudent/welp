@@ -1,4 +1,4 @@
-// backend/src/routes/adminRoutes.js
+
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
@@ -9,17 +9,17 @@ const adminController = require('../controllers/adminController');
 
 const router = express.Router();
 
-// All admin routes require authentication and admin authorization
+
 router.use(authenticate);
 router.use(authorizeAdmin());
 
-// Profile
+
 router.get('/profile', adminController.getAdminProfile);
 
-// Dashboard
+
 router.get('/dashboard/stats', adminController.getDashboardStats);
 
-// User management
+
 router.get('/users', adminController.getUsers);
 router.get('/users/:id', adminController.getUserDetails);
 router.post('/users',
@@ -33,14 +33,14 @@ router.post('/users',
 router.patch('/users/:id', adminController.updateUser);
 router.delete('/users/:id', adminController.deleteUser);
 
-// Company management
+
 router.get('/companies', adminController.getCompanies);
 router.get('/companies/:id', adminController.getCompanyDetails);
 router.patch('/companies/:id/verify', adminController.verifyCompany);
 router.patch('/companies/:id/status', adminController.updateCompanyStatus);
 router.delete('/companies/:id', adminController.deleteCompany);
 
-// Review management
+
 router.get('/reviews', adminController.getReviews);
 router.get('/reviews/pending', adminController.getPendingReviews);
 router.patch('/reviews/:id/moderate',
@@ -52,12 +52,12 @@ router.patch('/reviews/:id/moderate',
 );
 router.delete('/reviews/:id', adminController.deleteReview);
 
-// Subscription management
+
 router.get('/subscriptions', adminController.getSubscriptions);
 router.get('/subscriptions/:id', adminController.getSubscriptionDetails);
 router.patch('/subscriptions/:id/cancel', adminController.cancelSubscription);
 
-// Pricing management
+
 router.get('/pricing', adminController.getPricingConfig);
 router.put('/pricing/:role/:plan',
     validate([
@@ -79,14 +79,14 @@ router.post('/pricing/country',
 );
 router.patch('/pricing/country/:countryCode', adminController.updateCountryPricing);
 
-// System settings
+
 router.get('/settings', adminController.getSystemSettings);
 router.patch('/settings', adminController.updateSystemSettings);
 
-// Audit logs
+
 router.get('/audit-logs', adminController.getAuditLogs);
 
-// Analytics
+
 router.get('/analytics/revenue', adminController.getRevenueAnalytics);
 router.get('/analytics/users', adminController.getUserAnalytics);
 router.get('/analytics/subscriptions', adminController.getSubscriptionAnalytics);

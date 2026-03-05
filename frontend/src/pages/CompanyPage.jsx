@@ -1,4 +1,4 @@
-// frontend/src/pages/CompanyPage.jsx (Complete working version)
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -27,7 +27,7 @@ const CompanyPage = () => {
     }, [id]);
 
     useEffect(() => {
-        // Check if user can claim the company
+
         if (user && user.role === 'business' && company && !company.is_claimed) {
             setShowClaimButton(true);
         } else {
@@ -130,10 +130,10 @@ const CompanyPage = () => {
 
                             <div className="company-meta">
                                 {company.address && (
-                                    <span className="company-address">📍 {company.address}</span>
+                                    <span className="company-address">Location: {company.address}</span>
                                 )}
                                 {company.phone && (
-                                    <span className="company-phone">📞 {company.phone}</span>
+                                    <span className="company-phone">Phone: {company.phone}</span>
                                 )}
                                 {company.website && (
                                     <a
@@ -142,7 +142,7 @@ const CompanyPage = () => {
                                         rel="noopener noreferrer"
                                         className="company-website"
                                     >
-                                        🌐 {company.website}
+                                        Website: {company.website}
                                     </a>
                                 )}
                             </div>
@@ -164,13 +164,13 @@ const CompanyPage = () => {
                                     className="btn btn-primary"
                                     style={{ marginLeft: user?.role === 'employee' ? '1rem' : '0' }}
                                 >
-                                    🏢 Claim This Business
+                                    Claim This Business
                                 </button>
                             )}
 
                             {company.is_claimed && (
                                 <span className="verified-badge-large">
-                                    ✓ Verified Business
+                                    Verified Business
                                 </span>
                             )}
                         </div>

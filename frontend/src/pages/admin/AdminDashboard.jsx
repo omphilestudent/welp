@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/AdminDashboard.jsx
+
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { Link } from 'react-router-dom';
@@ -195,13 +195,13 @@ const AdminDashboard = () => {
 
     return (
         <div className="admin-dashboard">
-            {/* Welcome Section */}
+            {}
             <div className="welcome-section">
                 <h1>Dashboard Overview</h1>
                 <p>Welcome to your admin dashboard. Here's what's happening today.</p>
             </div>
 
-            {/* Stats Grid */}
+            {}
             <div className="stats-grid">
                 {statCards.map((stat, index) => (
                     <Link to={stat.link} key={index} className="stat-card">
@@ -220,7 +220,7 @@ const AdminDashboard = () => {
                 ))}
             </div>
 
-            {/* Charts Section */}
+            {}
             <div className="charts-section">
                 <div className="chart-card">
                     <h3>Revenue Overview</h3>
@@ -308,7 +308,7 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            {/* Tables Section */}
+            {}
             <div className="tables-section">
                 <div className="table-card">
                     <div className="table-header">
@@ -360,10 +360,7 @@ const AdminDashboard = () => {
                             <tr key={review.id}>
                                 <td>{review.company}</td>
                                 <td>
-                                    <div className="rating-stars">
-                                        {'★'.repeat(review.rating)}
-                                        {'☆'.repeat(5 - review.rating)}
-                                    </div>
+                                    <div className="rating-stars">{review.rating}/5</div>
                                 </td>
                                 <td>{review.content.substring(0, 30)}...</td>
                                 <td>{review.date}</td>

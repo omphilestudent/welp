@@ -1,35 +1,35 @@
-// backend/src/controllers/reviewController.js
+
 const { query } = require('../utils/database');
 
-// Helper function to update reviews table schema (runs once at module load)
+
 const updateReviewsTable = async () => {
     try {
         await query(`
-            ALTER TABLE reviews 
+            ALTER TABLE reviews
             ADD COLUMN IF NOT EXISTS author_occupation VARCHAR(255),
             ADD COLUMN IF NOT EXISTS author_workplace_id UUID REFERENCES companies(id)
         `);
-        console.log('✅ Reviews table schema updated successfully');
+        console.log(' Reviews table schema updated successfully');
     } catch (error) {
         console.error('Error updating reviews table:', error.message);
     }
 };
 
-// Run the schema update
+
 updateReviewsTable();
 
-// UPDATED: Create review with author occupation and workplace
+
 const createReview = async (req, res) => {
     try {
         const { companyId, rating, content, isPublic = true } = req.body;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(companyId)) {
             return res.status(400).json({ error: 'Invalid company ID format' });
         }
 
-        // Check if company exists
+
         const company = await query(
             'SELECT id FROM companies WHERE id = $1',
             [companyId]
@@ -39,7 +39,7 @@ const createReview = async (req, res) => {
             return res.status(404).json({ error: 'Company not found' });
         }
 
-        // Check if user already reviewed this company
+
         const existingReview = await query(
             'SELECT id FROM reviews WHERE company_id = $1 AND author_id = $2',
             [companyId, req.user.id]
@@ -49,10 +49,10 @@ const createReview = async (req, res) => {
             return res.status(400).json({ error: 'You have already reviewed this company' });
         }
 
-        // Get user's occupation and workplace
+
         const user = await query(
-            `SELECT 
-                u.occupation, 
+            `SELECT
+                u.occupation,
                 u.workplace_id,
                 json_build_object(
                     'id', c.id,
@@ -66,12 +66,12 @@ const createReview = async (req, res) => {
 
         const result = await query(
             `INSERT INTO reviews (
-                company_id, 
-                author_id, 
-                rating, 
-                content, 
-                is_public, 
-                author_occupation, 
+                company_id,
+                author_id,
+                rating,
+                content,
+                is_public,
+                author_occupation,
                 author_workplace_id
              )
              VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -89,11 +89,11 @@ const createReview = async (req, res) => {
 
         const review = result.rows[0];
 
-        // Get complete author info with workplace
+
         const author = await query(
-            `SELECT 
-                u.id, 
-                u.display_name, 
+            `SELECT
+                u.id,
+                u.display_name,
                 u.is_anonymous,
                 u.occupation,
                 u.avatar_url,
@@ -119,13 +119,13 @@ const createReview = async (req, res) => {
     }
 };
 
-// UPDATED: Get company reviews with UUID validation and consistent pagination
+
 const getCompanyReviews = async (req, res) => {
     try {
         const { companyId } = req.params;
         const { page = 1, limit = 20, sort = 'newest' } = req.query;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(companyId)) {
             return res.status(400).json({ error: 'Invalid company ID format' });
@@ -148,14 +148,14 @@ const getCompanyReviews = async (req, res) => {
                 break;
         }
 
-        // Get total count
+
         const countResult = await query(
             'SELECT COUNT(*) FROM reviews WHERE company_id = $1 AND is_public = true',
             [companyId]
         );
         const total = parseInt(countResult.rows[0]?.count || 0);
 
-        // Get reviews with replies and author workplace info
+
         const result = await query(
             `SELECT
                  r.*,
@@ -224,13 +224,13 @@ const updateReview = async (req, res) => {
         const { reviewId } = req.params;
         const { content, rating, isPublic } = req.body;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(reviewId)) {
             return res.status(400).json({ error: 'Invalid review ID format' });
         }
 
-        // Check if review exists and belongs to user
+
         const review = await query(
             'SELECT * FROM reviews WHERE id = $1',
             [reviewId]
@@ -244,7 +244,7 @@ const updateReview = async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        // Check 24-hour window
+
         const now = new Date();
         const createdAt = new Date(review.rows[0].created_at);
         const hoursDiff = (now - createdAt) / (1000 * 60 * 60);
@@ -291,13 +291,13 @@ const deleteReview = async (req, res) => {
     try {
         const { reviewId } = req.params;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(reviewId)) {
             return res.status(400).json({ error: 'Invalid review ID format' });
         }
 
-        // Check if review exists and belongs to user
+
         const review = await query(
             'SELECT * FROM reviews WHERE id = $1',
             [reviewId]
@@ -311,7 +311,7 @@ const deleteReview = async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        // Check 24-hour window
+
         const now = new Date();
         const createdAt = new Date(review.rows[0].created_at);
         const hoursDiff = (now - createdAt) / (1000 * 60 * 60);
@@ -334,13 +334,13 @@ const addReply = async (req, res) => {
         const { reviewId } = req.params;
         const { content } = req.body;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(reviewId)) {
             return res.status(400).json({ error: 'Invalid review ID format' });
         }
 
-        // Check if review exists
+
         const review = await query(
             'SELECT * FROM reviews WHERE id = $1',
             [reviewId]
@@ -350,7 +350,7 @@ const addReply = async (req, res) => {
             return res.status(404).json({ error: 'Review not found' });
         }
 
-        // Check if user can reply (business can only reply to their company's reviews)
+
         if (req.user.role === 'business') {
             const companyOwner = await query(
                 'SELECT * FROM company_owners WHERE company_id = $1 AND user_id = $2',
@@ -369,7 +369,7 @@ const addReply = async (req, res) => {
             [reviewId, req.user.id, req.user.role, content]
         );
 
-        // Get author info
+
         const author = await query(
             'SELECT id, display_name, role, avatar_url FROM users WHERE id = $1',
             [req.user.id]
@@ -385,7 +385,7 @@ const addReply = async (req, res) => {
     }
 };
 
-// UPDATED: Get user's own reviews with workplace info
+
 const getMyReviews = async (req, res) => {
     try {
         const { page = 1, limit = 20 } = req.query;
@@ -447,12 +447,12 @@ const getMyReviews = async (req, res) => {
     }
 };
 
-// UPDATED: Get review by ID with workplace info
+
 const getReviewById = async (req, res) => {
     try {
         const { reviewId } = req.params;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(reviewId)) {
             return res.status(400).json({ error: 'Invalid review ID format' });
@@ -521,19 +521,19 @@ const getReviewById = async (req, res) => {
     }
 };
 
-// Report a review (for moderation)
+
 const reportReview = async (req, res) => {
     try {
         const { reviewId } = req.params;
         const { reason } = req.body;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(reviewId)) {
             return res.status(400).json({ error: 'Invalid review ID format' });
         }
 
-        // Create reports table if not exists
+
         await query(`
             CREATE TABLE IF NOT EXISTS review_reports (
                                                           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -561,12 +561,12 @@ const reportReview = async (req, res) => {
     }
 };
 
-// Get company review statistics
+
 const getCompanyReviewStats = async (req, res) => {
     try {
         const { companyId } = req.params;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(companyId)) {
             return res.status(400).json({ error: 'Invalid company ID format' });
@@ -595,13 +595,13 @@ const getCompanyReviewStats = async (req, res) => {
 };
 
 module.exports = {
-    createReview, // Updated with occupation and workplace
-    getCompanyReviews, // Updated with workplace info in author object
-    getMyReviews, // Updated with workplace info
-    getReviewById, // Updated with workplace info
+    createReview,
+    getCompanyReviews,
+    getMyReviews,
+    getReviewById,
     updateReview,
     deleteReview,
-    addReply, // Updated with avatar URL
+    addReply,
     reportReview,
     getCompanyReviewStats
 };

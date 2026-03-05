@@ -1,8 +1,8 @@
-// backend/src/utils/emailService.js
+
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Check if email is configured
+
 const isEmailConfigured = () => {
     return process.env.EMAIL_USER &&
         process.env.EMAIL_PASSWORD &&
@@ -10,7 +10,7 @@ const isEmailConfigured = () => {
         process.env.EMAIL_PASSWORD !== '';
 };
 
-// Create transporter only if configured
+
 let transporter = null;
 if (isEmailConfigured()) {
     try {
@@ -27,24 +27,24 @@ if (isEmailConfigured()) {
             }
         });
 
-        // Verify connection
+
         transporter.verify((error) => {
             if (error) {
-                console.log('⚠️ Email service configured but not working:', error.message);
+                console.log(' Email service configured but not working:', error.message);
                 transporter = null;
             } else {
-                console.log('✅ Email service is ready to send messages');
+                console.log(' Email service is ready to send messages');
             }
         });
     } catch (error) {
-        console.log('⚠️ Failed to initialize email service:', error.message);
+        console.log(' Failed to initialize email service:', error.message);
         transporter = null;
     }
 } else {
-    console.log('📧 Email service not configured. Running in development mode with console logging.');
+    console.log('Email service not configured. Running in development mode with console logging.');
 }
 
-// Send claim invitation
+
 const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
     const claimLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/claim/${companyId}`;
     if (!transporter) {
@@ -96,15 +96,15 @@ const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Claim invitation email sent to:', companyEmail);
+        console.log(' Claim invitation email sent to:', companyEmail);
         return { success: true, info };
     } catch (error) {
-        console.error('❌ Failed to send email:', error.message);
+        console.error(' Failed to send email:', error.message);
         return { success: true, devMode: true };
     }
 };
 
-// Send verification email
+
 const sendVerificationEmail = async (email, code) => {
     if (!transporter) {
         console.log('\n=== VERIFICATION EMAIL (DEV MODE) ===');
@@ -151,15 +151,15 @@ const sendVerificationEmail = async (email, code) => {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log('✅ Verification email sent to:', email);
+        console.log(' Verification email sent to:', email);
         return { success: true };
     } catch (error) {
-        console.error('❌ Failed to send verification email:', error.message);
+        console.error(' Failed to send verification email:', error.message);
         return { success: true, devMode: true };
     }
 };
 
-// Send application confirmation
+
 const sendApplicationConfirmation = async (email, name) => {
     if (!transporter) {
         console.log('\n=== APPLICATION CONFIRMATION (DEV MODE) ===');
@@ -204,15 +204,15 @@ const sendApplicationConfirmation = async (email, name) => {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log('✅ Application confirmation email sent to:', email);
+        console.log(' Application confirmation email sent to:', email);
         return { success: true };
     } catch (error) {
-        console.error('❌ Failed to send confirmation email:', error.message);
+        console.error(' Failed to send confirmation email:', error.message);
         return { success: true, devMode: true };
     }
 };
 
-// New KYC approval email
+
 const sendKYCApprovalEmail = async (email, companyName, status = 'approved') => {
     if (!transporter) {
         console.log('\n=== KYC EMAIL (DEV MODE) ===');
@@ -224,7 +224,7 @@ const sendKYCApprovalEmail = async (email, companyName, status = 'approved') => 
 
     const isApproved = status === 'approved';
     const subject = isApproved
-        ? `✅ Your KYC Application for ${companyName} is Approved!`
+        ? ` Your KYC Application for ${companyName} is Approved!`
         : `📝 KYC Application Received - ${companyName}`;
 
     const mailOptions = {
@@ -244,15 +244,15 @@ const sendKYCApprovalEmail = async (email, companyName, status = 'approved') => 
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log(`✅ KYC ${status} email sent to:`, email);
+        console.log(` KYC ${status} email sent to:`, email);
         return { success: true, info };
     } catch (error) {
-        console.error('❌ Failed to send KYC email:', error.message);
+        console.error(' Failed to send KYC email:', error.message);
         return { success: false, error: error.message };
     }
 };
 
-// New KYC rejection email
+
 const sendKYCRejectionEmail = async (email, companyName, reason) => {
     if (!transporter) {
         console.log('\n=== KYC REJECTION EMAIL (DEV MODE) ===');
@@ -280,10 +280,10 @@ const sendKYCRejectionEmail = async (email, companyName, reason) => {
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log('✅ KYC rejection email sent to:', email);
+        console.log(' KYC rejection email sent to:', email);
         return { success: true, info };
     } catch (error) {
-        console.error('❌ Failed to send KYC rejection email:', error.message);
+        console.error(' Failed to send KYC rejection email:', error.message);
         return { success: false, error: error.message };
     }
 };

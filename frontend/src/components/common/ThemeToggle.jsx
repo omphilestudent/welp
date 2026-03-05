@@ -1,4 +1,4 @@
-// src/components/common/ThemeToggle.jsx
+
 import React from 'react';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -11,7 +11,7 @@ const ThemeToggle = () => {
             className="theme-toggle"
             aria-label="Toggle theme"
         >
-            {isDarkMode ? '☀️' : '🌙'}
+            {isDarkMode ? 'Light' : 'Dark'}
         </button>
     );
 };
