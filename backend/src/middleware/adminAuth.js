@@ -19,7 +19,21 @@ const authorizeAdmin = (requiredPermissions = []) => {
             );
 
             if (adminResult.rows.length === 0) {
-                return res.status(403).json({ error: 'Admin access required' });
+                const normalizedUserRole = req.user.role?.toLowerCase();
+                const isLegacyAdminRole = ['admin', 'super_admin'].includes(normalizedUserRole);
+
+                if (!isLegacyAdminRole) {
+                    return res.status(403).json({ error: 'Admin access required' });
+                }
+
+                req.admin = {
+                    id: null,
+                    user_id: req.user.id,
+                    role_name: normalizedUserRole,
+                    role_permissions: {}
+                };
+
+                return next();
             }
 
             const admin = adminResult.rows[0];
@@ -70,7 +84,20 @@ const authorizeHR = () => {
             );
 
             if (adminResult.rows.length === 0) {
-                return res.status(403).json({ error: 'HR access required' });
+                const normalizedUserRole = req.user.role?.toLowerCase();
+                const isLegacyHRRole = ['hr', 'hr_admin', 'super_admin', 'admin'].includes(normalizedUserRole);
+
+                if (!isLegacyHRRole) {
+                    return res.status(403).json({ error: 'HR access required' });
+                }
+
+                req.hrAdmin = {
+                    id: null,
+                    user_id: req.user.id,
+                    role_name: normalizedUserRole
+                };
+
+                return next();
             }
 
             req.hrAdmin = adminResult.rows[0];
