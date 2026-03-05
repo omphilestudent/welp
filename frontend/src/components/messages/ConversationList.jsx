@@ -1,4 +1,4 @@
-// src/components/messages/ConversationList.jsx
+
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';

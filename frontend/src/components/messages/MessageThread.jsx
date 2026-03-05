@@ -1,4 +1,4 @@
-// src/components/messages/MessageThread.jsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';

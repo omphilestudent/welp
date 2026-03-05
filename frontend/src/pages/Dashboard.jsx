@@ -1,4 +1,4 @@
-// frontend/src/pages/Dashboard.jsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
@@ -8,7 +8,7 @@ import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit } from 'react-icons/fa';
 
-// Profile Section Component
+
 const ProfileSection = ({ user, onUpdate }) => {
     const [uploading, setUploading] = useState(false);
     const [editing, setEditing] = useState(false);
@@ -23,13 +23,13 @@ const ProfileSection = ({ user, onUpdate }) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file type
+
         if (!file.type.match(/image.*/)) {
             toast.error('Please select an image file');
             return;
         }
 
-        // Validate file size (max 2MB)
+
         if (file.size > 2 * 1024 * 1024) {
             toast.error('File size must be less than 2MB');
             return;
@@ -303,7 +303,7 @@ const Dashboard = () => {
 
                 {error && <div className="alert alert-error">{error}</div>}
 
-                {/* Updated Profile Section */}
+                {}
                 <ProfileSection user={user} onUpdate={fetchDashboardData} />
 
                 <div className="dashboard-tabs">

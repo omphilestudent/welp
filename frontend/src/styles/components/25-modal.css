@@ -1,4 +1,4 @@
-/* ===== Modal ===== */
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -61,7 +61,7 @@
   gap: 1rem;
 }
 
-/* Chat Request Modal */
+
 .chat-request-modal .psychologists-list {
   margin-bottom: 1.5rem;
 }

@@ -1,4 +1,4 @@
-// frontend/src/components/companies/CompanyCard.jsx
+
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaMapMarkerAlt, FaBuilding } from 'react-icons/fa';

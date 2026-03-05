@@ -1,4 +1,4 @@
-// frontend/src/pages/CompanyPage.jsx (Complete working version)
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -27,7 +27,7 @@ const CompanyPage = () => {
     }, [id]);
 
     useEffect(() => {
-        // Check if user can claim the company
+
         if (user && user.role === 'business' && company && !company.is_claimed) {
             setShowClaimButton(true);
         } else {

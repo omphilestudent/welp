@@ -1,4 +1,4 @@
-// backend/src/routes/messageRoutes.js
+
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -8,7 +8,7 @@ const messageController = require('../controllers/messageController');
 
 const router = express.Router();
 
-// Psychologist routes
+
 router.post('/conversations/request',
     authenticate,
     authorize('psychologist'),
@@ -16,7 +16,7 @@ router.post('/conversations/request',
     messageController.sendMessageRequest
 );
 
-// Employee routes
+
 router.get('/conversations/pending',
     authenticate,
     authorize('employee'),
@@ -29,7 +29,7 @@ router.patch('/conversations/:conversationId/status',
     messageController.updateConversationStatus
 );
 
-// ✅ NEW Employee Routes
+
 
 router.post('/request-chat',
     authenticate,
@@ -48,7 +48,7 @@ router.get('/available-psychologists',
     messageController.getAvailablePsychologists
 );
 
-// Shared routes
+
 router.get('/conversations',
     authenticate,
     messageController.getConversations

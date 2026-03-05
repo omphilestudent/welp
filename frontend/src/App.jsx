@@ -1,4 +1,4 @@
-// frontend/src/App.jsx
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -28,7 +28,7 @@ import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
 
-// Admin Pages
+
 import AdminDashboard from './pages/admin/AdminDashboard';
 import PricingManagement from './pages/admin/PricingManagement';
 import UserManagement from './pages/admin/UserManagement';
@@ -37,7 +37,7 @@ import ReviewModeration from './pages/admin/ReviewModeration';
 import SubscriptionManagement from './pages/admin/SubscriptionManagement';
 import SystemSettings from './pages/admin/SystemSettings';
 
-// HR Pages
+
 import HRDashboard from './pages/hr/HRDashboard';
 import JobPostings from './pages/hr/JobPostings';
 import Applications from './pages/hr/Applications';
@@ -64,7 +64,7 @@ function App() {
                         <Navbar />
                         <main className="main-content">
                             <Routes>
-                                {/* Public Routes */}
+                                {}
                                 <Route path="/" element={<Home />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
@@ -74,7 +74,7 @@ function App() {
                                 <Route path="/psychologist/join" element={<JoinPsychologist />} />
                                 <Route path="/application-success" element={<ApplicationSuccess />} />
 
-                                {/* Career Routes */}
+                                {}
                                 <Route path="/careers" element={<Careers />} />
                                 <Route path="/careers/jobs/:id" element={<JobDetails />} />
                                 <Route path="/careers/apply/:id" element={<ApplyJob />} />
@@ -82,7 +82,7 @@ function App() {
                                 <Route path="/careers/internships" element={<Internships />} />
                                 <Route path="/careers/apply/general" element={<GeneralApplication />} />
 
-                                {/* Protected Routes */}
+                                {}
                                 <Route
                                     path="/claim/:id"
                                     element={
@@ -124,7 +124,7 @@ function App() {
                                     }
                                 />
 
-                                {/* Admin Routes */}
+                                {}
                                 <Route
                                     path="/admin"
                                     element={
@@ -143,7 +143,7 @@ function App() {
                                     <Route path="settings" element={<SystemSettings />} />
                                 </Route>
 
-                                {/* HR Routes */}
+                                {}
                                 <Route
                                     path="/hr"
                                     element={

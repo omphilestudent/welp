@@ -1,20 +1,20 @@
-// backend/src/seed.js
+
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Create a dedicated pool for seeding with timeout settings
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
         rejectUnauthorized: false,
         require: true
     },
-    connectionTimeoutMillis: 30000, // Increase timeout to 30 seconds
+    connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
 });
 
 const sampleCompanies = [
-    // Claimed Companies (for existing businesses)
+
     {
         name: 'Google',
         description: 'Leading technology company specializing in internet services and products.',
@@ -115,7 +115,7 @@ const sampleCompanies = [
         address: '1515 3rd St, San Francisco, CA 94158, USA',
         is_claimed: true
     },
-    // Unclaimed Companies (available for claiming)
+
     {
         name: 'DeepSeek AI',
         description: 'Cutting-edge AI research and development company pushing the boundaries of machine learning.',
@@ -148,7 +148,7 @@ const sampleCompanies = [
     }
 ];
 
-// Test database connection
+
 async function testConnection() {
     console.log('🔄 Testing database connection...');
     try {
@@ -177,23 +177,23 @@ async function seedDatabase() {
         console.log('🌱 Seeding database with sample companies...');
         console.log('=============================================');
 
-        // Test connection first
+
         const isConnected = await testConnection();
         if (!isConnected) {
             throw new Error('Could not connect to database');
         }
 
-        // Get a client for transactions
+
         client = await pool.connect();
 
-        // Check if we already have companies
+
         const existing = await client.query('SELECT COUNT(*) FROM companies');
         const count = parseInt(existing.rows[0]?.count || 0);
 
         if (count > 0) {
             console.log(`✅ Database already has ${count} companies.`);
 
-            // Show counts of claimed vs unclaimed
+
             const claimedResult = await client.query("SELECT COUNT(*) FROM companies WHERE is_claimed = true");
             const unclaimedResult = await client.query("SELECT COUNT(*) FROM companies WHERE is_claimed = false");
 
@@ -212,11 +212,11 @@ async function seedDatabase() {
             } else {
                 console.log('\nℹ️  Skipping seed. Use --force to reseed.');
                 console.log('   Example: npm run seed -- --force');
-                return; // Exit without closing pool here
+                return;
             }
         }
 
-        // Insert sample companies
+
         console.log('📊 Inserting companies...');
 
         for (const company of sampleCompanies) {
@@ -247,7 +247,7 @@ async function seedDatabase() {
         console.log('✅ Database seeded successfully!');
         console.log(`📊 Total companies: ${sampleCompanies.length}`);
 
-        // Verify the counts
+
         const result = await client.query('SELECT COUNT(*) FROM companies');
         const finalCount = parseInt(result.rows[0].count);
 
@@ -258,7 +258,7 @@ async function seedDatabase() {
         console.log(`   🔒 Claimed: ${claimedFinal.rows[0].count}`);
         console.log(`   📢 Unclaimed: ${unclaimedFinal.rows[0].count}`);
 
-        // List unclaimed companies for easy reference
+
         const unclaimedList = await client.query(
             "SELECT name FROM companies WHERE is_claimed = false ORDER BY name"
         );
@@ -273,7 +273,7 @@ async function seedDatabase() {
     } catch (error) {
         console.error('❌ Error seeding database:', error);
 
-        // Provide more helpful error messages
+
         if (error.code === 'ETIMEDOUT') {
             console.log('\n🔍 Connection timeout. Please check:');
             console.log('   1. Your internet connection');
@@ -285,16 +285,16 @@ async function seedDatabase() {
             console.log('\n🔍 Connection refused. Database might be down or firewall is blocking');
         }
     } finally {
-        // Release the client back to the pool
+
         if (client) {
             client.release();
         }
-        // Close the pool
+
         await pool.end();
     }
 }
 
-// Run the seed function and handle the exit
+
 seedDatabase()
     .then(() => {
         console.log('✨ Seed script completed');

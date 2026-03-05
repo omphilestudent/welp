@@ -1,7 +1,7 @@
-// backend/src/controllers/pricingController.js
+
 const { query } = require('../utils/database');
 
-// Hardcoded pricing data as fallback
+
 const defaultPricing = {
     employee: {
         free: {
@@ -37,7 +37,7 @@ const defaultPricing = {
                 "Crisis support line"
             ],
             limits: {
-                chatHoursPerDay: -1, // unlimited
+                chatHoursPerDay: -1,
                 videoCallsPerWeek: 3,
                 videoCallDuration: 60,
                 assignedPsychologist: true
@@ -76,7 +76,7 @@ const defaultPricing = {
                 "Professional development resources"
             ],
             limits: {
-                messagesPerMonth: -1, // unlimited
+                messagesPerMonth: -1,
                 leadGeneration: true,
                 assignments: true,
                 leadPriority: "high"
@@ -116,7 +116,7 @@ const defaultPricing = {
                 "Recruitment tools"
             ],
             limits: {
-                teamMembers: -1, // unlimited
+                teamMembers: -1,
                 advancedAnalytics: true,
                 api_access: true
             }
@@ -124,7 +124,7 @@ const defaultPricing = {
     }
 };
 
-// Country-based price multipliers and currency conversion
+
 const countryConfig = {
     'US': { multiplier: 1.0, currency: 'USD', symbol: '$' },
     'CA': { multiplier: 0.95, currency: 'CAD', symbol: 'C$' },
@@ -176,7 +176,7 @@ const countryConfig = {
     'KW': { multiplier: 0.9, currency: 'KWD', symbol: 'د.ك' }
 };
 
-// Currency conversion rates (as of 2024, approximate)
+
 const currencyRates = {
     'USD': 1.0,
     'EUR': 0.92,
@@ -223,34 +223,34 @@ const currencyRates = {
     'KWD': 0.31
 };
 
-// Get pricing based on user role and country
+
 const getPricing = async (req, res) => {
     try {
         const { role, country } = req.query;
 
         console.log('Fetching pricing for:', { role, country });
 
-        // Get country configuration
+
         const countryCode = country?.toUpperCase() || 'US';
         const config = countryConfig[countryCode] || countryConfig['US'];
 
-        // Get multiplier and currency
+
         const multiplier = config.multiplier;
         const targetCurrency = config.currency;
 
-        // Create a deep copy of default pricing
+
         const pricing = JSON.parse(JSON.stringify(defaultPricing));
 
-        // Apply country adjustments to prices
+
         if (role && pricing[role]) {
             const rolePricing = { ...pricing[role] };
 
-            // Adjust premium prices
+
             if (rolePricing.premium) {
-                // First apply country multiplier
+
                 const priceInUSD = Math.round(rolePricing.premium.price * multiplier * 100) / 100;
 
-                // Convert to local currency
+
                 const conversionRate = currencyRates[targetCurrency] || 1.0;
                 const localPrice = Math.round(priceInUSD * conversionRate * 100) / 100;
 
@@ -266,7 +266,7 @@ const getPricing = async (req, res) => {
                 };
             }
 
-            // Add country info to free plan
+
             if (rolePricing.free) {
                 rolePricing.free = {
                     ...rolePricing.free,
@@ -281,7 +281,7 @@ const getPricing = async (req, res) => {
             return res.json(rolePricing);
         }
 
-        // Return all pricing with country adjustments
+
         const adjustedPricing = {};
         for (const [roleKey, roleValue] of Object.entries(pricing)) {
             adjustedPricing[roleKey] = {
@@ -309,12 +309,12 @@ const getPricing = async (req, res) => {
         res.json(adjustedPricing);
     } catch (error) {
         console.error('Get pricing error:', error);
-        // Return default pricing even on error
+
         res.json(defaultPricing);
     }
 };
 
-// Get country list for pricing with currency info
+
 const getCountries = async (req, res) => {
     const countries = Object.entries(countryConfig).map(([code, config]) => ({
         code,
@@ -327,7 +327,7 @@ const getCountries = async (req, res) => {
     res.json(countries);
 };
 
-// Helper function to get country names
+
 function getCountryName(code) {
     const names = {
         'US': 'United States',
@@ -382,12 +382,12 @@ function getCountryName(code) {
     return names[code] || code;
 }
 
-// Create subscription
+
 const createSubscription = async (req, res) => {
     try {
         const { plan, role, country, paymentMethod } = req.body;
 
-        // Get pricing to verify amount
+
         const config = countryConfig[country?.toUpperCase()] || countryConfig['US'];
         const multiplier = config.multiplier;
         const targetCurrency = config.currency;
@@ -397,7 +397,7 @@ const createSubscription = async (req, res) => {
         const priceInUSD = Math.round(basePrice * multiplier * 100) / 100;
         const localPrice = Math.round(priceInUSD * conversionRate * 100) / 100;
 
-        // Create subscriptions table if not exists
+
         await query(`
             CREATE TABLE IF NOT EXISTS subscriptions (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -416,7 +416,7 @@ const createSubscription = async (req, res) => {
             )
         `);
 
-        // Create subscription
+
         const result = await query(
             `INSERT INTO subscriptions (
                 user_id, plan, role, country, price, currency, payment_method
@@ -428,10 +428,10 @@ const createSubscription = async (req, res) => {
             ]
         );
 
-        // Update user's subscription tier
+
         await query(
-            `UPDATE users 
-             SET subscription_tier = $1, updated_at = CURRENT_TIMESTAMP 
+            `UPDATE users
+             SET subscription_tier = $1, updated_at = CURRENT_TIMESTAMP
              WHERE id = $2`,
             [plan === 'premium' ? 'premium' : 'free', req.user.id]
         );
@@ -446,11 +446,11 @@ const createSubscription = async (req, res) => {
     }
 };
 
-// Get user's subscription
+
 const getMySubscription = async (req, res) => {
     try {
         const result = await query(
-            `SELECT * FROM subscriptions 
+            `SELECT * FROM subscriptions
              WHERE user_id = $1 AND status = 'active'
              ORDER BY created_at DESC
              LIMIT 1`,
@@ -458,7 +458,7 @@ const getMySubscription = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            // Check user's subscription tier from users table
+
             const userResult = await query(
                 'SELECT subscription_tier FROM users WHERE id = $1',
                 [req.user.id]
@@ -478,13 +478,13 @@ const getMySubscription = async (req, res) => {
     }
 };
 
-// Cancel subscription
+
 const cancelSubscription = async (req, res) => {
     try {
         const { subscriptionId } = req.params;
 
         await query(
-            `UPDATE subscriptions 
+            `UPDATE subscriptions
              SET status = 'cancelled', end_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
              WHERE id = $1 AND user_id = $2`,
             [subscriptionId, req.user.id]

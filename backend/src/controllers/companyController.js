@@ -1,13 +1,13 @@
-// backend/src/controllers/companyController.js
+
 const { query } = require('../utils/database');
 const { sendClaimInvitation } = require('../utils/emailService');
 
-// Search companies with filters - UPDATED with unclaimed filter
+
 const searchCompanies = async (req, res) => {
     try {
         const { q, page = 1, limit = 20, industry, unclaimed } = req.query;
 
-        // Validate and sanitize pagination parameters
+
         const validPage = Math.max(1, parseInt(page) || 1);
         const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
         const offset = (validPage - 1) * validLimit;
@@ -16,7 +16,7 @@ const searchCompanies = async (req, res) => {
         const params = [];
         let paramIndex = 1;
 
-        // Build search conditions
+
         if (q && q.trim() !== '') {
             whereClause += ` WHERE (name ILIKE $${paramIndex} OR description ILIKE $${paramIndex} OR industry ILIKE $${paramIndex})`;
             params.push(`%${q.trim()}%`);
@@ -29,7 +29,7 @@ const searchCompanies = async (req, res) => {
             paramIndex++;
         }
 
-        // Filter for unclaimed companies
+
         if (unclaimed === 'true') {
             if (whereClause) {
                 whereClause += ` AND is_claimed = false`;
@@ -38,14 +38,14 @@ const searchCompanies = async (req, res) => {
             }
         }
 
-        // Get total count
+
         const countResult = await query(
             `SELECT COUNT(*) FROM companies${whereClause}`,
             params
         );
         const total = parseInt(countResult.rows[0]?.count || 0);
 
-        // Get companies with review stats
+
         const result = await query(
             `SELECT
                  c.*,
@@ -81,12 +81,12 @@ const searchCompanies = async (req, res) => {
     }
 };
 
-// Get single company by ID - UPDATED with UUID validation and owner information
+
 const getCompany = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Validate UUID format
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(id)) {
             return res.status(400).json({ error: 'Invalid company ID format' });
@@ -124,7 +124,7 @@ const getCompany = async (req, res) => {
     }
 };
 
-// Create new company
+
 const createCompany = async (req, res) => {
     try {
         const { name, description, industry, website, email, phone, address } = req.body;
@@ -166,7 +166,7 @@ const createCompany = async (req, res) => {
     }
 };
 
-// Claim a company
+
 const claimCompany = async (req, res) => {
     try {
         const { id } = req.params;
@@ -206,7 +206,7 @@ const claimCompany = async (req, res) => {
     }
 };
 
-// Get all industries
+
 const getIndustries = async (req, res) => {
     try {
         const result = await query(
@@ -219,7 +219,7 @@ const getIndustries = async (req, res) => {
     }
 };
 
-// Get companies owned by the current user
+
 const getMyCompanies = async (req, res) => {
     try {
         const result = await query(
@@ -252,7 +252,7 @@ const getMyCompanies = async (req, res) => {
     }
 };
 
-// Update company details
+
 const updateCompany = async (req, res) => {
     try {
         const { id } = req.params;
@@ -287,7 +287,7 @@ const updateCompany = async (req, res) => {
     }
 };
 
-// Get company reviews for business dashboard
+
 const getCompanyReviewsForBusiness = async (req, res) => {
     try {
         const { id } = req.params;
@@ -343,7 +343,7 @@ const getCompanyReviewsForBusiness = async (req, res) => {
     }
 };
 
-// Get unclaimed companies
+
 const getUnclaimedCompanies = async (req, res) => {
     try {
         const result = await query(
@@ -365,13 +365,13 @@ const getUnclaimedCompanies = async (req, res) => {
     }
 };
 
-// Request to claim a company
+
 const requestClaimCompany = async (req, res) => {
     try {
         const { id } = req.params;
         const { businessEmail, businessPhone, position, message } = req.body;
 
-        // Validate required fields
+
         if (!businessEmail || !businessEmail.includes('@')) {
             return res.status(400).json({ error: 'Valid business email is required' });
         }
@@ -397,7 +397,7 @@ const requestClaimCompany = async (req, res) => {
             return res.status(400).json({ error: 'Company already claimed' });
         }
 
-        // Create claim_requests table if not exists
+
         await query(`
             CREATE TABLE IF NOT EXISTS claim_requests (
                                                           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -440,7 +440,7 @@ const requestClaimCompany = async (req, res) => {
     }
 };
 
-// Get user's claim requests
+
 const getMyClaimRequests = async (req, res) => {
     try {
         const result = await query(
@@ -467,7 +467,7 @@ const getMyClaimRequests = async (req, res) => {
     }
 };
 
-// Verify business email
+
 const verifyBusinessEmail = async (req, res) => {
     try {
         const { email } = req.body;
@@ -476,7 +476,7 @@ const verifyBusinessEmail = async (req, res) => {
             return res.status(400).json({ error: 'Valid email is required' });
         }
 
-        // Create email_verifications table if not exists
+
         await query(`
             CREATE TABLE IF NOT EXISTS email_verifications (
                                                                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -488,23 +488,23 @@ const verifyBusinessEmail = async (req, res) => {
                 )
         `);
 
-        // Generate verification code
+
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Delete old codes
+
         await query('DELETE FROM email_verifications WHERE email = $1', [email]);
 
-        // Save new code
+
         await query(
             'INSERT INTO email_verifications (email, code, user_id) VALUES ($1, $2, $3)',
             [email, verificationCode, req.user.id]
         );
 
-        // In development, just log the code
+
         console.log(`📧 Verification code for ${email}: ${verificationCode}`);
 
-        // TODO: Send actual email in production
-        // await sendVerificationEmail(email, verificationCode);
+
+
 
         res.json({ message: 'Verification code sent to your email' });
     } catch (error) {
@@ -513,7 +513,7 @@ const verifyBusinessEmail = async (req, res) => {
     }
 };
 
-// Confirm email verification
+
 const confirmEmailVerification = async (req, res) => {
     try {
         const { email, code } = req.body;
@@ -533,7 +533,7 @@ const confirmEmailVerification = async (req, res) => {
             return res.status(400).json({ error: 'Invalid or expired verification code' });
         }
 
-        // Delete used code
+
         await query('DELETE FROM email_verifications WHERE id = $1', [result.rows[0].id]);
 
         res.json({ message: 'Email verified successfully' });
@@ -543,16 +543,16 @@ const confirmEmailVerification = async (req, res) => {
     }
 };
 
-// Get pending claim requests (admin function)
+
 const getPendingClaimRequests = async (req, res) => {
     try {
-        // Check if user is admin (you'll need to add this role check)
+
         if (req.user.role !== 'admin') {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 cr.*,
                 json_build_object(
                     'id', c.id,
@@ -579,19 +579,19 @@ const getPendingClaimRequests = async (req, res) => {
     }
 };
 
-// Approve claim request (admin function)
+
 const approveClaimRequest = async (req, res) => {
     try {
         const { requestId } = req.params;
 
-        // Check if user is admin
+
         if (req.user.role !== 'admin') {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
         await query('BEGIN');
 
-        // Get the claim request
+
         const claimRequest = await query(
             'SELECT * FROM claim_requests WHERE id = $1',
             [requestId]
@@ -602,19 +602,19 @@ const approveClaimRequest = async (req, res) => {
             return res.status(404).json({ error: 'Claim request not found' });
         }
 
-        // Update claim request status
+
         await query(
             'UPDATE claim_requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             ['approved', requestId]
         );
 
-        // Update company as claimed
+
         await query(
             'UPDATE companies SET is_claimed = true WHERE id = $1',
             [claimRequest.rows[0].company_id]
         );
 
-        // Add company owner
+
         await query(
             'INSERT INTO company_owners (company_id, user_id) VALUES ($1, $2)',
             [claimRequest.rows[0].company_id, claimRequest.rows[0].user_id]
@@ -630,13 +630,13 @@ const approveClaimRequest = async (req, res) => {
     }
 };
 
-// Reject claim request (admin function)
+
 const rejectClaimRequest = async (req, res) => {
     try {
         const { requestId } = req.params;
         const { reason } = req.body;
 
-        // Check if user is admin
+
         if (req.user.role !== 'admin') {
             return res.status(403).json({ error: 'Not authorized' });
         }
@@ -653,9 +653,9 @@ const rejectClaimRequest = async (req, res) => {
     }
 };
 
-// Export ALL functions
+
 module.exports = {
-    searchCompanies, // Updated with unclaimed filter
+    searchCompanies,
     getCompany,
     createCompany,
     claimCompany,
@@ -668,7 +668,7 @@ module.exports = {
     getMyClaimRequests,
     verifyBusinessEmail,
     confirmEmailVerification,
-    getPendingClaimRequests, // New admin function
-    approveClaimRequest, // New admin function
-    rejectClaimRequest // New admin function
+    getPendingClaimRequests,
+    approveClaimRequest,
+    rejectClaimRequest
 };

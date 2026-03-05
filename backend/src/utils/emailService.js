@@ -1,8 +1,8 @@
-// backend/src/utils/emailService.js
+
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Check if email is configured
+
 const isEmailConfigured = () => {
     return process.env.EMAIL_USER &&
         process.env.EMAIL_PASSWORD &&
@@ -10,7 +10,7 @@ const isEmailConfigured = () => {
         process.env.EMAIL_PASSWORD !== '';
 };
 
-// Create transporter only if configured
+
 let transporter = null;
 if (isEmailConfigured()) {
     try {
@@ -27,7 +27,7 @@ if (isEmailConfigured()) {
             }
         });
 
-        // Verify connection
+
         transporter.verify((error) => {
             if (error) {
                 console.log('⚠️ Email service configured but not working:', error.message);
@@ -44,7 +44,7 @@ if (isEmailConfigured()) {
     console.log('📧 Email service not configured. Running in development mode with console logging.');
 }
 
-// Send claim invitation
+
 const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
     const claimLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/claim/${companyId}`;
     if (!transporter) {
@@ -104,7 +104,7 @@ const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
     }
 };
 
-// Send verification email
+
 const sendVerificationEmail = async (email, code) => {
     if (!transporter) {
         console.log('\n=== VERIFICATION EMAIL (DEV MODE) ===');
@@ -159,7 +159,7 @@ const sendVerificationEmail = async (email, code) => {
     }
 };
 
-// Send application confirmation
+
 const sendApplicationConfirmation = async (email, name) => {
     if (!transporter) {
         console.log('\n=== APPLICATION CONFIRMATION (DEV MODE) ===');
@@ -212,7 +212,7 @@ const sendApplicationConfirmation = async (email, name) => {
     }
 };
 
-// New KYC approval email
+
 const sendKYCApprovalEmail = async (email, companyName, status = 'approved') => {
     if (!transporter) {
         console.log('\n=== KYC EMAIL (DEV MODE) ===');
@@ -252,7 +252,7 @@ const sendKYCApprovalEmail = async (email, companyName, status = 'approved') => 
     }
 };
 
-// New KYC rejection email
+
 const sendKYCRejectionEmail = async (email, companyName, reason) => {
     if (!transporter) {
         console.log('\n=== KYC REJECTION EMAIL (DEV MODE) ===');

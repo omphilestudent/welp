@@ -1,4 +1,4 @@
-// backend/src/routes/companyRoutes.js
+
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -8,13 +8,13 @@ const companyController = require('../controllers/companyController');
 
 const router = express.Router();
 
-// Public routes
+
 router.get('/search', apiLimiter, companyController.searchCompanies);
 router.get('/industries', apiLimiter, companyController.getIndustries);
 router.get('/unclaimed', apiLimiter, companyController.getUnclaimedCompanies);
 router.get('/:id', apiLimiter, companyController.getCompany);
 
-// Employee routes
+
 router.post('/',
     authenticate,
     authorize('employee'),
@@ -22,7 +22,7 @@ router.post('/',
     companyController.createCompany
 );
 
-// Business routes
+
 router.get('/my-companies',
     authenticate,
     authorize('business'),
@@ -48,7 +48,7 @@ router.get('/:id/business-reviews',
     companyController.getCompanyReviewsForBusiness
 );
 
-// Claim request routes
+
 router.post('/:id/request-claim',
     authenticate,
     authorize('business'),
@@ -67,7 +67,7 @@ router.get('/my-claim-requests',
     companyController.getMyClaimRequests
 );
 
-// Email verification routes
+
 router.post('/verify-email',
     authenticate,
     authorize('business'),

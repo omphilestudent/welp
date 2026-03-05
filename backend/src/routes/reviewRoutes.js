@@ -1,4 +1,4 @@
-// backend/src/routes/reviewRoutes.js (UPDATED VERSION)
+
 const express = require('express');
 const { authenticate, authorize } = require('../middleware/auth');
 const { reviewLimiter } = require('../middleware/rateLimiter');
@@ -7,7 +7,7 @@ const reviewController = require('../controllers/reviewController');
 
 const router = express.Router();
 
-// Employee routes
+
 router.post('/',
     authenticate,
     authorize('employee'),
@@ -22,12 +22,12 @@ router.get('/my-reviews',
     reviewController.getMyReviews
 );
 
-// Public routes
+
 router.get('/company/:companyId', reviewController.getCompanyReviews);
 router.get('/company/:companyId/stats', reviewController.getCompanyReviewStats);
 router.get('/:reviewId', reviewController.getReviewById);
 
-// Protected routes (authenticated users)
+
 router.patch('/:reviewId',
     authenticate,
     validate(reviewValidation),

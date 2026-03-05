@@ -1,4 +1,4 @@
-// frontend/src/components/settings/ProfileSettings.jsx
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
@@ -57,13 +57,13 @@ const ProfileSettings = ({ onUpdate }) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file type
+
         if (!file.type.startsWith('image/')) {
             toast.error('Please select an image file');
             return;
         }
 
-        // Validate file size (max 2MB)
+
         if (file.size > 2 * 1024 * 1024) {
             toast.error('File size must be less than 2MB');
             return;
@@ -78,10 +78,10 @@ const ProfileSettings = ({ onUpdate }) => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            // Update profile with new avatar URL
+
             setProfile(prev => ({ ...prev, avatarUrl: data.avatarUrl }));
 
-            // Update user context
+
             if (updateUser) {
                 updateUser({ ...user, avatar_url: data.avatarUrl });
             }
@@ -130,7 +130,7 @@ const ProfileSettings = ({ onUpdate }) => {
         setWorkplaceSearch(value);
         searchWorkplace(value);
 
-        // Clear selected workplace if search changes
+
         if (profile.workplaceId && value !== profile.workplace?.name) {
             setProfile({
                 ...profile,
@@ -155,7 +155,7 @@ const ProfileSettings = ({ onUpdate }) => {
                 website: profile.website
             });
 
-            // Update user context
+
             if (updateUser) {
                 updateUser({
                     ...user,
@@ -176,7 +176,7 @@ const ProfileSettings = ({ onUpdate }) => {
 
     return (
         <div className="profile-settings">
-            {/* Profile Picture Section */}
+            {}
             <div className="profile-picture-section">
                 <h3>Profile Picture</h3>
                 <div className="avatar-upload-container">
@@ -212,7 +212,7 @@ const ProfileSettings = ({ onUpdate }) => {
                 </div>
             </div>
 
-            {/* Profile Form */}
+            {}
             <form onSubmit={handleSubmit} className="profile-form">
                 <h3>Personal Information</h3>
 

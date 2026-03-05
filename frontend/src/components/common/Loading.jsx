@@ -1,4 +1,4 @@
-// src/components/common/Loading.jsx
+
 import React from 'react';
 
 const Loading = ({ size = 'medium' }) => {

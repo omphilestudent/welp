@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/ReviewModeration.jsx
+
 import React from 'react';
 
 const ReviewModeration = () => {

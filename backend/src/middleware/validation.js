@@ -1,4 +1,4 @@
-// backend/src/middleware/validation.js
+
 const { body, validationResult } = require('express-validator');
 
 
@@ -22,7 +22,7 @@ const validate = (validations) => {
     };
 };
 
-// Auth validations
+
 const registerValidation = [
     body('email').optional().isEmail().normalizeEmail(),
     body('password').optional()
@@ -41,7 +41,7 @@ const loginValidation = [
     body('password').isLength({ min: 6 })
 ];
 
-// Company validations
+
 const companyValidation = [
     body('name').trim().isLength({ min: 2, max: 100 }),
     body('description').optional().trim().isLength({ max: 1000 }),
@@ -52,24 +52,24 @@ const companyValidation = [
     body('address').optional().trim()
 ];
 
-// Review validations
+
 const reviewValidation = [
     body('rating').isInt({ min: 1, max: 5 }),
     body('content').trim().isLength({ min: 10, max: 2000 }),
     body('isPublic').optional().isBoolean()
 ];
 
-// Reply validation
+
 const replyValidation = [
     body('content').trim().isLength({ min: 1, max: 1000 })
 ];
 
-// Message validation
+
 const messageValidation = [
     body('content').trim().isLength({ min: 1, max: 2000 })
 ];
 
-// Claim Request Validation
+
 const claimRequestValidation = [
     body('businessEmail').isEmail().normalizeEmail(),
     body('businessPhone').optional().trim(),
@@ -77,7 +77,7 @@ const claimRequestValidation = [
     body('message').optional().trim().isLength({ max: 500 })
 ];
 
-// Email Verification Validation
+
 const verifyEmailValidation = [
     body('email').isEmail().normalizeEmail()
 ];

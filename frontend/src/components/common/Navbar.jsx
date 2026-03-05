@@ -1,4 +1,4 @@
-// frontend/src/components/common/Navbar.jsx (Add after business section)
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaComment, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
@@ -104,7 +104,7 @@ const Navbar = () => {
                                     </>
                                 )}
 
-                                {/* Admin Links */}
+                                {}
                                 {isAdmin && (
                                     <div className="nav-dropdown">
                                         <button className="nav-dropdown-btn">
@@ -124,7 +124,7 @@ const Navbar = () => {
                                     </div>
                                 )}
 
-                                {/* HR Links */}
+                                {}
                                 {isHR && (
                                     <div className="nav-dropdown">
                                         <button className="nav-dropdown-btn">
@@ -182,7 +182,7 @@ const Navbar = () => {
                 </div>
             </nav>
 
-            {/* Chat Request Modal */}
+            {}
             <ChatRequestModal
                 isOpen={showChatModal}
                 onClose={() => setShowChatModal(false)}

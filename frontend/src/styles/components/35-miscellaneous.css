@@ -1,4 +1,4 @@
-/* ===== Miscellaneous ===== */
+
 .coming-soon {
   text-align: center;
   padding: 4rem;
@@ -24,9 +24,9 @@
   align-items: center;
   gap: 0.5rem;
 }
-/* Add to src/styles/components.css */
 
-/* Profile Settings */
+
+
 .profile-settings {
   max-width: 600px;
   margin: 0 auto;
@@ -120,7 +120,7 @@
   font-size: 0.85rem;
 }
 
-/* Profile Form */
+
 .profile-form {
   padding: 1.5rem;
   background: var(--card-bg);
@@ -137,7 +137,7 @@
   margin-top: 0;
 }
 
-/* Selected Workplace */
+
 .selected-workplace {
   margin-top: 0.5rem;
   padding: 0.75rem;
@@ -167,7 +167,7 @@
   opacity: 1;
 }
 
-/* Search Results */
+
 .search-results {
   margin-top: 0.5rem;
   border: 1px solid var(--border-color);
@@ -200,14 +200,14 @@
   text-align: center;
 }
 
-/* Form Actions */
+
 .form-actions {
   margin-top: 2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border-color);
 }
 
-/* Profile Tab */
+
 .profile-tab {
   padding: 1rem 0;
 }
@@ -216,9 +216,9 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-/* Add to src/styles/components.css */
 
-/* KYC Page */
+
+
 .kyc-page {
   min-height: 100vh;
   background: var(--bg-secondary);
@@ -270,7 +270,7 @@
   padding-bottom: 3rem;
 }
 
-/* KYC Steps */
+
 .kyc-steps {
   grid-column: 1 / -1;
   display: flex;
@@ -334,7 +334,7 @@
   margin: 0 1rem;
 }
 
-/* KYC Form */
+
 .kyc-form {
   background: var(--card-bg);
   border-radius: 20px;
@@ -354,7 +354,7 @@
   margin-bottom: 2rem;
 }
 
-/* Document Sections */
+
 .document-section {
   margin-bottom: 2rem;
   padding: 1.5rem;
@@ -378,7 +378,7 @@
   margin-bottom: 1rem;
 }
 
-/* File List */
+
 .file-list {
   margin-top: 1rem;
 }
@@ -418,7 +418,7 @@
   opacity: 1;
 }
 
-/* Review Sections */
+
 .review-section {
   margin-bottom: 1.5rem;
   padding: 1rem;
@@ -455,7 +455,7 @@
   color: var(--text-primary);
 }
 
-/* Terms Section */
+
 .terms-section {
   margin: 2rem 0;
   padding: 1.5rem;
@@ -476,7 +476,7 @@
   text-decoration: underline;
 }
 
-/* KYC Sidebar */
+
 .kyc-sidebar {
   display: flex;
   flex-direction: column;
@@ -546,7 +546,7 @@
   margin-top: 0.5rem;
 }
 
-/* Warning Notice */
+
 .verification-notice.warning {
   background: var(--warning-bg);
   border-color: var(--warning-border);
@@ -556,7 +556,7 @@
   color: var(--warning-text);
 }
 
-/* Responsive */
+
 @media (max-width: 1024px) {
   .kyc-content {
     grid-template-columns: 1fr;
@@ -588,9 +588,9 @@
   }
 }
 
-/* Add to src/styles/components.css */
 
-/* Claim Business Page */
+
+
 .claim-business-page {
   min-height: 100vh;
   padding: 2rem 0;
@@ -708,9 +708,9 @@
   justify-content: center;
   gap: 0.5rem;
 }
-/* Add to src/styles/components.css */
 
-/* Filter Tabs */
+
+
 .filter-tabs {
   display: flex;
   gap: 1rem;
@@ -743,7 +743,7 @@
   color: white;
 }
 
-/* Company Card Wrapper */
+
 .company-card-wrapper {
   position: relative;
   height: 100%;
@@ -764,7 +764,7 @@
   transform: translateY(-2px);
 }
 
-/* Empty State */
+
 .empty-state {
   text-align: center;
   padding: 4rem 2rem;
@@ -787,7 +787,7 @@
   color: var(--text-muted);
 }
 
-/* Responsive */
+
 @media (max-width: 768px) {
   .filter-tabs {
     flex-direction: column;
@@ -800,9 +800,9 @@
   }
 }
 
-/* Add to src/styles/components.css */
 
-/* Pricing Page */
+
+
 .pricing-page {
   min-height: 100vh;
   background: var(--bg-secondary);
@@ -827,7 +827,7 @@
   opacity: 0.95;
 }
 
-/* Role Selector */
+
 .role-selector {
   display: flex;
   justify-content: center;
@@ -866,7 +866,7 @@
   color: white;
 }
 
-/* Country Selector */
+
 .country-selector {
   display: flex;
   align-items: center;
@@ -900,7 +900,7 @@
   cursor: pointer;
 }
 
-/* Pricing Grid */
+
 .pricing-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1031,7 +1031,7 @@
   margin-top: auto;
 }
 
-/* Comparison Section */
+
 .comparison-section {
   margin: 4rem 0;
 }
@@ -1079,7 +1079,7 @@
   color: var(--text-primary);
 }
 
-/* FAQ Section */
+
 .pricing-faq {
   margin: 4rem 0;
 }
@@ -1115,7 +1115,7 @@
   line-height: 1.6;
 }
 
-/* Payment Modal */
+
 .payment-modal {
   position: fixed;
   top: 0;
@@ -1221,7 +1221,7 @@
   justify-content: flex-end;
 }
 
-/* Responsive */
+
 @media (max-width: 1024px) {
   .pricing-grid {
     grid-template-columns: 1fr;
@@ -1267,9 +1267,9 @@
     padding: 0.75rem 0.5rem;
   }
 }
-/* Add to src/styles/components.css */
 
-/* Navbar Dropdown */
+
+
 .nav-dropdown {
   position: relative;
   display: inline-block;

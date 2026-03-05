@@ -1,4 +1,4 @@
-// frontend/src/pages/Register.jsx (Updated)
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -21,7 +21,7 @@ const Register = () => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
-        // Account Info
+
         email: '',
         password: '',
         confirmPassword: '',
@@ -29,13 +29,13 @@ const Register = () => {
         isAnonymous: false,
         displayName: '',
 
-        // Professional Info
+
         occupation: '',
         workplaceName: '',
         workplaceExists: false,
         selectedWorkplace: null,
 
-        // For business/psychologist registration
+
         businessEmail: '',
         businessPhone: '',
         position: '',
@@ -50,7 +50,7 @@ const Register = () => {
     const handleRoleChange = (role) => {
         setFormData({ ...formData, role });
 
-        // Redirect based on role after registration
+
         if (role === 'psychologist') {
             toast.success('You will be redirected to the psychologist application form');
         } else if (role === 'business') {
@@ -132,7 +132,7 @@ const Register = () => {
         if (step === 1) {
             if (validateStep1()) {
                 if (formData.isAnonymous) {
-                    // Skip to final registration for anonymous users
+
                     await completeRegistration();
                 } else {
                     setStep(2);
@@ -152,11 +152,11 @@ const Register = () => {
         setLoading(true);
 
         try {
-            // First, handle workplace if it's new
+
             let workplaceId = formData.selectedWorkplace?.id;
 
             if (!formData.workplaceExists && formData.workplaceName && formData.role === 'employee') {
-                // Create new company
+
                 const companyData = {
                     name: formData.workplaceName,
                     description: `Workplace of ${formData.displayName || 'employee'}`,
@@ -168,7 +168,7 @@ const Register = () => {
                 workplaceId = data.id;
             }
 
-            // Prepare registration data
+
             const registrationData = formData.isAnonymous
                 ? {
                     role: formData.role,
@@ -190,7 +190,7 @@ const Register = () => {
             if (result.success) {
                 toast.success('Account created successfully!');
 
-                // Redirect based on role
+
                 if (formData.role === 'psychologist') {
                     navigate('/psychologist/join');
                 } else if (formData.role === 'business') {
@@ -220,7 +220,7 @@ const Register = () => {
                     <h1 className="auth-title">Create Account</h1>
                     <p className="auth-subtitle">Join Welp today</p>
 
-                    {/* Progress Steps */}
+                    {}
                     {!formData.isAnonymous && (
                         <div className="register-steps">
                             <div className={`step ${step >= 1 ? 'active' : ''}`}>
@@ -236,14 +236,14 @@ const Register = () => {
                     )}
 
                     <form onSubmit={handleSubmit} className="auth-form">
-                        {/* Step 1: Account Information */}
+                        {}
                         {step === 1 && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                             >
-                                {/* Role Selection */}
+                                {}
                                 <div className="form-group">
                                     <label className="form-label">I am a...</label>
                                     <div className="role-options">
@@ -267,7 +267,7 @@ const Register = () => {
                                     </div>
                                 </div>
 
-                                {/* Anonymous Option */}
+                                {}
                                 <div className="form-group">
                                     <label className="checkbox-label">
                                         <input
@@ -283,7 +283,7 @@ const Register = () => {
                                     </p>
                                 </div>
 
-                                {/* Display Name */}
+                                {}
                                 <div className="form-group">
                                     <label htmlFor="displayName" className="form-label">
                                         <FaUser /> Display Name
@@ -299,7 +299,7 @@ const Register = () => {
                                     />
                                 </div>
 
-                                {/* Email and Password (not for anonymous) */}
+                                {}
                                 {!formData.isAnonymous && (
                                     <>
                                         <div className="form-group">
@@ -366,7 +366,7 @@ const Register = () => {
                             </motion.div>
                         )}
 
-                        {/* Step 2: Professional Information (for employees) */}
+                        {}
                         {step === 2 && formData.role === 'employee' && (
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -395,7 +395,7 @@ const Register = () => {
                                         <FaBuilding /> Your Workplace *
                                     </label>
 
-                                    {/* Workplace Search */}
+                                    {}
                                     <input
                                         type="text"
                                         value={formData.workplaceName}
@@ -407,7 +407,7 @@ const Register = () => {
                                         placeholder="Search for your company"
                                     />
 
-                                    {/* Search Results */}
+                                    {}
                                     {searching && <div className="searching">Searching...</div>}
 
                                     {searchResults.length > 0 && (

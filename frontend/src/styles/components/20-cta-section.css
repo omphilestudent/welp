@@ -1,4 +1,4 @@
-/* ===== CTA Section ===== */
+
 .cta-section {
   padding: 5rem 0;
   background: var(--gradient-primary);
@@ -48,7 +48,7 @@
   min-width: 200px;
 }
 
-/* CTA Enhanced */
+
 .cta-section.enhanced {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #9f7aea 100%);
 }

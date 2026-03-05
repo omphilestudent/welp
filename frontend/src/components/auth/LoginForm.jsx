@@ -1,4 +1,4 @@
-// src/components/auth/LoginForm.jsx
+
 import React, { useState } from 'react';
 
 const LoginForm = ({ onSubmit, loading }) => {

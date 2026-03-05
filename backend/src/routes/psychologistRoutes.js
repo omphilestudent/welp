@@ -1,4 +1,4 @@
-// backend/src/routes/psychologistRoutes.js
+
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
@@ -8,7 +8,7 @@ const psychologistController = require('../controllers/psychologistController');
 
 const router = express.Router();
 
-// Validation rules for psychologist application
+
 const psychologistApplicationValidation = [
     body('fullName').trim().notEmpty().withMessage('Full name is required'),
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
@@ -29,7 +29,7 @@ const psychologistApplicationValidation = [
     body('avatarUrl').optional().isURL()
 ];
 
-// Public routes
+
 router.post('/apply',
     apiLimiter,
     validate(psychologistApplicationValidation),
@@ -41,7 +41,7 @@ router.get('/status/:email',
     psychologistController.getApplicationStatus
 );
 
-// Protected routes (authenticated users)
+
 router.post('/upload-license/:applicationId',
     authenticate,
     apiLimiter,

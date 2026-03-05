@@ -1,4 +1,4 @@
-// frontend/src/pages/JobDetails.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -38,7 +38,7 @@ const JobDetails = () => {
     const fetchJobDetails = async () => {
         setLoading(true);
         try {
-            // Mock data - replace with API call
+
             const mockJob = {
                 id: 1,
                 title: 'Senior Frontend Developer',
@@ -87,7 +87,7 @@ const JobDetails = () => {
             };
             setJob(mockJob);
 
-            // Similar jobs
+
             setSimilarJobs([
                 {
                     id: 2,
@@ -148,20 +148,20 @@ const JobDetails = () => {
     return (
         <div className="job-details-page">
             <div className="container">
-                {/* Back Button */}
+                {}
                 <button onClick={() => navigate(-1)} className="back-btn">
                     <FaArrowLeft /> Back to Jobs
                 </button>
 
                 <div className="job-details-grid">
-                    {/* Main Content */}
+                    {}
                     <motion.div
                         className="job-main"
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
                     >
-                        {/* Job Header */}
+                        {}
                         <div className="job-header">
                             <div className="job-title-section">
                                 <h1>{job.title}</h1>
@@ -185,7 +185,7 @@ const JobDetails = () => {
                             </div>
                         </div>
 
-                        {/* Company Info */}
+                        {}
                         <div className="company-card">
                             <div className="company-logo">
                                 {job.company.logo ? (
@@ -204,13 +204,13 @@ const JobDetails = () => {
                             </div>
                         </div>
 
-                        {/* Job Description */}
+                        {}
                         <div className="job-section">
                             <h2>About the Role</h2>
                             <p className="job-description">{job.description}</p>
                         </div>
 
-                        {/* Responsibilities */}
+                        {}
                         <div className="job-section">
                             <h2>Responsibilities</h2>
                             <ul className="job-list">
@@ -223,7 +223,7 @@ const JobDetails = () => {
                             </ul>
                         </div>
 
-                        {/* Requirements */}
+                        {}
                         <div className="job-section">
                             <h2>Requirements</h2>
                             <ul className="job-list">
@@ -236,7 +236,7 @@ const JobDetails = () => {
                             </ul>
                         </div>
 
-                        {/* Benefits */}
+                        {}
                         <div className="job-section">
                             <h2>Benefits</h2>
                             <div className="benefits-grid">
@@ -250,14 +250,14 @@ const JobDetails = () => {
                         </div>
                     </motion.div>
 
-                    {/* Sidebar */}
+                    {}
                     <motion.div
                         className="job-sidebar"
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
                     >
-                        {/* Apply Card */}
+                        {}
                         <div className="sidebar-card apply-card">
                             <h3>Ready to Apply?</h3>
                             <p>Applications close in {Math.ceil((new Date(job.deadline) - new Date()) / (1000 * 60 * 60 * 24))} days</p>
@@ -267,7 +267,7 @@ const JobDetails = () => {
                             <p className="application-count">{job.applications} people have already applied</p>
                         </div>
 
-                        {/* Job Overview */}
+                        {}
                         <div className="sidebar-card">
                             <h3>Job Overview</h3>
                             <div className="overview-item">
@@ -296,7 +296,7 @@ const JobDetails = () => {
                             </div>
                         </div>
 
-                        {/* Similar Jobs */}
+                        {}
                         {similarJobs.length > 0 && (
                             <div className="sidebar-card">
                                 <h3>Similar Jobs</h3>
@@ -347,7 +347,7 @@ const JobDetails = () => {
                     gap: 2rem;
                 }
 
-                /* Main Content */
+                
                 .job-main {
                     background: white;
                     border-radius: 16px;
@@ -509,7 +509,7 @@ const JobDetails = () => {
                     color: #f687b3;
                 }
 
-                /* Sidebar */
+                
                 .job-sidebar {
                     display: flex;
                     flex-direction: column;

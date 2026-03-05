@@ -1,4 +1,4 @@
-// frontend/src/pages/ApplyJob.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -28,13 +28,13 @@ const ApplyJob = () => {
     const [submitting, setSubmitting] = useState(false);
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
-        // Personal Information
+
         firstName: '',
         lastName: '',
         email: '',
         phone: '',
 
-        // Professional Information
+
         experience: '',
         currentCompany: '',
         currentPosition: '',
@@ -43,18 +43,18 @@ const ApplyJob = () => {
         github: '',
         portfolio: '',
 
-        // Application
+
         coverLetter: '',
         resume: null,
         additionalDocs: [],
 
-        // Preferences
+
         startDate: '',
         salaryExpectation: '',
         workAuthorization: '',
         remotePreference: 'hybrid',
 
-        // Agreements
+
         agreeToTerms: false,
         confirmAccuracy: false
     });
@@ -69,7 +69,7 @@ const ApplyJob = () => {
     const fetchJobDetails = async () => {
         setLoading(true);
         try {
-            // Mock data - replace with API call
+
             const mockJob = {
                 id: 1,
                 title: 'Senior Frontend Developer',
@@ -115,14 +115,14 @@ const ApplyJob = () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file type
+
         const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
         if (!allowedTypes.includes(file.type)) {
             toast.error('Please upload a PDF or Word document');
             return;
         }
 
-        // Validate file size (max 5MB)
+
         if (file.size > 5 * 1024 * 1024) {
             toast.error('File size must be less than 5MB');
             return;
@@ -130,7 +130,7 @@ const ApplyJob = () => {
 
         setUploadProgress(prev => ({ ...prev, [field]: 0 }));
 
-        // Simulate upload progress
+
         const interval = setInterval(() => {
             setUploadProgress(prev => ({
                 ...prev,
@@ -139,7 +139,7 @@ const ApplyJob = () => {
         }, 200);
 
         try {
-            // In production, upload to server
+
             const fakeUrl = URL.createObjectURL(file);
             setFormData(prev => ({
                 ...prev,
@@ -226,7 +226,7 @@ const ApplyJob = () => {
 
         setSubmitting(true);
         try {
-            // API call would go here
+
             await new Promise(resolve => setTimeout(resolve, 2000));
             toast.success('Application submitted successfully!');
             navigate('/application-success');
@@ -242,7 +242,7 @@ const ApplyJob = () => {
     return (
         <div className="apply-page">
             <div className="container">
-                {/* Header */}
+                {}
                 <div className="apply-header">
                     <button onClick={() => navigate(-1)} className="back-btn">
                         <FaArrowLeft /> Back to Job
@@ -251,7 +251,7 @@ const ApplyJob = () => {
                     <p className="job-subtitle">{job?.department} • {job?.location} • {job?.type}</p>
                 </div>
 
-                {/* Progress Steps */}
+                {}
                 <div className="progress-steps">
                     <div className={`step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}>
                         <div className="step-number">{step > 1 ? <FaCheckCircle /> : 1}</div>
@@ -275,14 +275,14 @@ const ApplyJob = () => {
                 </div>
 
                 <div className="apply-content">
-                    {/* Application Form */}
+                    {}
                     <motion.div
                         className="apply-form"
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
                     >
-                        {/* Step 1: Personal Information */}
+                        {}
                         {step === 1 && (
                             <div className="form-step">
                                 <h2>Personal Information</h2>
@@ -344,7 +344,7 @@ const ApplyJob = () => {
                             </div>
                         )}
 
-                        {/* Step 2: Professional Information */}
+                        {}
                         {step === 2 && (
                             <div className="form-step">
                                 <h2>Professional Information</h2>
@@ -459,7 +459,7 @@ const ApplyJob = () => {
                             </div>
                         )}
 
-                        {/* Step 3: Documents */}
+                        {}
                         {step === 3 && (
                             <div className="form-step">
                                 <h2>Documents</h2>
@@ -531,7 +531,7 @@ const ApplyJob = () => {
                             </div>
                         )}
 
-                        {/* Step 4: Review & Submit */}
+                        {}
                         {step === 4 && (
                             <div className="form-step">
                                 <h2>Review & Submit</h2>
@@ -675,7 +675,7 @@ const ApplyJob = () => {
                             </div>
                         )}
 
-                        {/* Navigation Buttons */}
+                        {}
                         <div className="form-navigation">
                             {step > 1 && (
                                 <button onClick={handleBack} className="btn btn-secondary">
@@ -698,7 +698,7 @@ const ApplyJob = () => {
                         </div>
                     </motion.div>
 
-                    {/* Application Tips */}
+                    {}
                     <motion.div
                         className="apply-tips"
                         initial={{ opacity: 0, x: 20 }}
@@ -772,7 +772,7 @@ const ApplyJob = () => {
                     color: #718096;
                 }
 
-                /* Progress Steps */
+                
                 .progress-steps {
                     display: flex;
                     align-items: center;
@@ -829,7 +829,7 @@ const ApplyJob = () => {
                     margin: 0 1rem;
                 }
 
-                /* Content */
+                
                 .apply-content {
                     display: grid;
                     grid-template-columns: 2fr 1fr;
@@ -977,7 +977,7 @@ const ApplyJob = () => {
                     transition: width 0.3s;
                 }
 
-                /* Review Section */
+                
                 .review-section {
                     background: #f7fafc;
                     border-radius: 8px;
@@ -1023,7 +1023,7 @@ const ApplyJob = () => {
                     font-size: 0.85rem;
                 }
 
-                /* Radio Group */
+                
                 .radio-group {
                     display: flex;
                     gap: 1.5rem;
@@ -1036,7 +1036,7 @@ const ApplyJob = () => {
                     font-weight: normal;
                 }
 
-                /* Terms Section */
+                
                 .terms-section {
                     margin: 2rem 0;
                     padding: 1.5rem;
@@ -1065,7 +1065,7 @@ const ApplyJob = () => {
                     text-decoration: underline;
                 }
 
-                /* Navigation */
+                
                 .form-navigation {
                     display: flex;
                     gap: 1rem;
@@ -1073,7 +1073,7 @@ const ApplyJob = () => {
                     margin-top: 2rem;
                 }
 
-                /* Tips Sidebar */
+                
                 .apply-tips {
                     display: flex;
                     flex-direction: column;

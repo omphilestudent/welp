@@ -1,4 +1,4 @@
-// src/pages/Messages.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';

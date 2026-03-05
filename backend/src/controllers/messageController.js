@@ -1,12 +1,12 @@
-// backend/src/controllers/messageController.js
+
 const { query } = require('../utils/database');
 
-// Request chat with psychologist (for employees)
+
 const requestChatWithPsychologist = async (req, res) => {
     try {
         const { psychologistId, initialMessage } = req.body;
 
-        // Check if psychologist exists and is verified
+
         const psychologist = await query(
             'SELECT id, role, is_verified FROM users WHERE id = $1 AND role = $2',
             [psychologistId, 'psychologist']
@@ -20,7 +20,7 @@ const requestChatWithPsychologist = async (req, res) => {
             return res.status(400).json({ error: 'Psychologist is not yet verified' });
         }
 
-        // Check if conversation already exists
+
         const existing = await query(
             'SELECT id FROM conversations WHERE employee_id = $1 AND psychologist_id = $2',
             [req.user.id, psychologistId]
@@ -30,7 +30,7 @@ const requestChatWithPsychologist = async (req, res) => {
             return res.status(400).json({ error: 'Chat request already sent' });
         }
 
-        // Create conversation
+
         const conversation = await query(
             `INSERT INTO conversations (employee_id, psychologist_id, status)
              VALUES ($1, $2, $3)
@@ -38,7 +38,7 @@ const requestChatWithPsychologist = async (req, res) => {
             [req.user.id, psychologistId, 'pending']
         );
 
-        // Add initial message
+
         await query(
             `INSERT INTO messages (conversation_id, sender_id, content)
              VALUES ($1, $2, $3)`,
@@ -55,7 +55,7 @@ const requestChatWithPsychologist = async (req, res) => {
     }
 };
 
-// Get available psychologists for chat (for employees)
+
 const getAvailablePsychologists = async (req, res) => {
     try {
         const result = await query(
@@ -81,12 +81,12 @@ const getAvailablePsychologists = async (req, res) => {
     }
 };
 
-// Send message request (for psychologists to initiate chat with employees)
+
 const sendMessageRequest = async (req, res) => {
     try {
         const { employeeId, initialMessage } = req.body;
 
-        // Check if employee exists
+
         const employee = await query(
             'SELECT id, role FROM users WHERE id = $1 AND role = $2',
             [employeeId, 'employee']
@@ -96,7 +96,7 @@ const sendMessageRequest = async (req, res) => {
             return res.status(404).json({ error: 'Employee not found' });
         }
 
-        // Check if conversation already exists
+
         const existing = await query(
             'SELECT id FROM conversations WHERE employee_id = $1 AND psychologist_id = $2',
             [employeeId, req.user.id]
@@ -106,7 +106,7 @@ const sendMessageRequest = async (req, res) => {
             return res.status(400).json({ error: 'Conversation already exists' });
         }
 
-        // Create conversation
+
         const conversation = await query(
             `INSERT INTO conversations (employee_id, psychologist_id, status)
              VALUES ($1, $2, $3)
@@ -114,7 +114,7 @@ const sendMessageRequest = async (req, res) => {
             [employeeId, req.user.id, 'pending']
         );
 
-        // Add initial message
+
         await query(
             `INSERT INTO messages (conversation_id, sender_id, content)
        VALUES ($1, $2, $3)`,
@@ -128,11 +128,11 @@ const sendMessageRequest = async (req, res) => {
     }
 };
 
-// Get pending requests (for employees to see incoming requests from psychologists)
+
 const getPendingRequests = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
         c.*,
         json_build_object(
           'id', u.id,
@@ -165,19 +165,19 @@ const getPendingRequests = async (req, res) => {
     }
 };
 
-// Update conversation status (accept/reject/block)
+
 const updateConversationStatus = async (req, res) => {
     try {
         const { conversationId } = req.params;
         const { status } = req.body;
 
-        // Validate status
+
         const validStatuses = ['accepted', 'rejected', 'blocked', 'ended'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ error: 'Invalid status' });
         }
 
-        // Check if conversation exists and user is authorized
+
         const conversation = await query(
             'SELECT * FROM conversations WHERE id = $1',
             [conversationId]
@@ -187,7 +187,7 @@ const updateConversationStatus = async (req, res) => {
             return res.status(404).json({ error: 'Conversation not found' });
         }
 
-        // Check authorization based on role and status change
+
         if (req.user.role === 'employee' && conversation.rows[0].employee_id !== req.user.id) {
             return res.status(403).json({ error: 'Not authorized' });
         }
@@ -197,14 +197,14 @@ const updateConversationStatus = async (req, res) => {
         }
 
         const result = await query(
-            `UPDATE conversations 
+            `UPDATE conversations
        SET status = $1, updated_at = CURRENT_TIMESTAMP
        WHERE id = $2
        RETURNING *`,
             [status, conversationId]
         );
 
-        // Add system message for status change
+
         let systemMessage = '';
         switch(status) {
             case 'accepted':
@@ -236,7 +236,7 @@ const updateConversationStatus = async (req, res) => {
     }
 };
 
-// Get accepted conversations
+
 const getConversations = async (req, res) => {
     try {
         let whereClause = '';
@@ -251,7 +251,7 @@ const getConversations = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT 
+            `SELECT
         c.*,
         json_build_object(
           'id', employee.id,
@@ -278,10 +278,10 @@ const getConversations = async (req, res) => {
           LIMIT 1
         ) as last_message,
         (
-          SELECT COUNT(*) 
-          FROM messages 
-          WHERE conversation_id = c.id 
-            AND sender_id != $1 
+          SELECT COUNT(*)
+          FROM messages
+          WHERE conversation_id = c.id
+            AND sender_id != $1
             AND is_read = false
         ) as unread_count
        FROM conversations c
@@ -299,12 +299,12 @@ const getConversations = async (req, res) => {
     }
 };
 
-// Get messages for a conversation
+
 const getConversationMessages = async (req, res) => {
     try {
         const { conversationId } = req.params;
 
-        // Check if user is part of conversation
+
         const conversation = await query(
             `SELECT * FROM conversations
              WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
@@ -316,7 +316,7 @@ const getConversationMessages = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT 
+            `SELECT
         m.*,
         json_build_object(
           'id', u.id,
@@ -337,7 +337,7 @@ const getConversationMessages = async (req, res) => {
     }
 };
 
-// Send a message
+
 const sendMessage = async (req, res) => {
     try {
         const { conversationId } = req.params;
@@ -347,9 +347,9 @@ const sendMessage = async (req, res) => {
             return res.status(400).json({ error: 'Message content is required' });
         }
 
-        // Check if user is part of conversation and it's accepted
+
         const conversation = await query(
-            `SELECT * FROM conversations 
+            `SELECT * FROM conversations
        WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2) AND status = 'accepted'`,
             [conversationId, req.user.id]
         );
@@ -365,13 +365,13 @@ const sendMessage = async (req, res) => {
             [conversationId, req.user.id, content]
         );
 
-        // Update conversation timestamp
+
         await query(
             'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
             [conversationId]
         );
 
-        // Get sender info
+
         const sender = await query(
             'SELECT id, display_name, role FROM users WHERE id = $1',
             [req.user.id]
@@ -387,14 +387,14 @@ const sendMessage = async (req, res) => {
     }
 };
 
-// Mark messages as read
+
 const markMessagesAsRead = async (req, res) => {
     try {
         const { conversationId } = req.params;
 
-        // Check if user is part of conversation
+
         const conversation = await query(
-            `SELECT * FROM conversations 
+            `SELECT * FROM conversations
        WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
             [conversationId, req.user.id]
         );
@@ -417,7 +417,7 @@ const markMessagesAsRead = async (req, res) => {
     }
 };
 
-// Get unread message count
+
 const getUnreadCount = async (req, res) => {
     try {
         let conversationIds;
@@ -458,12 +458,12 @@ const getUnreadCount = async (req, res) => {
     }
 };
 
-// Block conversation (employee can block psychologist)
+
 const blockConversation = async (req, res) => {
     try {
         const { conversationId } = req.params;
 
-        // Check if user is employee in this conversation
+
         const conversation = await query(
             'SELECT * FROM conversations WHERE id = $1 AND employee_id = $2',
             [conversationId, req.user.id]
@@ -474,13 +474,13 @@ const blockConversation = async (req, res) => {
         }
 
         await query(
-            `UPDATE conversations 
+            `UPDATE conversations
        SET status = 'blocked', updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
             [conversationId]
         );
 
-        // Add system message
+
         await query(
             `INSERT INTO messages (conversation_id, sender_id, content, is_system_message)
              VALUES ($1, $2, $3, true)`,
@@ -494,14 +494,14 @@ const blockConversation = async (req, res) => {
     }
 };
 
-// Delete conversation
+
 const deleteConversation = async (req, res) => {
     try {
         const { conversationId } = req.params;
 
-        // Check if user is part of conversation
+
         const conversation = await query(
-            `SELECT * FROM conversations 
+            `SELECT * FROM conversations
        WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
             [conversationId, req.user.id]
         );
@@ -510,7 +510,7 @@ const deleteConversation = async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        // Hard delete (completely remove)
+
         await query('DELETE FROM conversations WHERE id = $1', [conversationId]);
 
         res.json({ message: 'Conversation deleted successfully' });
@@ -521,11 +521,11 @@ const deleteConversation = async (req, res) => {
 };
 
 module.exports = {
-    // New methods
+
     requestChatWithPsychologist,
     getAvailablePsychologists,
 
-    // Existing methods
+
     sendMessageRequest,
     getPendingRequests,
     updateConversationStatus,

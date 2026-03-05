@@ -1,4 +1,4 @@
-// backend/src/routes/kycRoutes.js
+
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -8,7 +8,7 @@ const kycController = require('../controllers/kycController');
 
 const router = express.Router();
 
-// KYC submission validation
+
 const kycValidation = [
     body('companyId').isUUID().withMessage('Valid company ID is required'),
     body('businessName').notEmpty().withMessage('Business name is required'),
@@ -20,7 +20,7 @@ const kycValidation = [
     body('agreeToTerms').isBoolean().custom(value => value === true).withMessage('You must agree to the terms')
 ];
 
-// User routes
+
 router.post('/submit',
     authenticate,
     authorize('business'),
@@ -41,16 +41,16 @@ router.get('/my-applications',
     kycController.getMyKYCs
 );
 
-// Admin routes (you may want to add an admin middleware)
+
 router.get('/admin/pending',
     authenticate,
-    // authorize('admin'),
+
     kycController.getPendingKYCs
 );
 
 router.patch('/admin/review/:applicationId',
     authenticate,
-    // authorize('admin'),
+
     validate([
         body('status').isIn(['approved', 'rejected']),
         body('adminNotes').optional().trim()

@@ -1,8 +1,8 @@
-// backend/src/controllers/psychologistController.js
+
 const { query } = require('../utils/database');
 const { sendApplicationConfirmation } = require('../utils/emailService');
 
-// Apply to become a psychologist
+
 const applyAsPsychologist = async (req, res) => {
     try {
         const {
@@ -25,18 +25,18 @@ const applyAsPsychologist = async (req, res) => {
             avatarUrl
         } = req.body;
 
-        // Validate required fields
+
         if (!fullName || !email || !licenseNumber || !licenseIssuingBody || !yearsOfExperience) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // Check if email already exists
+
         const existingUser = await query(
             'SELECT id FROM users WHERE email = $1',
             [email]
         );
 
-        // Create psychologist_applications table if not exists
+
         await query(`
       CREATE TABLE IF NOT EXISTS psychologist_applications (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,7 +64,7 @@ const applyAsPsychologist = async (req, res) => {
       )
     `);
 
-        // Check if application already exists
+
         const existing = await query(
             'SELECT * FROM psychologist_applications WHERE email = $1',
             [email]
@@ -74,10 +74,10 @@ const applyAsPsychologist = async (req, res) => {
             return res.status(400).json({ error: 'Application already submitted' });
         }
 
-        // Create application
+
         const result = await query(
             `INSERT INTO psychologist_applications (
-        full_name, email, license_number, license_issuing_body, 
+        full_name, email, license_number, license_issuing_body,
         years_of_experience, specialization, qualifications, biography,
         phone_number, address, website, linkedin, consultation_modes,
         languages, accepted_age_groups, emergency_contact, avatar_url
@@ -91,7 +91,7 @@ const applyAsPsychologist = async (req, res) => {
             ]
         );
 
-        // Send confirmation email (in dev mode, this will just log)
+
         try {
             await sendApplicationConfirmation(email, fullName);
         } catch (emailError) {
@@ -108,7 +108,7 @@ const applyAsPsychologist = async (req, res) => {
     }
 };
 
-// Get application status
+
 const getApplicationStatus = async (req, res) => {
     try {
         const { email } = req.params;
@@ -133,7 +133,7 @@ const getApplicationStatus = async (req, res) => {
     }
 };
 
-// Upload license document
+
 const uploadLicenseDocument = async (req, res) => {
     try {
         const { applicationId } = req.params;
@@ -143,7 +143,7 @@ const uploadLicenseDocument = async (req, res) => {
             return res.status(400).json({ error: 'Document URL is required' });
         }
 
-        // Create license_documents table if not exists
+
         await query(`
       CREATE TABLE IF NOT EXISTS license_documents (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

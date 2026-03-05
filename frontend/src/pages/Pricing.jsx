@@ -1,4 +1,4 @@
-// frontend/src/pages/Pricing.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -105,7 +105,7 @@ const Pricing = () => {
             </div>
 
             <div className="container">
-                {/* Role Selector */}
+                {}
                 <div className="role-selector">
                     {['employee', 'psychologist', 'business'].map(role => (
                         <button
@@ -121,7 +121,7 @@ const Pricing = () => {
                     ))}
                 </div>
 
-                {/* Country Selector */}
+                {}
                 <div className="country-selector">
                     <FaGlobe />
                     <label>Select your country:</label>
@@ -138,10 +138,10 @@ const Pricing = () => {
                     </select>
                 </div>
 
-                {/* Pricing Cards */}
+                {}
                 {pricing && (
                     <div className="pricing-grid">
-                        {/* Free Plan */}
+                        {}
                         <div className="pricing-card free">
                             <div className="pricing-card-header">
                                 <h3>{pricing.free?.name || 'Free Plan'}</h3>
@@ -173,7 +173,7 @@ const Pricing = () => {
                             </div>
                         </div>
 
-                        {/* Premium Plan */}
+                        {}
                         {pricing.premium && (
                             <div className="pricing-card premium">
                                 <div className="popular-badge">Most Popular</div>
@@ -217,7 +217,7 @@ const Pricing = () => {
                     </div>
                 )}
 
-                {/* Feature Comparison Table */}
+                {}
                 {selectedRole === 'employee' && (
                     <div className="comparison-section">
                         <h2>Compare Plans</h2>
@@ -272,7 +272,7 @@ const Pricing = () => {
                     </div>
                 )}
 
-                {/* Country Pricing Note */}
+                {}
                 <div className="pricing-note">
                     <p>✨ Prices are adjusted based on your country's economic factors to ensure fair access worldwide.</p>
                     <p>Selected country: {countries.find(c => c.code === selectedCountry)?.name}

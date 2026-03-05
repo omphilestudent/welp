@@ -1,4 +1,4 @@
-// frontend/src/pages/Test.jsx
+
 import React from 'react';
 
 const Test = () => {
