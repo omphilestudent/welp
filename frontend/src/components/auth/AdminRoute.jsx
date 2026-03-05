@@ -8,11 +8,6 @@ const ROLE_PROFILE_ENDPOINTS = {
     hr: '/hr/profile'
 };
 
-const LOCAL_ROLE_ACCESS = {
-    admin: ['admin', 'super_admin'],
-    hr: ['hr', 'hr_admin', 'admin', 'super_admin']
-};
-
 const AdminRoute = ({ children, requiredRole = 'admin' }) => {
     const { user, loading: authLoading } = useAuth();
     const [hasAccess, setHasAccess] = useState(null);
@@ -26,15 +21,6 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
 
             if (!user) {
                 setHasAccess(false);
-                setLoading(false);
-                return;
-            }
-
-            const normalizedRole = user.role?.toLowerCase();
-            const allowedLocalRoles = LOCAL_ROLE_ACCESS[requiredRole] || [];
-
-            if (normalizedRole && allowedLocalRoles.includes(normalizedRole)) {
-                setHasAccess(true);
                 setLoading(false);
                 return;
             }
