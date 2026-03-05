@@ -105,7 +105,7 @@ const UserManagement = () => {
                 await fetchUsers();
             } catch (error) {
 
-
+console.log('Error in checkAuth:', error);
                 if (error.response?.status === 401) {
                     navigate('/login');
                 }
