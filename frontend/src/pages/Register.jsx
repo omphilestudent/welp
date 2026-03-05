@@ -12,6 +12,7 @@ import {
     FaBuilding,
     FaBriefcase,
     FaUserMd,
+    FaCheckCircle,
     FaArrowRight
 } from 'react-icons/fa';
 
