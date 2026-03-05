@@ -1,40 +1,59 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
-const AdminRoute = ({ children }) => {
+const ROLE_PROFILE_ENDPOINTS = {
+    admin: '/admin/profile',
+    hr: '/hr/profile'
+};
+
+const LOCAL_ROLE_ACCESS = {
+    admin: ['admin', 'super_admin'],
+    hr: ['hr', 'hr_admin', 'admin', 'super_admin']
+};
+
+const AdminRoute = ({ children, requiredRole = 'admin' }) => {
     const { user, loading: authLoading } = useAuth();
-    const [isAdmin, setIsAdmin] = useState(null);
+    const [hasAccess, setHasAccess] = useState(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const checkAdminStatus = async () => {
+        const checkAccess = async () => {
             if (authLoading) {
                 return;
             }
 
             if (!user) {
-                setIsAdmin(false);
+                setHasAccess(false);
                 setLoading(false);
                 return;
             }
 
+            const normalizedRole = user.role?.toLowerCase();
+            const allowedLocalRoles = LOCAL_ROLE_ACCESS[requiredRole] || [];
+
+            if (normalizedRole && allowedLocalRoles.includes(normalizedRole)) {
+                setHasAccess(true);
+                setLoading(false);
+                return;
+            }
+
+            const profileEndpoint = ROLE_PROFILE_ENDPOINTS[requiredRole] || ROLE_PROFILE_ENDPOINTS.admin;
             setLoading(true);
 
             try {
-                await api.get('/admin/profile', { skipAuthRedirect: true });
-                setIsAdmin(true);
+                await api.get(profileEndpoint, { skipAuthRedirect: true });
+                setHasAccess(true);
             } catch (error) {
-                setIsAdmin(false);
+                setHasAccess(false);
             } finally {
                 setLoading(false);
             }
         };
 
-        checkAdminStatus();
-    }, [user, authLoading]);
+        checkAccess();
+    }, [user, authLoading, requiredRole]);
 
     if (authLoading || loading) {
         return (
@@ -46,12 +65,12 @@ const AdminRoute = ({ children }) => {
     }
 
     if (!user) {
-        return <Navigate to="/login" />;
+        return <Navigate to="/login" replace />;
     }
 
-    if (!isAdmin) {
-        console.log('User is not admin, redirecting to home');
-        return <Navigate to="UserManagement" />;
+    if (!hasAccess) {
+        console.log(`User does not have ${requiredRole} access, redirecting to home`);
+        return <Navigate to="/" replace />;
     }
 
     return children;
