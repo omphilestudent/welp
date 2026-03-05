@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Navbar from './components/common/Navbar';
@@ -128,7 +128,7 @@ function App() {
                                 <Route
                                     path="/admin"
                                     element={
-                                        <AdminRoute>
+                                        <AdminRoute requiredRole="admin">
                                             <AdminLayout />
                                         </AdminRoute>
                                     }
@@ -136,29 +136,35 @@ function App() {
                                     <Route index element={<AdminDashboard />} />
                                     <Route path="dashboard" element={<AdminDashboard />} />
                                     <Route path="users" element={<UserManagement />} />
+                                    <Route path="UserManagement" element={<Navigate to="/admin/users" replace />} />
+                                    <Route path="usermanagement" element={<Navigate to="/admin/users" replace />} />
                                     <Route path="pricing" element={<PricingManagement />} />
                                     <Route path="companies" element={<CompanyManagement />} />
                                     <Route path="reviews" element={<ReviewModeration />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />
+                                    <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                                 </Route>
 
                                 {}
                                 <Route
                                     path="/hr"
                                     element={
-                                        <AdminRoute>
+                                        <AdminRoute requiredRole="hr">
                                             <AdminLayout />
                                         </AdminRoute>
                                     }
                                 >
                                     <Route index element={<HRDashboard />} />
                                     <Route path="dashboard" element={<HRDashboard />} />
+                                    <Route path="UserManagement" element={<Navigate to="/hr/dashboard" replace />} />
                                     <Route path="jobs" element={<JobPostings />} />
                                     <Route path="applications" element={<Applications />} />
                                     <Route path="interviews" element={<Interviews />} />
                                     <Route path="employees" element={<EmployeeRelations />} />
                                     <Route path="departments" element={<Departments />} />
+                                    <Route path="Departments" element={<Navigate to="/hr/departments" replace />} />
+                                    <Route path="*" element={<Navigate to="/hr/dashboard" replace />} />
                                 </Route>
                             </Routes>
                         </main>
