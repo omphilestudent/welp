@@ -30,9 +30,9 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             const requestUrl = error.config?.url || '';
             const isAuthFlowRoute = AUTH_REDIRECT_EXCLUDED_ROUTES.some((route) => requestUrl.includes(route));
+            const skipAuthRedirect = error.config?.skipAuthRedirect === true;
 
-
-            if (!isAuthFlowRoute) {
+            if (!isAuthFlowRoute && !skipAuthRedirect) {
                 window.location.href = '/login';
             }
         }
