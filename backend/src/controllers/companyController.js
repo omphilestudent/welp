@@ -501,7 +501,7 @@ const verifyBusinessEmail = async (req, res) => {
         );
 
 
-        console.log(`Verification code for ${email}: ${verificationCode}`);
+        console.log(`📧 Verification code for ${email}: ${verificationCode}`);
 
 
 

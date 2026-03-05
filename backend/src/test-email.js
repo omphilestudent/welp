@@ -18,6 +18,7 @@ async function testEmail() {
         console.log(' Email configuration is valid!');
 
 
+
         const info = await transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: process.env.EMAIL_USER,

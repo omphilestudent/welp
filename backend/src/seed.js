@@ -194,6 +194,7 @@ async function seedDatabase() {
             console.log(` Database already has ${count} companies.`);
 
 
+
             const claimedResult = await client.query("SELECT COUNT(*) FROM companies WHERE is_claimed = true");
             const unclaimedResult = await client.query("SELECT COUNT(*) FROM companies WHERE is_claimed = false");
 
@@ -217,7 +218,7 @@ async function seedDatabase() {
         }
 
 
-        console.log('📊 Inserting companies...');
+        console.log(' Inserting companies...');
 
         for (const company of sampleCompanies) {
             try {
@@ -245,7 +246,7 @@ async function seedDatabase() {
 
         console.log('\n=============================================');
         console.log(' Database seeded successfully!');
-        console.log(`📊 Total companies: ${sampleCompanies.length}`);
+        console.log(` Total companies: ${sampleCompanies.length}`);
 
 
         const result = await client.query('SELECT COUNT(*) FROM companies');
@@ -272,6 +273,7 @@ async function seedDatabase() {
 
     } catch (error) {
         console.error(' Error seeding database:', error);
+
 
 
         if (error.code === 'ETIMEDOUT') {
