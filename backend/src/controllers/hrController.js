@@ -1,11 +1,11 @@
-// backend/src/controllers/hrController.js
+
 const { query } = require('../utils/database');
 
-// Get HR profile
+
 const getHRProfile = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 au.*,
                 u.email,
                 u.display_name,
@@ -13,7 +13,7 @@ const getHRProfile = async (req, res) => {
             FROM admin_users au
             JOIN users u ON au.user_id = u.id
             JOIN admin_roles ar ON au.role_id = ar.id
-            WHERE au.user_id = $1 AND au.is_active = true 
+            WHERE au.user_id = $1 AND au.is_active = true
             AND (ar.name = 'hr_admin' OR ar.name = 'super_admin')`,
             [req.user.id]
         );
@@ -29,11 +29,11 @@ const getHRProfile = async (req, res) => {
     }
 };
 
-// Get HR dashboard stats
+
 const getHRDashboardStats = async (req, res) => {
     try {
         const jobStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_jobs,
                 COUNT(CASE WHEN status = 'open' THEN 1 END) as open_jobs,
                 COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_jobs,
@@ -42,7 +42,7 @@ const getHRDashboardStats = async (req, res) => {
         );
 
         const applicationStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_applications,
                 COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_applications,
                 COUNT(CASE WHEN status = 'reviewed' THEN 1 END) as reviewed_applications,
@@ -54,7 +54,7 @@ const getHRDashboardStats = async (req, res) => {
         );
 
         const interviewStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_interviews,
                 COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as scheduled_interviews,
                 COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_interviews,
@@ -63,14 +63,14 @@ const getHRDashboardStats = async (req, res) => {
         );
 
         const departmentStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_departments,
                 COUNT(DISTINCT manager_id) as departments_with_manager
             FROM departments`
         );
 
         const employeeStats = await query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total_employees,
                 COUNT(CASE WHEN is_active = true THEN 1 END) as active_employees
             FROM users WHERE role = 'employee'`
@@ -89,7 +89,7 @@ const getHRDashboardStats = async (req, res) => {
     }
 };
 
-// Create job posting
+
 const createJobPosting = async (req, res) => {
     try {
         const {
@@ -125,13 +125,13 @@ const createJobPosting = async (req, res) => {
     }
 };
 
-// Get all job postings
+
 const getJobPostings = async (req, res) => {
     try {
         const { status, department } = req.query;
 
         let queryText = `
-            SELECT 
+            SELECT
                 j.*,
                 d.name as department_name,
                 u.display_name as posted_by_name,
@@ -168,13 +168,13 @@ const getJobPostings = async (req, res) => {
     }
 };
 
-// Get job details
+
 const getJobDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 j.*,
                 d.name as department_name,
                 u.display_name as posted_by_name,
@@ -208,7 +208,7 @@ const getJobDetails = async (req, res) => {
     }
 };
 
-// Update job posting
+
 const updateJobPosting = async (req, res) => {
     try {
         const { id } = req.params;
@@ -230,7 +230,7 @@ const updateJobPosting = async (req, res) => {
         values.push(id);
 
         const query_text = `
-            UPDATE job_postings 
+            UPDATE job_postings
             SET ${setClause.join(', ')}
             WHERE id = $${paramIndex}
             RETURNING *
@@ -249,14 +249,14 @@ const updateJobPosting = async (req, res) => {
     }
 };
 
-// Publish job
+
 const publishJob = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `UPDATE job_postings 
-             SET status = 'published', 
+            `UPDATE job_postings
+             SET status = 'published',
                  published_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $1
@@ -275,14 +275,14 @@ const publishJob = async (req, res) => {
     }
 };
 
-// Close job
+
 const closeJob = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `UPDATE job_postings 
-             SET status = 'closed', 
+            `UPDATE job_postings
+             SET status = 'closed',
                  closed_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $1
@@ -301,7 +301,7 @@ const closeJob = async (req, res) => {
     }
 };
 
-// Delete job posting
+
 const deleteJobPosting = async (req, res) => {
     try {
         const { id } = req.params;
@@ -315,14 +315,14 @@ const deleteJobPosting = async (req, res) => {
     }
 };
 
-// Get job applications
+
 const getJobApplications = async (req, res) => {
     try {
         const { jobId } = req.params;
         const { status } = req.query;
 
         let queryText = `
-            SELECT 
+            SELECT
                 a.*,
                 j.title as job_title,
                 d.name as department_name
@@ -350,13 +350,13 @@ const getJobApplications = async (req, res) => {
     }
 };
 
-// Get application details
+
 const getApplicationDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 a.*,
                 j.title as job_title,
                 j.description as job_description,
@@ -381,15 +381,15 @@ const getApplicationDetails = async (req, res) => {
     }
 };
 
-// Update application status
+
 const updateApplicationStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, notes } = req.body;
 
         const result = await query(
-            `UPDATE job_applications 
-             SET status = $1, 
+            `UPDATE job_applications
+             SET status = $1,
                  notes = $2,
                  reviewed_by = $3,
                  reviewed_at = CURRENT_TIMESTAMP,
@@ -410,14 +410,14 @@ const updateApplicationStatus = async (req, res) => {
     }
 };
 
-// Add application notes
+
 const addApplicationNotes = async (req, res) => {
     try {
         const { id } = req.params;
         const { notes } = req.body;
 
         const result = await query(
-            `UPDATE job_applications 
+            `UPDATE job_applications
              SET notes = CONCAT(notes, '\n', $1),
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
@@ -436,7 +436,7 @@ const addApplicationNotes = async (req, res) => {
     }
 };
 
-// Schedule interview
+
 const scheduleInterview = async (req, res) => {
     try {
         const { id } = req.params;
@@ -454,9 +454,9 @@ const scheduleInterview = async (req, res) => {
             [id, interviewer_id, interview_type, scheduled_at, duration_minutes, location, meeting_link]
         );
 
-        // Update application status
+
         await query(
-            `UPDATE job_applications 
+            `UPDATE job_applications
              SET status = 'interviewed', updated_at = CURRENT_TIMESTAMP
              WHERE id = $1`,
             [id]
@@ -469,11 +469,11 @@ const scheduleInterview = async (req, res) => {
     }
 };
 
-// Get upcoming interviews
+
 const getUpcomingInterviews = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 i.*,
                 a.first_name, a.last_name, a.email,
                 j.title as job_title,
@@ -493,7 +493,7 @@ const getUpcomingInterviews = async (req, res) => {
     }
 };
 
-// Update interview
+
 const updateInterview = async (req, res) => {
     try {
         const { id } = req.params;
@@ -515,7 +515,7 @@ const updateInterview = async (req, res) => {
         values.push(id);
 
         const query_text = `
-            UPDATE interviews 
+            UPDATE interviews
             SET ${setClause.join(', ')}
             WHERE id = $${paramIndex}
             RETURNING *
@@ -534,16 +534,16 @@ const updateInterview = async (req, res) => {
     }
 };
 
-// Submit interview feedback
+
 const submitInterviewFeedback = async (req, res) => {
     try {
         const { id } = req.params;
         const { feedback, rating, recommended_for_next } = req.body;
 
         const result = await query(
-            `UPDATE interviews 
-             SET feedback = $1, 
-                 rating = $2, 
+            `UPDATE interviews
+             SET feedback = $1,
+                 rating = $2,
                  recommended_for_next = $3,
                  status = 'completed',
                  updated_at = CURRENT_TIMESTAMP
@@ -556,10 +556,10 @@ const submitInterviewFeedback = async (req, res) => {
             return res.status(404).json({ error: 'Interview not found' });
         }
 
-        // If recommended, update application status
+
         if (recommended_for_next) {
             await query(
-                `UPDATE job_applications 
+                `UPDATE job_applications
                  SET status = 'shortlisted', updated_at = CURRENT_TIMESTAMP
                  WHERE id = (SELECT application_id FROM interviews WHERE id = $1)`,
                 [id]
@@ -573,7 +573,7 @@ const submitInterviewFeedback = async (req, res) => {
     }
 };
 
-// Create employee relation
+
 const createEmployeeRelation = async (req, res) => {
     try {
         const {
@@ -596,13 +596,13 @@ const createEmployeeRelation = async (req, res) => {
     }
 };
 
-// Get employee relations
+
 const getEmployeeRelations = async (req, res) => {
     try {
         const { status, priority } = req.query;
 
         let queryText = `
-            SELECT 
+            SELECT
                 er.*,
                 u.display_name as employee_name,
                 u.email as employee_email,
@@ -638,13 +638,13 @@ const getEmployeeRelations = async (req, res) => {
     }
 };
 
-// Get relation details
+
 const getRelationDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 er.*,
                 u.display_name as employee_name,
                 u.email as employee_email,
@@ -668,15 +668,15 @@ const getRelationDetails = async (req, res) => {
     }
 };
 
-// Update employee relation
+
 const updateEmployeeRelation = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, resolution } = req.body;
 
         const result = await query(
-            `UPDATE employee_relations 
-             SET status = $1, 
+            `UPDATE employee_relations
+             SET status = $1,
                  resolution = $2,
                  resolved_at = CASE WHEN $1 = 'resolved' THEN CURRENT_TIMESTAMP ELSE resolved_at END,
                  updated_at = CURRENT_TIMESTAMP
@@ -696,7 +696,7 @@ const updateEmployeeRelation = async (req, res) => {
     }
 };
 
-// Upload employee document
+
 const uploadEmployeeDocument = async (req, res) => {
     try {
         const {
@@ -720,14 +720,14 @@ const uploadEmployeeDocument = async (req, res) => {
     }
 };
 
-// Get employee documents
+
 const getEmployeeDocuments = async (req, res) => {
     try {
         const { employeeId } = req.params;
 
         const result = await query(
-            `SELECT * FROM employee_documents 
-             WHERE employee_id = $1 
+            `SELECT * FROM employee_documents
+             WHERE employee_id = $1
              ORDER BY created_at DESC`,
             [employeeId]
         );
@@ -739,7 +739,7 @@ const getEmployeeDocuments = async (req, res) => {
     }
 };
 
-// Delete employee document
+
 const deleteEmployeeDocument = async (req, res) => {
     try {
         const { id } = req.params;
@@ -753,7 +753,7 @@ const deleteEmployeeDocument = async (req, res) => {
     }
 };
 
-// Create performance review
+
 const createPerformanceReview = async (req, res) => {
     try {
         const {
@@ -775,13 +775,13 @@ const createPerformanceReview = async (req, res) => {
     }
 };
 
-// Get performance reviews
+
 const getPerformanceReviews = async (req, res) => {
     try {
         const { employee_id } = req.query;
 
         let queryText = `
-            SELECT 
+            SELECT
                 pr.*,
                 u.display_name as employee_name,
                 r.display_name as reviewer_name
@@ -810,13 +810,13 @@ const getPerformanceReviews = async (req, res) => {
     }
 };
 
-// Get performance review details
+
 const getPerformanceReviewDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT 
+            `SELECT
                 pr.*,
                 u.display_name as employee_name,
                 u.email as employee_email,
@@ -839,7 +839,7 @@ const getPerformanceReviewDetails = async (req, res) => {
     }
 };
 
-// Update performance review
+
 const updatePerformanceReview = async (req, res) => {
     try {
         const { id } = req.params;
@@ -848,7 +848,7 @@ const updatePerformanceReview = async (req, res) => {
         } = req.body;
 
         const result = await query(
-            `UPDATE performance_reviews 
+            `UPDATE performance_reviews
              SET strengths = $1,
                  areas_for_improvement = $2,
                  overall_rating = $3,
@@ -871,13 +871,13 @@ const updatePerformanceReview = async (req, res) => {
     }
 };
 
-// Submit performance review
+
 const submitPerformanceReview = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `UPDATE performance_reviews 
+            `UPDATE performance_reviews
              SET status = 'submitted',
                  review_date = CURRENT_DATE,
                  updated_at = CURRENT_TIMESTAMP
@@ -897,13 +897,13 @@ const submitPerformanceReview = async (req, res) => {
     }
 };
 
-// Acknowledge performance review
+
 const acknowledgePerformanceReview = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await query(
-            `UPDATE performance_reviews 
+            `UPDATE performance_reviews
              SET employee_acknowledged = true,
                  employee_acknowledged_at = CURRENT_TIMESTAMP,
                  status = 'acknowledged',
@@ -924,11 +924,11 @@ const acknowledgePerformanceReview = async (req, res) => {
     }
 };
 
-// Get departments
+
 const getDepartments = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 d.*,
                 u.display_name as manager_name,
                 COUNT(e.id) as employee_count
@@ -946,7 +946,7 @@ const getDepartments = async (req, res) => {
     }
 };
 
-// Create department
+
 const createDepartment = async (req, res) => {
     try {
         const { name, description, manager_id, parent_department_id } = req.body;
@@ -965,14 +965,14 @@ const createDepartment = async (req, res) => {
     }
 };
 
-// Update department
+
 const updateDepartment = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, description, manager_id } = req.body;
 
         const result = await query(
-            `UPDATE departments 
+            `UPDATE departments
              SET name = COALESCE($1, name),
                  description = COALESCE($2, description),
                  manager_id = COALESCE($3, manager_id),
@@ -993,11 +993,11 @@ const updateDepartment = async (req, res) => {
     }
 };
 
-// Get hiring analytics
+
 const getHiringAnalytics = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 DATE_TRUNC('month', created_at) as month,
                 COUNT(*) as applications,
                 COUNT(CASE WHEN status = 'hired' THEN 1 END) as hires,
@@ -1015,11 +1015,11 @@ const getHiringAnalytics = async (req, res) => {
     }
 };
 
-// Get employee analytics
+
 const getEmployeeAnalytics = async (req, res) => {
     try {
         const result = await query(
-            `SELECT 
+            `SELECT
                 d.name as department,
                 COUNT(u.id) as total_employees,
                 COUNT(CASE WHEN u.is_active = true THEN 1 END) as active_employees,

@@ -1,4 +1,4 @@
-// src/components/common/ThemeToggle.jsx
+
 import React from 'react';
 import { useTheme } from '../../hooks/useTheme';
 

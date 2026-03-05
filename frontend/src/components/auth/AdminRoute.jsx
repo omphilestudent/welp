@@ -1,4 +1,4 @@
-// frontend/src/components/auth/AdminRoute.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -25,7 +25,7 @@ const AdminRoute = ({ children }) => {
         }
 
         try {
-            // If the profile endpoint returns successfully, user is admin
+
             await api.get('/admin/profile');
             console.log('Admin profile found - user is admin');
             setIsAdmin(true);

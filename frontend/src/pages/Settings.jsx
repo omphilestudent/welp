@@ -1,4 +1,4 @@
-// frontend/src/pages/Settings.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -117,7 +117,7 @@ const Settings = () => {
         try {
             await api.patch('/users/settings', settings);
 
-            // Update theme if changed
+
             if (settings.theme === 'dark' !== isDarkMode) {
                 toggleTheme();
             }
@@ -207,7 +207,7 @@ const Settings = () => {
                 </motion.h1>
 
                 <div className="settings-layout">
-                    {/* Sidebar */}
+                    {}
                     <motion.div
                         className="settings-sidebar"
                         initial={{ opacity: 0, x: -20 }}
@@ -249,13 +249,13 @@ const Settings = () => {
                         </div>
                     </motion.div>
 
-                    {/* Main Content */}
+                    {}
                     <motion.div
                         className="settings-content"
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                     >
-                        {/* Profile Settings */}
+                        {}
                         {activeTab === 'profile' && (
                             <div className="settings-section">
                                 <h2>Profile Settings</h2>
@@ -342,7 +342,7 @@ const Settings = () => {
                             </div>
                         )}
 
-                        {/* Account Settings */}
+                        {}
                         {activeTab === 'account' && (
                             <div className="settings-section">
                                 <h2>Account Settings</h2>
@@ -440,7 +440,7 @@ const Settings = () => {
                             </div>
                         )}
 
-                        {/* Notification Settings */}
+                        {}
                         {activeTab === 'notifications' && (
                             <div className="settings-section">
                                 <h2>Notification Settings</h2>
@@ -489,7 +489,7 @@ const Settings = () => {
                             </div>
                         )}
 
-                        {/* Appearance Settings */}
+                        {}
                         {activeTab === 'appearance' && (
                             <div className="settings-section">
                                 <h2>Appearance Settings</h2>
@@ -538,7 +538,7 @@ const Settings = () => {
                             </div>
                         )}
 
-                        {/* Become Psychologist */}
+                        {}
                         {activeTab === 'become-psychologist' && (
                             <div className="settings-section">
                                 <h2>Become a Psychologist</h2>

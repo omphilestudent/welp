@@ -1,4 +1,4 @@
-// frontend/src/pages/Internships.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -42,7 +42,7 @@ const Internships = () => {
     const fetchInternships = async () => {
         setLoading(true);
         try {
-            // Mock data
+
             const mockInternships = [
                 {
                     id: 1,
@@ -172,7 +172,7 @@ const Internships = () => {
 
     return (
         <div className="internships-page">
-            {/* Hero Section */}
+            {}
             <section className="internships-hero">
                 <div className="container">
                     <motion.div
@@ -193,7 +193,7 @@ const Internships = () => {
                 </div>
             </section>
 
-            {/* Program Highlights */}
+            {}
             <section className="highlights-section">
                 <div className="container">
                     <div className="highlights-grid">
@@ -248,13 +248,13 @@ const Internships = () => {
                 </div>
             </section>
 
-            {/* Internship Listings */}
+            {}
             <section className="listings-section">
                 <div className="container">
                     <div className="listings-header">
                         <h2>Open Internships</h2>
 
-                        {/* Search and Filter */}
+                        {}
                         <div className="search-filter">
                             <div className="search-box">
                                 <FaSearch className="search-icon" />
@@ -336,7 +336,7 @@ const Internships = () => {
                 </div>
             </section>
 
-            {/* FAQ Section */}
+            {}
             <section className="faq-section">
                 <div className="container">
                     <h2>Frequently Asked Questions</h2>
@@ -380,7 +380,7 @@ const Internships = () => {
                     overflow-x: hidden;
                 }
 
-                /* Hero Section */
+                
                 .internships-hero {
                     background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
                     color: white;
@@ -411,7 +411,7 @@ const Internships = () => {
                     opacity: 0.95;
                 }
 
-                /* Highlights */
+                
                 .highlights-section {
                     padding: 4rem 0;
                 }
@@ -442,7 +442,7 @@ const Internships = () => {
                     color: #718096;
                 }
 
-                /* Listings */
+                
                 .listings-section {
                     padding: 4rem 0;
                     background: #f7fafc;
@@ -611,7 +611,7 @@ const Internships = () => {
                     color: #718096;
                 }
 
-                /* FAQ */
+                
                 .faq-section {
                     padding: 4rem 0;
                 }

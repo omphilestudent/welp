@@ -1,4 +1,4 @@
-// src/pages/admin/UserManagement.jsx
+
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -32,7 +32,7 @@ const UserManagement = () => {
         totalPages: 0
     });
 
-    // Use the API hooks
+
     const {
         execute: fetchUsersApi,
         loading: usersLoading
@@ -63,7 +63,7 @@ const UserManagement = () => {
         execute: resetPasswordApi
     } = useApi('/rbac/users/reset-password', 'post');
 
-    // Fetch users with pagination and filters
+
     const fetchUsers = async () => {
         try {
             const params = {
@@ -89,7 +89,7 @@ const UserManagement = () => {
         }
     };
 
-    // Fetch available roles
+
     const fetchRoles = async () => {
         const result = await fetchRolesApi();
         if (result.success) {
@@ -97,15 +97,15 @@ const UserManagement = () => {
         }
     };
 
-    // Handle 401 Unauthorized - redirect to login
+
     useEffect(() => {
         const checkAuth = async () => {
             try {
                 await fetchRoles();
                 await fetchUsers();
             } catch (error) {
-                // If there's an auth error, the interceptor should handle redirect
-                // But we can also check here
+
+
                 if (error.response?.status === 401) {
                     navigate('/login');
                 }
@@ -113,31 +113,31 @@ const UserManagement = () => {
         };
 
         checkAuth();
-    }, [pagination.page, filters]); // Re-fetch when pagination or filters change
+    }, [pagination.page, filters]);
 
     const handleSaveUser = async (userData) => {
         let result;
 
         if (selectedUser) {
-            // Update existing user
+
             result = await updateUserApi(
                 userData,
                 null,
-                true // show toast
+                true
             );
         } else {
-            // Create new user
+
             result = await createUserApi(
                 userData,
                 null,
-                true // show toast
+                true
             );
         }
 
         if (result.success) {
             setShowModal(false);
             setSelectedUser(null);
-            fetchUsers(); // Refresh the list
+            fetchUsers();
         }
     };
 
@@ -145,33 +145,33 @@ const UserManagement = () => {
         let result;
 
         if (selectedUsers.length > 0) {
-            // Bulk delete
+
             result = await bulkDeleteUsersApi(
                 { userIds: selectedUsers },
                 null,
-                true // show toast
+                true
             );
 
             if (result.success) {
                 setSelectedUsers([]);
             }
         } else if (selectedUser) {
-            // Single delete
+
             result = await deleteUserApi(
                 null,
                 null,
-                true // show toast
+                true
             );
 
-            // Note: You'll need to modify the deleteUserApi to include the ID
-            // Currently it's not handling dynamic URLs with IDs
-            // Better to create a separate hook for delete with ID
+
+
+
         }
 
         if (result.success) {
             setShowDeleteConfirm(false);
             setSelectedUser(null);
-            fetchUsers(); // Refresh the list
+            fetchUsers();
         }
     };
 
@@ -186,7 +186,7 @@ const UserManagement = () => {
         const result = await resetPasswordApi(
             { userId, newPassword },
             null,
-            true // show toast
+            true
         );
     };
 

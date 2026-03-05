@@ -1,4 +1,4 @@
-// backend/src/controllers/authController.js
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
@@ -25,7 +25,7 @@ const register = async (req, res) => {
     try {
         const { email, password, role, isAnonymous, displayName } = req.body;
 
-        // Handle anonymous users
+
         if (isAnonymous) {
             const result = await query(
                 `INSERT INTO users (role, is_anonymous, display_name)
@@ -49,12 +49,12 @@ const register = async (req, res) => {
             });
         }
 
-        // Handle regular users
+
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password required' });
         }
 
-        // Check if user exists
+
         const existingUser = await query(
             'SELECT id FROM users WHERE email = $1',
             [email]

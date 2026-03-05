@@ -1,8 +1,8 @@
-// backend/src/controllers/userController.js
+
 const { query } = require('../utils/database');
 const bcrypt = require('bcryptjs');
 
-// Get user profile
+
 const getProfile = async (req, res) => {
     try {
         const result = await query(
@@ -44,7 +44,7 @@ const getProfile = async (req, res) => {
     }
 };
 
-// Update user profile
+
 const updateProfile = async (req, res) => {
     try {
         const {
@@ -59,7 +59,7 @@ const updateProfile = async (req, res) => {
         } = req.body;
 
         const result = await query(
-            `UPDATE users 
+            `UPDATE users
             SET display_name = COALESCE($1, display_name),
                 avatar_url = COALESCE($2, avatar_url),
                 phone_number = COALESCE($3, phone_number),
@@ -81,12 +81,12 @@ const updateProfile = async (req, res) => {
     }
 };
 
-// Change password
+
 const changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
 
-        // Get user with password
+
         const user = await query(
             'SELECT password_hash FROM users WHERE id = $1',
             [req.user.id]
@@ -100,16 +100,16 @@ const changePassword = async (req, res) => {
             return res.status(400).json({ error: 'Password change is not available for this account type' });
         }
 
-        // Verify current password
+
         const validPassword = await bcrypt.compare(currentPassword, user.rows[0].password_hash);
         if (!validPassword) {
             return res.status(401).json({ error: 'Current password is incorrect' });
         }
 
-        // Hash new password
+
         const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-        // Update password + revoke existing sessions by incrementing token version
+
         await query(
             'UPDATE users SET password_hash = $1, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [hashedPassword, req.user.id]
@@ -128,10 +128,10 @@ const changePassword = async (req, res) => {
     }
 };
 
-// Get user settings
+
 const getSettings = async (req, res) => {
     try {
-        // Create settings table if not exists
+
         await query(`
             CREATE TABLE IF NOT EXISTS user_settings (
                 user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -150,7 +150,7 @@ const getSettings = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            // Return default settings
+
             return res.json({
                 theme: 'light',
                 email_notifications: true,
@@ -166,7 +166,7 @@ const getSettings = async (req, res) => {
     }
 };
 
-// Update settings
+
 const updateSettings = async (req, res) => {
     try {
         const {
@@ -179,8 +179,8 @@ const updateSettings = async (req, res) => {
         await query(
             `INSERT INTO user_settings (user_id, theme, email_notifications, message_notifications, review_notifications)
             VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (user_id) 
-            DO UPDATE SET 
+            ON CONFLICT (user_id)
+            DO UPDATE SET
                 theme = $2,
                 email_notifications = $3,
                 message_notifications = $4,
@@ -196,7 +196,7 @@ const updateSettings = async (req, res) => {
     }
 };
 
-// Add psychologist profile to existing user
+
 const addPsychologistProfile = async (req, res) => {
     try {
         const {
@@ -213,7 +213,7 @@ const addPsychologistProfile = async (req, res) => {
             availability
         } = req.body;
 
-        // Check if user already has psychologist profile
+
         const existing = await query(
             'SELECT id FROM users WHERE id = $1 AND role = $2',
             [req.user.id, 'psychologist']
@@ -223,7 +223,7 @@ const addPsychologistProfile = async (req, res) => {
             return res.status(400).json({ error: 'You already have a psychologist profile' });
         }
 
-        // Create psychologist_profiles table if not exists
+
         await query(`
             CREATE TABLE IF NOT EXISTS psychologist_profiles (
                 user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -244,13 +244,13 @@ const addPsychologistProfile = async (req, res) => {
             )
         `);
 
-        // Update user role to include psychologist
+
         await query(
             'UPDATE users SET role = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             ['psychologist', req.user.id]
         );
 
-        // Create psychologist profile
+
         await query(
             `INSERT INTO psychologist_profiles (
                 user_id, license_number, license_issuing_body, years_of_experience,
@@ -273,12 +273,12 @@ const addPsychologistProfile = async (req, res) => {
     }
 };
 
-// Delete account
+
 const deleteAccount = async (req, res) => {
     try {
         const { password } = req.body;
 
-        // Get user with password
+
         const user = await query(
             'SELECT password_hash FROM users WHERE id = $1',
             [req.user.id]
@@ -292,13 +292,13 @@ const deleteAccount = async (req, res) => {
             return res.status(400).json({ error: 'Account deletion requires a password-based account' });
         }
 
-        // Verify password
+
         const validPassword = await bcrypt.compare(password, user.rows[0].password_hash);
         if (!validPassword) {
             return res.status(401).json({ error: 'Password is incorrect' });
         }
 
-        // Delete user (cascade will handle related records)
+
         await query('DELETE FROM users WHERE id = $1', [req.user.id]);
 
         res.json({ message: 'Account deleted successfully' });

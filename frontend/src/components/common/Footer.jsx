@@ -1,4 +1,4 @@
-// frontend/src/components/common/Footer.jsx
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaBriefcase, FaUsers, FaFileAlt, FaUserGraduate } from 'react-icons/fa';
@@ -55,7 +55,7 @@ const Footer = () => {
                         </ul>
                     </div>
 
-                    {/* Career Section */}
+                    {}
                     <div className="footer-section">
                         <h4>Careers</h4>
                         <ul className="footer-links">
@@ -99,7 +99,7 @@ const Footer = () => {
                     align-items: center;
                     gap: 0.5rem;
                 }
-                
+
                 .career-link svg {
                     font-size: 0.9rem;
                 }

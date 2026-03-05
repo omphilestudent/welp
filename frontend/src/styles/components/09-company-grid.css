@@ -1,4 +1,4 @@
-/* ===== Company Grid (legacy usage on several pages) ===== */
+
 .companies-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -6,7 +6,7 @@
   margin-top: 2rem;
 }
 
-/* ===== CompanyList component ===== */
+
 .company-list {
   width: 100%;
   max-width: 1200px;

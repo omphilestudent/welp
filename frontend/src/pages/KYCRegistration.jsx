@@ -1,4 +1,4 @@
-// frontend/src/pages/KYCRegistration.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -74,7 +74,7 @@ const KYCRegistration = () => {
 
             <div className="container">
                 <div className="kyc-content">
-                    {/* Progress Steps */}
+                    {}
                     <div className="kyc-steps">
                         <div className={`step ${step >= 1 ? 'active' : ''}`}>
                             <div className="step-number">1</div>
@@ -217,7 +217,7 @@ const KYCRegistration = () => {
                         )}
                     </div>
 
-                    {/* Sidebar */}
+                    {}
                     <div className="kyc-sidebar">
                         <div className="info-card">
                             <h3><FaShieldAlt /> Why KYC?</h3>

@@ -1,4 +1,4 @@
-// backend/src/server.js
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -60,7 +60,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: corsOptions });
 
-// Middleware
+
 app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
@@ -70,7 +70,7 @@ app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/', apiLimiter);
 
-// Routes
+
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/reviews', reviewRoutes);
@@ -86,12 +86,12 @@ if (authV2Routes && rbacUserRoutes && roleRoutes) {
     app.use('/api/rbac/roles', roleRoutes);
 }
 
-// Health check
+
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date() });
 });
 
-// Socket.io for real-time messaging
+
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) {

@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.jsx
+
 import React, { createContext, useState, useEffect } from 'react';
 import api from '../services/api';
 
@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // New method to update user state
+
     const updateUser = (updatedUserData) => {
         setUser(prev => ({
             ...prev,
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         checkAuth,
-        updateUser // Added
+        updateUser
     };
 
     return (

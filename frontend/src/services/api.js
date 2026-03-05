@@ -1,4 +1,4 @@
-// src/services/api.js
+
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -13,7 +13,7 @@ const api = axios.create({
     },
 });
 
-// Request interceptor
+
 api.interceptors.request.use(
     (config) => {
         return config;
@@ -23,7 +23,7 @@ api.interceptors.request.use(
     }
 );
 
-// Response interceptor
+
 api.interceptors.response.use(
     (response) => response,
     (error) => {
@@ -31,7 +31,7 @@ api.interceptors.response.use(
             const requestUrl = error.config?.url || '';
             const isAuthFlowRoute = AUTH_REDIRECT_EXCLUDED_ROUTES.some((route) => requestUrl.includes(route));
 
-            // Redirect only for protected API calls, not auth flow requests
+
             if (!isAuthFlowRoute) {
                 window.location.href = '/login';
             }

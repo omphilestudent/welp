@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/SystemSettings.jsx
+
 import React from 'react';
 
 const SystemSettings = () => {

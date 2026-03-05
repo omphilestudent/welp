@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/CompanyManagement.jsx
+
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import Loading from '../../components/common/Loading';
@@ -155,7 +155,7 @@ const CompanyManagement = () => {
     };
 
     const handleExport = () => {
-        // Export functionality
+
         const data = companies.map(c => ({
             Name: c.name,
             Industry: c.industry,
@@ -188,7 +188,7 @@ const CompanyManagement = () => {
         a.click();
     };
 
-    // Filter and sort companies
+
     const filteredCompanies = companies
         .filter(company => {
             const matchesSearch = company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -221,7 +221,7 @@ const CompanyManagement = () => {
             }
         });
 
-    // Pagination
+
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = filteredCompanies.slice(indexOfFirstItem, indexOfLastItem);
@@ -231,7 +231,7 @@ const CompanyManagement = () => {
 
     return (
         <div className="company-management">
-            {/* Header */}
+            {}
             <div className="page-header">
                 <div className="header-left">
                     <h1>
@@ -252,7 +252,7 @@ const CompanyManagement = () => {
                 </div>
             </div>
 
-            {/* Stats Cards */}
+            {}
             <div className="stats-grid">
                 <div className="stat-card">
                     <div className="stat-icon" style={{ backgroundColor: '#4299e120', color: '#4299e1' }}>
@@ -299,7 +299,7 @@ const CompanyManagement = () => {
                 </div>
             </div>
 
-            {/* Filters */}
+            {}
             <div className="filters-section">
                 <div className="search-box">
                     <FaSearch className="search-icon" />
@@ -340,7 +340,7 @@ const CompanyManagement = () => {
                 </div>
             </div>
 
-            {/* Companies Table */}
+            {}
             <div className="table-container">
                 <table className="data-table">
                     <thead>
@@ -471,7 +471,7 @@ const CompanyManagement = () => {
                 )}
             </div>
 
-            {/* Pagination */}
+            {}
             {filteredCompanies.length > 0 && (
                 <div className="pagination">
                     <button
@@ -507,7 +507,7 @@ const CompanyManagement = () => {
                 </div>
             )}
 
-            {/* Company Details Modal */}
+            {}
             {showDetails && selectedCompany && (
                 <div className="modal-overlay" onClick={() => setShowDetails(false)}>
                     <div className="modal-content large" onClick={e => e.stopPropagation()}>
@@ -1023,7 +1023,7 @@ const CompanyManagement = () => {
                     margin-left: 1rem;
                 }
 
-                /* Modal Styles */
+                
                 .modal-overlay {
                     position: fixed;
                     top: 0;

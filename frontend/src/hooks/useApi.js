@@ -1,4 +1,4 @@
-// src/hooks/useApi.js (enhanced version)
+
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,7 @@ export const useApi = (baseUrl, method = 'get') => {
         setError(null);
 
         try {
-            // Build the URL with ID if provided
+
             let url = baseUrl;
             if (id) {
                 url = `${baseUrl}/${id}`;
@@ -36,7 +36,7 @@ export const useApi = (baseUrl, method = 'get') => {
 
             return { success: true, data: response.data };
         } catch (err) {
-            // Handle 401 Unauthorized
+
             if (err.response?.status === 401) {
                 toast.error('Session expired. Please login again.');
                 navigate('/login');

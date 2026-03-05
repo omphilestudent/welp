@@ -1,4 +1,4 @@
-// frontend/src/pages/hr/Interviews.jsx
+
 import React from 'react';
 
 const Interviews = () => {

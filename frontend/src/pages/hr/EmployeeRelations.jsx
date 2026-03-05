@@ -1,4 +1,4 @@
-// frontend/src/pages/hr/EmployeeRelations.jsx
+
 import React from 'react';
 
 const EmployeeRelations = () => {
