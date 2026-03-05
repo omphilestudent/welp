@@ -53,7 +53,7 @@ const AdminRoute = ({ children }) => {
 
     if (!isAdmin) {
         console.log('User is not admin, redirecting to home');
-        return <Navigate to="/" />;
+        return <Navigate to="UserManagement" />;
     }
 
     console.log('Admin access granted');
