@@ -23,14 +23,14 @@ const Navbar = () => {
         if (!user) return;
 
         try {
-            await api.get('/admin/profile');
+            await api.get('/admin/profile', { skipAuthRedirect: true });
             setIsAdmin(true);
         } catch (error) {
             setIsAdmin(false);
         }
 
         try {
-            await api.get('/hr/profile');
+            await api.get('/hr/profile', { skipAuthRedirect: true });
             setIsHR(true);
         } catch (error) {
             setIsHR(false);
