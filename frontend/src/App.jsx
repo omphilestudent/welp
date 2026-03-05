@@ -128,7 +128,7 @@ function App() {
                                 <Route
                                     path="/admin"
                                     element={
-                                        <AdminRoute>
+                                        <AdminRoute requiredRole="admin">
                                             <AdminLayout />
                                         </AdminRoute>
                                     }
@@ -147,7 +147,7 @@ function App() {
                                 <Route
                                     path="/hr"
                                     element={
-                                        <AdminRoute>
+                                        <AdminRoute requiredRole="hr">
                                             <AdminLayout />
                                         </AdminRoute>
                                     }
