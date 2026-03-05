@@ -8,6 +8,11 @@ const ROLE_PROFILE_ENDPOINTS = {
     hr: '/hr/profile'
 };
 
+const CLIENT_ROLE_ACCESS = {
+    admin: ['admin', 'super_admin'],
+    hr: ['hr', 'hr_admin', 'admin', 'super_admin']
+};
+
 const AdminRoute = ({ children, requiredRole = 'admin' }) => {
     const { user, loading: authLoading } = useAuth();
     const [hasAccess, setHasAccess] = useState(null);
@@ -21,6 +26,15 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
 
             if (!user) {
                 setHasAccess(false);
+                setLoading(false);
+                return;
+            }
+
+            const normalizedUserRole = String(user.role || '').toLowerCase();
+            const allowedClientRoles = CLIENT_ROLE_ACCESS[requiredRole] || [];
+
+            if (allowedClientRoles.includes(normalizedUserRole)) {
+                setHasAccess(true);
                 setLoading(false);
                 return;
             }
