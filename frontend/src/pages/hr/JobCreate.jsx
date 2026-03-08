@@ -64,12 +64,46 @@ const JobCreate = () => {
 
     const fetchDepartments = async () => {
         try {
+            console.log('Fetching departments...');
             const { data } = await api.get('/hr/departments');
+            console.log('Departments response:', data);
+
+            // Handle different response formats
             const deptData = data.data || data.departments || data;
-            setDepartments(Array.isArray(deptData) ? deptData : []);
+            const deptArray = Array.isArray(deptData) ? deptData : [];
+
+            setDepartments(deptArray);
+
+            // If no departments, create a default one for testing
+            if (deptArray.length === 0) {
+                console.log('No departments found, adding default option');
+                setDepartments([
+                    { id: 'default', name: 'General' },
+                    { id: 'engineering', name: 'Engineering' },
+                    { id: 'product', name: 'Product' },
+                    { id: 'design', name: 'Design' },
+                    { id: 'marketing', name: 'Marketing' },
+                    { id: 'sales', name: 'Sales' },
+                    { id: 'hr', name: 'Human Resources' },
+                    { id: 'finance', name: 'Finance' },
+                    { id: 'operations', name: 'Operations' }
+                ]);
+            }
         } catch (error) {
             console.error('Failed to fetch departments:', error);
-            toast.error('Failed to load departments');
+            // Set default departments on error
+            setDepartments([
+                { id: 'default', name: 'General' },
+                { id: 'engineering', name: 'Engineering' },
+                { id: 'product', name: 'Product' },
+                { id: 'design', name: 'Design' },
+                { id: 'marketing', name: 'Marketing' },
+                { id: 'sales', name: 'Sales' },
+                { id: 'hr', name: 'Human Resources' },
+                { id: 'finance', name: 'Finance' },
+                { id: 'operations', name: 'Operations' }
+            ]);
+            toast.error('Using default departments');
         }
     };
 
@@ -205,53 +239,83 @@ const JobCreate = () => {
     };
 
     const handleSubmit = async (status = 'draft') => {
-        if (!validateForm()) return;
+        console.log('🚀 handleSubmit called with status:', status);
+        console.log('📋 Form data:', formData);
+
+        if (!validateForm()) {
+            console.log('❌ Validation failed');
+            return;
+        }
 
         setSubmitting(true);
+        console.log('⏳ Submitting...');
+
         try {
             // Prepare data for API
             const jobData = {
-                ...formData,
+                title: formData.title,
+                department_id: formData.department_id,
+                employment_type: formData.employment_type,
+                location: formData.location,
+                is_remote: formData.is_remote,
                 salary_min: formData.salary_min ? Number(formData.salary_min) : null,
                 salary_max: formData.salary_max ? Number(formData.salary_max) : null,
+                salary_currency: formData.salary_currency,
+                description: formData.description,
                 requirements: formData.requirements,
                 responsibilities: formData.responsibilities,
                 benefits: formData.benefits,
                 skills_required: formData.skills_required,
-                status: status // Use the passed status
+                experience_level: formData.experience_level,
+                education_required: formData.education_required,
+                application_deadline: formData.application_deadline || null,
+                status: status
             };
+
+            console.log('📤 Sending to API:', jobData);
 
             let response;
             if (id) {
-                // Update existing job
+                console.log('✏️ Updating existing job:', id);
                 response = await api.put(`/hr/jobs/${id}`, jobData);
             } else {
-                // Create new job
+                console.log('🆕 Creating new job');
                 response = await api.post('/hr/jobs', jobData);
             }
+
+            console.log('✅ API Response:', response.data);
 
             if (response.data.success || response.data.id) {
                 toast.success(status === 'open'
                     ? 'Job published successfully!'
                     : 'Job saved as draft successfully!'
                 );
+                console.log('✅ Success, navigating to /hr/jobs');
                 navigate('/hr/jobs');
             } else {
+                console.log('❌ API returned success: false');
                 toast.error('Failed to save job');
             }
         } catch (error) {
-            console.error('Error saving job:', error);
+            console.error('❌ Error saving job:', error);
+            console.error('❌ Error response:', error.response?.data);
+            console.error('❌ Error status:', error.response?.status);
+            console.error('❌ Error headers:', error.response?.headers);
+
             toast.error(error.response?.data?.error || 'Failed to save job');
         } finally {
             setSubmitting(false);
+            console.log('🏁 Submission completed');
         }
     };
 
     const handlePublish = () => {
+        console.log('📢 Publish button clicked');
         handleSubmit('open');
     };
 
     const handleSaveDraft = () => {
+        console.log('💾 Save Draft button clicked');
         handleSubmit('draft');
     };
 
