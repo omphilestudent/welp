@@ -1,5 +1,6 @@
+// src/pages/hr/JobCreate.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../services/api';
 import Loading from '../../components/common/Loading';
 import toast from 'react-hot-toast';
@@ -17,12 +18,16 @@ import {
     FaGraduationCap,
     FaGlobe,
     FaCheckCircle,
-    FaRegClock
+    FaRegClock,
+    FaArrowLeft,
+    FaCloudUploadAlt
 } from 'react-icons/fa';
 
 const JobCreate = () => {
     const navigate = useNavigate();
+    const { id } = useParams(); // For edit mode
     const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [departments, setDepartments] = useState([]);
     const [formData, setFormData] = useState({
         title: '',
@@ -49,9 +54,13 @@ const JobCreate = () => {
     const [newBenefit, setNewBenefit] = useState('');
     const [newSkill, setNewSkill] = useState('');
 
+    // Fetch departments on mount
     useEffect(() => {
         fetchDepartments();
-    }, []);
+        if (id) {
+            fetchJobDetails();
+        }
+    }, [id]);
 
     const fetchDepartments = async () => {
         try {
@@ -61,6 +70,40 @@ const JobCreate = () => {
         } catch (error) {
             console.error('Failed to fetch departments:', error);
             toast.error('Failed to load departments');
+        }
+    };
+
+    const fetchJobDetails = async () => {
+        setLoading(true);
+        try {
+            const { data } = await api.get(`/hr/jobs/${id}`);
+            const jobData = data.data || data;
+
+            setFormData({
+                title: jobData.title || '',
+                department_id: jobData.department_id || '',
+                employment_type: jobData.employment_type || 'full-time',
+                location: jobData.location || '',
+                is_remote: jobData.is_remote || false,
+                salary_min: jobData.salary_min || '',
+                salary_max: jobData.salary_max || '',
+                salary_currency: jobData.salary_currency || 'USD',
+                description: jobData.description || '',
+                requirements: Array.isArray(jobData.requirements) ? jobData.requirements : [],
+                responsibilities: Array.isArray(jobData.responsibilities) ? jobData.responsibilities : [],
+                benefits: Array.isArray(jobData.benefits) ? jobData.benefits : [],
+                skills_required: Array.isArray(jobData.skills_required) ? jobData.skills_required : [],
+                experience_level: jobData.experience_level || '',
+                education_required: jobData.education_required || '',
+                application_deadline: jobData.application_deadline ? jobData.application_deadline.split('T')[0] : '',
+                status: jobData.status || 'draft'
+            });
+        } catch (error) {
+            console.error('Failed to fetch job details:', error);
+            toast.error('Failed to load job details');
+            navigate('/hr/jobs');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -161,12 +204,10 @@ const JobCreate = () => {
         return true;
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
+    const handleSubmit = async (status = 'draft') => {
         if (!validateForm()) return;
 
-        setLoading(true);
+        setSubmitting(true);
         try {
             // Prepare data for API
             const jobData = {
@@ -176,58 +217,88 @@ const JobCreate = () => {
                 requirements: formData.requirements,
                 responsibilities: formData.responsibilities,
                 benefits: formData.benefits,
-                skills_required: formData.skills_required
+                skills_required: formData.skills_required,
+                status: status // Use the passed status
             };
 
-            const response = await api.post('/hr/jobs', jobData);
+            let response;
+            if (id) {
+                // Update existing job
+                response = await api.put(`/hr/jobs/${id}`, jobData);
+            } else {
+                // Create new job
+                response = await api.post('/hr/jobs', jobData);
+            }
 
             if (response.data.success || response.data.id) {
-                toast.success('Job created successfully');
+                toast.success(status === 'open'
+                    ? 'Job published successfully!'
+                    : 'Job saved as draft successfully!'
+                );
                 navigate('/hr/jobs');
             } else {
-                toast.error('Failed to create job');
+                toast.error('Failed to save job');
             }
         } catch (error) {
-            console.error('Error creating job:', error);
-            toast.error(error.response?.data?.error || 'Failed to create job');
+            console.error('Error saving job:', error);
+            toast.error(error.response?.data?.error || 'Failed to save job');
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
-    const handleSaveAsDraft = async () => {
-        setFormData(prev => ({ ...prev, status: 'draft' }));
-        await handleSubmit({ preventDefault: () => {} });
+    const handlePublish = () => {
+        handleSubmit('open');
     };
 
-    const handlePublish = async () => {
-        setFormData(prev => ({ ...prev, status: 'open' }));
-        await handleSubmit({ preventDefault: () => {} });
+    const handleSaveDraft = () => {
+        handleSubmit('draft');
     };
 
     if (loading) return <Loading />;
 
     return (
         <div className="job-create-page">
+            {/* Header */}
             <div className="page-header">
-                <h1>
-                    <FaBriefcase className="header-icon" />
-                    Create New Job Posting
-                </h1>
+                <div className="header-left">
+                    <button className="back-button" onClick={() => navigate('/hr/jobs')}>
+                        <FaArrowLeft /> Back to Jobs
+                    </button>
+                    <h1>
+                        <FaBriefcase className="header-icon" />
+                        {id ? 'Edit Job Posting' : 'Create New Job Posting'}
+                    </h1>
+                </div>
                 <div className="header-actions">
-                    <button className="btn btn-secondary" onClick={() => navigate('/hr/jobs')}>
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => navigate('/hr/jobs')}
+                        disabled={submitting}
+                    >
                         <FaTimes /> Cancel
                     </button>
-                    <button className="btn btn-primary" onClick={handlePublish}>
-                        <FaCheckCircle /> Publish Job
+                    <button
+                        className="btn btn-success"
+                        onClick={handlePublish}
+                        disabled={submitting}
+                    >
+                        {submitting ? <FaRegClock className="spinning" /> : <FaCloudUploadAlt />}
+                        {submitting ? 'Publishing...' : 'Publish Job'}
                     </button>
-                    <button className="btn btn-secondary" onClick={handleSaveAsDraft}>
-                        <FaSave /> Save as Draft
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleSaveDraft}
+                        disabled={submitting}
+                    >
+                        {submitting ? <FaRegClock className="spinning" /> : <FaSave />}
+                        {submitting ? 'Saving...' : 'Save as Draft'}
                     </button>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="job-form">
+            {/* Form */}
+            <form className="job-form" onSubmit={(e) => e.preventDefault()}>
                 <div className="form-grid">
                     {/* Basic Information */}
                     <div className="form-section">
@@ -241,7 +312,7 @@ const JobCreate = () => {
                                 value={formData.title}
                                 onChange={handleInputChange}
                                 placeholder="e.g., Senior Frontend Developer"
-                                required
+                                disabled={submitting}
                             />
                         </div>
 
@@ -252,7 +323,7 @@ const JobCreate = () => {
                                     name="department_id"
                                     value={formData.department_id}
                                     onChange={handleInputChange}
-                                    required
+                                    disabled={submitting}
                                 >
                                     <option value="">Select Department</option>
                                     {departments.map(dept => (
@@ -269,12 +340,12 @@ const JobCreate = () => {
                                     name="employment_type"
                                     value={formData.employment_type}
                                     onChange={handleInputChange}
+                                    disabled={submitting}
                                 >
                                     <option value="full-time">Full Time</option>
                                     <option value="part-time">Part Time</option>
                                     <option value="contract">Contract</option>
                                     <option value="internship">Internship</option>
-                                    <option value="remote">Remote</option>
                                 </select>
                             </div>
                         </div>
@@ -288,6 +359,7 @@ const JobCreate = () => {
                                     value={formData.location}
                                     onChange={handleInputChange}
                                     placeholder="e.g., New York, NY"
+                                    disabled={submitting}
                                 />
                             </div>
 
@@ -298,6 +370,7 @@ const JobCreate = () => {
                                         name="is_remote"
                                         checked={formData.is_remote}
                                         onChange={handleInputChange}
+                                        disabled={submitting}
                                     />
                                     <span>Remote Position</span>
                                 </label>
@@ -318,6 +391,7 @@ const JobCreate = () => {
                                     value={formData.salary_min}
                                     onChange={handleInputChange}
                                     placeholder="50000"
+                                    disabled={submitting}
                                 />
                             </div>
 
@@ -329,6 +403,7 @@ const JobCreate = () => {
                                     value={formData.salary_max}
                                     onChange={handleInputChange}
                                     placeholder="80000"
+                                    disabled={submitting}
                                 />
                             </div>
 
@@ -338,6 +413,7 @@ const JobCreate = () => {
                                     name="salary_currency"
                                     value={formData.salary_currency}
                                     onChange={handleInputChange}
+                                    disabled={submitting}
                                 >
                                     <option value="USD">USD</option>
                                     <option value="EUR">EUR</option>
@@ -349,7 +425,7 @@ const JobCreate = () => {
                         </div>
                     </div>
 
-                    {/* Requirements */}
+                    {/* Requirements & Qualifications */}
                     <div className="form-section">
                         <h2>Requirements & Qualifications</h2>
 
@@ -360,6 +436,7 @@ const JobCreate = () => {
                                     name="experience_level"
                                     value={formData.experience_level}
                                     onChange={handleInputChange}
+                                    disabled={submitting}
                                 >
                                     <option value="">Select Experience Level</option>
                                     <option value="entry">Entry Level (0-2 years)</option>
@@ -378,6 +455,7 @@ const JobCreate = () => {
                                     value={formData.education_required}
                                     onChange={handleInputChange}
                                     placeholder="e.g., Bachelor's in Computer Science"
+                                    disabled={submitting}
                                 />
                             </div>
                         </div>
@@ -391,8 +469,14 @@ const JobCreate = () => {
                                     onChange={(e) => setNewSkill(e.target.value)}
                                     placeholder="Add a skill (e.g., React, Python)"
                                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
+                                    disabled={submitting}
                                 />
-                                <button type="button" className="btn-icon" onClick={handleAddSkill}>
+                                <button
+                                    type="button"
+                                    className="btn-icon"
+                                    onClick={handleAddSkill}
+                                    disabled={submitting}
+                                >
                                     <FaPlus />
                                 </button>
                             </div>
@@ -400,7 +484,11 @@ const JobCreate = () => {
                                 {formData.skills_required.map((skill, index) => (
                                     <span key={index} className="tag">
                                         {skill}
-                                        <button type="button" onClick={() => handleRemoveSkill(index)}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveSkill(index)}
+                                            disabled={submitting}
+                                        >
                                             <FaTimes />
                                         </button>
                                     </span>
@@ -417,8 +505,14 @@ const JobCreate = () => {
                                     onChange={(e) => setNewRequirement(e.target.value)}
                                     placeholder="Add a requirement"
                                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddRequirement())}
+                                    disabled={submitting}
                                 />
-                                <button type="button" className="btn-icon" onClick={handleAddRequirement}>
+                                <button
+                                    type="button"
+                                    className="btn-icon"
+                                    onClick={handleAddRequirement}
+                                    disabled={submitting}
+                                >
                                     <FaPlus />
                                 </button>
                             </div>
@@ -426,7 +520,11 @@ const JobCreate = () => {
                                 {formData.requirements.map((req, index) => (
                                     <li key={index}>
                                         {req}
-                                        <button type="button" onClick={() => handleRemoveRequirement(index)}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveRequirement(index)}
+                                            disabled={submitting}
+                                        >
                                             <FaTrash />
                                         </button>
                                     </li>
@@ -447,8 +545,14 @@ const JobCreate = () => {
                                     onChange={(e) => setNewResponsibility(e.target.value)}
                                     placeholder="Add a responsibility"
                                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddResponsibility())}
+                                    disabled={submitting}
                                 />
-                                <button type="button" className="btn-icon" onClick={handleAddResponsibility}>
+                                <button
+                                    type="button"
+                                    className="btn-icon"
+                                    onClick={handleAddResponsibility}
+                                    disabled={submitting}
+                                >
                                     <FaPlus />
                                 </button>
                             </div>
@@ -456,7 +560,11 @@ const JobCreate = () => {
                                 {formData.responsibilities.map((resp, index) => (
                                     <li key={index}>
                                         {resp}
-                                        <button type="button" onClick={() => handleRemoveResponsibility(index)}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveResponsibility(index)}
+                                            disabled={submitting}
+                                        >
                                             <FaTrash />
                                         </button>
                                     </li>
@@ -477,8 +585,14 @@ const JobCreate = () => {
                                     onChange={(e) => setNewBenefit(e.target.value)}
                                     placeholder="Add a benefit"
                                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddBenefit())}
+                                    disabled={submitting}
                                 />
-                                <button type="button" className="btn-icon" onClick={handleAddBenefit}>
+                                <button
+                                    type="button"
+                                    className="btn-icon"
+                                    onClick={handleAddBenefit}
+                                    disabled={submitting}
+                                >
                                     <FaPlus />
                                 </button>
                             </div>
@@ -486,7 +600,11 @@ const JobCreate = () => {
                                 {formData.benefits.map((benefit, index) => (
                                     <li key={index}>
                                         {benefit}
-                                        <button type="button" onClick={() => handleRemoveBenefit(index)}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveBenefit(index)}
+                                            disabled={submitting}
+                                        >
                                             <FaTrash />
                                         </button>
                                     </li>
@@ -506,7 +624,7 @@ const JobCreate = () => {
                                 onChange={handleInputChange}
                                 rows="10"
                                 placeholder="Provide a detailed description of the role..."
-                                required
+                                disabled={submitting}
                             />
                         </div>
                     </div>
@@ -523,16 +641,10 @@ const JobCreate = () => {
                                 value={formData.application_deadline}
                                 onChange={handleInputChange}
                                 min={new Date().toISOString().split('T')[0]}
+                                disabled={submitting}
                             />
                         </div>
                     </div>
-                </div>
-
-                <div className="form-actions">
-                    <button type="button" className="btn btn-secondary" onClick={() => navigate('/hr/jobs')}>
-                        Cancel
-                    </button>
-                    <button type="submit" className="btn btn-primary" style={{ display: 'none' }}>Submit</button>
                 </div>
             </form>
 
@@ -550,6 +662,34 @@ const JobCreate = () => {
                     margin-bottom: 2rem;
                 }
 
+                .header-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
+                .back-button {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem 1rem;
+                    background: #f7fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    color: #4a5568;
+                    cursor: pointer;
+                    font-size: 0.9rem;
+                }
+
+                .back-button:hover {
+                    background: #edf2f7;
+                }
+
+                .back-button:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
                 .page-header h1 {
                     display: flex;
                     align-items: center;
@@ -564,6 +704,62 @@ const JobCreate = () => {
                 .header-actions {
                     display: flex;
                     gap: 1rem;
+                    align-items: center;
+                }
+
+                .btn {
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 8px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    border: none;
+                    font-size: 0.95rem;
+                    transition: all 0.3s;
+                }
+
+                .btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                .btn-primary {
+                    background: #4299e1;
+                    color: white;
+                }
+
+                .btn-primary:hover:not(:disabled) {
+                    background: #3182ce;
+                }
+
+                .btn-success {
+                    background: #48bb78;
+                    color: white;
+                }
+
+                .btn-success:hover:not(:disabled) {
+                    background: #38a169;
+                }
+
+                .btn-secondary {
+                    background: white;
+                    color: #4a5568;
+                    border: 1px solid #e2e8f0;
+                }
+
+                .btn-secondary:hover:not(:disabled) {
+                    background: #f7fafc;
+                }
+
+                .spinning {
+                    animation: spin 1s linear infinite;
+                }
+
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
                 }
 
                 .job-form {
@@ -615,6 +811,7 @@ const JobCreate = () => {
                     border: 1px solid #e2e8f0;
                     border-radius: 6px;
                     font-size: 0.95rem;
+                    transition: all 0.3s;
                 }
 
                 .form-group input:focus,
@@ -623,6 +820,13 @@ const JobCreate = () => {
                     outline: none;
                     border-color: #4299e1;
                     box-shadow: 0 0 0 3px rgba(66,153,225,0.1);
+                }
+
+                .form-group input:disabled,
+                .form-group select:disabled,
+                .form-group textarea:disabled {
+                    background: #f7fafc;
+                    cursor: not-allowed;
                 }
 
                 .form-row {
@@ -642,6 +846,7 @@ const JobCreate = () => {
                     align-items: center;
                     gap: 0.5rem;
                     cursor: pointer;
+                    margin-bottom: 0;
                 }
 
                 .checkbox-group input[type="checkbox"] {
@@ -655,6 +860,29 @@ const JobCreate = () => {
 
                 .tag-input-group input {
                     flex: 1;
+                }
+
+                .btn-icon {
+                    width: 42px;
+                    height: 42px;
+                    border-radius: 6px;
+                    border: none;
+                    background: #4299e1;
+                    color: white;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s;
+                }
+
+                .btn-icon:hover:not(:disabled) {
+                    background: #3182ce;
+                }
+
+                .btn-icon:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
                 }
 
                 .tags-list {
@@ -685,6 +913,10 @@ const JobCreate = () => {
                     align-items: center;
                 }
 
+                .tag button:hover {
+                    opacity: 0.8;
+                }
+
                 .list-items {
                     list-style: none;
                     padding: 0;
@@ -710,70 +942,11 @@ const JobCreate = () => {
                     padding: 0.25rem;
                 }
 
-                .form-actions {
-                    margin-top: 2rem;
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 1rem;
-                }
-
-                .btn {
-                    padding: 0.75rem 1.5rem;
-                    border-radius: 8px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    border: none;
-                    font-size: 0.95rem;
-                }
-
-                .btn-primary {
-                    background: #4299e1;
-                    color: white;
-                }
-
-                .btn-primary:hover {
-                    background: #3182ce;
-                }
-
-                .btn-secondary {
-                    background: white;
-                    color: #4a5568;
-                    border: 1px solid #e2e8f0;
-                }
-
-                .btn-secondary:hover {
-                    background: #f7fafc;
-                }
-
-                .btn-icon {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 6px;
-                    border: none;
-                    background: #4299e1;
-                    color: white;
-                    cursor: pointer;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-
-                .btn-icon:hover {
-                    background: #3182ce;
+                .list-items li button:hover {
+                    color: #e53e3e;
                 }
 
                 @media (max-width: 768px) {
-                    .form-grid {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .form-row {
-                        grid-template-columns: 1fr;
-                    }
-
                     .page-header {
                         flex-direction: column;
                         gap: 1rem;
@@ -783,6 +956,19 @@ const JobCreate = () => {
                     .header-actions {
                         width: 100%;
                         flex-direction: column;
+                    }
+
+                    .btn {
+                        width: 100%;
+                        justify-content: center;
+                    }
+
+                    .form-grid {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .form-row {
+                        grid-template-columns: 1fr;
                     }
                 }
             `}</style>
