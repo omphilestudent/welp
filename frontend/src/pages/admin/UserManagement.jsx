@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi';
-import { useAuth } from '../../hooks/useAuth'; // Add this import
+import { useAuth } from '../../hooks/useAuth';
 import Modal from '../../components/common/Modal';
 import UserForm from '../../components/admin/UserForm';
 import UserTable from '../../components/admin/UserTable';
@@ -12,7 +12,10 @@ import './UserManagement.css';
 
 const UserManagement = () => {
     const navigate = useNavigate();
-    const { user } = useAuth(); // Get user from auth context
+    const { user, isAuthenticated, loading: authLoading } = useAuth();
+    const [adminProfile, setAdminProfile] = useState(null);
+    const [checkingAdmin, setCheckingAdmin] = useState(true);
+    const [adminCheckComplete, setAdminCheckComplete] = useState(false);
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -23,7 +26,6 @@ const UserManagement = () => {
     const [filters, setFilters] = useState({
         search: '',
         roleId: '',
-        department: '',
         isActive: ''
     });
     const [pagination, setPagination] = useState({
@@ -33,129 +35,220 @@ const UserManagement = () => {
         totalPages: 0
     });
 
+    // API hooks
     const {
-        execute: fetchUsersApi,
-        loading: usersLoading,
-        error: usersError
-    } = useApi('/rbac/users', 'get');
+        execute: fetchAdminProfile,
+        loading: adminProfileLoading
+    } = useApi('/admin/profile', 'get');
 
     const {
-        execute: fetchRolesApi,
-        data: rolesData,
-        error: rolesError
-    } = useApi('/rbac/users/roles/available', 'get');
+        execute: fetchUsersApi,
+        loading: usersLoading
+    } = useApi('/admin/users', 'get');
+
+    const {
+        execute: fetchRolesApi
+    } = useApi('/admin/roles', 'get');
 
     const {
         execute: createUserApi
-    } = useApi('/rbac/users', 'post');
+    } = useApi('/admin/users', 'post');
 
     const {
         execute: updateUserApi
-    } = useApi('/rbac/users', 'put');
+    } = useApi('/admin/users', 'put');
 
     const {
         execute: deleteUserApi
-    } = useApi('/rbac/users', 'delete');
+    } = useApi('/admin/users', 'delete');
 
     const {
         execute: bulkDeleteUsersApi
-    } = useApi('/rbac/users/bulk-delete', 'post');
+    } = useApi('/admin/users/bulk-delete', 'post');
 
     const {
         execute: resetPasswordApi
-    } = useApi('/rbac/users/reset-password', 'post');
+    } = useApi('/admin/users/reset-password', 'post');
 
-    const fetchUsers = async () => {
-        try {
-            const params = {
-                page: pagination.page,
-                limit: pagination.limit,
-                ...filters
-            };
-
-            console.log('Fetching users with params:', params);
-            const result = await fetchUsersApi(null, { params }); // Fixed: pass params correctly
-
-            if (result?.success) {
-                setUsers(result.data?.users || []);
-                setPagination(prev => ({
-                    ...prev,
-                    total: result.data?.total || 0,
-                    totalPages: result.data?.totalPages || 0
-                }));
-            } else {
-                console.log('Fetch users result not successful:', result);
-            }
-        } catch (error) {
-            console.error('Error in fetchUsers:', error);
-            // Don't navigate on error, just show toast
-            toast.error('Failed to fetch users');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchRoles = async () => {
-        try {
-            console.log('Fetching roles...');
-            const result = await fetchRolesApi();
-            console.log('Fetch roles result:', result);
-
-            if (result?.success) {
-                setRoles(result.data || []);
-            } else {
-                console.log('Fetch roles not successful:', result);
-                // Set empty roles array if fetch fails
-                setRoles([]);
-            }
-        } catch (error) {
-            console.error('Error in fetchRoles:', error);
-            // Don't navigate on error
-            setRoles([]);
-        }
-    };
-
+    // Combined auth and admin check
     useEffect(() => {
+        let isMounted = true;
+
+        const initializePage = async () => {
+            // Wait for auth to load
+            if (authLoading) {
+                console.log('Auth loading...');
+                return;
+            }
+
+            // Check if authenticated
+            if (!isAuthenticated || !user) {
+                console.log('User not authenticated, redirecting to login');
+                navigate('/login', {
+                    replace: true,
+                    state: { from: '/admin/users', message: 'Please login to access user management' }
+                });
+                return;
+            }
+
+            // User is authenticated, now check admin profile
+            console.log('User authenticated, checking admin profile...');
+            setCheckingAdmin(true);
+
+            try {
+                const result = await fetchAdminProfile();
+
+                if (!isMounted) return;
+
+                if (result && result.data) {
+                    console.log('✅ Admin access granted - role:', result.data.role_name);
+                    setAdminProfile(result.data);
+                    // Success - we have admin access, now load data
+                } else {
+                    console.log('❌ No admin profile found');
+                    toast.error('You do not have admin access');
+                    navigate('/dashboard', { replace: true });
+                }
+            } catch (error) {
+                console.error('❌ Error checking admin profile:', error);
+
+                if (!isMounted) return;
+
+                // Check if it's a 403 (forbidden - not admin)
+                if (error.response?.status === 403) {
+                    toast.error('You do not have admin access');
+                    navigate('/dashboard', { replace: true });
+                } else if (error.response?.status === 401) {
+                    // Session expired
+                    navigate('/login', {
+                        replace: true,
+                        state: { from: '/admin/users', message: 'Session expired. Please login again.' }
+                    });
+                } else {
+                    // For other errors, show error but don't redirect
+                    toast.error('Error verifying admin access');
+                }
+            } finally {
+                if (isMounted) {
+                    setCheckingAdmin(false);
+                    setAdminCheckComplete(true);
+                }
+            }
+        };
+
+        initializePage();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [authLoading, isAuthenticated, user]);
+
+    // Load data when admin profile is confirmed
+    useEffect(() => {
+        if (!adminCheckComplete || !adminProfile) return;
+
         const loadData = async () => {
             setLoading(true);
             try {
-                // Fetch roles and users in parallel
                 await Promise.all([
-                    fetchRoles(),
-                    fetchUsers()
+                    fetchRolesData(),
+                    fetchUsersData()
                 ]);
             } catch (error) {
                 console.error('Error loading data:', error);
-                // Check if it's an auth error
-                if (error?.response?.status === 401) {
-                    console.log('Auth error detected, but letting AdminRoute handle it');
-                    // Don't navigate - let the AdminRoute component handle it
-                } else {
-                    toast.error('Failed to load data');
-                }
+                toast.error('Failed to load some data');
             } finally {
                 setLoading(false);
             }
         };
 
         loadData();
-    }, [pagination.page, filters.search, filters.roleId, filters.department, filters.isActive]); // Add all filter dependencies
+    }, [adminCheckComplete, adminProfile, pagination.page, filters.search, filters.roleId, filters.isActive]);
+
+    const fetchRolesData = async () => {
+        try {
+            const result = await fetchRolesApi();
+            if (result?.success && result.data) {
+                setRoles(result.data);
+            } else {
+                // Default roles as fallback
+                setRoles([
+                    { id: 'admin', name: 'Admin' },
+                    { id: 'super_admin', name: 'Super Admin' },
+                    { id: 'user', name: 'User' },
+                    { id: 'psychologist', name: 'Psychologist' },
+                    { id: 'business', name: 'Business' },
+                    { id: 'employee', name: 'Employee' }
+                ]);
+            }
+        } catch (error) {
+            console.error('Error fetching roles:', error);
+            setRoles([
+                { id: 'admin', name: 'Admin' },
+                { id: 'super_admin', name: 'Super Admin' },
+                { id: 'user', name: 'User' },
+                { id: 'psychologist', name: 'Psychologist' },
+                { id: 'business', name: 'Business' },
+                { id: 'employee', name: 'Employee' }
+            ]);
+        }
+    };
+
+    const fetchUsersData = async () => {
+        try {
+            const params = {
+                page: pagination.page,
+                limit: pagination.limit,
+                search: filters.search || undefined,
+                role: filters.roleId || undefined,
+                isActive: filters.isActive || undefined
+            };
+
+            // Remove undefined values
+            Object.keys(params).forEach(key =>
+                params[key] === undefined && delete params[key]
+            );
+
+            const result = await fetchUsersApi(null, { params });
+
+            if (result?.success) {
+                setUsers(result.data?.users || []);
+                setPagination(prev => ({
+                    ...prev,
+                    total: result.data?.total || 0,
+                    totalPages: Math.ceil((result.data?.total || 0) / prev.limit)
+                }));
+            } else {
+                setUsers([]);
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            setUsers([]);
+        }
+    };
+
+    const handleFilterChange = (e) => {
+        const { name, value } = e.target;
+        setFilters((prev) => ({ ...prev, [name]: value }));
+        setPagination((prev) => ({ ...prev, page: 1 }));
+    };
 
     const handleSaveUser = async (userData) => {
-        let result;
+        if (!adminProfile) {
+            toast.error('Admin access required');
+            return;
+        }
 
         try {
-            if (selectedUser) {
-                result = await updateUserApi(userData);
-            } else {
-                result = await createUserApi(userData);
-            }
+            const result = selectedUser
+                ? await updateUserApi({ ...userData, id: selectedUser.id })
+                : await createUserApi(userData);
 
             if (result?.success) {
                 toast.success(selectedUser ? 'User updated successfully' : 'User created successfully');
                 setShowModal(false);
                 setSelectedUser(null);
-                fetchUsers(); // Refresh the list
+                await fetchUsersData();
             } else {
                 toast.error(result?.error || 'Operation failed');
             }
@@ -166,28 +259,29 @@ const UserManagement = () => {
     };
 
     const handleDeleteUser = async () => {
+        if (!adminProfile) {
+            toast.error('Admin access required');
+            return;
+        }
+
         try {
             let result;
 
             if (selectedUsers.length > 0) {
                 result = await bulkDeleteUsersApi({ userIds: selectedUsers });
-
-                if (result?.success) {
-                    toast.success(`${selectedUsers.length} users deleted successfully`);
-                    setSelectedUsers([]);
-                }
             } else if (selectedUser) {
                 result = await deleteUserApi(null, { params: { id: selectedUser.id } });
-
-                if (result?.success) {
-                    toast.success('User deleted successfully');
-                }
             }
 
             if (result?.success) {
+                toast.success(selectedUsers.length > 0
+                    ? `${selectedUsers.length} users deleted successfully`
+                    : 'User deleted successfully'
+                );
                 setShowDeleteConfirm(false);
                 setSelectedUser(null);
-                fetchUsers(); // Refresh the list
+                setSelectedUsers([]);
+                await fetchUsersData();
             } else {
                 toast.error(result?.error || 'Delete failed');
             }
@@ -198,8 +292,12 @@ const UserManagement = () => {
     };
 
     const handleResetPassword = async (userId) => {
-        const newPassword = window.prompt('Enter new password (min 8 characters):');
+        if (!adminProfile) {
+            toast.error('Admin access required');
+            return;
+        }
 
+        const newPassword = window.prompt('Enter new password (min 8 characters):');
         if (!newPassword) return;
 
         if (newPassword.length < 8) {
@@ -209,7 +307,6 @@ const UserManagement = () => {
 
         try {
             const result = await resetPasswordApi({ userId, newPassword });
-
             if (result?.success) {
                 toast.success('Password reset successfully');
             } else {
@@ -221,38 +318,59 @@ const UserManagement = () => {
         }
     };
 
-    const handleFilterChange = (e) => {
-        const { name, value } = e.target;
-        setFilters((prev) => ({ ...prev, [name]: value }));
-        setPagination((prev) => ({ ...prev, page: 1 })); // Reset to first page on filter change
-    };
-
     const handleBulkAction = (action) => {
         if (selectedUsers.length === 0) {
             toast.error('Please select users first');
             return;
         }
-
         if (action === 'delete') setShowDeleteConfirm(true);
     };
 
-    // Add a check to verify user has access before rendering
-    if (!user) {
-        console.log('No user in UserManagement, but should be handled by AdminRoute');
-        return null; // Let the AdminRoute handle the redirect
+    const handleRefresh = () => {
+        setLoading(true);
+        Promise.all([fetchRolesData(), fetchUsersData()]).finally(() => setLoading(false));
+    };
+
+    // Show loading while checking auth
+    if (authLoading) {
+        return <Loading text="Checking authentication..." />;
     }
 
+    // Don't render anything if not authenticated (redirect will happen in useEffect)
+    if (!isAuthenticated || !user) {
+        return null;
+    }
+
+    // Show loading while checking admin profile
+    if (checkingAdmin) {
+        return <Loading text="Verifying admin access..." />;
+    }
+
+    // If admin check is complete but no profile, don't render (redirect will happen)
+    if (adminCheckComplete && !adminProfile) {
+        return null;
+    }
+
+    // Render the page
     return (
         <div className="user-management">
             <div className="page-header">
                 <h1>User Management</h1>
                 <div className="header-actions">
                     <button
+                        className="btn-secondary"
+                        onClick={handleRefresh}
+                        disabled={loading || usersLoading}
+                    >
+                        <i className="fas fa-sync-alt" /> Refresh
+                    </button>
+                    <button
                         className="btn-primary"
                         onClick={() => {
                             setSelectedUser(null);
                             setShowModal(true);
                         }}
+                        disabled={loading || usersLoading}
                     >
                         <i className="fas fa-plus" /> Create New User
                     </button>
@@ -268,6 +386,7 @@ const UserManagement = () => {
                         value={filters.search}
                         onChange={handleFilterChange}
                         className="search-input"
+                        disabled={loading || usersLoading}
                     />
                 </div>
 
@@ -277,10 +396,11 @@ const UserManagement = () => {
                         value={filters.roleId}
                         onChange={handleFilterChange}
                         className="filter-select"
+                        disabled={loading || usersLoading}
                     >
                         <option value="">All Roles</option>
-                        {roles && roles.map((role) => (
-                            <option key={role.id || role._id} value={role.id || role._id}>
+                        {roles.map((role) => (
+                            <option key={role.id} value={role.id}>
                                 {role.name}
                             </option>
                         ))}
@@ -293,6 +413,7 @@ const UserManagement = () => {
                         value={filters.isActive}
                         onChange={handleFilterChange}
                         className="filter-select"
+                        disabled={loading || usersLoading}
                     >
                         <option value="">All Status</option>
                         <option value="true">Active</option>
@@ -308,6 +429,7 @@ const UserManagement = () => {
                         <button
                             className="btn-danger"
                             onClick={() => handleBulkAction('delete')}
+                            disabled={loading || usersLoading}
                         >
                             <i className="fas fa-trash" /> Delete Selected
                         </button>
@@ -315,7 +437,7 @@ const UserManagement = () => {
                 )}
             </div>
 
-            {(loading || usersLoading) ? (
+            {loading || usersLoading ? (
                 <Loading text="Loading users..." />
             ) : (
                 <>
@@ -333,16 +455,14 @@ const UserManagement = () => {
                             setShowDeleteConfirm(true);
                         }}
                         onResetPassword={handleResetPassword}
+                        isLoading={loading || usersLoading}
                     />
 
                     {pagination.totalPages > 1 && (
                         <div className="pagination">
                             <button
-                                onClick={() => setPagination((prev) => ({
-                                    ...prev,
-                                    page: prev.page - 1
-                                }))}
-                                disabled={pagination.page === 1}
+                                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                disabled={pagination.page === 1 || loading || usersLoading}
                                 className="pagination-btn"
                             >
                                 Previous
@@ -351,11 +471,8 @@ const UserManagement = () => {
                                 Page {pagination.page} of {pagination.totalPages}
                             </span>
                             <button
-                                onClick={() => setPagination((prev) => ({
-                                    ...prev,
-                                    page: prev.page + 1
-                                }))}
-                                disabled={pagination.page === pagination.totalPages}
+                                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                disabled={pagination.page === pagination.totalPages || loading || usersLoading}
                                 className="pagination-btn"
                             >
                                 Next
@@ -382,6 +499,7 @@ const UserManagement = () => {
                         setShowModal(false);
                         setSelectedUser(null);
                     }}
+                    isLoading={loading || usersLoading}
                 />
             </Modal>
 
@@ -397,11 +515,12 @@ const UserManagement = () => {
                 message={
                     selectedUsers.length > 0
                         ? `Are you sure you want to delete ${selectedUsers.length} users? This action cannot be undone.`
-                        : `Are you sure you want to delete ${selectedUser?.firstName || ''} ${selectedUser?.lastName || ''}? This action cannot be undone.`
+                        : `Are you sure you want to delete ${selectedUser?.displayName || selectedUser?.email || ''}? This action cannot be undone.`
                 }
                 confirmText="Delete"
                 cancelText="Cancel"
                 type="danger"
+                isLoading={loading || usersLoading}
             />
         </div>
     );

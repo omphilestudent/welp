@@ -1,3 +1,4 @@
+// backend/src/controllers/authController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
@@ -29,7 +30,7 @@ const register = async (req, res) => {
             const result = await query(
                 `INSERT INTO users (role, is_anonymous, display_name)
                  VALUES ($1, $2, $3)
-                 RETURNING id, role, is_anonymous, display_name, token_version`,
+                     RETURNING id, role, is_anonymous, display_name, token_version`,
                 [role || 'user', true, displayName || `Anonymous_${Date.now()}`]
             );
 
@@ -77,7 +78,7 @@ const register = async (req, res) => {
         const result = await query(
             `INSERT INTO users (email, password_hash, role, is_anonymous, display_name, is_verified)
              VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING id, email, role, is_anonymous, display_name, token_version, created_at`,
+                 RETURNING id, email, role, is_anonymous, display_name, token_version, created_at`,
             [email.toLowerCase(), hashedPassword, role || 'user', false, displayNameValue, false]
         );
 
@@ -123,6 +124,7 @@ const register = async (req, res) => {
     }
 };
 
+// FIXED LOGIN FUNCTION - Now returns correct admin role
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -135,12 +137,22 @@ const login = async (req, res) => {
             });
         }
 
-        // Find user by email
+        // FIXED QUERY - Join with admin tables to get correct role
         const result = await query(
-            `SELECT id, email, password_hash, role, is_anonymous, display_name, 
-                    token_version, is_verified, created_at
-             FROM users 
-             WHERE email = $1`,
+            `SELECT
+                 u.id,
+                 u.email,
+                 u.password_hash,
+                 u.is_anonymous,
+                 u.display_name,
+                 u.token_version,
+                 u.is_verified,
+                 u.created_at,
+                 COALESCE(ar.name, u.role) as role
+             FROM users u
+                      LEFT JOIN admin_users au ON u.id = au.user_id
+                      LEFT JOIN admin_roles ar ON au.role_id = ar.id
+             WHERE u.email = $1`,
             [email.toLowerCase()]
         );
 
@@ -171,29 +183,31 @@ const login = async (req, res) => {
             });
         }
 
-        // Check if email is verified (optional)
-        // if (!user.is_verified) {
-        //     return res.status(401).json({ 
-        //         success: false,
-        //         error: 'Please verify your email before logging in' 
-        //     });
-        // }
-
-        // Generate token
-        const token = signUserToken(user);
+        // Generate token with the CORRECT role
+        const token = jwt.sign(
+            {
+                userId: user.id,
+                role: user.role, // This will be 'super_admin' for admin users
+                tokenVersion: Number(user.token_version ?? 0)
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRE || '7d' }
+        );
 
         // Set cookie
         res.cookie('token', token, getCookieOptions());
 
-        // Return success
+        // Return success with CORRECT role
         res.json({
             success: true,
+            token, // Send token to client for localStorage
             user: {
                 id: user.id,
                 email: user.email,
-                role: user.role,
+                role: user.role, // This will be 'super_admin' not 'employee'
                 displayName: user.display_name,
-                isAnonymous: user.is_anonymous
+                isAnonymous: user.is_anonymous,
+                isVerified: user.is_verified
             }
         });
     } catch (error) {
@@ -268,12 +282,22 @@ const getCurrentUser = async (req, res) => {
             });
         }
 
-        // Get user from database
+        // FIXED QUERY - Join with admin tables to get correct role
         const result = await query(
-            `SELECT id, email, role, is_anonymous, display_name, avatar_url, 
-                    token_version, is_verified, created_at
-             FROM users 
-             WHERE id = $1`,
+            `SELECT
+                 u.id,
+                 u.email,
+                 u.is_anonymous,
+                 u.display_name,
+                 u.avatar_url,
+                 u.token_version,
+                 u.is_verified,
+                 u.created_at,
+                 COALESCE(ar.name, u.role) as role
+             FROM users u
+                      LEFT JOIN admin_users au ON u.id = au.user_id
+                      LEFT JOIN admin_roles ar ON au.role_id = ar.id
+             WHERE u.id = $1`,
             [decoded.userId]
         );
 

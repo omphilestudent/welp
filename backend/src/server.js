@@ -137,6 +137,16 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Add this near your other routes (around line where you have other app.use statements)
+app.get('/api/health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        message: 'API is healthy',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        database: sequelize ? 'connected' : 'disconnected'
+    });
+});
 // 404 handler
 app.use('*', (req, res) => {
     res.status(404).json({
