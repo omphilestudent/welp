@@ -1,5 +1,6 @@
 
 const { query } = require('../utils/database');
+const { moderateReview, analyzeSentiment } = require('../services/mlServices');
 
 
 const updateReviewsTable = async () => {
@@ -7,7 +8,10 @@ const updateReviewsTable = async () => {
         await query(`
             ALTER TABLE reviews
             ADD COLUMN IF NOT EXISTS author_occupation VARCHAR(255),
-            ADD COLUMN IF NOT EXISTS author_workplace_id UUID REFERENCES companies(id)
+            ADD COLUMN IF NOT EXISTS author_workplace_id UUID REFERENCES companies(id),
+            ADD COLUMN IF NOT EXISTS sentiment_label VARCHAR(32),
+            ADD COLUMN IF NOT EXISTS sentiment_score NUMERIC(5,4),
+            ADD COLUMN IF NOT EXISTS moderation_reason VARCHAR(255)
         `);
         console.log('✅ Reviews table schema updated successfully');
     } catch (error) {
@@ -64,6 +68,16 @@ const createReview = async (req, res) => {
             [req.user.id]
         );
 
+        const moderation = await moderateReview(content);
+        if (moderation.is_flagged) {
+            return res.status(400).json({
+                error: 'Review flagged by moderation',
+                reason: moderation.reason
+            });
+        }
+
+        const sentiment = await analyzeSentiment(content);
+
         const result = await query(
             `INSERT INTO reviews (
                 company_id,
@@ -72,9 +86,12 @@ const createReview = async (req, res) => {
                 content,
                 is_public,
                 author_occupation,
-                author_workplace_id
+                author_workplace_id,
+                sentiment_label,
+                sentiment_score,
+                moderation_reason
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              RETURNING *`,
             [
                 companyId,
@@ -83,7 +100,10 @@ const createReview = async (req, res) => {
                 content,
                 isPublic,
                 user.rows[0]?.occupation,
-                user.rows[0]?.workplace_id
+                user.rows[0]?.workplace_id,
+                sentiment.sentiment,
+                sentiment.score,
+                moderation.reason
             ]
         );
 

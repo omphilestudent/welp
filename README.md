@@ -32,3 +32,15 @@ Welp is a company review platform focused on employee experience and wellbeing, 
 - Socket.io-client for real-time updates
 
 ## Project Structure
+
+## ML Microservices (new)
+
+Welp now includes independently deployable Python ML services under `ml-services/`:
+
+- `content-moderation` (`POST /moderate-review`)
+- `sentiment-analysis` (`POST /analyze-sentiment`)
+- `recommendation-engine` (`GET /recommendations?user_id=<id>`)
+- `image-analysis` (`POST /analyze-image`)
+- `fraud-detection` (`POST /detect-fraud`)
+
+The backend review creation flow now calls moderation and sentiment services before inserting a review. Moderation can block submission, and sentiment label/score are persisted with each review.
