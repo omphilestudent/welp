@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
@@ -9,15 +8,15 @@ const hrController = require('../controllers/hrController');
 
 const router = express.Router();
 
-
+// All HR routes require authentication and HR authorization
 router.use(authenticate);
 router.use(authorizeHR());
 
-
+// HR Profile
 router.get('/profile', hrController.getHRProfile);
 router.get('/dashboard/stats', hrController.getHRDashboardStats);
 
-
+// Job Postings - FIXED: Added missing controller
 router.post('/jobs',
     validate([
         body('title').notEmpty(),
@@ -27,7 +26,7 @@ router.post('/jobs',
         body('requirements').isArray(),
         body('application_deadline').optional().isDate()
     ]),
-    hrController.createJobPosting
+    hrController.createJobPosting  // This was missing!
 );
 router.get('/jobs', hrController.getJobPostings);
 router.get('/jobs/:id', hrController.getJobDetails);
@@ -36,7 +35,7 @@ router.patch('/jobs/:id/publish', hrController.publishJob);
 router.patch('/jobs/:id/close', hrController.closeJob);
 router.delete('/jobs/:id', hrController.deleteJobPosting);
 
-
+// Job Applications
 router.get('/jobs/:jobId/applications', hrController.getJobApplications);
 router.get('/applications/:id', hrController.getApplicationDetails);
 router.patch('/applications/:id/status',
@@ -51,7 +50,7 @@ router.post('/applications/:id/notes',
     hrController.addApplicationNotes
 );
 
-
+// Interviews
 router.post('/applications/:id/interviews',
     validate([
         body('interviewer_id').isUUID(),
@@ -72,7 +71,7 @@ router.post('/interviews/:id/feedback',
     hrController.submitInterviewFeedback
 );
 
-
+// Employee Relations
 router.post('/employee-relations',
     validate([
         body('employee_id').isUUID(),
@@ -93,7 +92,7 @@ router.patch('/employee-relations/:id',
     hrController.updateEmployeeRelation
 );
 
-
+// Employee Documents
 router.post('/documents',
     validate([
         body('employee_id').isUUID(),
@@ -107,7 +106,7 @@ router.post('/documents',
 router.get('/documents/:employeeId', hrController.getEmployeeDocuments);
 router.delete('/documents/:id', hrController.deleteEmployeeDocument);
 
-
+// Performance Reviews
 router.post('/performance-reviews',
     validate([
         body('employee_id').isUUID(),
@@ -131,7 +130,7 @@ router.patch('/performance-reviews/:id',
 router.post('/performance-reviews/:id/submit', hrController.submitPerformanceReview);
 router.post('/performance-reviews/:id/acknowledge', hrController.acknowledgePerformanceReview);
 
-
+// Departments
 router.get('/departments', hrController.getDepartments);
 router.post('/departments',
     validate([
@@ -144,7 +143,7 @@ router.post('/departments',
 );
 router.patch('/departments/:id', hrController.updateDepartment);
 
-
+// Analytics
 router.get('/analytics/hiring', hrController.getHiringAnalytics);
 router.get('/analytics/employee', hrController.getEmployeeAnalytics);
 

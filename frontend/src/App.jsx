@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -28,7 +27,7 @@ import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
 
-
+// Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import PricingManagement from './pages/admin/PricingManagement';
 import UserManagement from './pages/admin/UserManagement';
@@ -37,9 +36,11 @@ import ReviewModeration from './pages/admin/ReviewModeration';
 import SubscriptionManagement from './pages/admin/SubscriptionManagement';
 import SystemSettings from './pages/admin/SystemSettings';
 
-
+// HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
 import JobPostings from './pages/hr/JobPostings';
+import JobCreate from './pages/hr/JobCreate'; // Add this import
+import JobDetailsHR from './pages/hr/JobDetails'; // Add this import (you might want to rename to avoid conflict with public JobDetails)
 import Applications from './pages/hr/Applications';
 import Interviews from './pages/hr/Interviews';
 import EmployeeRelations from './pages/hr/EmployeeRelations';
@@ -64,7 +65,7 @@ function App() {
                         <Navbar />
                         <main className="main-content">
                             <Routes>
-                                {}
+                                {/* Public Routes */}
                                 <Route path="/" element={<Home />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
@@ -74,7 +75,7 @@ function App() {
                                 <Route path="/psychologist/join" element={<JoinPsychologist />} />
                                 <Route path="/application-success" element={<ApplicationSuccess />} />
 
-                                {}
+                                {/* Public Career Routes */}
                                 <Route path="/careers" element={<Careers />} />
                                 <Route path="/careers/jobs/:id" element={<JobDetails />} />
                                 <Route path="/careers/apply/:id" element={<ApplyJob />} />
@@ -82,7 +83,7 @@ function App() {
                                 <Route path="/careers/internships" element={<Internships />} />
                                 <Route path="/careers/apply/general" element={<GeneralApplication />} />
 
-                                {}
+                                {/* Protected Routes */}
                                 <Route
                                     path="/claim/:id"
                                     element={
@@ -124,7 +125,7 @@ function App() {
                                     }
                                 />
 
-                                {}
+                                {/* Admin Routes */}
                                 <Route
                                     path="/admin"
                                     element={
@@ -146,7 +147,7 @@ function App() {
                                     <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                                 </Route>
 
-                                {}
+                                {/* HR Routes */}
                                 <Route
                                     path="/hr"
                                     element={
@@ -158,7 +159,15 @@ function App() {
                                     <Route index element={<HRDashboard />} />
                                     <Route path="dashboard" element={<HRDashboard />} />
                                     <Route path="UserManagement" element={<Navigate to="/hr/dashboard" replace />} />
+
+                                    {/* Job Management Routes - FIXED: Added all missing routes */}
                                     <Route path="jobs" element={<JobPostings />} />
+                                    <Route path="jobs/create" element={<JobCreate />} />
+                                    <Route path="jobs/:id" element={<JobDetailsHR />} />
+                                    <Route path="jobs/:id/edit" element={<JobCreate />} />
+                                    <Route path="jobs/:id/applications" element={<Applications />} />
+
+                                    {/* Other HR Routes */}
                                     <Route path="applications" element={<Applications />} />
                                     <Route path="interviews" element={<Interviews />} />
                                     <Route path="employees" element={<EmployeeRelations />} />

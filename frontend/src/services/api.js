@@ -1,4 +1,3 @@
-// services/api.js
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -8,37 +7,55 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    withCredentials: true // Important for cookies/sessions
+    withCredentials: true
 });
 
-// Add request interceptor for debugging
+// Request interceptor to add token
 api.interceptors.request.use(
     (config) => {
-        console.log(`🚀 ${config.method.toUpperCase()} request to: ${config.baseURL}${config.url}`);
-        console.log('Request data:', config.data);
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+
+        console.log(`🚀 ${config.method.toUpperCase()} ${config.url}`, {
+            data: config.data,
+            params: config.params,
+            headers: config.headers
+        });
+
         return config;
     },
     (error) => {
-        console.error('Request error:', error);
+        console.error('❌ Request error:', error);
         return Promise.reject(error);
     }
 );
 
-// Add response interceptor for debugging
+// Response interceptor
 api.interceptors.response.use(
     (response) => {
-        console.log('✅ Response received:', response.data);
+        console.log('✅ Response received:', {
+            status: response.status,
+            data: response.data,
+            url: response.config.url
+        });
         return response;
     },
     (error) => {
-        if (error.code === 'ERR_NETWORK') {
-            console.error('❌ Network error - Backend may be down or unreachable');
-            console.error('Please check if backend is running on:', API_URL);
-        } else if (error.response) {
-            console.error('❌ Error response:', error.response.status, error.response.data);
-        } else {
-            console.error('❌ Error:', error.message);
+        console.error('❌ Response error:', {
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data,
+            url: error.config?.url
+        });
+
+        // Handle 401 errors
+        if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
         }
+
         return Promise.reject(error);
     }
 );

@@ -1,42 +1,118 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import {
+    FiCheckCircle,
+    FiXCircle,
+    FiClock,
+    FiUser,
+    FiMail,
+    FiPhone,
+    FiMapPin,
+    FiBriefcase,
+    FiDownload,
+    FiStar,
+    FiMessageSquare,
+    FiCalendar,
+    FiArrowRight,
+    FiChevronDown,
+    FiFilter,
+    FiSearch,
+    FiEye,
+    FiThumbsUp,
+    FiThumbsDown,
+    FiUpload,
+    FiFileText,
+    FiAward
+} from 'react-icons/fi';
 
 const STORAGE_KEY = 'hrApplications';
 
+// Application stages for the workflow
+const APPLICATION_STAGES = [
+    { id: 'new', label: 'New', color: '#3498db', icon: FiClock },
+    { id: 'screening', label: 'Screening', color: '#f39c12', icon: FiUser },
+    { id: 'interview', label: 'Interview', color: '#9b59b6', icon: FiCalendar },
+    { id: 'technical', label: 'Technical', color: '#e74c3c', icon: FiBriefcase },
+    { id: 'offer', label: 'Offer', color: '#2ecc71', icon: FiAward },
+    { id: 'hired', label: 'Hired', color: '#27ae60', icon: FiCheckCircle },
+    { id: 'rejected', label: 'Rejected', color: '#e74c3c', icon: FiXCircle }
+];
+
 const EMPTY_FORM = {
+    // Job Details
     jobTitle: '',
     department: '',
     position: '',
-    description: '',
-    requirements: '',
-    responsibilities: '',
+
+    // Applicant Personal Details
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
     location: '',
-    employmentType: 'full-time',
-    experienceLevel: 'entry',
-    salaryMin: '',
-    salaryMax: '',
-    currency: 'USD',
-    applicationDeadline: '',
+
+    // Professional Details
+    experience: '',
+    education: '',
+    skills: [],
+    expectedSalary: '',
+    currentCompany: '',
+    noticePeriod: '',
+
+    // Application Details
+    coverLetter: '',
+    resumeUrl: '',
+    portfolioUrl: '',
+    linkedInUrl: '',
+    githubUrl: '',
+
+    // Workflow
+    currentStage: 'new',
+    stageHistory: [],
+    priority: 'medium',
+    tags: [],
+
+    // Review
+    notes: [],
+    ratings: {},
+    interviews: [],
+
     status: 'active',
-    questions: []
+    appliedDate: new Date().toISOString(),
+
+    // Metadata
+    createdBy: 'Current HR User',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
 };
 
 const Applications = () => {
     const [applications, setApplications] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedApplication, setSelectedApplication] = useState(null);
-    const [viewMode, setViewMode] = useState('create');
+    const [viewMode, setViewMode] = useState('view'); // view, edit, review
     const [formData, setFormData] = useState(EMPTY_FORM);
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
+    const [stageFilter, setStageFilter] = useState('all');
+    const [departmentFilter, setDepartmentFilter] = useState('all');
+    const [priorityFilter, setPriorityFilter] = useState('all');
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [activeTab, setActiveTab] = useState('details'); // details, notes, interviews, reviews
+    const [newNote, setNewNote] = useState('');
+    const [rating, setRating] = useState({ category: '', score: 0, comment: '' });
 
+    // Load from localStorage
     useEffect(() => {
         try {
             const savedApplications = localStorage.getItem(STORAGE_KEY);
-            if (!savedApplications) return;
+            if (!savedApplications) {
+                // Add sample data for demonstration
+                const sampleApplications = generateSampleApplications();
+                setApplications(sampleApplications);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleApplications));
+                return;
+            }
             const parsed = JSON.parse(savedApplications);
             if (Array.isArray(parsed)) {
                 setApplications(parsed);
@@ -47,272 +123,831 @@ const Applications = () => {
         }
     }, []);
 
+    // Save to localStorage
     useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(applications));
+        if (applications.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(applications));
+        }
     }, [applications]);
 
+    // Generate sample applications for demonstration
+    const generateSampleApplications = () => {
+        const firstNames = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emma', 'James', 'Lisa'];
+        const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis'];
+        const jobs = ['Senior Developer', 'Product Manager', 'UX Designer', 'Marketing Specialist', 'Sales Representative', 'HR Coordinator'];
+        const departments = ['Engineering', 'Product', 'Design', 'Marketing', 'Sales', 'HR'];
+
+        return Array.from({ length: 12 }, (_, i) => {
+            const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+            const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+            const jobTitle = jobs[Math.floor(Math.random() * jobs.length)];
+            const department = departments[Math.floor(Math.random() * departments.length)];
+            const stage = APPLICATION_STAGES[Math.floor(Math.random() * (APPLICATION_STAGES.length - 2))].id;
+
+            return {
+                id: `sample-${i}`,
+                jobTitle,
+                department,
+                position: jobTitle,
+                firstName,
+                lastName,
+                email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
+                phone: `+1 (555) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
+                location: ['New York, NY', 'San Francisco, CA', 'Austin, TX', 'Chicago, IL', 'Boston, MA'][Math.floor(Math.random() * 5)],
+                experience: `${Math.floor(Math.random() * 10) + 2} years`,
+                education: ['Bachelor\'s in Computer Science', 'Master\'s in Business Administration', 'Bachelor\'s in Design', 'Associate Degree'][Math.floor(Math.random() * 4)],
+                skills: ['JavaScript', 'React', 'Node.js', 'Python', 'UI/UX', 'Project Management', 'Communication'].slice(0, Math.floor(Math.random() * 4) + 2),
+                expectedSalary: `$${Math.floor(Math.random() * 60) + 40}k`,
+                currentCompany: ['Tech Corp', 'Innovation Inc', 'Digital Solutions', 'Creative Agency'][Math.floor(Math.random() * 4)],
+                noticePeriod: ['Immediate', '2 weeks', '1 month'][Math.floor(Math.random() * 3)],
+                coverLetter: 'I am excited to apply for this position...',
+                currentStage: stage,
+                stageHistory: [{ stage: 'new', date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), note: 'Application received' }],
+                priority: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
+                tags: ['urgent', 'remote-ready', 'senior'].slice(0, Math.floor(Math.random() * 2) + 1),
+                notes: [
+                    { id: 1, author: 'HR Manager', content: 'Good candidate, schedule interview', date: new Date().toISOString() }
+                ],
+                ratings: { technical: 4, communication: 5, experience: 4 },
+                interviews: stage === 'interview' || stage === 'technical' ? [
+                    { id: 1, type: 'HR Screen', date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), interviewer: 'Sarah Johnson', status: 'scheduled' }
+                ] : [],
+                status: 'active',
+                appliedDate: new Date(Date.now() - Math.floor(Math.random() * 14) * 24 * 60 * 60 * 1000).toISOString(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                createdBy: 'HR System'
+            };
+        });
+    };
+
+    // Filter applications based on search and filters
     const filteredApplications = useMemo(() => {
         return applications.filter((app) => {
-            const matchesSearch =
-                app.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                app.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                app.position?.toLowerCase().includes(searchTerm.toLowerCase());
+            const fullName = `${app.firstName || ''} ${app.lastName || ''}`.toLowerCase();
+            const jobTitle = (app.jobTitle || '').toLowerCase();
+            const department = (app.department || '').toLowerCase();
+            const email = (app.email || '').toLowerCase();
 
-            const matchesStatus = statusFilter === 'all' ? true : app.status === statusFilter;
+            const matchesSearch = searchTerm === '' ||
+                fullName.includes(searchTerm.toLowerCase()) ||
+                jobTitle.includes(searchTerm.toLowerCase()) ||
+                department.includes(searchTerm.toLowerCase()) ||
+                email.includes(searchTerm.toLowerCase());
 
-            return matchesSearch && matchesStatus;
+            const matchesStage = stageFilter === 'all' || app.currentStage === stageFilter;
+            const matchesDepartment = departmentFilter === 'all' || app.department === departmentFilter;
+            const matchesPriority = priorityFilter === 'all' || app.priority === priorityFilter;
+
+            return matchesSearch && matchesStage && matchesDepartment && matchesPriority;
         });
-    }, [applications, searchTerm, statusFilter]);
+    }, [applications, searchTerm, stageFilter, departmentFilter, priorityFilter]);
 
+    // Calculate statistics
     const stats = useMemo(() => {
-        const total = applications.length;
-        const active = applications.filter((app) => app.status === 'active').length;
-        const applicants = applications.reduce((sum, app) => sum + Number(app.applicants || 0), 0);
-        return { total, active, applicants };
+        return {
+            total: applications.length,
+            new: applications.filter(app => app.currentStage === 'new').length,
+            screening: applications.filter(app => app.currentStage === 'screening').length,
+            interview: applications.filter(app => app.currentStage === 'interview').length,
+            technical: applications.filter(app => app.currentStage === 'technical').length,
+            offer: applications.filter(app => app.currentStage === 'offer').length,
+            hired: applications.filter(app => app.currentStage === 'hired').length,
+            rejected: applications.filter(app => app.currentStage === 'rejected').length,
+            highPriority: applications.filter(app => app.priority === 'high').length
+        };
     }, [applications]);
 
-    const handleOpenDialog = (mode, application = null) => {
-        setError('');
-        setSuccessMessage('');
-        setViewMode(mode);
+    // Get unique departments for filter
+    const departments = useMemo(() => {
+        return [...new Set(applications.map(app => app.department))].filter(Boolean);
+    }, [applications]);
 
-        if (application) {
-            setSelectedApplication(application);
-            setFormData({ ...EMPTY_FORM, ...application });
-        } else {
-            setSelectedApplication(null);
-            setFormData(EMPTY_FORM);
-        }
-
+    const handleOpenApplication = (application) => {
+        setSelectedApplication(application);
+        setFormData({ ...EMPTY_FORM, ...application });
+        setViewMode('view');
+        setActiveTab('details');
         setOpenDialog(true);
     };
 
     const handleCloseDialog = () => {
         setOpenDialog(false);
         setSelectedApplication(null);
-        setViewMode('create');
         setFormData(EMPTY_FORM);
+        setNewNote('');
+        setActiveTab('details');
     };
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
-    };
+    // Update application stage
+    const handleStageChange = (applicationId, newStage) => {
+        const application = applications.find(app => app.id === applicationId);
+        if (!application) return;
 
-    const validateForm = () => {
-        if (!formData.jobTitle || !formData.department || !formData.position) {
-            return 'Please fill in all required fields.';
-        }
-
-        if (formData.salaryMin && formData.salaryMax && Number(formData.salaryMin) > Number(formData.salaryMax)) {
-            return 'Salary min cannot be greater than salary max.';
-        }
-
-        if (formData.applicationDeadline) {
-            const chosenDate = new Date(formData.applicationDeadline);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            if (chosenDate < today && viewMode === 'create') {
-                return 'Application deadline must be today or a future date.';
+        const stageHistory = [
+            ...(application.stageHistory || []),
+            {
+                stage: newStage,
+                date: new Date().toISOString(),
+                note: `Moved to ${APPLICATION_STAGES.find(s => s.id === newStage)?.label} stage`
             }
-        }
+        ];
 
-        return null;
+        setApplications(prev => prev.map(app =>
+            app.id === applicationId
+                ? {
+                    ...app,
+                    currentStage: newStage,
+                    stageHistory,
+                    updatedAt: new Date().toISOString()
+                }
+                : app
+        ));
+
+        setSuccessMessage(`Application moved to ${APPLICATION_STAGES.find(s => s.id === newStage)?.label} stage`);
+
+        if (selectedApplication?.id === applicationId) {
+            setSelectedApplication(prev => ({
+                ...prev,
+                currentStage: newStage,
+                stageHistory,
+                updatedAt: new Date().toISOString()
+            }));
+        }
     };
 
-    const handleSubmit = () => {
-        const validationError = validateForm();
-        if (validationError) {
-            setError(validationError);
-            return;
-        }
+    // Add note to application
+    const handleAddNote = () => {
+        if (!newNote.trim() || !selectedApplication) return;
 
-        const generatedId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-            ? crypto.randomUUID()
-            : Date.now().toString();
-
-        const updatedApplication = {
-            ...formData,
-            id: selectedApplication?.id || generatedId,
-            createdAt: selectedApplication?.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            createdBy: selectedApplication?.createdBy || 'Current HR User',
-            applicants: selectedApplication?.applicants || 0
+        const note = {
+            id: Date.now(),
+            author: 'Current HR User',
+            content: newNote,
+            date: new Date().toISOString()
         };
 
-        if (viewMode === 'edit' && selectedApplication) {
-            setApplications((prev) =>
-                prev.map((app) => (app.id === selectedApplication.id ? updatedApplication : app))
-            );
-            setSuccessMessage('Application updated successfully.');
-        } else {
-            setApplications((prev) => [...prev, updatedApplication]);
-            setSuccessMessage('Job application created successfully.');
-        }
+        const updatedNotes = [...(selectedApplication.notes || []), note];
 
-        handleCloseDialog();
+        setApplications(prev => prev.map(app =>
+            app.id === selectedApplication.id
+                ? { ...app, notes: updatedNotes, updatedAt: new Date().toISOString() }
+                : app
+        ));
+
+        setSelectedApplication(prev => ({
+            ...prev,
+            notes: updatedNotes,
+            updatedAt: new Date().toISOString()
+        }));
+
+        setNewNote('');
+        setSuccessMessage('Note added successfully');
     };
 
-    const handleDelete = (id) => {
-        if (!window.confirm('Are you sure you want to delete this job application?')) return;
+    // Add rating
+    const handleAddRating = () => {
+        if (!rating.category || !rating.score || !selectedApplication) return;
 
-        setApplications((prev) => prev.filter((app) => app.id !== id));
-        setSuccessMessage('Job application deleted successfully.');
-        setError('');
+        const updatedRatings = {
+            ...(selectedApplication.ratings || {}),
+            [rating.category]: rating.score
+        };
+
+        setApplications(prev => prev.map(app =>
+            app.id === selectedApplication.id
+                ? { ...app, ratings: updatedRatings }
+                : app
+        ));
+
+        setSelectedApplication(prev => ({ ...prev, ratings: updatedRatings }));
+        setRating({ category: '', score: 0, comment: '' });
+        setSuccessMessage('Rating added successfully');
+    };
+
+    // Approve application (move to next stage)
+    const handleApprove = () => {
+        if (!selectedApplication) return;
+
+        const currentStageIndex = APPLICATION_STAGES.findIndex(s => s.id === selectedApplication.currentStage);
+        if (currentStageIndex < APPLICATION_STAGES.length - 2) { // Don't go beyond offer
+            const nextStage = APPLICATION_STAGES[currentStageIndex + 1].id;
+            handleStageChange(selectedApplication.id, nextStage);
+        }
+    };
+
+    // Reject application
+    const handleReject = () => {
+        if (!selectedApplication) return;
+        handleStageChange(selectedApplication.id, 'rejected');
+    };
+
+    // Schedule interview
+    const handleScheduleInterview = () => {
+        if (!selectedApplication) return;
+
+        const interview = {
+            id: Date.now(),
+            type: prompt('Enter interview type (e.g., HR Screen, Technical):') || 'Interview',
+            date: new Date(prompt('Enter date (YYYY-MM-DD):') || Date.now()).toISOString(),
+            interviewer: prompt('Enter interviewer name:') || 'To be assigned',
+            status: 'scheduled'
+        };
+
+        const updatedInterviews = [...(selectedApplication.interviews || []), interview];
+
+        setApplications(prev => prev.map(app =>
+            app.id === selectedApplication.id
+                ? { ...app, interviews: updatedInterviews }
+                : app
+        ));
+
+        setSelectedApplication(prev => ({ ...prev, interviews: updatedInterviews }));
+        setSuccessMessage('Interview scheduled successfully');
+    };
+
+    // Stage Progress Component
+    const StageProgress = ({ currentStage }) => {
+        const currentIndex = APPLICATION_STAGES.findIndex(s => s.id === currentStage);
+
+        return (
+            <div className="stage-progress" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '1rem',
+                background: 'var(--bg-secondary)',
+                borderRadius: '0.5rem',
+                overflowX: 'auto',
+                marginBottom: '1rem'
+            }}>
+                {APPLICATION_STAGES.map((stage, index) => {
+                    const StageIcon = stage.icon;
+                    const isCompleted = index < currentIndex;
+                    const isCurrent = index === currentIndex;
+                    const isRejected = stage.id === 'rejected';
+
+                    return (
+                        <React.Fragment key={stage.id}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    minWidth: '80px',
+                                    cursor: 'pointer',
+                                    opacity: isRejected && currentStage !== 'rejected' ? 0.5 : 1
+                                }}
+                                onClick={() => !isRejected && handleStageChange(selectedApplication.id, stage.id)}
+                            >
+                                <div style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '50%',
+                                    background: isCompleted ? stage.color : isCurrent ? stage.color : 'var(--bg-tertiary)',
+                                    color: isCompleted || isCurrent ? 'white' : 'var(--text-muted)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    border: isCurrent ? `3px solid ${stage.color}` : 'none',
+                                    boxShadow: isCurrent ? '0 0 0 2px var(--bg-primary)' : 'none'
+                                }}>
+                                    <StageIcon size={20} />
+                                </div>
+                                <span style={{
+                                    fontSize: '0.75rem',
+                                    marginTop: '0.25rem',
+                                    fontWeight: isCurrent ? 'bold' : 'normal',
+                                    color: isCurrent ? stage.color : 'var(--text-muted)'
+                                }}>
+                                    {stage.label}
+                                </span>
+                            </div>
+                            {index < APPLICATION_STAGES.length - 1 && (
+                                <FiArrowRight style={{ color: 'var(--text-muted)' }} />
+                            )}
+                        </React.Fragment>
+                    );
+                })}
+            </div>
+        );
     };
 
     return (
         <div className="dashboard-page">
             <div className="container">
-                <div className="dashboard-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h1 className="dashboard-title">Job Applications Management</h1>
-                    <button className="btn btn-primary" onClick={() => handleOpenDialog('create')}>
-                        + Create New Application
-                    </button>
-                </div>
-
-                {(error || successMessage) && (
-                    <div style={{ marginBottom: '1rem' }}>
-                        {error && <div className="alert alert-error">{error}</div>}
-                        {successMessage && <div className="alert alert-success">{successMessage}</div>}
-                    </div>
-                )}
-
-                <div className="companies-grid" style={{ marginBottom: '1rem' }}>
-                    <div className="card"><div className="card-content"><h3>Total Applications</h3><p>{stats.total}</p></div></div>
-                    <div className="card"><div className="card-content"><h3>Active Jobs</h3><p>{stats.active}</p></div></div>
-                    <div className="card"><div className="card-content"><h3>Total Applicants</h3><p>{stats.applicants}</p></div></div>
-                    <div className="card"><div className="card-content"><h3>Open Positions</h3><p>{stats.active}</p></div></div>
-                </div>
-
-                <div className="card" style={{ marginBottom: '1rem' }}>
-                    <div className="card-content" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <input
-                            className="form-input"
-                            placeholder="Search job title, department, or position..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{ maxWidth: '420px' }}
-                        />
-                        <select
-                            className="form-input"
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            style={{ maxWidth: '220px' }}
-                        >
-                            <option value="all">All Statuses</option>
-                            <option value="active">Active</option>
-                            <option value="closed">Closed</option>
-                            <option value="draft">Draft</option>
-                        </select>
+                <div className="dashboard-header" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div>
+                        <h1 className="dashboard-title">Applicant Tracking System</h1>
+                        <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                            Manage and review candidate applications
+                        </p>
                     </div>
                 </div>
 
+                {/* Statistics Cards */}
+                <div className="companies-grid" style={{
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                    marginBottom: '1.5rem'
+                }}>
+                    {APPLICATION_STAGES.map(stage => {
+                        const StageIcon = stage.icon;
+                        const count = stats[stage.id] || 0;
+                        return (
+                            <div key={stage.id} className="card" style={{ borderLeft: `4px solid ${stage.color}` }}>
+                                <div className="card-content" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <div style={{
+                                        background: stage.color,
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'white'
+                                    }}>
+                                        <StageIcon size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ fontSize: '1.25rem', margin: 0 }}>{count}</h3>
+                                        <p style={{ fontSize: '0.85rem', margin: 0, color: 'var(--text-muted)' }}>{stage.label}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Filters */}
+                <div className="card" style={{ marginBottom: '1.5rem' }}>
+                    <div className="card-content">
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div style={{ position: 'relative', flex: '1', minWidth: '250px' }}>
+                                <FiSearch style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                <input
+                                    className="form-input"
+                                    placeholder="Search candidates, jobs, or departments..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    style={{ paddingLeft: '2.25rem', width: '100%' }}
+                                />
+                            </div>
+
+                            <select
+                                className="form-input"
+                                value={stageFilter}
+                                onChange={(e) => setStageFilter(e.target.value)}
+                                style={{ minWidth: '140px' }}
+                            >
+                                <option value="all">All Stages</option>
+                                {APPLICATION_STAGES.map(stage => (
+                                    <option key={stage.id} value={stage.id}>{stage.label}</option>
+                                ))}
+                            </select>
+
+                            <select
+                                className="form-input"
+                                value={departmentFilter}
+                                onChange={(e) => setDepartmentFilter(e.target.value)}
+                                style={{ minWidth: '140px' }}
+                            >
+                                <option value="all">All Departments</option>
+                                {departments.map(dept => (
+                                    <option key={dept} value={dept}>{dept}</option>
+                                ))}
+                            </select>
+
+                            <select
+                                className="form-input"
+                                value={priorityFilter}
+                                onChange={(e) => setPriorityFilter(e.target.value)}
+                                style={{ minWidth: '140px' }}
+                            >
+                                <option value="all">All Priorities</option>
+                                <option value="high">High Priority</option>
+                                <option value="medium">Medium Priority</option>
+                                <option value="low">Low Priority</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Applications Table */}
                 <div className="card">
                     <div className="card-content" style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                                <tr>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Job Title</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Department</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Position</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Applicants</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Created</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Actions</th>
-                                </tr>
+                            <tr style={{ background: 'var(--bg-secondary)' }}>
+                                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Candidate</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Job / Department</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Stage</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Priority</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Applied</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Actions</th>
+                            </tr>
                             </thead>
                             <tbody>
-                                {filteredApplications.map((app) => (
-                                    <tr key={app.id} style={{ borderTop: '1px solid var(--border-color)' }}>
-                                        <td style={{ padding: '0.5rem' }}>{app.jobTitle}</td>
-                                        <td style={{ padding: '0.5rem' }}>{app.department}</td>
-                                        <td style={{ padding: '0.5rem' }}>{app.position}</td>
-                                        <td style={{ padding: '0.5rem' }}>{app.employmentType}</td>
-                                        <td style={{ padding: '0.5rem' }}>{app.status}</td>
-                                        <td style={{ padding: '0.5rem' }}>{app.applicants || 0}</td>
-                                        <td style={{ padding: '0.5rem' }}>
-                                            {app.createdAt ? format(new Date(app.createdAt), 'MM/dd/yyyy') : '-'}
+                            {filteredApplications.map((app) => {
+                                const stage = APPLICATION_STAGES.find(s => s.id === app.currentStage) || APPLICATION_STAGES[0];
+                                const StageIcon = stage.icon;
+
+                                return (
+                                    <tr key={app.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <div style={{
+                                                    width: '36px',
+                                                    height: '36px',
+                                                    borderRadius: '50%',
+                                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                    color: 'white',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontWeight: 'bold'
+                                                }}>
+                                                    {app.firstName?.[0]}{app.lastName?.[0]}
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 500 }}>{app.firstName} {app.lastName}</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{app.email}</div>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td style={{ padding: '0.5rem', display: 'flex', gap: '0.35rem' }}>
-                                            <button className="btn btn-small" onClick={() => handleOpenDialog('view', app)}>View</button>
-                                            <button className="btn btn-small btn-secondary" onClick={() => handleOpenDialog('edit', app)}>Edit</button>
-                                            <button className="btn btn-small btn-danger" onClick={() => handleDelete(app.id)}>Delete</button>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <div><strong>{app.jobTitle}</strong></div>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{app.department}</div>
+                                        </td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <div style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                padding: '0.25rem 0.5rem',
+                                                background: stage.color + '20',
+                                                color: stage.color,
+                                                borderRadius: '1rem',
+                                                fontSize: '0.85rem'
+                                            }}>
+                                                <StageIcon size={14} />
+                                                <span>{stage.label}</span>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    width: '8px',
+                                                    height: '8px',
+                                                    borderRadius: '50%',
+                                                    background: app.priority === 'high' ? '#e74c3c' : app.priority === 'medium' ? '#f39c12' : '#95a5a6',
+                                                    marginRight: '0.5rem'
+                                                }} />
+                                            {app.priority?.charAt(0).toUpperCase() + app.priority?.slice(1) || 'Normal'}
+                                        </td>
+                                        <td style={{ padding: '0.75rem', fontSize: '0.9rem' }}>
+                                            {format(new Date(app.appliedDate), 'MMM dd, yyyy')}
+                                        </td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                                <button
+                                                    className="btn btn-small"
+                                                    onClick={() => handleOpenApplication(app)}
+                                                    title="View Application"
+                                                >
+                                                    <FiEye size={14} />
+                                                </button>
+                                                <button
+                                                    className="btn btn-small btn-success"
+                                                    onClick={() => handleStageChange(app.id, APPLICATION_STAGES[APPLICATION_STAGES.findIndex(s => s.id === app.currentStage) + 1]?.id)}
+                                                    disabled={app.currentStage === 'hired' || app.currentStage === 'rejected'}
+                                                    title="Approve"
+                                                >
+                                                    <FiThumbsUp size={14} />
+                                                </button>
+                                                <button
+                                                    className="btn btn-small btn-danger"
+                                                    onClick={() => handleStageChange(app.id, 'rejected')}
+                                                    disabled={app.currentStage === 'rejected'}
+                                                    title="Reject"
+                                                >
+                                                    <FiThumbsDown size={14} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
-                                ))}
-                                {filteredApplications.length === 0 && (
-                                    <tr>
-                                        <td colSpan={8} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                            No job applications found.
-                                        </td>
-                                    </tr>
-                                )}
+                                );
+                            })}
+                            {filteredApplications.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                        No applications found. Start by adding candidates or sync with your job board.
+                                    </td>
+                                </tr>
+                            )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            {openDialog && (
+            {/* Application Detail Modal */}
+            {openDialog && selectedApplication && (
                 <div className="modal-overlay" role="dialog" aria-modal="true">
-                    <div className="modal-content" style={{ width: 'min(920px, 95vw)' }}>
-                        <h3 style={{ marginBottom: '1rem' }}>
-                            {viewMode === 'create' && 'Create New Job Application'}
-                            {viewMode === 'edit' && 'Edit Job Application'}
-                            {viewMode === 'view' && 'View Job Application'}
-                        </h3>
-
-                        <div className="companies-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                            <input className="form-input" name="jobTitle" placeholder="Job Title *" value={formData.jobTitle} onChange={handleInputChange} disabled={viewMode === 'view'} />
-                            <input className="form-input" name="department" placeholder="Department *" value={formData.department} onChange={handleInputChange} disabled={viewMode === 'view'} />
-                            <input className="form-input" name="position" placeholder="Position *" value={formData.position} onChange={handleInputChange} disabled={viewMode === 'view'} />
-                            <input className="form-input" name="location" placeholder="Location" value={formData.location} onChange={handleInputChange} disabled={viewMode === 'view'} />
-
-                            <select className="form-input" name="employmentType" value={formData.employmentType} onChange={handleInputChange} disabled={viewMode === 'view'}>
-                                <option value="full-time">Full Time</option>
-                                <option value="part-time">Part Time</option>
-                                <option value="contract">Contract</option>
-                                <option value="internship">Internship</option>
-                            </select>
-
-                            <select className="form-input" name="experienceLevel" value={formData.experienceLevel} onChange={handleInputChange} disabled={viewMode === 'view'}>
-                                <option value="entry">Entry Level</option>
-                                <option value="mid">Mid Level</option>
-                                <option value="senior">Senior Level</option>
-                                <option value="lead">Lead / Manager</option>
-                            </select>
-
-                            <input className="form-input" type="number" name="salaryMin" placeholder="Salary Min" value={formData.salaryMin} onChange={handleInputChange} disabled={viewMode === 'view'} />
-                            <input className="form-input" type="number" name="salaryMax" placeholder="Salary Max" value={formData.salaryMax} onChange={handleInputChange} disabled={viewMode === 'view'} />
-
-                            <select className="form-input" name="currency" value={formData.currency} onChange={handleInputChange} disabled={viewMode === 'view'}>
-                                <option value="USD">USD</option>
-                                <option value="EUR">EUR</option>
-                                <option value="GBP">GBP</option>
-                            </select>
-
-                            <input className="form-input" type="date" name="applicationDeadline" value={formData.applicationDeadline} onChange={handleInputChange} disabled={viewMode === 'view'} />
-
-                            <select className="form-input" name="status" value={formData.status} onChange={handleInputChange} disabled={viewMode === 'view'}>
-                                <option value="active">Active</option>
-                                <option value="closed">Closed</option>
-                                <option value="draft">Draft</option>
-                            </select>
+                    <div className="modal-content" style={{ width: 'min(1200px, 95vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+                        {/* Header */}
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '1rem',
+                            borderBottom: '1px solid var(--border-color)',
+                            position: 'sticky',
+                            top: 0,
+                            background: 'var(--bg-primary)',
+                            zIndex: 10
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '50%',
+                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1.25rem',
+                                    fontWeight: 'bold'
+                                }}>
+                                    {selectedApplication.firstName?.[0]}{selectedApplication.lastName?.[0]}
+                                </div>
+                                <div>
+                                    <h2 style={{ margin: 0 }}>{selectedApplication.firstName} {selectedApplication.lastName}</h2>
+                                    <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)' }}>
+                                        {selectedApplication.jobTitle} • {selectedApplication.department}
+                                    </p>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button className="btn btn-success" onClick={handleApprove}>
+                                    <FiCheckCircle /> Approve
+                                </button>
+                                <button className="btn btn-danger" onClick={handleReject}>
+                                    <FiXCircle /> Reject
+                                </button>
+                                <button className="btn btn-secondary" onClick={handleCloseDialog}>Close</button>
+                            </div>
                         </div>
 
-                        <textarea className="form-textarea" name="description" placeholder="Job Description" value={formData.description} onChange={handleInputChange} disabled={viewMode === 'view'} rows={4} style={{ marginTop: '0.75rem' }} />
-                        <textarea className="form-textarea" name="requirements" placeholder="Requirements" value={formData.requirements} onChange={handleInputChange} disabled={viewMode === 'view'} rows={4} style={{ marginTop: '0.75rem' }} />
-                        <textarea className="form-textarea" name="responsibilities" placeholder="Responsibilities" value={formData.responsibilities} onChange={handleInputChange} disabled={viewMode === 'view'} rows={4} style={{ marginTop: '0.75rem' }} />
+                        {/* Stage Progress */}
+                        <StageProgress currentStage={selectedApplication.currentStage} />
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={handleCloseDialog}>Cancel</button>
-                            {viewMode !== 'view' && (
-                                <button className="btn btn-primary" onClick={handleSubmit}>
-                                    {viewMode === 'create' ? 'Create' : 'Save Changes'}
+                        {/* Tabs */}
+                        <div style={{ display: 'flex', gap: '0.5rem', padding: '0 1rem', borderBottom: '1px solid var(--border-color)' }}>
+                            {['details', 'notes', 'interviews', 'reviews'].map(tab => (
+                                <button
+                                    key={tab}
+                                    className={`btn ${activeTab === tab ? 'btn-primary' : 'btn-ghost'}`}
+                                    onClick={() => setActiveTab(tab)}
+                                    style={{ borderRadius: 0, borderBottom: activeTab === tab ? '2px solid var(--primary)' : 'none' }}
+                                >
+                                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
                                 </button>
+                            ))}
+                        </div>
+
+                        {/* Tab Content */}
+                        <div style={{ padding: '1.5rem' }}>
+                            {activeTab === 'details' && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                    {/* Left Column - Personal Info */}
+                                    <div>
+                                        <h3 style={{ marginBottom: '1rem' }}>Personal Information</h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <FiMail style={{ color: 'var(--text-muted)' }} />
+                                                <span>{selectedApplication.email}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <FiPhone style={{ color: 'var(--text-muted)' }} />
+                                                <span>{selectedApplication.phone}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <FiMapPin style={{ color: 'var(--text-muted)' }} />
+                                                <span>{selectedApplication.location}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <FiBriefcase style={{ color: 'var(--text-muted)' }} />
+                                                <span>{selectedApplication.currentCompany} • {selectedApplication.experience}</span>
+                                            </div>
+                                        </div>
+
+                                        <h3 style={{ margin: '1.5rem 0 1rem' }}>Skills</h3>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                            {selectedApplication.skills?.map((skill, index) => (
+                                                <span key={index} style={{
+                                                    padding: '0.25rem 0.75rem',
+                                                    background: 'var(--bg-secondary)',
+                                                    borderRadius: '1rem',
+                                                    fontSize: '0.85rem'
+                                                }}>
+                                                    {skill}
+                                                </span>
+                                            ))}
+                                        </div>
+
+                                        <h3 style={{ margin: '1.5rem 0 1rem' }}>Education</h3>
+                                        <p>{selectedApplication.education}</p>
+                                    </div>
+
+                                    {/* Right Column - Application Details */}
+                                    <div>
+                                        <h3 style={{ marginBottom: '1rem' }}>Application Details</h3>
+                                        <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '0.5rem' }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Applied Date</div>
+                                                    <div>{format(new Date(selectedApplication.appliedDate), 'MMM dd, yyyy')}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Expected Salary</div>
+                                                    <div>{selectedApplication.expectedSalary}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Notice Period</div>
+                                                    <div>{selectedApplication.noticePeriod}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Priority</div>
+                                                    <div style={{
+                                                        color: selectedApplication.priority === 'high' ? '#e74c3c' :
+                                                            selectedApplication.priority === 'medium' ? '#f39c12' : 'inherit'
+                                                    }}>
+                                                        {selectedApplication.priority?.toUpperCase()}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <h3 style={{ margin: '1.5rem 0 1rem' }}>Cover Letter</h3>
+                                        <p style={{ lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                                            {selectedApplication.coverLetter}
+                                        </p>
+
+                                        <h3 style={{ margin: '1.5rem 0 1rem' }}>Links</h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {selectedApplication.resumeUrl && (
+                                                <a href={selectedApplication.resumeUrl} target="_blank" rel="noopener noreferrer">
+                                                    <FiDownload /> Resume
+                                                </a>
+                                            )}
+                                            {selectedApplication.linkedInUrl && (
+                                                <a href={selectedApplication.linkedInUrl} target="_blank" rel="noopener noreferrer">
+                                                    LinkedIn Profile
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'notes' && (
+                                <div>
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <h3>Add Note</h3>
+                                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                            <textarea
+                                                className="form-textarea"
+                                                value={newNote}
+                                                onChange={(e) => setNewNote(e.target.value)}
+                                                placeholder="Add a note about this candidate..."
+                                                rows={3}
+                                                style={{ flex: 1 }}
+                                            />
+                                            <button className="btn btn-primary" onClick={handleAddNote}>
+                                                Add Note
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <h3>Notes History</h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                                        {selectedApplication.notes?.map((note, index) => (
+                                            <div key={note.id || index} style={{
+                                                padding: '1rem',
+                                                background: 'var(--bg-secondary)',
+                                                borderRadius: '0.5rem'
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                                    <span style={{ fontWeight: 500 }}>{note.author}</span>
+                                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                        {format(new Date(note.date), 'MMM dd, yyyy HH:mm')}
+                                                    </span>
+                                                </div>
+                                                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{note.content}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'interviews' && (
+                                <div>
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <button className="btn btn-primary" onClick={handleScheduleInterview}>
+                                            <FiCalendar /> Schedule Interview
+                                        </button>
+                                    </div>
+
+                                    <h3>Scheduled Interviews</h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                                        {selectedApplication.interviews?.map((interview, index) => (
+                                            <div key={interview.id || index} style={{
+                                                padding: '1rem',
+                                                background: 'var(--bg-secondary)',
+                                                borderRadius: '0.5rem'
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div>
+                                                        <h4 style={{ margin: '0 0 0.25rem' }}>{interview.type}</h4>
+                                                        <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                                            with {interview.interviewer}
+                                                        </p>
+                                                    </div>
+                                                    <span style={{
+                                                        padding: '0.25rem 0.5rem',
+                                                        background: interview.status === 'scheduled' ? '#f39c12' : '#2ecc71',
+                                                        color: 'white',
+                                                        borderRadius: '1rem',
+                                                        fontSize: '0.85rem'
+                                                    }}>
+                                                        {interview.status}
+                                                    </span>
+                                                </div>
+                                                <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                                                    <FiCalendar /> {format(new Date(interview.date), 'MMM dd, yyyy HH:mm')}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'reviews' && (
+                                <div>
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <h3>Add Rating</h3>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                            <select
+                                                className="form-input"
+                                                value={rating.category}
+                                                onChange={(e) => setRating({ ...rating, category: e.target.value })}
+                                            >
+                                                <option value="">Select Category</option>
+                                                <option value="technical">Technical Skills</option>
+                                                <option value="communication">Communication</option>
+                                                <option value="experience">Experience</option>
+                                                <option value="culture">Culture Fit</option>
+                                                <option value="leadership">Leadership</option>
+                                            </select>
+                                            <select
+                                                className="form-input"
+                                                value={rating.score}
+                                                onChange={(e) => setRating({ ...rating, score: parseInt(e.target.value) })}
+                                            >
+                                                <option value="0">Select Rating</option>
+                                                {[1, 2, 3, 4, 5].map(score => (
+                                                    <option key={score} value={score}>{score} Star{score > 1 ? 's' : ''}</option>
+                                                ))}
+                                            </select>
+                                            <button className="btn btn-primary" onClick={handleAddRating}>
+                                                Add Rating
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <h3>Ratings</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+                                        {Object.entries(selectedApplication.ratings || {}).map(([category, score]) => (
+                                            <div key={category} style={{
+                                                padding: '1rem',
+                                                background: 'var(--bg-secondary)',
+                                                borderRadius: '0.5rem',
+                                                textAlign: 'center'
+                                            }}>
+                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                                                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                                                </div>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
+                                                    {score}/5
+                                                </div>
+                                                <div style={{ color: '#f39c12' }}>
+                                                    {'★'.repeat(score)}{'☆'.repeat(5 - score)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>

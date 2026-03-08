@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -19,10 +18,16 @@ import {
     FaChartLine,
     FaRocket,
     FaHandsHelping,
-    FaCalendarAlt
+    FaCalendarAlt,
+    FaDollarSign,
+    FaLevelUpAlt,
+    FaRegClock,
+    FaCheckCircle,
+    FaTimesCircle
 } from 'react-icons/fa';
 import api from '../services/api';
 import Loading from '../components/common/Loading';
+import toast from 'react-hot-toast';
 
 const Careers = () => {
     const [jobs, setJobs] = useState([]);
@@ -31,36 +36,92 @@ const Careers = () => {
     const [selectedDepartment, setSelectedDepartment] = useState('all');
     const [selectedLocation, setSelectedLocation] = useState('all');
     const [selectedType, setSelectedType] = useState('all');
+    const [departments, setDepartments] = useState([]);
+    const [locations, setLocations] = useState([]);
+    const [jobTypes, setJobTypes] = useState([]);
+    const [stats, setStats] = useState({
+        total: 0,
+        countries: 0,
+        remote: 0
+    });
 
-    const departments = [
-        'Engineering',
-        'Product',
-        'Design',
-        'Marketing',
-        'Sales',
-        'HR',
-        'Operations',
-        'Finance'
-    ];
+    useEffect(() => {
+        fetchJobs();
+        fetchFilters();
+    }, []);
 
-    const locations = [
-        'Remote',
-        'San Francisco, CA',
-        'New York, NY',
-        'Austin, TX',
-        'Seattle, WA',
-        'London, UK',
-        'Berlin, Germany',
-        'Singapore'
-    ];
+    const fetchJobs = async () => {
+        setLoading(true);
+        try {
+            // Fetch only open jobs for public view
+            const { data } = await api.get('/hr/jobs/public?status=open');
 
-    const jobTypes = [
-        'Full-time',
-        'Part-time',
-        'Contract',
-        'Internship',
-        'Remote'
-    ];
+            // Handle different response formats
+            const jobsData = data.data || data.jobs || data;
+
+            const normalizedJobs = (Array.isArray(jobsData) ? jobsData : []).map((job) => ({
+                id: job.id,
+                title: job.title || 'Untitled Position',
+                department: job.department_name || job.department || 'Unassigned',
+                location: job.location || 'Remote',
+                type: job.employment_type || job.type || 'full-time',
+                experience: job.experience_level || job.experience || 'Not specified',
+                salary_min: job.salary_min || null,
+                salary_max: job.salary_max || null,
+                salary_currency: job.salary_currency || 'USD',
+                description: job.description || '',
+                requirements: Array.isArray(job.requirements) ? job.requirements : [],
+                responsibilities: Array.isArray(job.responsibilities) ? job.responsibilities : [],
+                benefits: Array.isArray(job.benefits) ? job.benefits : [],
+                skills: Array.isArray(job.skills_required) ? job.skills_required : [],
+                isRemote: job.is_remote || false,
+                education: job.education_required || null,
+                postedDate: job.created_at ? new Date(job.created_at).toISOString() : new Date().toISOString(),
+                featured: job.is_featured || false
+            }));
+
+            setJobs(normalizedJobs);
+
+            // Calculate stats
+            const uniqueLocations = [...new Set(normalizedJobs.map(j => j.location))];
+            const remoteCount = normalizedJobs.filter(j => j.isRemote || j.location.toLowerCase().includes('remote')).length;
+
+            setStats({
+                total: normalizedJobs.length,
+                countries: uniqueLocations.length,
+                remote: remoteCount
+            });
+        } catch (error) {
+            console.error('Failed to fetch jobs:', error);
+            toast.error('Failed to load job listings');
+            setJobs([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchFilters = async () => {
+        try {
+            // Fetch departments for filter
+            const deptResponse = await api.get('/hr/departments');
+            const deptData = deptResponse.data.data || deptResponse.data.departments || deptResponse.data;
+            setDepartments(Array.isArray(deptData) ? deptData.map(d => d.name) : []);
+
+            // Static options for now - these could come from API
+            setLocations(['Remote', 'San Francisco, CA', 'New York, NY', 'Austin, TX', 'Seattle, WA', 'London, UK', 'Berlin, Germany', 'Singapore']);
+            setJobTypes(['Full-time', 'Part-time', 'Contract', 'Internship', 'Remote']);
+        } catch (error) {
+            console.error('Failed to fetch filters:', error);
+        }
+    };
+
+    const formatSalary = (job) => {
+        if (!job.salary_min && !job.salary_max) return null;
+        if (job.salary_min && job.salary_max) {
+            return `${job.salary_currency} ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}`;
+        }
+        return job.salary_min ? `${job.salary_currency} ${job.salary_min.toLocaleString()}+` : 'Negotiable';
+    };
 
     const benefits = [
         { icon: <FaHeart />, title: 'Health & Wellness', description: 'Comprehensive health, dental, and vision insurance' },
@@ -73,174 +134,16 @@ const Careers = () => {
         { icon: <FaGlobe />, title: 'Global Team', description: 'Work with colleagues from 20+ countries' }
     ];
 
-    useEffect(() => {
-        fetchJobs();
-    }, []);
-
-    const fetchJobs = async () => {
-        setLoading(true);
-        try {
-
-            const mockJobs = [
-                {
-                    id: 1,
-                    title: 'Senior Frontend Developer',
-                    department: 'Engineering',
-                    location: 'Remote',
-                    type: 'Full-time',
-                    experience: '5+ years',
-                    salary: '$120k - $150k',
-                    description: 'We are looking for an experienced Frontend Developer to join our team...',
-                    responsibilities: [
-                        'Build responsive and performant web applications',
-                        'Collaborate with designers and backend engineers',
-                        'Mentor junior developers',
-                        'Participate in code reviews'
-                    ],
-                    requirements: [
-                        '5+ years of experience with React',
-                        'Strong TypeScript skills',
-                        'Experience with Next.js',
-                        'Understanding of web performance optimization'
-                    ],
-                    postedDate: '2024-01-15',
-                    featured: true
-                },
-                {
-                    id: 2,
-                    title: 'Product Manager',
-                    department: 'Product',
-                    location: 'San Francisco, CA',
-                    type: 'Full-time',
-                    experience: '3+ years',
-                    salary: '$110k - $140k',
-                    description: 'Seeking a Product Manager to lead our flagship product...',
-                    responsibilities: [
-                        'Define product strategy and roadmap',
-                        'Work with engineering and design teams',
-                        'Conduct user research',
-                        'Analyze product metrics'
-                    ],
-                    requirements: [
-                        '3+ years of product management experience',
-                        'Strong analytical skills',
-                        'Excellent communication skills',
-                        'Experience with Agile methodologies'
-                    ],
-                    postedDate: '2024-01-14',
-                    featured: true
-                },
-                {
-                    id: 3,
-                    title: 'UX Designer',
-                    department: 'Design',
-                    location: 'New York, NY',
-                    type: 'Full-time',
-                    experience: '3+ years',
-                    salary: '$90k - $120k',
-                    description: 'Join our design team to create beautiful and intuitive experiences...',
-                    responsibilities: [
-                        'Create user flows and wireframes',
-                        'Design high-fidelity mockups',
-                        'Conduct user testing',
-                        'Maintain design system'
-                    ],
-                    requirements: [
-                        '3+ years of UX design experience',
-                        'Proficiency in Figma',
-                        'Portfolio of work',
-                        'User-centered design approach'
-                    ],
-                    postedDate: '2024-01-14',
-                    featured: false
-                },
-                {
-                    id: 4,
-                    title: 'DevOps Engineer',
-                    department: 'Engineering',
-                    location: 'Austin, TX',
-                    type: 'Full-time',
-                    experience: '4+ years',
-                    salary: '$130k - $160k',
-                    description: 'Looking for a DevOps engineer to manage our cloud infrastructure...',
-                    responsibilities: [
-                        'Manage AWS infrastructure',
-                        'Implement CI/CD pipelines',
-                        'Monitor system performance',
-                        'Ensure security best practices'
-                    ],
-                    requirements: [
-                        '4+ years of DevOps experience',
-                        'AWS certification',
-                        'Experience with Kubernetes',
-                        'Infrastructure as Code (Terraform)'
-                    ],
-                    postedDate: '2024-01-13',
-                    featured: true
-                },
-                {
-                    id: 5,
-                    title: 'HR Business Partner',
-                    department: 'HR',
-                    location: 'Remote',
-                    type: 'Full-time',
-                    experience: '5+ years',
-                    salary: '$95k - $120k',
-                    description: 'We are seeking an HR Business Partner to support our growing team...',
-                    responsibilities: [
-                        'Manage employee relations',
-                        'Lead recruitment efforts',
-                        'Develop HR policies',
-                        'Coordinate performance reviews'
-                    ],
-                    requirements: [
-                        '5+ years of HR experience',
-                        'Knowledge of employment law',
-                        'Excellent interpersonal skills',
-                        'HR certification preferred'
-                    ],
-                    postedDate: '2024-01-12',
-                    featured: false
-                },
-                {
-                    id: 6,
-                    title: 'Backend Developer Intern',
-                    department: 'Engineering',
-                    location: 'Remote',
-                    type: 'Internship',
-                    experience: '0-1 years',
-                    salary: '$25/hour',
-                    description: 'Join our backend team as an intern to learn and grow...',
-                    responsibilities: [
-                        'Build APIs under guidance',
-                        'Write unit tests',
-                        'Participate in code reviews',
-                        'Learn from senior engineers'
-                    ],
-                    requirements: [
-                        'Currently pursuing CS degree',
-                        'Knowledge of Node.js',
-                        'Eager to learn',
-                        'Good communication skills'
-                    ],
-                    postedDate: '2024-01-11',
-                    featured: false
-                }
-            ];
-            setJobs(mockJobs);
-        } catch (error) {
-            console.error('Failed to fetch jobs:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const filteredJobs = jobs.filter(job => {
-        const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            job.description.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch =
+            job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            job.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (job.department && job.department.toLowerCase().includes(searchTerm.toLowerCase()));
+
         const matchesDepartment = selectedDepartment === 'all' || job.department === selectedDepartment;
         const matchesLocation = selectedLocation === 'all' || job.location === selectedLocation;
         const matchesType = selectedType === 'all' || job.type === selectedType;
+
         return matchesSearch && matchesDepartment && matchesLocation && matchesType;
     });
 
@@ -251,7 +154,7 @@ const Careers = () => {
 
     return (
         <div className="careers-page">
-            {}
+            {/* Hero Section */}
             <section className="careers-hero">
                 <div className="hero-particles"></div>
                 <div className="container">
@@ -272,36 +175,36 @@ const Careers = () => {
 
                         <div className="hero-stats">
                             <div className="stat-item">
-                                <span className="stat-number">20+</span>
+                                <span className="stat-number">{stats.countries}+</span>
                                 <span className="stat-label">Countries</span>
                             </div>
                             <div className="stat-item">
-                                <span className="stat-number">150+</span>
-                                <span className="stat-label">Team Members</span>
+                                <span className="stat-number">{stats.total}</span>
+                                <span className="stat-label">Open Positions</span>
+                            </div>
+                            <div className="stat-item">
+                                <span className="stat-number">{stats.remote}%</span>
+                                <span className="stat-label">Remote Friendly</span>
                             </div>
                             <div className="stat-item">
                                 <span className="stat-number">4.8</span>
                                 <span className="stat-label">Glassdoor Rating</span>
                             </div>
-                            <div className="stat-item">
-                                <span className="stat-number">100%</span>
-                                <span className="stat-label">Remote First</span>
-                            </div>
                         </div>
 
                         <div className="hero-cta">
-                            <Link to="#openings" className="btn btn-primary btn-large">
+                            <a href="#openings" className="btn btn-primary btn-large">
                                 View Open Positions
-                            </Link>
-                            <Link to="#culture" className="btn btn-secondary btn-large">
+                            </a>
+                            <a href="#culture" className="btn btn-secondary btn-large">
                                 Learn About Our Culture
-                            </Link>
+                            </a>
                         </div>
                     </motion.div>
                 </div>
             </section>
 
-            
+            {/* Benefits Section */}
             <section className="benefits-section" id="culture">
                 <div className="container">
                     <motion.div
@@ -335,7 +238,7 @@ const Careers = () => {
                 </div>
             </section>
 
-            
+            {/* Culture Section */}
             <section className="culture-section">
                 <div className="container">
                     <motion.div
@@ -425,7 +328,7 @@ const Careers = () => {
                 </div>
             </section>
 
-            
+            {/* Jobs Section */}
             <section className="jobs-section" id="openings">
                 <div className="container">
                     <motion.div
@@ -439,13 +342,13 @@ const Careers = () => {
                         <p>Find your next role at Welp</p>
                     </motion.div>
 
-                    
+                    {/* Filters */}
                     <div className="job-filters">
                         <div className="search-box">
                             <FaSearch className="search-icon" />
                             <input
                                 type="text"
-                                placeholder="Search jobs by title or description..."
+                                placeholder="Search jobs by title, department, or description..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -487,74 +390,101 @@ const Careers = () => {
                         </div>
                     </div>
 
-                    
+                    {/* Featured Jobs */}
                     {featuredJobs.length > 0 && (
                         <div className="featured-jobs">
                             <h3>Featured Opportunities</h3>
                             <div className="jobs-grid">
-                                {featuredJobs.map((job, index) => (
-                                    <motion.div
-                                        key={job.id}
-                                        className="job-card featured"
-                                        initial={{ opacity: 0, y: 20 }}
-                                        whileInView={{ opacity: 1, y: 0 }}
-                                        viewport={{ once: true }}
-                                        transition={{ duration: 0.5, delay: index * 0.1 }}
-                                        whileHover={{ y: -5 }}
-                                    >
-                                        <div className="job-badge">Featured</div>
-                                        <div className="job-header">
-                                            <h3>{job.title}</h3>
-                                            <span className="job-department">{job.department}</span>
-                                        </div>
-                                        <div className="job-meta">
-                                            <span><FaMapMarkerAlt /> {job.location}</span>
-                                            <span><FaBriefcase /> {job.type}</span>
-                                            <span><FaClock /> {job.experience}</span>
-                                        </div>
-                                        <p className="job-description">{job.description}</p>
-                                        <div className="job-footer">
-                                            <span className="job-salary">{job.salary}</span>
-                                            <Link to={`/careers/jobs/${job.id}`} className="btn btn-primary">
-                                                View Details
-                                            </Link>
-                                        </div>
-                                    </motion.div>
-                                ))}
+                                {featuredJobs.map((job, index) => {
+                                    const salary = formatSalary(job);
+                                    return (
+                                        <motion.div
+                                            key={job.id}
+                                            className="job-card featured"
+                                            initial={{ opacity: 0, y: 20 }}
+                                            whileInView={{ opacity: 1, y: 0 }}
+                                            viewport={{ once: true }}
+                                            transition={{ duration: 0.5, delay: index * 0.1 }}
+                                            whileHover={{ y: -5 }}
+                                        >
+                                            <div className="job-badge">Featured</div>
+                                            <div className="job-header">
+                                                <h3>{job.title}</h3>
+                                                <span className="job-department">{job.department}</span>
+                                            </div>
+                                            <div className="job-meta">
+                                                <span><FaMapMarkerAlt /> {job.location} {job.isRemote && '🌍'}</span>
+                                                <span><FaBriefcase /> {job.type}</span>
+                                                <span><FaLevelUpAlt /> {job.experience}</span>
+                                            </div>
+                                            {salary && (
+                                                <div className="job-salary">
+                                                    <FaDollarSign /> {salary}
+                                                </div>
+                                            )}
+                                            <p className="job-description">{job.description.substring(0, 150)}...</p>
+                                            <div className="skills-preview">
+                                                {job.skills.slice(0, 3).map((skill, i) => (
+                                                    <span key={i} className="skill-tag">{skill}</span>
+                                                ))}
+                                            </div>
+                                            <div className="job-footer">
+                                                <span className="posted-date">
+                                                    <FaRegClock /> Posted {new Date(job.postedDate).toLocaleDateString()}
+                                                </span>
+                                                <Link to={`/careers/jobs/${job.id}`} className="btn btn-primary">
+                                                    View Details
+                                                </Link>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
 
-                    
+                    {/* All Jobs */}
                     <div className="all-jobs">
                         <h3>All Openings</h3>
                         <div className="jobs-list">
-                            {regularJobs.map((job, index) => (
-                                <motion.div
-                                    key={job.id}
-                                    className="job-list-item"
-                                    initial={{ opacity: 0, x: -20 }}
-                                    whileInView={{ opacity: 1, x: 0 }}
-                                    viewport={{ once: true }}
-                                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                                >
-                                    <div className="job-item-content">
-                                        <div className="job-item-header">
-                                            <h4>{job.title}</h4>
-                                            <span className="job-item-department">{job.department}</span>
+                            {regularJobs.map((job, index) => {
+                                const salary = formatSalary(job);
+                                return (
+                                    <motion.div
+                                        key={job.id}
+                                        className="job-list-item"
+                                        initial={{ opacity: 0, x: -20 }}
+                                        whileInView={{ opacity: 1, x: 0 }}
+                                        viewport={{ once: true }}
+                                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                                    >
+                                        <div className="job-item-content">
+                                            <div className="job-item-header">
+                                                <h4>{job.title}</h4>
+                                                <span className="job-item-department">{job.department}</span>
+                                            </div>
+                                            <div className="job-item-meta">
+                                                <span><FaMapMarkerAlt /> {job.location}</span>
+                                                <span><FaBriefcase /> {job.type}</span>
+                                                <span><FaLevelUpAlt /> {job.experience}</span>
+                                                {salary && (
+                                                    <span className="job-item-salary">
+                                                        <FaDollarSign /> {salary}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="job-item-skills">
+                                                {job.skills.slice(0, 3).map((skill, i) => (
+                                                    <span key={i} className="skill-tag-small">{skill}</span>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="job-item-meta">
-                                            <span><FaMapMarkerAlt /> {job.location}</span>
-                                            <span><FaBriefcase /> {job.type}</span>
-                                            <span><FaClock /> {job.experience}</span>
-                                            <span className="job-item-salary">{job.salary}</span>
-                                        </div>
-                                    </div>
-                                    <Link to={`/careers/jobs/${job.id}`} className="btn btn-secondary">
-                                        Apply Now
-                                    </Link>
-                                </motion.div>
-                            ))}
+                                        <Link to={`/careers/jobs/${job.id}`} className="btn btn-secondary">
+                                            Apply Now
+                                        </Link>
+                                    </motion.div>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -568,7 +498,7 @@ const Careers = () => {
                 </div>
             </section>
 
-            
+            {/* CTA Section */}
             <section className="careers-cta">
                 <div className="container">
                     <motion.div
@@ -597,7 +527,13 @@ const Careers = () => {
                     overflow-x: hidden;
                 }
 
-                
+                .container {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    padding: 0 2rem;
+                }
+
+                /* Hero Section */
                 .careers-hero {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
@@ -674,7 +610,7 @@ const Careers = () => {
                     justify-content: center;
                 }
 
-                
+                /* Section Headers */
                 .section-header {
                     text-align: center;
                     margin-bottom: 3rem;
@@ -691,7 +627,7 @@ const Careers = () => {
                     font-size: 1.2rem;
                 }
 
-                
+                /* Benefits Section */
                 .benefits-section {
                     padding: 5rem 0;
                     background: #f7fafc;
@@ -728,7 +664,7 @@ const Careers = () => {
                     line-height: 1.6;
                 }
 
-                
+                /* Culture Section */
                 .culture-section {
                     padding: 5rem 0;
                 }
@@ -768,7 +704,7 @@ const Careers = () => {
                     line-height: 1.6;
                 }
 
-                
+                /* Jobs Section */
                 .jobs-section {
                     padding: 5rem 0;
                     background: #f7fafc;
@@ -885,10 +821,37 @@ const Careers = () => {
                     font-size: 0.9rem;
                 }
 
+                .job-salary {
+                    background: #f0f9ff;
+                    padding: 0.5rem 1rem;
+                    border-radius: 6px;
+                    margin-bottom: 1rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    color: #48bb78;
+                    font-weight: 600;
+                }
+
                 .job-description {
                     color: #4a5568;
                     margin-bottom: 1rem;
                     line-height: 1.6;
+                }
+
+                .skills-preview {
+                    display: flex;
+                    gap: 0.5rem;
+                    flex-wrap: wrap;
+                    margin-bottom: 1rem;
+                }
+
+                .skill-tag {
+                    padding: 0.25rem 0.75rem;
+                    background: #f7fafc;
+                    color: #4a5568;
+                    border-radius: 30px;
+                    font-size: 0.8rem;
                 }
 
                 .job-footer {
@@ -897,9 +860,12 @@ const Careers = () => {
                     align-items: center;
                 }
 
-                .job-salary {
-                    font-weight: 600;
-                    color: #48bb78;
+                .posted-date {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    color: #718096;
+                    font-size: 0.85rem;
                 }
 
                 .jobs-list {
@@ -949,6 +915,7 @@ const Careers = () => {
                     gap: 1.5rem;
                     color: #718096;
                     font-size: 0.9rem;
+                    flex-wrap: wrap;
                 }
 
                 .job-item-meta span {
@@ -960,6 +927,20 @@ const Careers = () => {
                 .job-item-salary {
                     color: #48bb78;
                     font-weight: 500;
+                }
+
+                .job-item-skills {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-top: 0.5rem;
+                }
+
+                .skill-tag-small {
+                    padding: 0.15rem 0.5rem;
+                    background: #f7fafc;
+                    color: #4a5568;
+                    border-radius: 30px;
+                    font-size: 0.75rem;
                 }
 
                 .no-jobs {
@@ -983,7 +964,7 @@ const Careers = () => {
                     color: #718096;
                 }
 
-                
+                /* CTA Section */
                 .careers-cta {
                     padding: 5rem 0;
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1013,7 +994,7 @@ const Careers = () => {
                     justify-content: center;
                 }
 
-                
+                /* Buttons */
                 .btn {
                     padding: 0.75rem 1.5rem;
                     border-radius: 8px;
@@ -1048,13 +1029,13 @@ const Careers = () => {
                     font-size: 1.1rem;
                 }
 
-                
+                /* Animation */
                 @keyframes float {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(-20px); }
                 }
 
-                
+                /* Responsive */
                 @media (max-width: 768px) {
                     .hero-content h1 {
                         font-size: 2rem;
