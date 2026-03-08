@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -18,59 +17,98 @@ const psychologistRoutes = require('./routes/psychologistRoutes');
 const pricingRoutes = require('./routes/pricingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const hrRoutes = require('./routes/hrRoutes');
-let rbacUserRoutes;
-let roleRoutes;
-let authV2Routes;
-let sequelize;
+
+// Database connection with better error handling
+const { sequelize, testConnection } = require('./models');
+
+// Optional routes with safe imports
+let rbacUserRoutes, roleRoutes, authV2Routes;
 
 try {
     rbacUserRoutes = require('./routes/rbacUserRoutes');
     roleRoutes = require('./routes/roleRoutes');
     authV2Routes = require('./routes/authV2Routes');
-    ({ sequelize } = require('./models'));
 } catch (error) {
-    console.warn('⚠️ RBAC Sequelize module unavailable:', error.message);
+    console.warn('⚠️ RBAC routes unavailable:', error.message);
 }
 
-const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+// Parse frontend origins with better handling
+const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,http://localhost:3000')
     .split(',')
     .map((origin) => origin.trim())
-    .filter(Boolean);
+    .filter(origin => origin && origin !== '');
 
-const weakJwtSecret = !process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET.includes('change-in-production');
-if (weakJwtSecret && process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET is missing or too weak. Use at least 32 characters and never use placeholders.');
-}
-if (weakJwtSecret) {
-    console.warn('⚠️ Weak JWT_SECRET detected. Update it before production deployment.');
-}
+// JWT Secret validation with better error messages
+const validateJwtSecret = () => {
+    const weakJwtSecret = !process.env.JWT_SECRET ||
+        process.env.JWT_SECRET.length < 32 ||
+        process.env.JWT_SECRET.includes('change-in-production') ||
+        process.env.JWT_SECRET === 'your_jwt_secret_key_here';
 
+    if (weakJwtSecret && process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET is missing or too weak. Use at least 32 characters and never use placeholders.');
+    }
+
+    if (weakJwtSecret) {
+        console.warn('⚠️ Weak JWT_SECRET detected. Update it before production deployment.');
+        console.warn('💡 Generate a strong secret with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+    }
+};
+
+validateJwtSecret();
+
+// Enhanced CORS configuration
 const corsOptions = {
     origin: (origin, callback) => {
-        if (!origin || frontendOrigins.includes(origin)) {
+        // Allow requests with no origin (like mobile apps, curl, Postman)
+        if (!origin || frontendOrigins.includes(origin) || frontendOrigins.includes('*')) {
             return callback(null, true);
         }
 
+        // Log CORS violations for debugging
+        console.warn(`🚫 CORS blocked request from origin: ${origin}`);
         return callback(new Error('CORS policy violation'));
     },
-    credentials: true
+    credentials: true,
+    optionsSuccessStatus: 200
 };
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, { cors: corsOptions });
 
+// Socket.IO with better error handling
+const io = new Server(httpServer, {
+    cors: corsOptions,
+    pingTimeout: 60000,
+    pingInterval: 25000
+});
 
+// Security middleware
 app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'", ...frontendOrigins]
+        }
+    }
 }));
+
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '100kb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
+
+// Static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Rate limiting
 app.use('/api/', apiLimiter);
 
-
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/reviews', reviewRoutes);
@@ -80,51 +118,122 @@ app.use('/api/psychologists', psychologistRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hr', hrRoutes);
+
+// RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {
     app.use('/api/rbac/auth', authV2Routes);
     app.use('/api/rbac/users', rbacUserRoutes);
     app.use('/api/rbac/roles', roleRoutes);
+    console.log('✅ RBAC routes registered');
 }
 
-
+// Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date() });
+    res.json({
+        status: 'OK',
+        timestamp: new Date(),
+        database: sequelize ? 'connected' : 'disconnected',
+        environment: process.env.NODE_ENV || 'development'
+    });
 });
 
+// 404 handler
+app.use('*', (req, res) => {
+    res.status(404).json({
+        error: 'Not Found',
+        message: `Cannot ${req.method} ${req.originalUrl}`
+    });
+});
 
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('❌ Unhandled error:', err);
+
+    // CORS error handling
+    if (err.message === 'CORS policy violation') {
+        return res.status(403).json({
+            error: 'CORS Error',
+            message: 'Origin not allowed'
+        });
+    }
+
+    // JWT error handling
+    if (err.name === 'JsonWebTokenError') {
+        return res.status(401).json({
+            error: 'Invalid token',
+            message: 'Authentication failed'
+        });
+    }
+
+    if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({
+            error: 'Token expired',
+            message: 'Please login again'
+        });
+    }
+
+    // Default error response
+    res.status(err.status || 500).json({
+        error: err.name || 'Internal Server Error',
+        message: process.env.NODE_ENV === 'production'
+            ? 'An unexpected error occurred'
+            : err.message
+    });
+});
+
+// Socket.IO authentication middleware
 io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
+    const token = socket.handshake.auth.token || socket.handshake.headers.token;
+
     if (!token) {
-        return next(new Error('Authentication error'));
+        return next(new Error('Authentication error: No token provided'));
     }
 
     try {
         const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         socket.userId = decoded.userId;
+        socket.userRole = decoded.role || 'user';
         next();
     } catch (err) {
-        next(new Error('Authentication error'));
+        console.error('Socket auth error:', err.message);
+        next(new Error('Authentication error: Invalid token'));
     }
 });
 
+// Socket.IO connection handling
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.userId);
+    console.log('🔌 User connected:', socket.userId, 'Role:', socket.userRole);
 
     socket.on('join-conversation', (conversationId) => {
+        if (!conversationId) {
+            return socket.emit('error', { message: 'Conversation ID required' });
+        }
         socket.join(`conversation-${conversationId}`);
+        console.log(`User ${socket.userId} joined conversation ${conversationId}`);
     });
 
     socket.on('leave-conversation', (conversationId) => {
+        if (!conversationId) return;
         socket.leave(`conversation-${conversationId}`);
+        console.log(`User ${socket.userId} left conversation ${conversationId}`);
     });
 
     socket.on('send-message', async (data) => {
         try {
             const { conversationId, content } = data;
 
+            if (!conversationId || !content) {
+                return socket.emit('error', { message: 'Conversation ID and content required' });
+            }
+
+            if (content.length > 5000) {
+                return socket.emit('error', { message: 'Message too long (max 5000 characters)' });
+            }
+
             const { query } = require('./utils/database');
 
+            // Check conversation access
             const conversationAccess = await query(
                 `SELECT id FROM conversations
                  WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
@@ -135,55 +244,136 @@ io.on('connection', (socket) => {
                 return socket.emit('error', { message: 'Unauthorized conversation access' });
             }
 
+            // Insert message
             const result = await query(
-                `INSERT INTO messages (conversation_id, sender_id, content)
-                 VALUES ($1, $2, $3)
-                 RETURNING *`,
+                `INSERT INTO messages (conversation_id, sender_id, content, created_at)
+                 VALUES ($1, $2, $3, NOW())
+                     RETURNING *`,
                 [conversationId, socket.userId, content]
             );
 
+            // Get sender info
             const sender = await query(
                 'SELECT id, display_name, role FROM users WHERE id = $1',
                 [socket.userId]
             );
 
+            // Update conversation timestamp
             await query(
-                'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+                'UPDATE conversations SET updated_at = NOW() WHERE id = $1',
                 [conversationId]
             );
 
             const message = {
                 ...result.rows[0],
-                sender: sender.rows[0]
+                sender: sender.rows[0] || { id: socket.userId, display_name: 'Unknown', role: 'user' }
             };
 
+            // Emit to all in conversation
             io.to(`conversation-${conversationId}`).emit('new-message', message);
+
+            console.log(`Message sent in conversation ${conversationId} by user ${socket.userId}`);
+
         } catch (error) {
             console.error('Socket message error:', error);
             socket.emit('error', { message: 'Failed to send message' });
         }
     });
 
+    socket.on('typing', (data) => {
+        const { conversationId, isTyping } = data;
+        socket.to(`conversation-${conversationId}`).emit('user-typing', {
+            userId: socket.userId,
+            isTyping
+        });
+    });
+
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.userId);
+        console.log('🔌 User disconnected:', socket.userId);
+    });
+
+    socket.on('error', (error) => {
+        console.error('Socket error for user', socket.userId, ':', error);
     });
 });
 
 const PORT = process.env.PORT || 5000;
 
-(async () => {
-    if (sequelize) {
-        try {
-            await sequelize.authenticate();
-            console.log('✅ Sequelize connection initialized');
-        } catch (error) {
-            console.warn('⚠️ Sequelize connection unavailable:', error.message);
+// Server startup with better error handling
+const startServer = async () => {
+    try {
+        // Test database connection using the enhanced testConnection function (with retries)
+        if (sequelize) {
+            const dbConnected = await testConnection(); // This should include retry logic
+            if (dbConnected) {
+                console.log('✅ Database connection established successfully');
+
+                // Sync models (only in development)
+                if (process.env.NODE_ENV === 'development') {
+                    await sequelize.sync({ alter: true });
+                    console.log('✅ Database models synchronized');
+                }
+            } else {
+                console.log('⚠️ Server will start but database features may not work');
+            }
+        } else {
+            console.warn('⚠️ Sequelize not available - running without database');
         }
+
+        // Start server
+        httpServer.listen(PORT, () => {
+            console.log(`✅ Server running on port ${PORT}`);
+            console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`🔗 Frontend origins allowed: ${frontendOrigins.join(', ') || 'all'}`);
+        });
+
+    } catch (error) {
+        console.error('❌ Failed to start server:', error);
+        process.exit(1);
     }
+};
 
-    httpServer.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
+// Handle graceful shutdown
+const gracefulShutdown = () => {
+    console.log('🛑 Received shutdown signal, closing connections...');
+
+    httpServer.close(() => {
+        console.log('✅ HTTP server closed');
+
+        if (sequelize) {
+            sequelize.close().then(() => {
+                console.log('✅ Database connection closed');
+                process.exit(0);
+            }).catch((err) => {
+                console.error('Error closing database connection:', err);
+                process.exit(1);
+            });
+        } else {
+            process.exit(0);
+        }
     });
-})();
 
-module.exports = { app, httpServer };
+    // Force shutdown after timeout
+    setTimeout(() => {
+        console.error('Could not close connections in time, forcefully shutting down');
+        process.exit(1);
+    }, 10000);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    gracefulShutdown();
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Start the server
+startServer();
+
+module.exports = { app, httpServer, io };

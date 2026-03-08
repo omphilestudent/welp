@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi';
+import { useAuth } from '../../hooks/useAuth'; // Add this import
 import Modal from '../../components/common/Modal';
 import UserForm from '../../components/admin/UserForm';
 import UserTable from '../../components/admin/UserTable';
@@ -12,6 +12,7 @@ import './UserManagement.css';
 
 const UserManagement = () => {
     const navigate = useNavigate();
+    const { user } = useAuth(); // Get user from auth context
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -32,15 +33,16 @@ const UserManagement = () => {
         totalPages: 0
     });
 
-
     const {
         execute: fetchUsersApi,
-        loading: usersLoading
+        loading: usersLoading,
+        error: usersError
     } = useApi('/rbac/users', 'get');
 
     const {
         execute: fetchRolesApi,
-        data: rolesData
+        data: rolesData,
+        error: rolesError
     } = useApi('/rbac/users/roles/available', 'get');
 
     const {
@@ -63,7 +65,6 @@ const UserManagement = () => {
         execute: resetPasswordApi
     } = useApi('/rbac/users/reset-password', 'post');
 
-
     const fetchUsers = async () => {
         try {
             const params = {
@@ -72,152 +73,190 @@ const UserManagement = () => {
                 ...filters
             };
 
-            const result = await fetchUsersApi(null, params);
+            console.log('Fetching users with params:', params);
+            const result = await fetchUsersApi(null, { params }); // Fixed: pass params correctly
 
-            if (result.success) {
-                setUsers(result.data.users || []);
+            if (result?.success) {
+                setUsers(result.data?.users || []);
                 setPagination(prev => ({
                     ...prev,
-                    total: result.data.total || 0,
-                    totalPages: result.data.totalPages || 0
+                    total: result.data?.total || 0,
+                    totalPages: result.data?.totalPages || 0
                 }));
+            } else {
+                console.log('Fetch users result not successful:', result);
             }
         } catch (error) {
             console.error('Error in fetchUsers:', error);
+            // Don't navigate on error, just show toast
+            toast.error('Failed to fetch users');
         } finally {
             setLoading(false);
         }
     };
 
-
     const fetchRoles = async () => {
-        const result = await fetchRolesApi();
-        if (result.success) {
-            setRoles(result.data || []);
+        try {
+            console.log('Fetching roles...');
+            const result = await fetchRolesApi();
+            console.log('Fetch roles result:', result);
+
+            if (result?.success) {
+                setRoles(result.data || []);
+            } else {
+                console.log('Fetch roles not successful:', result);
+                // Set empty roles array if fetch fails
+                setRoles([]);
+            }
+        } catch (error) {
+            console.error('Error in fetchRoles:', error);
+            // Don't navigate on error
+            setRoles([]);
         }
     };
 
-
     useEffect(() => {
-        const checkAuth = async () => {
+        const loadData = async () => {
+            setLoading(true);
             try {
-                await fetchRoles();
-                await fetchUsers();
+                // Fetch roles and users in parallel
+                await Promise.all([
+                    fetchRoles(),
+                    fetchUsers()
+                ]);
             } catch (error) {
-
-console.log('Error in checkAuth:', error);
-                if (error.response?.status === 401) {
-                    navigate('/login');
+                console.error('Error loading data:', error);
+                // Check if it's an auth error
+                if (error?.response?.status === 401) {
+                    console.log('Auth error detected, but letting AdminRoute handle it');
+                    // Don't navigate - let the AdminRoute component handle it
+                } else {
+                    toast.error('Failed to load data');
                 }
+            } finally {
+                setLoading(false);
             }
         };
 
-        checkAuth();
-    }, [pagination.page, filters]);
+        loadData();
+    }, [pagination.page, filters.search, filters.roleId, filters.department, filters.isActive]); // Add all filter dependencies
 
     const handleSaveUser = async (userData) => {
         let result;
 
-        if (selectedUser) {
+        try {
+            if (selectedUser) {
+                result = await updateUserApi(userData);
+            } else {
+                result = await createUserApi(userData);
+            }
 
-            result = await updateUserApi(
-                userData,
-                null,
-                true
-            );
-        } else {
-
-            result = await createUserApi(
-                userData,
-                null,
-                true
-            );
-        }
-
-        if (result.success) {
-            setShowModal(false);
-            setSelectedUser(null);
-            fetchUsers();
+            if (result?.success) {
+                toast.success(selectedUser ? 'User updated successfully' : 'User created successfully');
+                setShowModal(false);
+                setSelectedUser(null);
+                fetchUsers(); // Refresh the list
+            } else {
+                toast.error(result?.error || 'Operation failed');
+            }
+        } catch (error) {
+            console.error('Error saving user:', error);
+            toast.error('Failed to save user');
         }
     };
 
     const handleDeleteUser = async () => {
-        let result;
+        try {
+            let result;
 
-        if (selectedUsers.length > 0) {
+            if (selectedUsers.length > 0) {
+                result = await bulkDeleteUsersApi({ userIds: selectedUsers });
 
-            result = await bulkDeleteUsersApi(
-                { userIds: selectedUsers },
-                null,
-                true
-            );
+                if (result?.success) {
+                    toast.success(`${selectedUsers.length} users deleted successfully`);
+                    setSelectedUsers([]);
+                }
+            } else if (selectedUser) {
+                result = await deleteUserApi(null, { params: { id: selectedUser.id } });
 
-            if (result.success) {
-                setSelectedUsers([]);
+                if (result?.success) {
+                    toast.success('User deleted successfully');
+                }
             }
-        } else if (selectedUser) {
 
-            result = await deleteUserApi(
-                null,
-                null,
-                true
-            );
-
-
-
-
-        }
-
-        if (result.success) {
-            setShowDeleteConfirm(false);
-            setSelectedUser(null);
-            fetchUsers();
+            if (result?.success) {
+                setShowDeleteConfirm(false);
+                setSelectedUser(null);
+                fetchUsers(); // Refresh the list
+            } else {
+                toast.error(result?.error || 'Delete failed');
+            }
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            toast.error('Failed to delete user');
         }
     };
 
     const handleResetPassword = async (userId) => {
         const newPassword = window.prompt('Enter new password (min 8 characters):');
 
-        if (!newPassword || newPassword.length < 8) {
+        if (!newPassword) return;
+
+        if (newPassword.length < 8) {
             toast.error('Password must be at least 8 characters long');
             return;
         }
 
-        const result = await resetPasswordApi(
-            { userId, newPassword },
-            null,
-            true
-        );
+        try {
+            const result = await resetPasswordApi({ userId, newPassword });
+
+            if (result?.success) {
+                toast.success('Password reset successfully');
+            } else {
+                toast.error(result?.error || 'Failed to reset password');
+            }
+        } catch (error) {
+            console.error('Error resetting password:', error);
+            toast.error('Failed to reset password');
+        }
     };
 
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         setFilters((prev) => ({ ...prev, [name]: value }));
-        setPagination((prev) => ({ ...prev, page: 1 }));
+        setPagination((prev) => ({ ...prev, page: 1 })); // Reset to first page on filter change
     };
 
     const handleBulkAction = (action) => {
         if (selectedUsers.length === 0) {
-            toast('Please select users first');
+            toast.error('Please select users first');
             return;
         }
 
         if (action === 'delete') setShowDeleteConfirm(true);
     };
 
+    // Add a check to verify user has access before rendering
+    if (!user) {
+        console.log('No user in UserManagement, but should be handled by AdminRoute');
+        return null; // Let the AdminRoute handle the redirect
+    }
+
     return (
         <div className="user-management">
             <div className="page-header">
                 <h1>User Management</h1>
-                <button
-                    className="btn-primary"
-                    onClick={() => {
-                        setSelectedUser(null);
-                        setShowModal(true);
-                    }}
-                >
-                    <i className="fas fa-plus" /> Create New User
-                </button>
+                <div className="header-actions">
+                    <button
+                        className="btn-primary"
+                        onClick={() => {
+                            setSelectedUser(null);
+                            setShowModal(true);
+                        }}
+                    >
+                        <i className="fas fa-plus" /> Create New User
+                    </button>
+                </div>
             </div>
 
             <div className="filters-section">
@@ -240,8 +279,8 @@ console.log('Error in checkAuth:', error);
                         className="filter-select"
                     >
                         <option value="">All Roles</option>
-                        {roles.map((role) => (
-                            <option key={role.id} value={role.id}>
+                        {roles && roles.map((role) => (
+                            <option key={role.id || role._id} value={role.id || role._id}>
                                 {role.name}
                             </option>
                         ))}
@@ -276,7 +315,7 @@ console.log('Error in checkAuth:', error);
                 )}
             </div>
 
-            {loading || usersLoading ? (
+            {(loading || usersLoading) ? (
                 <Loading text="Loading users..." />
             ) : (
                 <>

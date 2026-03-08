@@ -1,4 +1,3 @@
-
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
@@ -25,13 +24,13 @@ const register = async (req, res) => {
     try {
         const { email, password, role, isAnonymous, displayName } = req.body;
 
-
+        // Handle anonymous registration
         if (isAnonymous) {
             const result = await query(
                 `INSERT INTO users (role, is_anonymous, display_name)
                  VALUES ($1, $2, $3)
                  RETURNING id, role, is_anonymous, display_name, token_version`,
-                [role, true, displayName || `Anonymous_${Date.now()}`]
+                [role || 'user', true, displayName || `Anonymous_${Date.now()}`]
             );
 
             const user = result.rows[0];
@@ -39,7 +38,8 @@ const register = async (req, res) => {
 
             res.cookie('token', token, getCookieOptions());
 
-            return res.json({
+            return res.status(201).json({
+                success: true,
                 user: {
                     id: user.id,
                     role: user.role,
@@ -49,28 +49,36 @@ const register = async (req, res) => {
             });
         }
 
-
+        // Validate email and password for regular registration
         if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password required' });
+            return res.status(400).json({
+                success: false,
+                error: 'Email and password are required'
+            });
         }
 
-
+        // Check if user already exists
         const existingUser = await query(
             'SELECT id FROM users WHERE email = $1',
-            [email]
+            [email.toLowerCase()]
         );
 
         if (existingUser.rows.length > 0) {
-            return res.status(400).json({ error: 'Email already registered' });
+            return res.status(409).json({
+                success: false,
+                error: 'Email already registered'
+            });
         }
 
+        // Hash password and create user
         const hashedPassword = await bcrypt.hash(password, 12);
+        const displayNameValue = displayName || email.split('@')[0];
 
         const result = await query(
-            `INSERT INTO users (email, password_hash, role, is_anonymous, display_name)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, email, role, is_anonymous, display_name, token_version`,
-            [email, hashedPassword, role, false, displayName || email.split('@')[0]]
+            `INSERT INTO users (email, password_hash, role, is_anonymous, display_name, is_verified)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, email, role, is_anonymous, display_name, token_version, created_at`,
+            [email.toLowerCase(), hashedPassword, role || 'user', false, displayNameValue, false]
         );
 
         const user = result.rows[0];
@@ -78,7 +86,8 @@ const register = async (req, res) => {
 
         res.cookie('token', token, getCookieOptions());
 
-        res.json({
+        res.status(201).json({
+            success: true,
             user: {
                 id: user.id,
                 email: user.email,
@@ -88,8 +97,29 @@ const register = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ error: 'Registration failed' });
+        console.error('❌ Registration error:', error);
+        console.error('Error stack:', error.stack);
+
+        // Handle specific database errors
+        if (error.code === '23505') { // Unique violation
+            return res.status(409).json({
+                success: false,
+                error: 'Email already registered'
+            });
+        }
+
+        if (error.code === '42P01') { // Table doesn't exist
+            console.error('❌ Users table does not exist. Please run database migrations.');
+            return res.status(503).json({
+                success: false,
+                error: 'Database not initialized'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            error: 'Registration failed. Please try again.'
+        });
     }
 };
 
@@ -97,31 +127,67 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // Validate input
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Email and password are required'
+            });
+        }
+
+        // Find user by email
         const result = await query(
-            'SELECT id, email, password_hash, role, is_anonymous, display_name, token_version FROM users WHERE email = $1',
-            [email]
+            `SELECT id, email, password_hash, role, is_anonymous, display_name, 
+                    token_version, is_verified, created_at
+             FROM users 
+             WHERE email = $1`,
+            [email.toLowerCase()]
         );
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            // Use generic message for security
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid email or password'
+            });
         }
 
         const user = result.rows[0];
 
+        // Check if user has a password (not OAuth only)
         if (!user.password_hash) {
-            return res.status(401).json({ error: 'Invalid login method for this account' });
+            return res.status(401).json({
+                success: false,
+                error: 'This account uses a different login method. Please try social login.'
+            });
         }
 
+        // Verify password
         const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid email or password'
+            });
         }
 
+        // Check if email is verified (optional)
+        // if (!user.is_verified) {
+        //     return res.status(401).json({ 
+        //         success: false,
+        //         error: 'Please verify your email before logging in' 
+        //     });
+        // }
+
+        // Generate token
         const token = signUserToken(user);
 
+        // Set cookie
         res.cookie('token', token, getCookieOptions());
 
+        // Return success
         res.json({
+            success: true,
             user: {
                 id: user.id,
                 email: user.email,
@@ -131,18 +197,52 @@ const login = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Login failed' });
+        console.error('❌ Login error:', error);
+        console.error('Error stack:', error.stack);
+
+        // Handle specific database errors
+        if (error.code === '42P01') { // Table doesn't exist
+            console.error('❌ Users table does not exist. Please run database migrations.');
+            return res.status(503).json({
+                success: false,
+                error: 'Database not initialized'
+            });
+        }
+
+        if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+            return res.status(503).json({
+                success: false,
+                error: 'Database connection error. Please try again.'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            error: 'Login failed. Please try again.'
+        });
     }
 };
 
 const logout = (req, res) => {
-    res.clearCookie('token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
-    });
-    res.json({ message: 'Logged out successfully' });
+    try {
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path: '/'
+        });
+
+        res.json({
+            success: true,
+            message: 'Logged out successfully'
+        });
+    } catch (error) {
+        console.error('❌ Logout error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Logout failed'
+        });
+    }
 };
 
 const getCurrentUser = async (req, res) => {
@@ -150,39 +250,69 @@ const getCurrentUser = async (req, res) => {
         const token = getTokenFromRequest(req);
 
         if (!token) {
-            return res.json({ user: null });
+            return res.json({
+                success: true,
+                user: null
+            });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Verify token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (jwtError) {
+            console.error('❌ Token verification failed:', jwtError.message);
+            return res.json({
+                success: true,
+                user: null
+            });
+        }
 
+        // Get user from database
         const result = await query(
-            'SELECT id, email, role, is_anonymous, display_name, avatar_url, token_version FROM users WHERE id = $1',
+            `SELECT id, email, role, is_anonymous, display_name, avatar_url, 
+                    token_version, is_verified, created_at
+             FROM users 
+             WHERE id = $1`,
             [decoded.userId]
         );
 
         if (result.rows.length === 0) {
-            return res.json({ user: null });
+            return res.json({
+                success: true,
+                user: null
+            });
         }
 
         const user = result.rows[0];
         const tokenVersion = Number(decoded.tokenVersion ?? 0);
 
+        // Check if token version matches (for logout/invalidate)
         if (tokenVersion !== Number(user.token_version ?? 0)) {
-            return res.json({ user: null });
+            return res.json({
+                success: true,
+                user: null
+            });
         }
 
         res.json({
+            success: true,
             user: {
                 id: user.id,
                 email: user.email,
                 role: user.role,
                 displayName: user.display_name,
                 isAnonymous: user.is_anonymous,
-                avatarUrl: user.avatar_url
+                avatarUrl: user.avatar_url,
+                isVerified: user.is_verified
             }
         });
     } catch (error) {
-        res.json({ user: null });
+        console.error('❌ Get current user error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get user information'
+        });
     }
 };
 
