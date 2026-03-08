@@ -45,10 +45,14 @@ services:
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
 
       NODE_ENV: development
+      ML_MODERATION_URL: http://content-moderation:8000/moderate-review
+      ML_SENTIMENT_URL: http://sentiment-analysis:8001/analyze-sentiment
 
     depends_on:
 
       - postgres
+      - content-moderation
+      - sentiment-analysis
 
     volumes:
 
@@ -60,6 +64,74 @@ services:
 
       - welp-network
 
+
+  content-moderation:
+
+    build: ./ml-services/content-moderation
+
+    ports:
+
+      - "8000:8000"
+
+    networks:
+
+      - welp-network
+
+
+
+  sentiment-analysis:
+
+    build: ./ml-services/sentiment-analysis
+
+    ports:
+
+      - "8001:8001"
+
+    networks:
+
+      - welp-network
+
+
+
+  recommendation-engine:
+
+    build: ./ml-services/recommendation-engine
+
+    ports:
+
+      - "8002:8002"
+
+    networks:
+
+      - welp-network
+
+
+
+  image-analysis:
+
+    build: ./ml-services/image-analysis
+
+    ports:
+
+      - "8003:8003"
+
+    networks:
+
+      - welp-network
+
+
+
+  fraud-detection:
+
+    build: ./ml-services/fraud-detection
+
+    ports:
+
+      - "8004:8004"
+
+    networks:
+
+      - welp-network
 
 
   frontend:
