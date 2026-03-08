@@ -98,7 +98,7 @@ app.use(helmet({
 }));
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '1mb' })); // Increased limit slightly
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 
@@ -248,7 +248,7 @@ io.on('connection', (socket) => {
             const result = await query(
                 `INSERT INTO messages (conversation_id, sender_id, content, created_at)
                  VALUES ($1, $2, $3, NOW())
-                 RETURNING *`,
+                     RETURNING *`,
                 [conversationId, socket.userId, content]
             );
 
@@ -302,10 +302,10 @@ const PORT = process.env.PORT || 5000;
 // Server startup with better error handling
 const startServer = async () => {
     try {
-        // Test database connection if sequelize is available
+        // Test database connection using the enhanced testConnection function (with retries)
         if (sequelize) {
-            try {
-                await sequelize.authenticate();
+            const dbConnected = await testConnection(); // This should include retry logic
+            if (dbConnected) {
                 console.log('✅ Database connection established successfully');
 
                 // Sync models (only in development)
@@ -313,8 +313,7 @@ const startServer = async () => {
                     await sequelize.sync({ alter: true });
                     console.log('✅ Database models synchronized');
                 }
-            } catch (dbError) {
-                console.error('❌ Database connection failed:', dbError.message);
+            } else {
                 console.log('⚠️ Server will start but database features may not work');
             }
         } else {
