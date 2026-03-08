@@ -72,39 +72,49 @@ const JobCreate = () => {
             const deptData = data.data || data.departments || data;
             const deptArray = Array.isArray(deptData) ? deptData : [];
 
-            setDepartments(deptArray);
+            // Ensure each department has a valid UUID
+            const validatedDepts = deptArray.map(dept => ({
+                id: dept.id || generateUUID(),
+                name: dept.name || 'Unnamed Department'
+            }));
 
-            // If no departments, create a default one for testing
-            if (deptArray.length === 0) {
-                console.log('No departments found, adding default option');
-                setDepartments([
-                    { id: 'default', name: 'General' },
-                    { id: 'engineering', name: 'Engineering' },
-                    { id: 'product', name: 'Product' },
-                    { id: 'design', name: 'Design' },
-                    { id: 'marketing', name: 'Marketing' },
-                    { id: 'sales', name: 'Sales' },
-                    { id: 'hr', name: 'Human Resources' },
-                    { id: 'finance', name: 'Finance' },
-                    { id: 'operations', name: 'Operations' }
-                ]);
+            setDepartments(validatedDepts);
+
+            // If no departments, create default ones with valid UUIDs
+            if (validatedDepts.length === 0) {
+                console.log('No departments found, adding default options with UUIDs');
+                setDepartments(getDefaultDepartments());
             }
         } catch (error) {
             console.error('Failed to fetch departments:', error);
-            // Set default departments on error
-            setDepartments([
-                { id: 'default', name: 'General' },
-                { id: 'engineering', name: 'Engineering' },
-                { id: 'product', name: 'Product' },
-                { id: 'design', name: 'Design' },
-                { id: 'marketing', name: 'Marketing' },
-                { id: 'sales', name: 'Sales' },
-                { id: 'hr', name: 'Human Resources' },
-                { id: 'finance', name: 'Finance' },
-                { id: 'operations', name: 'Operations' }
-            ]);
+            // Set default departments with valid UUIDs on error
+            setDepartments(getDefaultDepartments());
             toast.error('Using default departments');
         }
+    };
+
+    // Generate a valid UUID v4
+    const generateUUID = () => {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    };
+
+    // Get default departments with valid UUIDs
+    const getDefaultDepartments = () => {
+        return [
+            { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
+            { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
+            { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
+            { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
+            { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
+            { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
+            { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
+            { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
+            { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+        ];
     };
 
     const fetchJobDetails = async () => {
@@ -226,6 +236,12 @@ const JobCreate = () => {
             toast.error('Department is required');
             return false;
         }
+        // Check if department_id is a valid UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(formData.department_id)) {
+            toast.error('Invalid department ID format. Please select a department from the list.');
+            return false;
+        }
         if (!formData.description.trim()) {
             toast.error('Job description is required');
             return false;
@@ -302,7 +318,19 @@ const JobCreate = () => {
             console.error('❌ Error status:', error.response?.status);
             console.error('❌ Error headers:', error.response?.headers);
 
-            toast.error(error.response?.data?.error || 'Failed to save job');
+            // Handle validation errors
+            if (error.response?.status === 400) {
+                const errors = error.response?.data?.errors;
+                if (errors && Array.isArray(errors)) {
+                    errors.forEach(err => {
+                        toast.error(err.msg || err.message || 'Validation error');
+                    });
+                } else {
+                    toast.error('Please check your form inputs');
+                }
+            } else {
+                toast.error(error.response?.data?.error || 'Failed to save job');
+            }
         } finally {
             setSubmitting(false);
             console.log('🏁 Submission completed');
