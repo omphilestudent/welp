@@ -1,9 +1,8 @@
 const express = require('express');
-const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { authorizeHR } = require('../middleware/adminAuth');
 const { apiLimiter } = require('../middleware/rateLimiter');
-const { validate } = require('../middleware/validation');
+const { validate, jobPostingValidation, jobApplicationValidation, interviewValidation, departmentValidation } = require('../middleware/validation');
 const hrController = require('../controllers/hrController');
 
 const router = express.Router();
@@ -16,21 +15,18 @@ router.use(authorizeHR());
 router.get('/profile', hrController.getHRProfile);
 router.get('/dashboard/stats', hrController.getHRDashboardStats);
 
-// Job Postings - FIXED: Added missing controller
+// Job Postings - Using the new validation
 router.post('/jobs',
-    validate([
-        body('title').notEmpty(),
-        body('department_id').isUUID(),
-        body('employment_type').isIn(['full-time', 'part-time', 'contract', 'internship', 'remote']),
-        body('description').notEmpty(),
-        body('requirements').isArray(),
-        body('application_deadline').optional().isDate()
-    ]),
-    hrController.createJobPosting  // This was missing!
+    validate(jobPostingValidation),
+    hrController.createJobPosting
 );
+
 router.get('/jobs', hrController.getJobPostings);
 router.get('/jobs/:id', hrController.getJobDetails);
-router.patch('/jobs/:id', hrController.updateJobPosting);
+router.patch('/jobs/:id',
+    validate(jobPostingValidation.map(validation => validation.optional())),
+    hrController.updateJobPosting
+);
 router.patch('/jobs/:id/publish', hrController.publishJob);
 router.patch('/jobs/:id/close', hrController.closeJob);
 router.delete('/jobs/:id', hrController.deleteJobPosting);
@@ -52,12 +48,7 @@ router.post('/applications/:id/notes',
 
 // Interviews
 router.post('/applications/:id/interviews',
-    validate([
-        body('interviewer_id').isUUID(),
-        body('interview_type').isIn(['phone', 'video', 'in-person', 'technical', 'hr']),
-        body('scheduled_at').isISO8601(),
-        body('duration_minutes').isInt({ min: 15, max: 240 })
-    ]),
+    validate(interviewValidation),
     hrController.scheduleInterview
 );
 router.get('/interviews/upcoming', hrController.getUpcomingInterviews);
@@ -133,12 +124,7 @@ router.post('/performance-reviews/:id/acknowledge', hrController.acknowledgePerf
 // Departments
 router.get('/departments', hrController.getDepartments);
 router.post('/departments',
-    validate([
-        body('name').notEmpty(),
-        body('description').optional(),
-        body('manager_id').optional().isUUID(),
-        body('parent_department_id').optional().isUUID()
-    ]),
+    validate(departmentValidation),
     hrController.createDepartment
 );
 router.patch('/departments/:id', hrController.updateDepartment);
