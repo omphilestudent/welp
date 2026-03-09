@@ -1251,15 +1251,15 @@ const getDepartments = async (req, res) => {
             console.log('Departments table does not exist, returning default departments');
             // Return default departments with UUIDs
             return res.json([
-                { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-                { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-                { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-                { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-                { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-                { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-                { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-                { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-                { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+                { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+                { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+                { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+                { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+                { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+                { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+                { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+                { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+                { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
             ]);
         }
 
@@ -1286,15 +1286,15 @@ const getDepartments = async (req, res) => {
         // If no departments in database, return defaults
         if (result.rows.length === 0) {
             return res.json([
-                { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-                { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-                { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-                { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-                { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-                { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-                { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-                { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-                { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+                { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+                { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+                { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+                { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+                { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+                { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+                { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+                { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+                { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
             ]);
         }
 
@@ -1303,15 +1303,15 @@ const getDepartments = async (req, res) => {
         console.error('❌ Get departments error:', error);
         // Return default departments on error
         res.json([
-            { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-            { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-            { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-            { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-            { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-            { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-            { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-            { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-            { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+            { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+            { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+            { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+            { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+            { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+            { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+            { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+            { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+            { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
         ]);
     }
 };
