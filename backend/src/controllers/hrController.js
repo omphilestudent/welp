@@ -1263,11 +1263,21 @@ const getDepartments = async (req, res) => {
             ]);
         }
 
+        const hasUsersDepartmentId = await columnExists('users', 'department_id');
+        const hasUsersDepartment = await columnExists('users', 'department');
+
+        let employeeCountSelect = '0';
+        if (hasUsersDepartmentId) {
+            employeeCountSelect = '(SELECT COUNT(*) FROM users WHERE department_id = d.id)';
+        } else if (hasUsersDepartment) {
+            employeeCountSelect = "(SELECT COUNT(*) FROM users WHERE department = d.name)";
+        }
+
         const result = await query(
             `SELECT
                  d.*,
                  u.display_name as manager_name,
-                 (SELECT COUNT(*) FROM users WHERE department_id = d.id) as employee_count
+                 ${employeeCountSelect} as employee_count
              FROM departments d
                       LEFT JOIN users u ON d.manager_id = u.id
              ORDER BY d.name`
