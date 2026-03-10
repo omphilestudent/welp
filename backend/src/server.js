@@ -108,6 +108,29 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Rate limiting
 app.use('/api/', apiLimiter);
 
+// ==================== HEALTH CHECK ENDPOINTS ====================
+// Simple health check (no /api prefix)
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        timestamp: new Date(),
+        database: sequelize ? 'connected' : 'disconnected',
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
+// API health check (with /api prefix - what your frontend is calling)
+app.get('/api/health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        message: 'API is healthy',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        database: sequelize ? 'connected' : 'disconnected'
+    });
+});
+// ================================================================
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
@@ -127,28 +150,16 @@ if (authV2Routes && rbacUserRoutes && roleRoutes) {
     console.log('✅ RBAC routes registered');
 }
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'OK',
-        timestamp: new Date(),
-        database: sequelize ? 'connected' : 'disconnected',
-        environment: process.env.NODE_ENV || 'development'
-    });
-});
-
-// Add this near your other routes (around line where you have other app.use statements)
-app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        status: 'ok',
-        message: 'API is healthy',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-        database: sequelize ? 'connected' : 'disconnected'
-    });
-});
-// 404 handler
+// 404 handler - This should be after all routes
 app.use('*', (req, res) => {
+    // Don't log health check 404s as errors
+    if (req.originalUrl === '/api/health' || req.originalUrl === '/health') {
+        return res.status(404).json({
+            error: 'Not Found',
+            message: `Health check endpoint not configured properly`
+        });
+    }
+
     res.status(404).json({
         error: 'Not Found',
         message: `Cannot ${req.method} ${req.originalUrl}`
@@ -179,6 +190,14 @@ app.use((err, req, res, next) => {
         return res.status(401).json({
             error: 'Token expired',
             message: 'Please login again'
+        });
+    }
+
+    // Database connection errors
+    if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+        return res.status(503).json({
+            error: 'Service Unavailable',
+            message: 'Database connection error'
         });
     }
 
@@ -258,7 +277,7 @@ io.on('connection', (socket) => {
             const result = await query(
                 `INSERT INTO messages (conversation_id, sender_id, content, created_at)
                  VALUES ($1, $2, $3, NOW())
-                     RETURNING *`,
+                 RETURNING *`,
                 [conversationId, socket.userId, content]
             );
 
@@ -309,25 +328,47 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Add retry logic for database connection
+const MAX_DB_RETRIES = 5;
+const DB_RETRY_INTERVAL = 5000; // 5 seconds
+
+const connectWithRetry = async (retries = MAX_DB_RETRIES) => {
+    if (!sequelize) {
+        console.warn('⚠️ Sequelize not available - running without database');
+        return false;
+    }
+
+    for (let i = 0; i < retries; i++) {
+        try {
+            await sequelize.authenticate();
+            console.log('✅ Database connection established successfully');
+
+            // Sync models (only in development)
+            if (process.env.NODE_ENV === 'development') {
+                await sequelize.sync({ alter: true });
+                console.log('✅ Database models synchronized');
+            }
+            return true;
+        } catch (error) {
+            console.log(`⚠️ Database connection attempt ${i + 1}/${retries} failed:`, error.message);
+            if (i < retries - 1) {
+                console.log(`⏳ Waiting ${DB_RETRY_INTERVAL/1000} seconds before retry...`);
+                await new Promise(resolve => setTimeout(resolve, DB_RETRY_INTERVAL));
+            }
+        }
+    }
+    console.error('❌ Could not connect to database after multiple attempts');
+    return false;
+};
+
 // Server startup with better error handling
 const startServer = async () => {
     try {
-        // Test database connection using the enhanced testConnection function (with retries)
-        if (sequelize) {
-            const dbConnected = await testConnection(); // This should include retry logic
-            if (dbConnected) {
-                console.log('✅ Database connection established successfully');
+        // Test database connection with retry logic
+        const dbConnected = await connectWithRetry();
 
-                // Sync models (only in development)
-                if (process.env.NODE_ENV === 'development') {
-                    await sequelize.sync({ alter: true });
-                    console.log('✅ Database models synchronized');
-                }
-            } else {
-                console.log('⚠️ Server will start but database features may not work');
-            }
-        } else {
-            console.warn('⚠️ Sequelize not available - running without database');
+        if (!dbConnected) {
+            console.log('⚠️ Server will start but database features may not work');
         }
 
         // Start server
@@ -335,6 +376,7 @@ const startServer = async () => {
             console.log(`✅ Server running on port ${PORT}`);
             console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
             console.log(`🔗 Frontend origins allowed: ${frontendOrigins.join(', ') || 'all'}`);
+            console.log(`📡 Health check available at: http://localhost:${PORT}/api/health`);
         });
 
     } catch (error) {
