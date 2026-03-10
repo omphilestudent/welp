@@ -338,9 +338,6 @@ const Benefits = () => {
                             <Link to="/careers" className="btn btn-primary btn-large">
                                 View Open Positions
                             </Link>
-                            <Link to="/careers/apply/general" className="btn btn-secondary btn-large">
-                                Submit General Application
-                            </Link>
                         </div>
                     </motion.div>
                 </div>
