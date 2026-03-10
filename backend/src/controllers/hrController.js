@@ -345,18 +345,9 @@ const updateJobPosting = async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
 
-        // Remove undefined fields
-        Object.keys(updates).forEach(key =>
-            updates[key] === undefined && delete updates[key]
-        );
-
-        if (Object.keys(updates).length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
-        }
-
         const setClause = [];
         const values = [];
-        let paramIndex = 1;
+        let index = 1;
 
         const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
 
@@ -369,33 +360,31 @@ const updateJobPosting = async (req, res) => {
                 setClause.push(`${key} = $${paramIndex}::text[]`);
                 values.push(value || null);
             } else {
-                setClause.push(`${key} = $${paramIndex}`);
+                setClause.push(`${key} = $${index}`);
                 values.push(value);
             }
-            paramIndex++;
+
+            index++;
         }
 
-        setClause.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(id);
 
-        const query_text = `
+        const result = await query(
+            `
             UPDATE job_postings
-            SET ${setClause.join(', ')}
-            WHERE id = $${paramIndex}
+            SET ${setClause.join(', ')},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $${index}
             RETURNING *
-        `;
+            `,
+            values
+        );
 
-        const result = await query(query_text, values);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Job posting not found' });
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Job not found' });
         }
 
-        console.log('✅ Job updated successfully:', id);
-        res.json({
-            success: true,
-            job: result.rows[0]
-        });
+        res.json(result.rows[0]);
     } catch (error) {
         console.error('❌ Update job posting error:', error);
 
@@ -408,6 +397,7 @@ const updateJobPosting = async (req, res) => {
         res.status(500).json({ error: 'Failed to update job posting' });
     }
 };
+
 
 const getJobPostings = async (req, res) => {
     try {
