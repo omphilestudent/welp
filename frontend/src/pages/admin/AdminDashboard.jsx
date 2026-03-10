@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { Link } from 'react-router-dom';
@@ -58,6 +57,34 @@ const AdminDashboard = () => {
         fetchDashboardData();
     }, []);
 
+    // Helper function to safely format dates
+    const safeFormatDate = (dateString, defaultValue = '-') => {
+        if (!dateString) return defaultValue;
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return defaultValue;
+            return date.toLocaleDateString();
+        } catch (e) {
+            return defaultValue;
+        }
+    };
+
+    // Helper function to safely format currency
+    const safeFormatCurrency = (value) => {
+        if (value === undefined || value === null) return '$0';
+        try {
+            return `$${Number(value).toLocaleString()}`;
+        } catch (e) {
+            return '$0';
+        }
+    };
+
+    // Helper function to safely truncate text
+    const safeTruncate = (text, maxLength = 30) => {
+        if (!text || typeof text !== 'string') return '';
+        return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    };
+
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
@@ -70,6 +97,7 @@ const AdminDashboard = () => {
                 api.get('/admin/analytics/subscriptions')
             ]);
 
+            // Safely extract dashboard stats
             const dashboard = dashboardRes.data || {};
             setStats({
                 totalUsers: Number(dashboard.users?.total_users || 0),
@@ -83,44 +111,60 @@ const AdminDashboard = () => {
                 userGrowth: Number(dashboard.userGrowth || 0)
             });
 
+            // Safely process recent users
             const recentUsersRows = usersRes.data?.users || [];
             setRecentUsers(recentUsersRows.map((user) => ({
-                id: user.id,
-                name: user.display_name || 'Unknown',
-                email: user.email,
-                role: user.role,
-                date: user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'
+                id: user?.id || Math.random(),
+                name: user?.display_name || user?.name || 'Unknown',
+                email: user?.email || '-',
+                role: user?.role || 'user',
+                date: safeFormatDate(user?.created_at)
             })));
 
+            // Safely process recent reviews - FIXES LINE 186 ISSUE
             const reviewRows = reviewsRes.data?.reviews || [];
             setRecentReviews(reviewRows.map((review) => ({
-                id: review.id,
-                company: review.company_name || 'Unknown',
-                rating: Number(review.rating || 0),
-                content: review.content || '',
-                date: review.created_at ? new Date(review.created_at).toLocaleDateString() : '-'
+                id: review?.id || Math.random(),
+                company: review?.company_name || review?.company?.name || 'Unknown',
+                rating: Math.min(5, Math.max(0, Number(review?.rating || 0))),
+                content: review?.content || '',
+                date: safeFormatDate(review?.created_at)
             })));
 
-            const revenueRows = (revenueRes.data || []).slice().reverse();
+            // Safely process revenue data
+            const revenueRows = Array.isArray(revenueRes.data) ? revenueRes.data.slice().reverse() : [];
             setRevenueData(revenueRows.map((row) => ({
-                date: new Date(row.date).toLocaleDateString(),
-                revenue: Number(row.revenue || 0),
-                subscriptions: Number(row.subscriptions || 0)
+                date: safeFormatDate(row?.date, 'Unknown'),
+                revenue: Number(row?.revenue || 0),
+                subscriptions: Number(row?.subscriptions || 0)
             })));
 
-            const userAnalyticsRows = (userAnalyticsRes.data || []).slice().reverse();
-            setUserActivity(userAnalyticsRows.map((row) => ({
-                name: new Date(row.date).toLocaleDateString(undefined, { weekday: 'short' }),
-                users: Number(row.new_users || 0)
-            })));
+            // Safely process user activity
+            const userAnalyticsRows = Array.isArray(userAnalyticsRes.data) ? userAnalyticsRes.data.slice().reverse() : [];
+            setUserActivity(userAnalyticsRows.map((row) => {
+                let dayName = 'Unknown';
+                try {
+                    if (row?.date) {
+                        dayName = new Date(row.date).toLocaleDateString(undefined, { weekday: 'short' });
+                    }
+                } catch (e) {
+                    dayName = 'Unknown';
+                }
+                return {
+                    name: dayName,
+                    users: Number(row?.new_users || 0)
+                };
+            }));
 
-            const subscriptionRows = subscriptionAnalyticsRes.data || [];
+            // Safely process subscription data
+            const subscriptionRows = Array.isArray(subscriptionAnalyticsRes.data) ? subscriptionAnalyticsRes.data : [];
             setSubscriptionData(subscriptionRows.map((row) => ({
-                name: row.plan || 'unknown',
-                value: Number(row.active || row.total || 0)
+                name: row?.plan || 'unknown',
+                value: Number(row?.active || row?.total || 0)
             })));
         } catch (error) {
             console.error('Failed to fetch dashboard data', error);
+            // Set empty arrays on error
             setRecentUsers([]);
             setRecentReviews([]);
             setRevenueData([]);
@@ -168,7 +212,7 @@ const AdminDashboard = () => {
         },
         {
             title: 'Monthly Revenue',
-            value: `$${stats.monthlyRevenue.toLocaleString()}`,
+            value: safeFormatCurrency(stats.monthlyRevenue),
             change: stats.revenueGrowth,
             icon: <FaDollarSign />,
             color: '#f687b3',
@@ -195,13 +239,13 @@ const AdminDashboard = () => {
 
     return (
         <div className="admin-dashboard">
-            {}
+            {/* Welcome Section */}
             <div className="welcome-section">
                 <h1>Dashboard Overview</h1>
                 <p>Welcome to your admin dashboard. Here's what's happening today.</p>
             </div>
 
-            {}
+            {/* Stats Grid */}
             <div className="stats-grid">
                 {statCards.map((stat, index) => (
                     <Link to={stat.link} key={index} className="stat-card">
@@ -220,12 +264,12 @@ const AdminDashboard = () => {
                 ))}
             </div>
 
-            {}
+            {/* Charts Section */}
             <div className="charts-section">
                 <div className="chart-card">
                     <h3>Revenue Overview</h3>
                     <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={revenueData}>
+                        <AreaChart data={revenueData.length ? revenueData : [{ date: 'No data', revenue: 0 }]}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="date" />
                             <YAxis />
@@ -238,7 +282,7 @@ const AdminDashboard = () => {
                 <div className="chart-card">
                     <h3>User Activity</h3>
                     <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={userActivity}>
+                        <BarChart data={userActivity.length ? userActivity : [{ name: 'No data', users: 0 }]}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
                             <YAxis />
@@ -255,18 +299,18 @@ const AdminDashboard = () => {
                     <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                             <Pie
-                                data={subscriptionData}
+                                data={subscriptionData.length ? subscriptionData : [{ name: 'No data', value: 1 }]}
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                label={({ name, percent }) => subscriptionData.length ? `${name} ${(percent * 100).toFixed(0)}%` : 'No data'}
                                 outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="value"
                             >
-                                {subscriptionData.map((entry, index) => (
+                                {subscriptionData.length ? subscriptionData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
+                                )) : <Cell fill="#cccccc" />}
                             </Pie>
                             <Tooltip />
                         </PieChart>
@@ -308,7 +352,7 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            {}
+            {/* Tables Section */}
             <div className="tables-section">
                 <div className="table-card">
                     <div className="table-header">
@@ -325,18 +369,22 @@ const AdminDashboard = () => {
                         </tr>
                         </thead>
                         <tbody>
-                        {recentUsers.map(user => (
+                        {recentUsers.length > 0 ? recentUsers.map(user => (
                             <tr key={user.id}>
-                                <td>{user.name}</td>
-                                <td>{user.email}</td>
+                                <td>{user.name || '-'}</td>
+                                <td>{user.email || '-'}</td>
                                 <td>
-                                        <span className={`role-badge role-${user.role}`}>
-                                            {user.role}
-                                        </span>
+                                    <span className={`role-badge role-${user.role || 'user'}`}>
+                                        {user.role || 'user'}
+                                    </span>
                                 </td>
-                                <td>{user.date}</td>
+                                <td>{user.date || '-'}</td>
                             </tr>
-                        ))}
+                        )) : (
+                            <tr>
+                                <td colSpan="4" className="no-data">No recent users</td>
+                            </tr>
+                        )}
                         </tbody>
                     </table>
                 </div>
@@ -356,7 +404,7 @@ const AdminDashboard = () => {
                         </tr>
                         </thead>
                         <tbody>
-                        {recentReviews.map(review => (
+                        {recentReviews.length > 0 ? recentReviews.map(review => (
                             <tr key={review.id}>
                                 <td>{review.company}</td>
                                 <td>
@@ -365,10 +413,14 @@ const AdminDashboard = () => {
                                         {'☆'.repeat(5 - review.rating)}
                                     </div>
                                 </td>
-                                <td>{review.content.substring(0, 30)}...</td>
+                                <td>{safeTruncate(review.content, 30)}</td> {/* FIXED: Line 186 is here */}
                                 <td>{review.date}</td>
                             </tr>
-                        ))}
+                        )) : (
+                            <tr>
+                                <td colSpan="4" className="no-data">No recent reviews</td>
+                            </tr>
+                        )}
                         </tbody>
                     </table>
                 </div>
