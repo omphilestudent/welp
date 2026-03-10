@@ -442,22 +442,7 @@ const login = async (req, res) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        const result = await query(
-            `SELECT
-                 u.id,
-                 u.email,
-                 u.password_hash,
-                 u.display_name,
-                 u.token_version,
-                 COALESCE(u.is_active, true) as is_active,
-                 COALESCE(u.status, 'active') as status,
-                 COALESCE(ar.name, u.role) as role
-             FROM users u
-             LEFT JOIN admin_users au ON u.id = au.user_id
-             LEFT JOIN admin_roles ar ON au.role_id = ar.id
-             WHERE u.email = $1`,
-            [email.toLowerCase()]
-        );
+        const result = await getUserByEmailForLogin(email);
 
         if (result.rows.length === 0) {
             return res.status(401).json({ error: 'Invalid email or password' });
@@ -500,21 +485,7 @@ const login = async (req, res) => {
 
 const getMe = async (req, res) => {
     try {
-        const result = await query(
-            `SELECT
-                 u.id,
-                 u.email,
-                 u.display_name,
-                 u.created_at,
-                 COALESCE(u.is_active, true) as is_active,
-                 COALESCE(u.is_anonymous, false) as is_anonymous,
-                 COALESCE(ar.name, u.role) as role
-             FROM users u
-             LEFT JOIN admin_users au ON u.id = au.user_id
-             LEFT JOIN admin_roles ar ON au.role_id = ar.id
-             WHERE u.id = $1`,
-            [req.user.id]
-        );
+        const result = await getUserByIdForProfile(req.user.id);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
