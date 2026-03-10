@@ -32,6 +32,80 @@ const columnExists = async (tableName, columnName) => {
     }
 };
 
+
+const hasAdminRoleTables = async () => {
+    const [adminUsersExist, adminRolesExist] = await Promise.all([
+        tableExists('admin_users'),
+        tableExists('admin_roles')
+    ]);
+    return adminUsersExist && adminRolesExist;
+};
+
+const getUserByEmailForLogin = async (email) => {
+    const [usersHasStatus, usersHasIsActive, adminTablesExist] = await Promise.all([
+        columnExists('users', 'status'),
+        columnExists('users', 'is_active'),
+        hasAdminRoleTables()
+    ]);
+
+    const statusSelect = usersHasStatus ? "COALESCE(u.status, 'active') as status" : "'active' as status";
+    const activeSelect = usersHasIsActive ? "COALESCE(u.is_active, true) as is_active" : "true as is_active";
+    const roleSelect = adminTablesExist ? "COALESCE(ar.name, u.role) as role" : "u.role as role";
+
+    const joinPart = adminTablesExist
+        ? `LEFT JOIN admin_users au ON u.id = au.user_id
+             LEFT JOIN admin_roles ar ON au.role_id = ar.id`
+        : '';
+
+    return query(
+        `SELECT
+             u.id,
+             u.email,
+             u.password_hash,
+             u.display_name,
+             u.token_version,
+             ${activeSelect},
+             ${statusSelect},
+             ${roleSelect}
+         FROM users u
+         ${joinPart}
+         WHERE u.email = $1`,
+        [email.toLowerCase()]
+    );
+};
+
+const getUserByIdForProfile = async (userId) => {
+    const [usersHasIsActive, usersHasIsAnonymous, adminTablesExist] = await Promise.all([
+        columnExists('users', 'is_active'),
+        columnExists('users', 'is_anonymous'),
+        hasAdminRoleTables()
+    ]);
+
+    const activeSelect = usersHasIsActive ? "COALESCE(u.is_active, true) as is_active" : "true as is_active";
+    const anonSelect = usersHasIsAnonymous ? "COALESCE(u.is_anonymous, false) as is_anonymous" : "false as is_anonymous";
+    const roleSelect = adminTablesExist ? "COALESCE(ar.name, u.role) as role" : "u.role as role";
+
+    const joinPart = adminTablesExist
+        ? `LEFT JOIN admin_users au ON u.id = au.user_id
+             LEFT JOIN admin_roles ar ON au.role_id = ar.id`
+        : '';
+
+    return query(
+        `SELECT
+             u.id,
+             u.email,
+             u.display_name,
+             u.created_at,
+             ${activeSelect},
+             ${anonSelect},
+             ${roleSelect}
+         FROM users u
+         ${joinPart}
+         WHERE u.id = $1`,
+        [userId]
+    );
+};
+
 const generateToken = (user) => {
     const role = String(user?.role || '').toLowerCase().trim();
     const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(role);
@@ -442,22 +516,7 @@ const login = async (req, res) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        const result = await query(
-            `SELECT
-                 u.id,
-                 u.email,
-                 u.password_hash,
-                 u.display_name,
-                 u.token_version,
-                 COALESCE(u.is_active, true) as is_active,
-                 COALESCE(u.status, 'active') as status,
-                 COALESCE(ar.name, u.role) as role
-             FROM users u
-             LEFT JOIN admin_users au ON u.id = au.user_id
-             LEFT JOIN admin_roles ar ON au.role_id = ar.id
-             WHERE u.email = $1`,
-            [email.toLowerCase()]
-        );
+        const result = await getUserByEmailForLogin(email);
 
         if (result.rows.length === 0) {
             return res.status(401).json({ error: 'Invalid email or password' });
@@ -500,21 +559,7 @@ const login = async (req, res) => {
 
 const getMe = async (req, res) => {
     try {
-        const result = await query(
-            `SELECT
-                 u.id,
-                 u.email,
-                 u.display_name,
-                 u.created_at,
-                 COALESCE(u.is_active, true) as is_active,
-                 COALESCE(u.is_anonymous, false) as is_anonymous,
-                 COALESCE(ar.name, u.role) as role
-             FROM users u
-             LEFT JOIN admin_users au ON u.id = au.user_id
-             LEFT JOIN admin_roles ar ON au.role_id = ar.id
-             WHERE u.id = $1`,
-            [req.user.id]
-        );
+        const result = await getUserByIdForProfile(req.user.id);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
