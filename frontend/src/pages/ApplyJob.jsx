@@ -69,18 +69,12 @@ const ApplyJob = () => {
     const fetchJobDetails = async () => {
         setLoading(true);
         try {
-
-            const mockJob = {
-                id: 1,
-                title: 'Senior Frontend Developer',
-                department: 'Engineering',
-                location: 'Remote',
-                type: 'Full-time'
-            };
-            setJob(mockJob);
+            const { data } = await api.get(`/hr/public/jobs/${id}`);
+            setJob(data);
         } catch (error) {
             console.error('Failed to fetch job details:', error);
             toast.error('Failed to load job details');
+            navigate('/careers');
         } finally {
             setLoading(false);
         }
@@ -226,12 +220,31 @@ const ApplyJob = () => {
 
         setSubmitting(true);
         try {
+            const payload = {
+                first_name: formData.firstName,
+                last_name: formData.lastName,
+                email: formData.email,
+                phone: formData.phone,
+                years_experience: formData.experience || null,
+                current_company: formData.currentCompany || null,
+                current_position: formData.currentPosition || null,
+                skills: formData.skills,
+                linkedin_url: formData.linkedin || null,
+                github_url: formData.github || null,
+                portfolio_url: formData.portfolio || null,
+                cover_letter: formData.coverLetter || null,
+                resume_url: formData.resume || null,
+                available_start_date: formData.startDate || null,
+                salary_expectation: formData.salaryExpectation || null,
+                work_authorization: formData.workAuthorization || null,
+                remote_preference: formData.remotePreference || null
+            };
 
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await api.post(`/hr/public/jobs/${id}/apply`, payload);
             toast.success('Application submitted successfully!');
             navigate('/application-success');
         } catch (error) {
-            toast.error('Failed to submit application');
+            toast.error(error?.response?.data?.error || 'Failed to submit application');
         } finally {
             setSubmitting(false);
         }
@@ -248,7 +261,7 @@ const ApplyJob = () => {
                         <FaArrowLeft /> Back to Job
                     </button>
                     <h1>Apply for {job?.title}</h1>
-                    <p className="job-subtitle">{job?.department} • {job?.location} • {job?.type}</p>
+                    <p className="job-subtitle">{job?.department_name || job?.department} • {job?.location} • {job?.employment_type || job?.type}</p>
                 </div>
 
                 {}

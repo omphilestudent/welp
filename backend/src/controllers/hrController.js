@@ -708,6 +708,190 @@ const getJobDetails = async (req, res) => {
     }
 };
 
+
+const getPublicJobPostings = async (req, res) => {
+    try {
+        const { department } = req.query;
+
+        const jobsExist = await tableExists('job_postings');
+        if (!jobsExist) return res.json([]);
+
+        const deptsExist = await tableExists('departments');
+        const appsExist = await tableExists('job_applications');
+
+        let selectPart = `SELECT j.*`;
+        if (deptsExist) selectPart += `, d.name as department_name`;
+        if (appsExist) selectPart += `, COUNT(a.id) as applications_count`;
+
+        let fromPart = `FROM job_postings j`;
+        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+        if (appsExist) fromPart += ` LEFT JOIN job_applications a ON j.id = a.job_id`;
+
+        const params = [];
+        let paramIndex = 1;
+        let wherePart = `WHERE j.status IN ('open', 'published')`;
+
+        if (department && department !== 'all' && deptsExist) {
+            wherePart += ` AND j.department_id = $${paramIndex}`;
+            params.push(department);
+            paramIndex += 1;
+        }
+
+        let groupPart = '';
+        if (appsExist) {
+            groupPart = `GROUP BY j.id`;
+            if (deptsExist) groupPart += `, d.name`;
+        }
+
+        const result = await query(
+            `${selectPart} ${fromPart} ${wherePart} ${groupPart} ORDER BY j.created_at DESC`,
+            params
+        );
+
+        return res.json(result.rows);
+    } catch (error) {
+        console.error('❌ Get public job postings error:', error);
+        return res.status(500).json({ error: 'Failed to fetch job postings' });
+    }
+};
+
+const getPublicJobDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const deptsExist = await tableExists('departments');
+        const appsExist = await tableExists('job_applications');
+
+        let selectPart = `SELECT j.*`;
+        if (deptsExist) selectPart += `, d.name as department_name`;
+        if (appsExist) selectPart += `, COUNT(a.id) as applications_count`;
+
+        let fromPart = `FROM job_postings j`;
+        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+        if (appsExist) fromPart += ` LEFT JOIN job_applications a ON j.id = a.job_id`;
+
+        let groupPart = '';
+        if (appsExist) {
+            groupPart = `GROUP BY j.id`;
+            if (deptsExist) groupPart += `, d.name`;
+        }
+
+        const result = await query(
+            `${selectPart} ${fromPart} WHERE j.id = $1 AND j.status IN ('open', 'published') ${groupPart}`,
+            [id]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Job posting not found' });
+        }
+
+        return res.json(result.rows[0]);
+    } catch (error) {
+        console.error('❌ Get public job details error:', error);
+        return res.status(500).json({ error: 'Failed to fetch job details' });
+    }
+};
+
+const submitPublicJobApplication = async (req, res) => {
+    try {
+        const { id: jobId } = req.params;
+        const {
+            first_name,
+            last_name,
+            email,
+            phone,
+            cover_letter,
+            resume_url,
+            linkedin_url,
+            github_url,
+            portfolio_url,
+            years_experience,
+            current_company,
+            current_position,
+            skills,
+            salary_expectation,
+            available_start_date,
+            work_authorization,
+            remote_preference
+        } = req.body;
+
+        const jobResult = await query(`SELECT id, status FROM job_postings WHERE id = $1`, [jobId]);
+        if (!jobResult.rows.length) {
+            return res.status(404).json({ error: 'Job posting not found' });
+        }
+
+        const jobStatus = String(jobResult.rows[0].status || '').toLowerCase();
+        if (!['open', 'published'].includes(jobStatus)) {
+            return res.status(400).json({ error: 'This job is not accepting applications' });
+        }
+
+        const appCols = await getTableColumns('job_applications');
+        if (!appCols.length) {
+            return res.status(500).json({ error: 'Applications table not available' });
+        }
+
+        const cols = ['job_id'];
+        const holders = ['$1'];
+        const params = [jobId];
+        let idx = 2;
+
+        const pushIfCol = (col, value, cast = '') => {
+            if (!appCols.includes(col)) return;
+            cols.push(col);
+            holders.push(`$${idx}${cast}`);
+            params.push(value);
+            idx += 1;
+        };
+
+        pushIfCol('first_name', first_name);
+        pushIfCol('last_name', last_name);
+        pushIfCol('email', String(email || '').toLowerCase().trim());
+        pushIfCol('phone', phone || null);
+        pushIfCol('cover_letter', cover_letter || null);
+        pushIfCol('resume_url', resume_url || null);
+        pushIfCol('linkedin_url', linkedin_url || null);
+        pushIfCol('github_url', github_url || null);
+        pushIfCol('portfolio_url', portfolio_url || null);
+        pushIfCol('years_experience', years_experience || null);
+        pushIfCol('current_company', current_company || null);
+        pushIfCol('current_position', current_position || null);
+        pushIfCol('salary_expectation', salary_expectation || null);
+        pushIfCol('available_start_date', available_start_date || null);
+        pushIfCol('work_authorization', work_authorization || null);
+        pushIfCol('remote_preference', remote_preference || null);
+
+        if (appCols.includes('skills')) {
+            pushIfCol('skills', JSON.stringify(Array.isArray(skills) ? skills : []), '::jsonb');
+        }
+
+        if (appCols.includes('status')) {
+            cols.push('status');
+            holders.push(`$${idx}`);
+            params.push('pending');
+            idx += 1;
+        }
+
+        if (appCols.includes('created_at')) {
+            cols.push('created_at');
+            holders.push('CURRENT_TIMESTAMP');
+        }
+        if (appCols.includes('updated_at')) {
+            cols.push('updated_at');
+            holders.push('CURRENT_TIMESTAMP');
+        }
+
+        const result = await query(
+            `INSERT INTO job_applications (${cols.join(', ')}) VALUES (${holders.join(', ')}) RETURNING *`,
+            params
+        );
+
+        return res.status(201).json({ success: true, message: 'Application submitted successfully', application: result.rows[0] });
+    } catch (error) {
+        console.error('❌ Submit public job application error:', error);
+        return res.status(500).json({ error: 'Failed to submit application' });
+    }
+};
+
 const getJobApplications = async (req, res) => {
     try {
         const { jobId } = req.params;
@@ -1541,6 +1725,9 @@ module.exports = {
     createJobPosting,
     getJobPostings,
     getJobDetails,
+    getPublicJobPostings,
+    getPublicJobDetails,
+    submitPublicJobApplication,
     updateJobPosting,
     publishJob,
     closeJob,
