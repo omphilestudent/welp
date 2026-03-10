@@ -42,6 +42,77 @@ const validateArrayField = (value, fieldName) => {
     return null;
 };
 
+// Helper function to get or create admin user ID from regular user ID
+const getOrCreateAdminUserId = async (userId) => {
+    try {
+        console.log('🔍 Getting/Creating admin user for user ID:', userId);
+
+        // First check if this user exists in admin_users table
+        const adminResult = await query(
+            `SELECT id FROM admin_users WHERE user_id = $1`,
+            [userId]
+        );
+
+        if (adminResult.rows.length > 0) {
+            console.log('✅ Found existing admin user:', adminResult.rows[0].id);
+            return adminResult.rows[0].id;
+        }
+
+        // If not in admin_users, check if user has HR role in users table
+        const userResult = await query(
+            `SELECT id, email, display_name, role FROM users WHERE id = $1`,
+            [userId]
+        );
+
+        if (userResult.rows.length === 0) {
+            console.log('❌ User not found in users table:', userId);
+            return null;
+        }
+
+        const user = userResult.rows[0];
+        const hrRoles = ['hr_admin', 'super_admin', 'admin'];
+
+        if (!hrRoles.includes(user.role)) {
+            console.log('❌ User does not have HR role:', user.role);
+            return null;
+        }
+
+        // Check if admin_roles table exists
+        const adminRolesExist = await tableExists('admin_roles');
+        if (!adminRolesExist) {
+            console.log('❌ admin_roles table does not exist');
+            return null;
+        }
+
+        // Get the appropriate role ID
+        const roleResult = await query(
+            `SELECT id FROM admin_roles WHERE name = $1`,
+            [user.role === 'super_admin' ? 'super_admin' : 'hr_admin']
+        );
+
+        if (roleResult.rows.length === 0) {
+            console.log('❌ Admin role not found for:', user.role);
+            return null;
+        }
+
+        // Create admin user entry
+        console.log('📝 Creating new admin user for:', user.email);
+        const createResult = await query(
+            `INSERT INTO admin_users (user_id, role_id, is_active, created_at, updated_at)
+             VALUES ($1, $2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             RETURNING id`,
+            [userId, roleResult.rows[0].id]
+        );
+
+        console.log('✅ Created new admin user with ID:', createResult.rows[0].id);
+        return createResult.rows[0].id;
+
+    } catch (error) {
+        console.error('❌ Error in getOrCreateAdminUserId:', error);
+        return null;
+    }
+};
+
 const getHRProfile = async (req, res) => {
     try {
         console.log('🔍 Getting HR profile for user:', req.user.id);
@@ -83,6 +154,34 @@ const getHRProfile = async (req, res) => {
             });
         }
 
+        // Try to get or create admin user
+        const adminUserId = await getOrCreateAdminUserId(req.user.id);
+
+        if (!adminUserId) {
+            // If we couldn't create admin user, check if user exists in admin_users directly
+            const result = await query(
+                `SELECT
+                     au.*,
+                     u.email,
+                     u.display_name,
+                     ar.name as role_name
+                 FROM admin_users au
+                          JOIN users u ON au.user_id = u.id
+                          JOIN admin_roles ar ON au.role_id = ar.id
+                 WHERE au.user_id = $1 AND au.is_active = true`,
+                [req.user.id]
+            );
+
+            if (result.rows.length === 0) {
+                console.log('No HR profile found for user:', req.user.id);
+                return res.status(403).json({ error: 'Not an HR user' });
+            }
+
+            console.log('✅ HR profile found');
+            return res.json(result.rows[0]);
+        }
+
+        // Get the admin user details
         const result = await query(
             `SELECT
                  au.*,
@@ -92,18 +191,13 @@ const getHRProfile = async (req, res) => {
              FROM admin_users au
                       JOIN users u ON au.user_id = u.id
                       JOIN admin_roles ar ON au.role_id = ar.id
-             WHERE au.user_id = $1 AND au.is_active = true
-               AND (ar.name = 'hr_admin' OR ar.name = 'super_admin' OR ar.name = 'admin')`,
-            [req.user.id]
+             WHERE au.id = $1`,
+            [adminUserId]
         );
 
-        if (result.rows.length === 0) {
-            console.log('No HR profile found for user:', req.user.id);
-            return res.status(403).json({ error: 'Not an HR user' });
-        }
-
-        console.log('✅ HR profile found');
+        console.log('✅ HR profile found/created');
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Get HR profile error:', error);
         res.status(500).json({ error: 'Failed to fetch HR profile' });
@@ -257,6 +351,7 @@ const createJobPosting = async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields: title, employment_type, description' });
         }
 
+        // Validate array fields
         const arrayValidationError =
             validateArrayField(requirements, 'requirements') ||
             validateArrayField(responsibilities, 'responsibilities') ||
@@ -267,196 +362,91 @@ const createJobPosting = async (req, res) => {
             return res.status(400).json({ error: arrayValidationError });
         }
 
-        const requirementsJson = requirements || [];
-        const responsibilitiesJson = responsibilities || [];
-        const benefitsJson = benefits || [];
-        const skillsRequiredJson = skills_required || [];
-
-        const fkColumnResult = await query(
-            `SELECT ccu.column_name
-             FROM information_schema.table_constraints tc
-                      JOIN information_schema.constraint_column_usage ccu
-                           ON tc.constraint_name = ccu.constraint_name
-             WHERE tc.constraint_type = 'FOREIGN KEY'
-               AND tc.table_name = 'job_postings'
-               AND tc.constraint_name = 'job_postings_posted_by_fkey'
-             LIMIT 1`
+        // Check if department exists
+        const deptCheck = await query(
+            'SELECT id FROM departments WHERE id = $1',
+            [department_id]
         );
 
-        const postedByReferenceColumn = fkColumnResult.rows[0]?.column_name || 'id';
-
-        const adminResult = await query(
-            `SELECT id, user_id FROM admin_users WHERE user_id = $1 OR id = $1 LIMIT 1`,
-            [req.user.id]
-        );
-
-        if (adminResult.rows.length === 0) {
-            return res.status(403).json({
-                success: false,
-                message: 'User is not an admin'
+        if (deptCheck.rows.length === 0) {
+            return res.status(400).json({
+                error: 'Department not found',
+                details: `Department with ID ${department_id} does not exist`
             });
         }
 
-        const postedBy = postedByReferenceColumn === 'user_id'
-            ? adminResult.rows[0].user_id
-            : adminResult.rows[0].id;
+        // Get or create admin user ID for the current user
+        const adminUserId = await getOrCreateAdminUserId(req.user.id);
+
+        if (!adminUserId) {
+            return res.status(403).json({
+                error: 'User not authorized to create job postings',
+                details: 'User must have HR privileges to create job postings',
+                hint: 'Please contact your system administrator to set up your HR account'
+            });
+        }
 
         // Set default status to 'draft' if not provided
         const jobStatus = status || 'draft';
+        const remoteValue = is_remote !== undefined ? is_remote : false;
 
-        res.status(500).json({
-            error: 'Failed to create job posting',
-            details: error.message
-        });
-    }
-};
-
-// Helper function to create job posting with admin user ID
-const createJobPostingWithAdminId = async (req, res, adminUserId) => {
-    const {
-        title,
-        department_id,
-        employment_type,
-        location,
-        salary_min,
-        salary_max,
-        salary_currency,
-        description,
-        requirements,
-        responsibilities,
-        benefits,
-        skills_required,
-        experience_level,
-        education_required,
-        application_deadline,
-        status
-    } = req.body;
-
-    // Set default status to 'draft' if not provided
-    const jobStatus = status || 'draft';
-
-    console.log('📥 Creating job posting with admin ID:', adminUserId);
-    console.log('Job data:', {
-        title,
-        department_id,
-        employment_type,
-        location,
-        salary_min,
-        salary_max,
-        description: description?.substring(0, 50) + '...',
-        requirements_count: requirements?.length || 0,
-        responsibilities_count: responsibilities?.length || 0,
-        benefits_count: benefits?.length || 0,
-        skills_count: skills_required?.length || 0,
-        status: jobStatus
-    });
-
-    // Properly format JSON fields for PostgreSQL
-    const requirementsJson = requirements ? JSON.stringify(requirements) : '[]';
-    const responsibilitiesJson = responsibilities ? JSON.stringify(responsibilities) : '[]';
-    const benefitsJson = benefits ? JSON.stringify(benefits) : '[]';
-    const skillsRequiredJson = skills_required ? JSON.stringify(skills_required) : '[]';
-
-    const result = await query(
-        `INSERT INTO job_postings (
-            title, department_id, employment_type, location,
-            salary_min, salary_max, salary_currency, description,
-            requirements, responsibilities, benefits, skills_required,
-            experience_level, education_required, application_deadline,
-            posted_by, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-             RETURNING *`,
-        [
+        console.log('📥 Creating job posting with data:', {
             title,
             department_id,
             employment_type,
             location,
-            is_remote,
+            is_remote: remoteValue,
             salary_min,
             salary_max,
-            salary_currency,
-            description: description?.substring(0, 50) + '...',
-            requirements: requirements?.length,
-            responsibilities: responsibilities?.length,
-            benefits: benefits?.length,
-            skills_required: skills_required?.length,
+            salary_currency: salary_currency || 'USD',
+            description_length: description?.length || 0,
+            requirements_count: requirements?.length || 0,
+            responsibilities_count: responsibilities?.length || 0,
+            benefits_count: benefits?.length || 0,
+            skills_count: skills_required?.length || 0,
             experience_level,
             education_required,
             application_deadline,
             status: jobStatus,
-            posted_by: postedBy
+            posted_by: adminUserId
         });
 
-// Helper function to create job posting with regular user ID (fallback)
-const createJobPostingWithUserId = async (req, res, userId) => {
-    const {
-        title,
-        department_id,
-        employment_type,
-        location,
-        salary_min,
-        salary_max,
-        salary_currency,
-        description,
-        requirements,
-        responsibilities,
-        benefits,
-        skills_required,
-        experience_level,
-        education_required,
-        application_deadline,
-        status
-    } = req.body;
+        // Properly format JSON fields for PostgreSQL - use jsonb type for better performance
+        const requirementsJson = requirements ? JSON.stringify(requirements) : '[]';
+        const responsibilitiesJson = responsibilities ? JSON.stringify(responsibilities) : '[]';
+        const benefitsJson = benefits ? JSON.stringify(benefits) : '[]';
+        const skillsRequiredJson = skills_required ? JSON.stringify(skills_required) : '[]';
 
-    // Set default status to 'draft' if not provided
-    const jobStatus = status || 'draft';
-
-    console.log('📥 Creating job posting with user ID (fallback):', userId);
-
-    // Properly format JSON fields for PostgreSQL
-    const requirementsJson = requirements ? JSON.stringify(requirements) : '[]';
-    const responsibilitiesJson = responsibilities ? JSON.stringify(responsibilities) : '[]';
-    const benefitsJson = benefits ? JSON.stringify(benefits) : '[]';
-    const skillsRequiredJson = skills_required ? JSON.stringify(skills_required) : '[]';
-
-    // Try to insert with user ID - this will work if the foreign key references users table
-    try {
         const result = await query(
             `INSERT INTO job_postings (
-                title,
-                department_id,
-                employment_type,
+                title, 
+                department_id, 
+                employment_type, 
                 location,
                 is_remote,
-                salary_min,
-                salary_max,
-                salary_currency,
+                salary_min, 
+                salary_max, 
+                salary_currency, 
                 description,
-                requirements,
-                responsibilities,
-                benefits,
+                requirements, 
+                responsibilities, 
+                benefits, 
                 skills_required,
-                experience_level,
-                education_required,
+                experience_level, 
+                education_required, 
                 application_deadline,
-                status,
-                posted_by
-            )
-            VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,
-                $10::jsonb,
-                $11::jsonb,
-                $12::jsonb,
-                $13::jsonb,
-                $14,$15,$16,$17,$18
-            )
+                posted_by, 
+                status, 
+                created_at, 
+                updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             RETURNING *`,
             [
                 title,
                 department_id,
                 employment_type,
                 location || null,
-                is_remote ?? false,
+                remoteValue,
                 salary_min ? parseFloat(salary_min) : null,
                 salary_max ? parseFloat(salary_max) : null,
                 salary_currency || 'USD',
@@ -468,28 +458,50 @@ const createJobPostingWithUserId = async (req, res, userId) => {
                 experience_level || null,
                 education_required || null,
                 application_deadline || null,
-                jobStatus,
-                postedBy
+                adminUserId,
+                jobStatus
             ]
         );
 
-        console.log('✅ Job created successfully with user ID:', result.rows[0].id);
+        console.log('✅ Job created successfully with ID:', result.rows[0].id);
         res.status(201).json({
             success: true,
             id: result.rows[0].id,
             job: result.rows[0]
         });
+
     } catch (error) {
         console.error('❌ Create job posting error:', error);
         console.error('Error details:', error.message);
+        console.error('Error code:', error.code);
 
-        if (error.code === '22P02') {
+        // Handle specific database errors
+        if (error.code === '23503') { // Foreign key violation
             return res.status(400).json({
-                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+                error: 'Invalid reference',
+                details: 'The user ID or department ID is invalid',
+                hint: 'Make sure the user has admin privileges and the department exists'
             });
         }
 
-        res.status(500).json({ error: 'Failed to create job posting: ' + error.message });
+        if (error.code === '23502') { // Not null violation
+            return res.status(400).json({
+                error: 'Missing required field',
+                details: error.message
+            });
+        }
+
+        if (error.code === '22P02') { // Invalid array format
+            return res.status(400).json({
+                error: 'Invalid data format',
+                details: 'One of the array fields (requirements, responsibilities, benefits, skills_required) is malformed'
+            });
+        }
+
+        res.status(500).json({
+            error: 'Failed to create job posting',
+            details: error.message
+        });
     }
 };
 
@@ -501,47 +513,61 @@ const updateJobPosting = async (req, res) => {
 
         const setClause = [];
         const values = [];
-        let index = 1;
+        let paramIndex = 1;
+
+        const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
 
         for (const [key, value] of Object.entries(updates)) {
-            if (['requirements', 'responsibilities', 'benefits', 'skills_required'].includes(key)) {
-                setClause.push(`${key} = $${index}::jsonb`);
-                values.push(value);
+            if (arrayFields.includes(key)) {
+                const arrayValidationError = validateArrayField(value, key);
+                if (arrayValidationError) {
+                    return res.status(400).json({ error: arrayValidationError });
+                }
+                setClause.push(`${key} = $${paramIndex}::jsonb`);
+                values.push(JSON.stringify(value || []));
             } else {
-                setClause.push(`${key} = $${index}`);
+                setClause.push(`${key} = $${paramIndex}`);
                 values.push(value);
             }
-
-            index++;
+            paramIndex++;
         }
 
+        // Always update the updated_at timestamp
+        setClause.push(`updated_at = CURRENT_TIMESTAMP`);
+
+        // Add the ID as the last parameter
         values.push(id);
 
-        const result = await query(
-            `
+        const query_text = `
             UPDATE job_postings
-            SET ${setClause.join(', ')},
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $${index}
+            SET ${setClause.join(', ')}
+            WHERE id = $${paramIndex}
             RETURNING *
-            `,
-            values
-        );
+        `;
 
-        if (!result.rows.length) {
-            return res.status(404).json({ error: 'Job not found' });
+        const result = await query(query_text, values);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Job posting not found' });
         }
 
-        res.json(result.rows[0]);
-    } catch (error) {
-        console.error('Update Job Error:', error);
-
-        res.status(500).json({
-            error: 'Failed to update job'
+        console.log('✅ Job updated successfully:', id);
+        res.json({
+            success: true,
+            job: result.rows[0]
         });
+    } catch (error) {
+        console.error('❌ Update job posting error:', error);
+
+        if (error.code === '22P02') {
+            return res.status(400).json({
+                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+            });
+        }
+
+        res.status(500).json({ error: 'Failed to update job posting' });
     }
 };
-
 
 const getJobPostings = async (req, res) => {
     try {
