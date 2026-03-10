@@ -81,6 +81,17 @@ router.patch('/pricing/country/:countryCode', adminController.updateCountryPrici
 
 
 router.get('/settings', adminController.getSystemSettings);
+
+
+router.get('/ml-interactions', adminController.getMlInteractions);
+router.patch('/ml-interactions/:id',
+    validate([
+        body('status').optional().isIn(['pending', 'edited', 'approved', 'rejected']),
+        body('notes').optional().isString().trim()
+    ]),
+    adminController.updateMlInteraction
+);
+
 router.patch('/settings', adminController.updateSystemSettings);
 
 
