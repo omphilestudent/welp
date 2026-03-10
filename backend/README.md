@@ -1,18 +1,23 @@
-# backend/README.md
+# Welp Backend API
 
-## Welp Backend API
+Express API for the Welp platform.
 
-This is the backend API for the Welp platform - an employee wellbeing review system.
+## Folder Structure
 
-### Tech Stack
-- Node.js with Express
-- PostgreSQL (Neon)
-- JWT Authentication
-- Socket.io for real-time messaging
-- Nodemailer for emails
+- `src/routes/` — Express route definitions (`*Routes.js`)
+- `src/controllers/` — endpoint handlers (`*Controller.js`)
+- `src/middleware/` — auth, validation, and request middleware
+- `src/config/` — app and DB configuration
+- `src/services/` — integrations and business logic
+- `src/seeders/` and `src/seed.js` — data bootstrap utilities
 
-### Setup Instructions
+## Setup
 
-1. **Install dependencies**
-   ```bash
-   npm install
+```bash
+npm install
+npm run dev
+```
+
+## Environment
+
+Create `backend/.env` with required DB/auth variables before running the server.

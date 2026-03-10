@@ -13,8 +13,8 @@ import Dashboard from './pages/Dashboard';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import ClaimBusiness from './pages/ClaimBusiness';
-import KYCRegistration from './pages/BusinessRegister.jsx';
-import JoinPsychologist from './pages/PsychologistRegister.jsx';
+import BusinessRegister from './pages/BusinessRegister';
+import PsychologistRegister from './pages/PsychologistRegister';
 import ApplicationSuccess from './pages/ApplicationSuccess';
 import Pricing from './pages/Pricing';
 import Careers from './pages/Careers';
@@ -72,7 +72,8 @@ function App() {
                                 <Route path="/search" element={<SearchPage />} />
                                 <Route path="/companies/:id" element={<CompanyPage />} />
                                 <Route path="/pricing" element={<Pricing />} />
-                                <Route path="/psychologist/join" element={<JoinPsychologist />} />
+                                <Route path="/register/psychologist" element={<PsychologistRegister />} />
+                                <Route path="/register/business" element={<BusinessRegister />} />
                                 <Route path="/application-success" element={<ApplicationSuccess />} />
 
                                 {/* Public Career Routes */}
@@ -96,7 +97,7 @@ function App() {
                                     path="/kyc/:id"
                                     element={
                                         <PrivateRoute>
-                                            <KYCRegistration />
+                                            <BusinessRegister />
                                         </PrivateRoute>
                                     }
                                 />
