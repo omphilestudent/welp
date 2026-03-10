@@ -59,134 +59,6 @@ const validateArrayField = (value, fieldName) => {
     return null;
 };
 
-// Helper function to validate UUID format
-const isValidUUID = (uuid) => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// resolveJobStatus — reads the actual check constraint from Postgres so we
-// never hard-code the allowed values. Falls back gracefully if the query
-// fails. Accepts the frontend alias "open" and maps it to "published".
-// ─────────────────────────────────────────────────────────────────────────────
-const STATUS_ALIAS_MAP = {
-    open: 'published',   // frontend sends "open", DB expects "published"
-};
-
-const resolveJobStatus = async (requestedStatus) => {
-    const raw = requestedStatus || 'draft';
-    const aliased = STATUS_ALIAS_MAP[raw] ?? raw;
-
-    try {
-        const constraintResult = await query(
-            `SELECT pg_get_constraintdef(c.oid) AS def
-             FROM pg_constraint c
-             JOIN pg_class t ON c.conrelid = t.oid
-             WHERE t.relname = 'job_postings'
-               AND c.conname ILIKE '%status%'
-               AND c.contype = 'c'
-             LIMIT 1`
-        );
-
-        if (constraintResult.rows.length > 0) {
-            const def = constraintResult.rows[0].def;
-            console.log('📋 status check constraint:', def);
-            const matches = def.match(/'([^']+)'/g);
-            if (matches) {
-                const allowed = matches.map(m => m.replace(/'/g, ''));
-                console.log('📋 Allowed statuses from DB:', allowed);
-
-                if (allowed.includes(aliased)) {
-                    console.log(`✅ Status resolved: "${raw}" → "${aliased}"`);
-                    return aliased;
-                }
-                // aliased value still not in constraint — try the raw value
-                if (allowed.includes(raw)) {
-                    console.log(`✅ Status resolved (raw): "${raw}"`);
-                    return raw;
-                }
-                // Fall back to first allowed value that looks like a default
-                const fallback = allowed.includes('draft') ? 'draft' : allowed[0];
-                console.warn(`⚠️  "${aliased}" not in allowed statuses ${JSON.stringify(allowed)}, falling back to "${fallback}"`);
-                return fallback;
-            }
-        }
-    } catch (err) {
-        console.warn('⚠️  Could not read status constraint:', err.message);
-    }
-
-    // Could not read constraint — return the aliased value and hope for the best
-    console.log(`📋 Status (no constraint check): "${raw}" → "${aliased}"`);
-    return aliased;
-};
-
-// Helper function to get or create admin user ID from regular user ID
-const getOrCreateAdminUserId = async (userId) => {
-    try {
-        console.log('🔍 Getting/Creating admin user for user ID:', userId);
-
-        const adminResult = await query(
-            `SELECT id FROM admin_users WHERE user_id = $1`,
-            [userId]
-        );
-
-        if (adminResult.rows.length > 0) {
-            console.log('✅ Found existing admin user:', adminResult.rows[0].id);
-            return adminResult.rows[0].id;
-        }
-
-        const userResult = await query(
-            `SELECT id, email, display_name, role FROM users WHERE id = $1`,
-            [userId]
-        );
-
-        if (userResult.rows.length === 0) {
-            console.log('❌ User not found in users table:', userId);
-            return null;
-        }
-
-        const user = userResult.rows[0];
-        const hrRoles = ['hr_admin', 'super_admin', 'admin'];
-
-        if (!hrRoles.includes(user.role)) {
-            console.log('❌ User does not have HR role:', user.role);
-            return null;
-        }
-
-        const adminRolesExist = await tableExists('admin_roles');
-        if (!adminRolesExist) {
-            console.log('❌ admin_roles table does not exist');
-            return null;
-        }
-
-        const roleResult = await query(
-            `SELECT id FROM admin_roles WHERE name = $1`,
-            [user.role === 'super_admin' ? 'super_admin' : 'hr_admin']
-        );
-
-        if (roleResult.rows.length === 0) {
-            console.log('❌ Admin role not found for:', user.role);
-            return null;
-        }
-
-        console.log('📝 Creating new admin user for:', user.email);
-        const createResult = await query(
-            `INSERT INTO admin_users (user_id, role_id, is_active, created_at, updated_at)
-             VALUES ($1, $2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                 RETURNING id`,
-            [userId, roleResult.rows[0].id]
-        );
-
-        console.log('✅ Created new admin user with ID:', createResult.rows[0].id);
-        return createResult.rows[0].id;
-
-    } catch (error) {
-        console.error('❌ Error in getOrCreateAdminUserId:', error);
-        return null;
-    }
-};
-
 const getHRProfile = async (req, res) => {
     try {
         console.log('🔍 Getting HR profile for user:', req.user.id);
@@ -653,7 +525,7 @@ const updateJobPosting = async (req, res) => {
         const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
         const setClause = [];
         const values = [];
-        let paramIndex = 1;
+        let index = 1;
 
         for (const [key, value] of Object.entries(updates)) {
             if (!has(key)) {
@@ -668,10 +540,11 @@ const updateJobPosting = async (req, res) => {
                 setClause.push(`${key} = $${paramIndex}::jsonb`);
                 values.push(JSON.stringify(value || []));
             } else {
-                setClause.push(`${key} = $${paramIndex}`);
+                setClause.push(`${key} = $${index}`);
                 values.push(value);
             }
-            paramIndex++;
+
+            index++;
         }
 
         if (setClause.length === 0) {
@@ -682,17 +555,21 @@ const updateJobPosting = async (req, res) => {
         values.push(id);
 
         const result = await query(
-            `UPDATE job_postings SET ${setClause.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+            `
+            UPDATE job_postings
+            SET ${setClause.join(', ')},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $${index}
+            RETURNING *
+            `,
             values
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Job posting not found' });
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Job not found' });
         }
 
-        console.log('✅ Job updated successfully:', id);
-        res.json({ success: true, job: result.rows[0] });
-
+        res.json(result.rows[0]);
     } catch (error) {
         console.error('❌ Update job posting error:', error);
         if (error.code === '23514') {
@@ -708,6 +585,7 @@ const updateJobPosting = async (req, res) => {
         res.status(500).json({ error: 'Failed to update job posting' });
     }
 };
+
 
 const getJobPostings = async (req, res) => {
     try {
