@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import 'Register.css';
+import './Register.css';
 
 const STEPS = ['Account', 'Credentials', 'Practice', 'Review'];
 
