@@ -349,10 +349,16 @@ const updateJobPosting = async (req, res) => {
         const values = [];
         let index = 1;
 
+        const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
+
         for (const [key, value] of Object.entries(updates)) {
-            if (['requirements', 'responsibilities', 'benefits', 'skills_required'].includes(key)) {
-                setClause.push(`${key} = $${index}::jsonb`);
-                values.push(value);
+            if (arrayFields.includes(key)) {
+                const arrayValidationError = validateArrayField(value, key);
+                if (arrayValidationError) {
+                    return res.status(400).json({ error: arrayValidationError });
+                }
+                setClause.push(`${key} = $${paramIndex}::text[]`);
+                values.push(value || null);
             } else {
                 setClause.push(`${key} = $${index}`);
                 values.push(value);
@@ -380,11 +386,15 @@ const updateJobPosting = async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('Update Job Error:', error);
+        console.error('❌ Update job posting error:', error);
 
-        res.status(500).json({
-            error: 'Failed to update job'
-        });
+        if (error.code === '22P02') {
+            return res.status(400).json({
+                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+            });
+        }
+
+        res.status(500).json({ error: 'Failed to update job posting' });
     }
 };
 
