@@ -80,6 +80,19 @@ router.post('/pricing/country',
 router.patch('/pricing/country/:countryCode', adminController.updateCountryPricing);
 
 
+// Backward-compatible subscription pricing aliases used by older admin UIs
+router.put('/subscriptions/pricing/:countryCode',
+    validate([
+        body('multiplier').optional().isFloat({ min: 0.1, max: 2.0 }),
+        body('currency').optional().isLength({ min: 3, max: 3 }),
+        body('currency_symbol').optional().isString().trim()
+    ]),
+    adminController.updateCountryPricing
+);
+router.patch('/subscriptions/pricing/:countryCode', adminController.updateCountryPricing);
+
+
+
 router.get('/settings', adminController.getSystemSettings);
 
 
