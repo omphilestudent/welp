@@ -34,7 +34,7 @@ const columnExists = async (tableName, columnName) => {
 
 const generateToken = (user) => {
     const role = String(user?.role || '').toLowerCase().trim();
-    const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(role);
+    const isAdminRole = ['super_admin', 'superadmin', 'system_admin', 'admin', 'hr_admin'].includes(role);
 
     const payload = {
         userId: user.id,
@@ -42,9 +42,9 @@ const generateToken = (user) => {
         tokenVersion: Number(user.token_version ?? 0)
     };
 
-    // Super admins keep a non-expiring token to avoid server-side session timeout.
+    // Admin roles keep a non-expiring token to avoid frequent forced re-logins.
     // Other roles keep configured JWT expiry.
-    if (isSuperAdmin) {
+    if (isAdminRole) {
         return jwt.sign(payload, process.env.JWT_SECRET || 'changeme');
     }
 
@@ -52,6 +52,39 @@ const generateToken = (user) => {
         payload,
         process.env.JWT_SECRET || 'changeme',
         { expiresIn: process.env.JWT_EXPIRE || process.env.JWT_EXPIRES_IN || '7d' }
+    );
+};
+
+
+const getUserByEmailForLogin = async (email) => {
+    const hasIsAnonymous = await columnExists('users', 'is_anonymous');
+    const hasIsActive = await columnExists('users', 'is_active');
+    const hasStatus = await columnExists('users', 'status');
+    const hasTokenVersion = await columnExists('users', 'token_version');
+
+    let selectPart = `SELECT id, email, password_hash, role, display_name`;
+    selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
+    selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
+    selectPart += hasStatus ? `, status` : `, NULL::text as status`;
+    selectPart += hasTokenVersion ? `, token_version` : `, 0 as token_version`;
+
+    return query(
+        `${selectPart} FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+        [email]
+    );
+};
+
+const getUserByIdForProfile = async (userId) => {
+    const hasIsAnonymous = await columnExists('users', 'is_anonymous');
+    const hasIsActive = await columnExists('users', 'is_active');
+
+    let selectPart = `SELECT id, email, role, display_name, created_at`;
+    selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
+    selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
+
+    return query(
+        `${selectPart} FROM users WHERE id = $1 LIMIT 1`,
+        [userId]
     );
 };
 
