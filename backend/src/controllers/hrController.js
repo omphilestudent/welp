@@ -267,25 +267,6 @@ const createJobPosting = async (req, res) => {
             return res.status(400).json({ error: arrayValidationError });
         }
 
-        const requirementsJson = requirements || [];
-        const responsibilitiesJson = responsibilities || [];
-        const benefitsJson = benefits || [];
-        const skillsRequiredJson = skills_required || [];
-
-        const adminResult = await query(
-            `SELECT id FROM admin_users WHERE user_id = $1`,
-            [req.user.id]
-        );
-
-        if (adminResult.rows.length === 0) {
-            return res.status(403).json({
-                success: false,
-                message: 'User is not an admin'
-            });
-        }
-
-        const postedBy = adminResult.rows[0].id;
-
         // Set default status to 'draft' if not provided
         const jobStatus = status || 'draft';
 
@@ -312,34 +293,13 @@ const createJobPosting = async (req, res) => {
 
         const result = await query(
             `INSERT INTO job_postings (
-                title,
-                department_id,
-                employment_type,
-                location,
-                is_remote,
-                salary_min,
-                salary_max,
-                salary_currency,
-                description,
-                requirements,
-                responsibilities,
-                benefits,
-                skills_required,
-                experience_level,
-                education_required,
-                application_deadline,
-                status,
-                posted_by
-            )
-            VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,
-                $10::jsonb,
-                $11::jsonb,
-                $12::jsonb,
-                $13::jsonb,
-                $14,$15,$16,$17,$18
-            )
-            RETURNING *`,
+                title, department_id, employment_type, location,
+                salary_min, salary_max, salary_currency, description,
+                requirements, responsibilities, benefits, skills_required,
+                experience_level, education_required, application_deadline,
+                posted_by, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text[], $10::text[], $11::text[], $12::text[], $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                 RETURNING *`,
             [
                 title,
                 department_id || null,
@@ -350,10 +310,10 @@ const createJobPosting = async (req, res) => {
                 salary_max ? parseFloat(salary_max) : null,
                 salary_currency || 'USD',
                 description,
-                requirementsJson,
-                responsibilitiesJson,
-                benefitsJson,
-                skillsRequiredJson,
+                requirements || null,
+                responsibilities || null,
+                benefits || null,
+                skills_required || null,
                 experience_level || null,
                 education_required || null,
                 application_deadline || null,
@@ -392,10 +352,16 @@ const updateJobPosting = async (req, res) => {
         const values = [];
         let index = 1;
 
+        const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
+
         for (const [key, value] of Object.entries(updates)) {
-            if (['requirements', 'responsibilities', 'benefits', 'skills_required'].includes(key)) {
-                setClause.push(`${key} = $${index}::jsonb`);
-                values.push(value);
+            if (arrayFields.includes(key)) {
+                const arrayValidationError = validateArrayField(value, key);
+                if (arrayValidationError) {
+                    return res.status(400).json({ error: arrayValidationError });
+                }
+                setClause.push(`${key} = $${paramIndex}::text[]`);
+                values.push(value || null);
             } else {
                 setClause.push(`${key} = $${index}`);
                 values.push(value);
@@ -423,11 +389,15 @@ const updateJobPosting = async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('Update Job Error:', error);
+        console.error('❌ Update job posting error:', error);
 
-        res.status(500).json({
-            error: 'Failed to update job'
-        });
+        if (error.code === '22P02') {
+            return res.status(400).json({
+                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+            });
+        }
+
+        res.status(500).json({ error: 'Failed to update job posting' });
     }
 };
 
