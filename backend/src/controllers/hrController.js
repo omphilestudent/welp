@@ -33,6 +33,15 @@ const columnExists = async (tableName, columnName) => {
     }
 };
 
+// Helper to ensure we only send native JS arrays to Postgres array columns
+const validateArrayField = (value, fieldName) => {
+    if (value === undefined || value === null) return null;
+    if (!Array.isArray(value)) {
+        return `${fieldName} must be an array`;
+    }
+    return null;
+};
+
 const getHRProfile = async (req, res) => {
     try {
         console.log('🔍 Getting HR profile for user:', req.user.id);
@@ -247,6 +256,21 @@ const createJobPosting = async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields: title, employment_type, description' });
         }
 
+        const arrayValidationError =
+            validateArrayField(requirements, 'requirements') ||
+            validateArrayField(responsibilities, 'responsibilities') ||
+            validateArrayField(benefits, 'benefits') ||
+            validateArrayField(skills_required, 'skills_required');
+
+        if (arrayValidationError) {
+            return res.status(400).json({ error: arrayValidationError });
+        }
+
+        const requirementsJson = requirements || [];
+        const responsibilitiesJson = responsibilities || [];
+        const benefitsJson = benefits || [];
+        const skillsRequiredJson = skills_required || [];
+
         // Set default status to 'draft' if not provided
         const jobStatus = status || 'draft';
 
@@ -277,7 +301,7 @@ const createJobPosting = async (req, res) => {
                 requirements, responsibilities, benefits, skills_required,
                 experience_level, education_required, application_deadline,
                 posted_by, status, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                  RETURNING *`,
             [
                 title,
@@ -288,10 +312,10 @@ const createJobPosting = async (req, res) => {
                 salary_max ? parseFloat(salary_max) : null,
                 salary_currency || 'USD',
                 description,
-                requirements ? JSON.stringify(requirements) : null,
-                responsibilities ? JSON.stringify(responsibilities) : null,
-                benefits ? JSON.stringify(benefits) : null,
-                skills_required ? JSON.stringify(skills_required) : null,
+                requirementsJson,
+                responsibilitiesJson,
+                benefitsJson,
+                skillsRequiredJson,
                 experience_level || null,
                 education_required || null,
                 application_deadline || null,
@@ -309,6 +333,13 @@ const createJobPosting = async (req, res) => {
     } catch (error) {
         console.error('❌ Create job posting error:', error);
         console.error('Error details:', error.message);
+
+        if (error.code === '22P02') {
+            return res.status(400).json({
+                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+            });
+        }
+
         res.status(500).json({ error: 'Failed to create job posting: ' + error.message });
     }
 };
@@ -319,57 +350,49 @@ const updateJobPosting = async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
 
-        // Remove undefined fields
-        Object.keys(updates).forEach(key =>
-            updates[key] === undefined && delete updates[key]
-        );
-
-        if (Object.keys(updates).length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
-        }
-
         const setClause = [];
         const values = [];
-        let paramIndex = 1;
+        let index = 1;
 
         for (const [key, value] of Object.entries(updates)) {
-            // Handle JSON fields
             if (['requirements', 'responsibilities', 'benefits', 'skills_required'].includes(key)) {
-                setClause.push(`${key} = $${paramIndex}`);
-                values.push(JSON.stringify(value));
+                setClause.push(`${key} = $${index}::jsonb`);
+                values.push(value);
             } else {
-                setClause.push(`${key} = $${paramIndex}`);
+                setClause.push(`${key} = $${index}`);
                 values.push(value);
             }
-            paramIndex++;
+
+            index++;
         }
 
-        setClause.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(id);
 
-        const query_text = `
+        const result = await query(
+            `
             UPDATE job_postings
-            SET ${setClause.join(', ')}
-            WHERE id = $${paramIndex}
+            SET ${setClause.join(', ')},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $${index}
             RETURNING *
-        `;
+            `,
+            values
+        );
 
-        const result = await query(query_text, values);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Job posting not found' });
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Job not found' });
         }
 
-        console.log('✅ Job updated successfully:', id);
-        res.json({
-            success: true,
-            job: result.rows[0]
-        });
+        res.json(result.rows[0]);
     } catch (error) {
-        console.error('❌ Update job posting error:', error);
-        res.status(500).json({ error: 'Failed to update job posting' });
+        console.error('Update Job Error:', error);
+
+        res.status(500).json({
+            error: 'Failed to update job'
+        });
     }
 };
+
 
 const getJobPostings = async (req, res) => {
     try {
@@ -1251,23 +1274,33 @@ const getDepartments = async (req, res) => {
             console.log('Departments table does not exist, returning default departments');
             // Return default departments with UUIDs
             return res.json([
-                { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-                { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-                { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-                { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-                { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-                { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-                { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-                { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-                { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+                { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+                { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+                { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+                { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+                { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+                { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+                { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+                { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+                { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
             ]);
+        }
+
+        const hasUsersDepartmentId = await columnExists('users', 'department_id');
+        const hasUsersDepartment = await columnExists('users', 'department');
+
+        let employeeCountSelect = '0';
+        if (hasUsersDepartmentId) {
+            employeeCountSelect = '(SELECT COUNT(*) FROM users WHERE department_id = d.id)';
+        } else if (hasUsersDepartment) {
+            employeeCountSelect = "(SELECT COUNT(*) FROM users WHERE department = d.name)";
         }
 
         const result = await query(
             `SELECT
                  d.*,
                  u.display_name as manager_name,
-                 (SELECT COUNT(*) FROM users WHERE department_id = d.id) as employee_count
+                 ${employeeCountSelect} as employee_count
              FROM departments d
                       LEFT JOIN users u ON d.manager_id = u.id
              ORDER BY d.name`
@@ -1276,15 +1309,15 @@ const getDepartments = async (req, res) => {
         // If no departments in database, return defaults
         if (result.rows.length === 0) {
             return res.json([
-                { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-                { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-                { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-                { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-                { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-                { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-                { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-                { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-                { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+                { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+                { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+                { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+                { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+                { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+                { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+                { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+                { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+                { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
             ]);
         }
 
@@ -1293,15 +1326,15 @@ const getDepartments = async (req, res) => {
         console.error('❌ Get departments error:', error);
         // Return default departments on error
         res.json([
-            { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-            { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-            { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-            { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-            { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-            { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-            { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-            { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-            { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+            { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+            { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+            { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+            { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+            { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+            { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+            { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+            { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+            { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
         ]);
     }
 };
