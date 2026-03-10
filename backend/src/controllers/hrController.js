@@ -33,6 +33,15 @@ const columnExists = async (tableName, columnName) => {
     }
 };
 
+// Helper to ensure we only send native JS arrays to Postgres array columns
+const validateArrayField = (value, fieldName) => {
+    if (value === undefined || value === null) return null;
+    if (!Array.isArray(value)) {
+        return `${fieldName} must be an array`;
+    }
+    return null;
+};
+
 const getHRProfile = async (req, res) => {
     try {
         console.log('🔍 Getting HR profile for user:', req.user.id);
@@ -247,6 +256,16 @@ const createJobPosting = async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields: title, employment_type, description' });
         }
 
+        const arrayValidationError =
+            validateArrayField(requirements, 'requirements') ||
+            validateArrayField(responsibilities, 'responsibilities') ||
+            validateArrayField(benefits, 'benefits') ||
+            validateArrayField(skills_required, 'skills_required');
+
+        if (arrayValidationError) {
+            return res.status(400).json({ error: arrayValidationError });
+        }
+
         // Set default status to 'draft' if not provided
         const jobStatus = status || 'draft';
 
@@ -277,7 +296,7 @@ const createJobPosting = async (req, res) => {
                 requirements, responsibilities, benefits, skills_required,
                 experience_level, education_required, application_deadline,
                 posted_by, status, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text[], $10::text[], $11::text[], $12::text[], $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                  RETURNING *`,
             [
                 title,
@@ -288,10 +307,10 @@ const createJobPosting = async (req, res) => {
                 salary_max ? parseFloat(salary_max) : null,
                 salary_currency || 'USD',
                 description,
-                requirements ? JSON.stringify(requirements) : null,
-                responsibilities ? JSON.stringify(responsibilities) : null,
-                benefits ? JSON.stringify(benefits) : null,
-                skills_required ? JSON.stringify(skills_required) : null,
+                requirements || null,
+                responsibilities || null,
+                benefits || null,
+                skills_required || null,
                 experience_level || null,
                 education_required || null,
                 application_deadline || null,
@@ -309,6 +328,13 @@ const createJobPosting = async (req, res) => {
     } catch (error) {
         console.error('❌ Create job posting error:', error);
         console.error('Error details:', error.message);
+
+        if (error.code === '22P02') {
+            return res.status(400).json({
+                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+            });
+        }
+
         res.status(500).json({ error: 'Failed to create job posting: ' + error.message });
     }
 };
@@ -332,11 +358,16 @@ const updateJobPosting = async (req, res) => {
         const values = [];
         let paramIndex = 1;
 
+        const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
+
         for (const [key, value] of Object.entries(updates)) {
-            // Handle JSON fields
-            if (['requirements', 'responsibilities', 'benefits', 'skills_required'].includes(key)) {
-                setClause.push(`${key} = $${paramIndex}`);
-                values.push(JSON.stringify(value));
+            if (arrayFields.includes(key)) {
+                const arrayValidationError = validateArrayField(value, key);
+                if (arrayValidationError) {
+                    return res.status(400).json({ error: arrayValidationError });
+                }
+                setClause.push(`${key} = $${paramIndex}::text[]`);
+                values.push(value || null);
             } else {
                 setClause.push(`${key} = $${paramIndex}`);
                 values.push(value);
@@ -367,6 +398,13 @@ const updateJobPosting = async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Update job posting error:', error);
+
+        if (error.code === '22P02') {
+            return res.status(400).json({
+                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+            });
+        }
+
         res.status(500).json({ error: 'Failed to update job posting' });
     }
 };
