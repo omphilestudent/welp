@@ -1,15 +1,27 @@
-
 const express = require('express');
-const { authenticate } = require('../middleware/auth');
-const { authLimiter, loginLimiter } = require('../middleware/rateLimiter');
-const { validate, registerValidation, loginValidation } = require('../middleware/validation');
-const authController = require('../controllers/authController');
-
 const router = express.Router();
 
-router.post('/register', authLimiter, validate(registerValidation), authController.register);
-router.post('/login', authLimiter, loginLimiter, validate(loginValidation), authController.login);
-router.post('/logout', authenticate, authController.logout);
-router.get('/me', authController.getCurrentUser);
+const {
+    registerEmployee,
+    registerPsychologist,
+    registerBusiness,
+    login,
+    getMe,
+    logout
+} = require('../controllers/authController');
+
+const { authenticate } = require('../middleware/auth');
+const { authLimiter, loginLimiter } = require('../middleware/rateLimiter');
+const { validate, loginValidation } = require('../middleware/validation');
+
+// Public
+router.post('/register', authLimiter, registerEmployee);
+router.post('/register/psychologist', authLimiter, registerPsychologist);
+router.post('/register/business', authLimiter, registerBusiness);
+router.post('/login', authLimiter, loginLimiter, validate(loginValidation), login);
+router.post('/logout', logout);
+
+// Protected
+router.get('/me', authenticate, getMe);
 
 module.exports = router;
