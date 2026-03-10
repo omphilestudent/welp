@@ -48,7 +48,14 @@ const AdminLayout = () => {
     const fetchAdminInfo = async () => {
         try {
             const { data } = await api.get('/admin/profile');
-            setAdminInfo(data);
+            const profile = data?.data || data || {};
+
+            setAdminInfo((prev) => ({
+                ...prev,
+                ...profile,
+                role_name: profile?.role_name || profile?.role || prev.role_name,
+                department: profile?.department || prev.department
+            }));
         } catch (error) {
             console.log('Using default admin info');
         }
