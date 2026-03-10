@@ -5,6 +5,16 @@ const serviceUrls = {
     sentiment: process.env.ML_SENTIMENT_URL || 'http://ml-sentiment-service:8001/analyze-sentiment'
 };
 
+const getMlAuthHeaders = () => {
+    const key = process.env.ML_API_KEY || process.env.AI_API_KEY;
+    if (!key) return {};
+
+    return {
+        Authorization: `Bearer ${key}`,
+        'x-api-key': key
+    };
+};
+
 const postJson = async (url, payload, timeoutMs = DEFAULT_TIMEOUT_MS) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -12,7 +22,10 @@ const postJson = async (url, payload, timeoutMs = DEFAULT_TIMEOUT_MS) => {
     try {
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...getMlAuthHeaders()
+            },
             body: JSON.stringify(payload),
             signal: controller.signal
         });

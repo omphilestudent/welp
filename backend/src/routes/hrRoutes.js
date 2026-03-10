@@ -4,9 +4,26 @@ const { authorizeHR } = require('../middleware/adminAuth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate, jobPostingValidation, jobApplicationValidation, interviewValidation, departmentValidation } = require('../middleware/validation');
 const hrController = require('../controllers/hrController');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 
 const router = express.Router();
+
+// Public job endpoints (no auth required)
+router.get('/public/jobs', hrController.getPublicJobPostings);
+router.get('/public/jobs/:id', hrController.getPublicJobDetails);
+router.post('/public/jobs/:id/apply',
+    validate([
+        param('id').isUUID().withMessage('Invalid job ID'),
+        body('first_name').notEmpty().trim().isLength({ max: 100 }),
+        body('last_name').notEmpty().trim().isLength({ max: 100 }),
+        body('email').isEmail().normalizeEmail(),
+        body('phone').optional().trim(),
+        body('cover_letter').optional().trim().isLength({ max: 5000 }),
+        body('skills').optional().isArray(),
+        body('skills.*').optional().isString().trim()
+    ]),
+    hrController.submitPublicJobApplication
+);
 
 // All HR routes require authentication and HR authorization
 router.use(authenticate);

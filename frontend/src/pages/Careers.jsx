@@ -57,10 +57,10 @@ const Careers = () => {
             // so we work regardless of whether a ?status= filter is supported.
             let response;
             try {
-                response = await api.get('/hr/jobs');
+                response = await api.get('/hr/public/jobs');
             } catch (primaryErr) {
                 // Fallback: some deployments expose a /jobs public route
-                response = await api.get('/jobs');
+                response = await api.get('/hr/public/jobs');
             }
 
             const raw = response.data;
@@ -126,13 +126,18 @@ const Careers = () => {
 
     const fetchFilters = async () => {
         try {
-            const deptResponse = await api.get('/hr/departments');
-            const raw = deptResponse.data;
-            const deptData = raw?.data ?? raw?.departments ?? raw;
-            setDepartments(Array.isArray(deptData) ? deptData.map(d => d.name).filter(Boolean) : []);
+            const jobsResponse = await api.get('/hr/public/jobs');
+            const jobsRaw = jobsResponse.data;
+            const jobsData = jobsRaw?.data ?? jobsRaw?.jobs ?? jobsRaw;
+            const list = Array.isArray(jobsData) ? jobsData : [];
 
-            setLocations(['Remote', 'San Francisco, CA', 'New York, NY', 'Austin, TX', 'Seattle, WA', 'London, UK', 'Berlin, Germany', 'Singapore']);
-            setJobTypes(['full-time', 'part-time', 'contract', 'internship', 'remote']);
+            const uniqueDepartments = [...new Set(list.map((j) => j.department_name || j.department).filter(Boolean))];
+            const uniqueLocations = [...new Set(list.map((j) => j.location).filter(Boolean))];
+            const uniqueTypes = [...new Set(list.map((j) => j.employment_type || j.type).filter(Boolean))];
+
+            setDepartments(uniqueDepartments);
+            setLocations(uniqueLocations);
+            setJobTypes(uniqueTypes);
         } catch (error) {
             console.error('Failed to fetch filters:', error);
         }
@@ -505,7 +510,7 @@ const Careers = () => {
                             {jobs.length === 0 ? (
                                 <>
                                     <h3>No open positions right now</h3>
-                                    <p>We're not actively hiring at the moment, but check back soon or submit a general application below.</p>
+                                    <p>We're not actively hiring at the moment, but check back soon for new openings.</p>
                                 </>
                             ) : (
                                 <>
@@ -540,11 +545,8 @@ const Careers = () => {
                         transition={{ duration: 0.6 }}
                     >
                         <h2>Don't see the right role?</h2>
-                        <p>We're always looking for talented people to join our team. Send us your resume and we'll keep you in mind for future opportunities.</p>
+                        <p>Follow us for upcoming openings and reach out to recruiting for future opportunities.</p>
                         <div className="cta-buttons">
-                            <Link to="/careers/apply/general" className="btn btn-primary btn-large">
-                                Submit General Application
-                            </Link>
                             <Link to="/contact" className="btn btn-secondary btn-large">
                                 Contact Recruiting
                             </Link>
