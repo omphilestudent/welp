@@ -33,41 +33,13 @@ const columnExists = async (tableName, columnName) => {
     }
 };
 
-// Helper function to get admin user ID from regular user ID
-const getAdminUserId = async (userId) => {
-    try {
-        // First check if this user exists in admin_users table
-        const adminResult = await query(
-            `SELECT id FROM admin_users WHERE user_id = $1`,
-            [userId]
-        );
-
-        if (adminResult.rows.length > 0) {
-            return adminResult.rows[0].id;
-        }
-
-        // If not in admin_users, check if user has HR role in users table
-        const userResult = await query(
-            `SELECT id, role FROM users WHERE id = $1`,
-            [userId]
-        );
-
-        if (userResult.rows.length > 0) {
-            const user = userResult.rows[0];
-            const hrRoles = ['hr_admin', 'super_admin', 'admin'];
-
-            if (hrRoles.includes(user.role)) {
-                // If user has HR role but not in admin_users, we need to handle this case
-                console.log('User has HR role but not in admin_users table:', userId);
-                return null;
-            }
-        }
-
-        return null;
-    } catch (error) {
-        console.error('Error getting admin user ID:', error);
-        return null;
+// Helper to ensure we only send native JS arrays to Postgres array columns
+const validateArrayField = (value, fieldName) => {
+    if (value === undefined || value === null) return null;
+    if (!Array.isArray(value)) {
+        return `${fieldName} must be an array`;
     }
+    return null;
 };
 
 const getHRProfile = async (req, res) => {
@@ -265,6 +237,7 @@ const createJobPosting = async (req, res) => {
             department_id,
             employment_type,
             location,
+            is_remote,
             salary_min,
             salary_max,
             salary_currency,
@@ -284,73 +257,18 @@ const createJobPosting = async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields: title, employment_type, description' });
         }
 
-        // Check if department exists
-        const deptCheck = await query(
-            'SELECT id FROM departments WHERE id = $1',
-            [department_id]
-        );
+        const arrayValidationError =
+            validateArrayField(requirements, 'requirements') ||
+            validateArrayField(responsibilities, 'responsibilities') ||
+            validateArrayField(benefits, 'benefits') ||
+            validateArrayField(skills_required, 'skills_required');
 
-        if (deptCheck.rows.length === 0) {
-            return res.status(400).json({
-                error: 'Department not found',
-                details: `Department with ID ${department_id} does not exist`
-            });
+        if (arrayValidationError) {
+            return res.status(400).json({ error: arrayValidationError });
         }
 
-        // Get the admin user ID for the current user
-        const adminUserId = await getAdminUserId(req.user.id);
-
-        if (!adminUserId) {
-            // If no admin user found, check if we can use the user ID directly
-            // Some schemas might have posted_by referencing users table directly
-            console.log('No admin user found, attempting to use user ID directly');
-
-            // Try to insert with user ID directly
-            try {
-                const userCheck = await query(
-                    'SELECT id FROM users WHERE id = $1',
-                    [req.user.id]
-                );
-
-                if (userCheck.rows.length === 0) {
-                    return res.status(403).json({
-                        error: 'User not authorized to create job postings',
-                        details: 'User not found in users table'
-                    });
-                }
-
-                // Proceed with user ID
-                return await createJobPostingWithUserId(req, res, req.user.id);
-            } catch (userError) {
-                console.error('Error using user ID:', userError);
-                return res.status(403).json({
-                    error: 'User not authorized to create job postings',
-                    details: 'User must be an admin user to create job postings'
-                });
-            }
-        }
-
-        return await createJobPostingWithAdminId(req, res, adminUserId);
-
-    } catch (error) {
-        console.error('❌ Create job posting error:', error);
-        console.error('Error details:', error.message);
-        console.error('Error code:', error.code);
-
-        // Handle specific database errors
-        if (error.code === '23503') { // Foreign key violation
-            return res.status(400).json({
-                error: 'Invalid reference',
-                details: 'The user ID or department ID is invalid'
-            });
-        }
-
-        if (error.code === '23502') { // Not null violation
-            return res.status(400).json({
-                error: 'Missing required field',
-                details: error.message
-            });
-        }
+        // Set default status to 'draft' if not provided
+        const jobStatus = status || 'draft';
 
         res.status(500).json({
             error: 'Failed to create job posting',
@@ -418,30 +336,22 @@ const createJobPostingWithAdminId = async (req, res, adminUserId) => {
             title,
             department_id,
             employment_type,
-            location || null,
-            salary_min ? parseFloat(salary_min) : null,
-            salary_max ? parseFloat(salary_max) : null,
-            salary_currency || 'USD',
-            description,
-            requirementsJson,
-            responsibilitiesJson,
-            benefitsJson,
-            skillsRequiredJson,
-            experience_level || null,
-            education_required || null,
-            application_deadline || null,
-            adminUserId,  // Use the admin user ID here
-            jobStatus
-        ]
-    );
-
-    console.log('✅ Job created successfully with ID:', result.rows[0].id);
-    res.status(201).json({
-        success: true,
-        id: result.rows[0].id,
-        job: result.rows[0]
-    });
-};
+            location,
+            is_remote,
+            salary_min,
+            salary_max,
+            salary_currency,
+            description: description?.substring(0, 50) + '...',
+            requirements: requirements?.length,
+            responsibilities: responsibilities?.length,
+            benefits: benefits?.length,
+            skills_required: skills_required?.length,
+            experience_level,
+            education_required,
+            application_deadline,
+            status: jobStatus,
+            posted_by: postedBy
+        });
 
 // Helper function to create job posting with regular user ID (fallback)
 const createJobPostingWithUserId = async (req, res, userId) => {
@@ -484,26 +394,27 @@ const createJobPostingWithUserId = async (req, res, userId) => {
                 requirements, responsibilities, benefits, skills_required,
                 experience_level, education_required, application_deadline,
                 posted_by, status, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text[], $10::text[], $11::text[], $12::text[], $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                  RETURNING *`,
             [
                 title,
                 department_id,
                 employment_type,
                 location || null,
+                is_remote ?? false,
                 salary_min ? parseFloat(salary_min) : null,
                 salary_max ? parseFloat(salary_max) : null,
                 salary_currency || 'USD',
                 description,
-                requirementsJson,
-                responsibilitiesJson,
-                benefitsJson,
-                skillsRequiredJson,
+                requirements || null,
+                responsibilities || null,
+                benefits || null,
+                skills_required || null,
                 experience_level || null,
                 education_required || null,
                 application_deadline || null,
-                userId,  // Use the regular user ID
-                jobStatus
+                jobStatus,
+                postedBy
             ]
         );
 
@@ -514,15 +425,16 @@ const createJobPostingWithUserId = async (req, res, userId) => {
             job: result.rows[0]
         });
     } catch (error) {
-        if (error.code === '23503') {
-            // If foreign key violation occurs, the constraint expects admin_users
-            return res.status(403).json({
-                error: 'User not authorized to create job postings',
-                details: 'User must be an admin user to create job postings',
-                hint: 'Please ensure the user has admin privileges in the system'
+        console.error('❌ Create job posting error:', error);
+        console.error('Error details:', error.message);
+
+        if (error.code === '22P02') {
+            return res.status(400).json({
+                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
             });
         }
-        throw error; // Re-throw other errors
+
+        res.status(500).json({ error: 'Failed to create job posting: ' + error.message });
     }
 };
 
@@ -532,57 +444,59 @@ const updateJobPosting = async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
 
-        // Remove undefined fields
-        Object.keys(updates).forEach(key =>
-            updates[key] === undefined && delete updates[key]
-        );
-
-        if (Object.keys(updates).length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
-        }
-
         const setClause = [];
         const values = [];
-        let paramIndex = 1;
+        let index = 1;
+
+        const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
 
         for (const [key, value] of Object.entries(updates)) {
-            // Handle JSON fields with proper casting
-            if (['requirements', 'responsibilities', 'benefits', 'skills_required'].includes(key)) {
-                setClause.push(`${key} = $${paramIndex}::jsonb`);
-                values.push(JSON.stringify(value));
+            if (arrayFields.includes(key)) {
+                const arrayValidationError = validateArrayField(value, key);
+                if (arrayValidationError) {
+                    return res.status(400).json({ error: arrayValidationError });
+                }
+                setClause.push(`${key} = $${paramIndex}::text[]`);
+                values.push(value || null);
             } else {
-                setClause.push(`${key} = $${paramIndex}`);
+                setClause.push(`${key} = $${index}`);
                 values.push(value);
             }
-            paramIndex++;
+
+            index++;
         }
 
-        setClause.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(id);
 
-        const query_text = `
+        const result = await query(
+            `
             UPDATE job_postings
-            SET ${setClause.join(', ')}
-            WHERE id = $${paramIndex}
-                RETURNING *
-        `;
+            SET ${setClause.join(', ')},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $${index}
+            RETURNING *
+            `,
+            values
+        );
 
-        const result = await query(query_text, values);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Job posting not found' });
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Job not found' });
         }
 
-        console.log('✅ Job updated successfully:', id);
-        res.json({
-            success: true,
-            job: result.rows[0]
-        });
+        res.json(result.rows[0]);
     } catch (error) {
         console.error('❌ Update job posting error:', error);
+
+        if (error.code === '22P02') {
+            return res.status(400).json({
+                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+            });
+        }
+
         res.status(500).json({ error: 'Failed to update job posting' });
     }
 };
+
 
 const getJobPostings = async (req, res) => {
     try {
@@ -1463,23 +1377,33 @@ const getDepartments = async (req, res) => {
             console.log('Departments table does not exist, returning default departments');
             // Return default departments with UUIDs
             return res.json([
-                { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-                { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-                { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-                { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-                { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-                { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-                { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-                { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-                { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+                { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+                { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+                { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+                { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+                { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+                { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+                { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+                { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+                { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
             ]);
+        }
+
+        const hasUsersDepartmentId = await columnExists('users', 'department_id');
+        const hasUsersDepartment = await columnExists('users', 'department');
+
+        let employeeCountSelect = '0';
+        if (hasUsersDepartmentId) {
+            employeeCountSelect = '(SELECT COUNT(*) FROM users WHERE department_id = d.id)';
+        } else if (hasUsersDepartment) {
+            employeeCountSelect = "(SELECT COUNT(*) FROM users WHERE department = d.name)";
         }
 
         const result = await query(
             `SELECT
                  d.*,
                  u.display_name as manager_name,
-                 (SELECT COUNT(*) FROM users WHERE department_id = d.id) as employee_count
+                 ${employeeCountSelect} as employee_count
              FROM departments d
                       LEFT JOIN users u ON d.manager_id = u.id
              ORDER BY d.name`
@@ -1488,15 +1412,15 @@ const getDepartments = async (req, res) => {
         // If no departments in database, return defaults
         if (result.rows.length === 0) {
             return res.json([
-                { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-                { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-                { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-                { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-                { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-                { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-                { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-                { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-                { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+                { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+                { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+                { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+                { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+                { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+                { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+                { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+                { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+                { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
             ]);
         }
 
@@ -1505,15 +1429,15 @@ const getDepartments = async (req, res) => {
         console.error('❌ Get departments error:', error);
         // Return default departments on error
         res.json([
-            { id: '11111111-1111-1111-1111-111111111111', name: 'General' },
-            { id: '22222222-2222-2222-2222-222222222222', name: 'Engineering' },
-            { id: '33333333-3333-3333-3333-333333333333', name: 'Product' },
-            { id: '44444444-4444-4444-4444-444444444444', name: 'Design' },
-            { id: '55555555-5555-5555-5555-555555555555', name: 'Marketing' },
-            { id: '66666666-6666-6666-6666-666666666666', name: 'Sales' },
-            { id: '77777777-7777-7777-7777-777777777777', name: 'Human Resources' },
-            { id: '88888888-8888-8888-8888-888888888888', name: 'Finance' },
-            { id: '99999999-9999-9999-9999-999999999999', name: 'Operations' }
+            { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
+            { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
+            { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
+            { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
+            { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
+            { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
+            { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
+            { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
+            { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
         ]);
     }
 };
