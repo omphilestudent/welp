@@ -4,6 +4,7 @@ const { authorizeHR } = require('../middleware/adminAuth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate, jobPostingValidation, jobApplicationValidation, interviewValidation, departmentValidation } = require('../middleware/validation');
 const hrController = require('../controllers/hrController');
+const { body } = require('express-validator');
 
 const router = express.Router();
 

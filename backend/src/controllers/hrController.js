@@ -33,6 +33,43 @@ const columnExists = async (tableName, columnName) => {
     }
 };
 
+// Helper function to get admin user ID from regular user ID
+const getAdminUserId = async (userId) => {
+    try {
+        // First check if this user exists in admin_users table
+        const adminResult = await query(
+            `SELECT id FROM admin_users WHERE user_id = $1`,
+            [userId]
+        );
+
+        if (adminResult.rows.length > 0) {
+            return adminResult.rows[0].id;
+        }
+
+        // If not in admin_users, check if user has HR role in users table
+        const userResult = await query(
+            `SELECT id, role FROM users WHERE id = $1`,
+            [userId]
+        );
+
+        if (userResult.rows.length > 0) {
+            const user = userResult.rows[0];
+            const hrRoles = ['hr_admin', 'super_admin', 'admin'];
+
+            if (hrRoles.includes(user.role)) {
+                // If user has HR role but not in admin_users, we need to handle this case
+                console.log('User has HR role but not in admin_users table:', userId);
+                return null;
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error getting admin user ID:', error);
+        return null;
+    }
+};
+
 const getHRProfile = async (req, res) => {
     try {
         console.log('🔍 Getting HR profile for user:', req.user.id);
@@ -214,7 +251,7 @@ const getHRDashboardStats = async (req, res) => {
     }
 };
 
-// FIXED: createJobPosting now accepts status from frontend and handles department_id better
+// FIXED: createJobPosting with proper posted_by handling
 const createJobPosting = async (req, res) => {
     try {
         // Check if table exists
@@ -247,29 +284,199 @@ const createJobPosting = async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields: title, employment_type, description' });
         }
 
-        // Set default status to 'draft' if not provided
-        const jobStatus = status || 'draft';
+        // Check if department exists
+        const deptCheck = await query(
+            'SELECT id FROM departments WHERE id = $1',
+            [department_id]
+        );
 
-        console.log('Creating job posting with data:', {
+        if (deptCheck.rows.length === 0) {
+            return res.status(400).json({
+                error: 'Department not found',
+                details: `Department with ID ${department_id} does not exist`
+            });
+        }
+
+        // Get the admin user ID for the current user
+        const adminUserId = await getAdminUserId(req.user.id);
+
+        if (!adminUserId) {
+            // If no admin user found, check if we can use the user ID directly
+            // Some schemas might have posted_by referencing users table directly
+            console.log('No admin user found, attempting to use user ID directly');
+
+            // Try to insert with user ID directly
+            try {
+                const userCheck = await query(
+                    'SELECT id FROM users WHERE id = $1',
+                    [req.user.id]
+                );
+
+                if (userCheck.rows.length === 0) {
+                    return res.status(403).json({
+                        error: 'User not authorized to create job postings',
+                        details: 'User not found in users table'
+                    });
+                }
+
+                // Proceed with user ID
+                return await createJobPostingWithUserId(req, res, req.user.id);
+            } catch (userError) {
+                console.error('Error using user ID:', userError);
+                return res.status(403).json({
+                    error: 'User not authorized to create job postings',
+                    details: 'User must be an admin user to create job postings'
+                });
+            }
+        }
+
+        return await createJobPostingWithAdminId(req, res, adminUserId);
+
+    } catch (error) {
+        console.error('❌ Create job posting error:', error);
+        console.error('Error details:', error.message);
+        console.error('Error code:', error.code);
+
+        // Handle specific database errors
+        if (error.code === '23503') { // Foreign key violation
+            return res.status(400).json({
+                error: 'Invalid reference',
+                details: 'The user ID or department ID is invalid'
+            });
+        }
+
+        if (error.code === '23502') { // Not null violation
+            return res.status(400).json({
+                error: 'Missing required field',
+                details: error.message
+            });
+        }
+
+        res.status(500).json({
+            error: 'Failed to create job posting',
+            details: error.message
+        });
+    }
+};
+
+// Helper function to create job posting with admin user ID
+const createJobPostingWithAdminId = async (req, res, adminUserId) => {
+    const {
+        title,
+        department_id,
+        employment_type,
+        location,
+        salary_min,
+        salary_max,
+        salary_currency,
+        description,
+        requirements,
+        responsibilities,
+        benefits,
+        skills_required,
+        experience_level,
+        education_required,
+        application_deadline,
+        status
+    } = req.body;
+
+    // Set default status to 'draft' if not provided
+    const jobStatus = status || 'draft';
+
+    console.log('📥 Creating job posting with admin ID:', adminUserId);
+    console.log('Job data:', {
+        title,
+        department_id,
+        employment_type,
+        location,
+        salary_min,
+        salary_max,
+        description: description?.substring(0, 50) + '...',
+        requirements_count: requirements?.length || 0,
+        responsibilities_count: responsibilities?.length || 0,
+        benefits_count: benefits?.length || 0,
+        skills_count: skills_required?.length || 0,
+        status: jobStatus
+    });
+
+    // Properly format JSON fields for PostgreSQL
+    const requirementsJson = requirements ? JSON.stringify(requirements) : '[]';
+    const responsibilitiesJson = responsibilities ? JSON.stringify(responsibilities) : '[]';
+    const benefitsJson = benefits ? JSON.stringify(benefits) : '[]';
+    const skillsRequiredJson = skills_required ? JSON.stringify(skills_required) : '[]';
+
+    const result = await query(
+        `INSERT INTO job_postings (
+            title, department_id, employment_type, location,
+            salary_min, salary_max, salary_currency, description,
+            requirements, responsibilities, benefits, skills_required,
+            experience_level, education_required, application_deadline,
+            posted_by, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             RETURNING *`,
+        [
             title,
             department_id,
             employment_type,
-            location,
-            salary_min,
-            salary_max,
-            salary_currency,
-            description: description?.substring(0, 50) + '...',
-            requirements: requirements?.length,
-            responsibilities: responsibilities?.length,
-            benefits: benefits?.length,
-            skills_required: skills_required?.length,
-            experience_level,
-            education_required,
-            application_deadline,
-            status: jobStatus,
-            posted_by: req.user.id
-        });
+            location || null,
+            salary_min ? parseFloat(salary_min) : null,
+            salary_max ? parseFloat(salary_max) : null,
+            salary_currency || 'USD',
+            description,
+            requirementsJson,
+            responsibilitiesJson,
+            benefitsJson,
+            skillsRequiredJson,
+            experience_level || null,
+            education_required || null,
+            application_deadline || null,
+            adminUserId,  // Use the admin user ID here
+            jobStatus
+        ]
+    );
 
+    console.log('✅ Job created successfully with ID:', result.rows[0].id);
+    res.status(201).json({
+        success: true,
+        id: result.rows[0].id,
+        job: result.rows[0]
+    });
+};
+
+// Helper function to create job posting with regular user ID (fallback)
+const createJobPostingWithUserId = async (req, res, userId) => {
+    const {
+        title,
+        department_id,
+        employment_type,
+        location,
+        salary_min,
+        salary_max,
+        salary_currency,
+        description,
+        requirements,
+        responsibilities,
+        benefits,
+        skills_required,
+        experience_level,
+        education_required,
+        application_deadline,
+        status
+    } = req.body;
+
+    // Set default status to 'draft' if not provided
+    const jobStatus = status || 'draft';
+
+    console.log('📥 Creating job posting with user ID (fallback):', userId);
+
+    // Properly format JSON fields for PostgreSQL
+    const requirementsJson = requirements ? JSON.stringify(requirements) : '[]';
+    const responsibilitiesJson = responsibilities ? JSON.stringify(responsibilities) : '[]';
+    const benefitsJson = benefits ? JSON.stringify(benefits) : '[]';
+    const skillsRequiredJson = skills_required ? JSON.stringify(skills_required) : '[]';
+
+    // Try to insert with user ID - this will work if the foreign key references users table
+    try {
         const result = await query(
             `INSERT INTO job_postings (
                 title, department_id, employment_type, location,
@@ -277,43 +484,49 @@ const createJobPosting = async (req, res) => {
                 requirements, responsibilities, benefits, skills_required,
                 experience_level, education_required, application_deadline,
                 posted_by, status, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                  RETURNING *`,
             [
                 title,
-                department_id || null,
+                department_id,
                 employment_type,
                 location || null,
                 salary_min ? parseFloat(salary_min) : null,
                 salary_max ? parseFloat(salary_max) : null,
                 salary_currency || 'USD',
                 description,
-                requirements ? JSON.stringify(requirements) : null,
-                responsibilities ? JSON.stringify(responsibilities) : null,
-                benefits ? JSON.stringify(benefits) : null,
-                skills_required ? JSON.stringify(skills_required) : null,
+                requirementsJson,
+                responsibilitiesJson,
+                benefitsJson,
+                skillsRequiredJson,
                 experience_level || null,
                 education_required || null,
                 application_deadline || null,
-                req.user.id,
+                userId,  // Use the regular user ID
                 jobStatus
             ]
         );
 
-        console.log('✅ Job created successfully with status:', jobStatus, 'ID:', result.rows[0].id);
+        console.log('✅ Job created successfully with user ID:', result.rows[0].id);
         res.status(201).json({
             success: true,
             id: result.rows[0].id,
             job: result.rows[0]
         });
     } catch (error) {
-        console.error('❌ Create job posting error:', error);
-        console.error('Error details:', error.message);
-        res.status(500).json({ error: 'Failed to create job posting: ' + error.message });
+        if (error.code === '23503') {
+            // If foreign key violation occurs, the constraint expects admin_users
+            return res.status(403).json({
+                error: 'User not authorized to create job postings',
+                details: 'User must be an admin user to create job postings',
+                hint: 'Please ensure the user has admin privileges in the system'
+            });
+        }
+        throw error; // Re-throw other errors
     }
 };
 
-// FIXED: updateJobPosting function
+// FIXED: updateJobPosting with proper JSONB handling
 const updateJobPosting = async (req, res) => {
     try {
         const { id } = req.params;
@@ -333,9 +546,9 @@ const updateJobPosting = async (req, res) => {
         let paramIndex = 1;
 
         for (const [key, value] of Object.entries(updates)) {
-            // Handle JSON fields
+            // Handle JSON fields with proper casting
             if (['requirements', 'responsibilities', 'benefits', 'skills_required'].includes(key)) {
-                setClause.push(`${key} = $${paramIndex}`);
+                setClause.push(`${key} = $${paramIndex}::jsonb`);
                 values.push(JSON.stringify(value));
             } else {
                 setClause.push(`${key} = $${paramIndex}`);
@@ -351,7 +564,7 @@ const updateJobPosting = async (req, res) => {
             UPDATE job_postings
             SET ${setClause.join(', ')}
             WHERE id = $${paramIndex}
-            RETURNING *
+                RETURNING *
         `;
 
         const result = await query(query_text, values);
@@ -1242,7 +1455,6 @@ const acknowledgePerformanceReview = async (req, res) => {
     }
 };
 
-// FIXED: getDepartments now returns default data when table doesn't exist
 const getDepartments = async (req, res) => {
     try {
         // Check if departments table exists

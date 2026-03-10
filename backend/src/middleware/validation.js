@@ -93,6 +93,7 @@ const confirmVerificationValidation = [
 
 // ========== HR MODULE VALIDATIONS ==========
 
+// FIXED: More flexible UUID validation
 const jobPostingValidation = [
     body('title')
         .notEmpty()
@@ -104,8 +105,14 @@ const jobPostingValidation = [
     body('department_id')
         .notEmpty()
         .withMessage('Department ID is required')
-        .isUUID(4)
-        .withMessage('Invalid department ID format'),
+        .custom((value) => {
+            // More flexible UUID validation that accepts any valid UUID format
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(value)) {
+                throw new Error('Invalid department ID format');
+            }
+            return true;
+        }),
 
     body('employment_type')
         .notEmpty()
@@ -235,7 +242,13 @@ const jobPostingValidation = [
 ];
 
 const jobApplicationValidation = [
-    body('job_id').isUUID().withMessage('Invalid job ID'),
+    body('job_id').custom((value) => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(value)) {
+            throw new Error('Invalid job ID format');
+        }
+        return true;
+    }),
     body('first_name').notEmpty().trim().isLength({ max: 100 }),
     body('last_name').notEmpty().trim().isLength({ max: 100 }),
     body('email').isEmail().normalizeEmail(),
@@ -245,7 +258,13 @@ const jobApplicationValidation = [
 ];
 
 const interviewValidation = [
-    body('interviewer_id').isUUID().withMessage('Invalid interviewer ID'),
+    body('interviewer_id').custom((value) => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(value)) {
+            throw new Error('Invalid interviewer ID format');
+        }
+        return true;
+    }),
     body('interview_type').isIn(['phone', 'video', 'in-person', 'technical', 'hr']),
     body('scheduled_at').isISO8601().withMessage('Invalid date format'),
     body('duration_minutes').isInt({ min: 15, max: 240 }),
@@ -269,13 +288,25 @@ const departmentValidation = [
 
     body('manager_id')
         .optional()
-        .isUUID()
-        .withMessage('Invalid manager ID'),
+        .custom((value) => {
+            if (!value) return true;
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(value)) {
+                throw new Error('Invalid manager ID format');
+            }
+            return true;
+        }),
 
     body('parent_department_id')
         .optional()
-        .isUUID()
-        .withMessage('Invalid parent department ID')
+        .custom((value) => {
+            if (!value) return true;
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(value)) {
+                throw new Error('Invalid parent department ID format');
+            }
+            return true;
+        })
 ];
 
 module.exports = {
