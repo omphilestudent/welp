@@ -892,6 +892,64 @@ const submitPublicJobApplication = async (req, res) => {
     }
 };
 
+
+const getAllApplications = async (req, res) => {
+    try {
+        const { status = 'all', page = 1, limit = 50, job_id } = req.query;
+
+        const appsExist = await tableExists('job_applications');
+        const deptsExist = await tableExists('departments');
+        if (!appsExist) return res.json([]);
+
+        const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+        const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+        const offset = (pageNum - 1) * limitNum;
+
+        let selectPart = `SELECT a.*, j.title as job_title`;
+        if (deptsExist) selectPart += `, d.name as department_name`;
+
+        let fromPart = `FROM job_applications a JOIN job_postings j ON a.job_id = j.id`;
+        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+
+        const params = [];
+        let wherePart = `WHERE 1=1`;
+
+        if (status && status !== 'all') {
+            params.push(status);
+            wherePart += ` AND a.status = $${params.length}`;
+        }
+
+        if (job_id) {
+            params.push(job_id);
+            wherePart += ` AND a.job_id = $${params.length}`;
+        }
+
+        const countResult = await query(
+            `SELECT COUNT(*)::int AS total ${fromPart} ${wherePart}`,
+            params
+        );
+
+        params.push(limitNum, offset);
+        const result = await query(
+            `${selectPart} ${fromPart} ${wherePart} ORDER BY a.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+            params
+        );
+
+        return res.json({
+            applications: result.rows,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total: Number(countResult.rows[0]?.total || 0),
+                pages: Math.ceil(Number(countResult.rows[0]?.total || 0) / limitNum)
+            }
+        });
+    } catch (error) {
+        console.error('❌ Get all applications error:', error);
+        return res.status(500).json({ error: 'Failed to fetch applications' });
+    }
+};
+
 const getJobApplications = async (req, res) => {
     try {
         const { jobId } = req.params;
@@ -1732,6 +1790,7 @@ module.exports = {
     publishJob,
     closeJob,
     deleteJobPosting,
+    getAllApplications,
     getJobApplications,
     getApplicationDetails,
     updateApplicationStatus,

@@ -51,6 +51,7 @@ router.delete('/jobs/:id', hrController.deleteJobPosting);
 
 // Job Applications
 router.get('/jobs/:jobId/applications', hrController.getJobApplications);
+router.get('/applications', hrController.getAllApplications);
 router.get('/applications/:id', hrController.getApplicationDetails);
 router.patch('/applications/:id/status',
     validate([

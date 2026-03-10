@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import api from '../../services/api';
 import {
     FiCheckCircle,
     FiXCircle,
@@ -25,15 +26,12 @@ import {
     FiAward
 } from 'react-icons/fi';
 
-const STORAGE_KEY = 'hrApplications';
-
 // Application stages for the workflow
 const APPLICATION_STAGES = [
-    { id: 'new', label: 'New', color: '#3498db', icon: FiClock },
-    { id: 'screening', label: 'Screening', color: '#f39c12', icon: FiUser },
-    { id: 'interview', label: 'Interview', color: '#9b59b6', icon: FiCalendar },
-    { id: 'technical', label: 'Technical', color: '#e74c3c', icon: FiBriefcase },
-    { id: 'offer', label: 'Offer', color: '#2ecc71', icon: FiAward },
+    { id: 'pending', label: 'Pending', color: '#3498db', icon: FiClock },
+    { id: 'reviewed', label: 'Reviewed', color: '#f39c12', icon: FiUser },
+    { id: 'shortlisted', label: 'Shortlisted', color: '#9b59b6', icon: FiCalendar },
+    { id: 'interviewed', label: 'Interviewed', color: '#e67e22', icon: FiBriefcase },
     { id: 'hired', label: 'Hired', color: '#27ae60', icon: FiCheckCircle },
     { id: 'rejected', label: 'Rejected', color: '#e74c3c', icon: FiXCircle }
 ];
@@ -102,87 +100,58 @@ const Applications = () => {
     const [newNote, setNewNote] = useState('');
     const [rating, setRating] = useState({ category: '', score: 0, comment: '' });
 
-    // Load from localStorage
-    useEffect(() => {
-        try {
-            const savedApplications = localStorage.getItem(STORAGE_KEY);
-            if (!savedApplications) {
-                // Add sample data for demonstration
-                const sampleApplications = generateSampleApplications();
-                setApplications(sampleApplications);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleApplications));
-                return;
-            }
-            const parsed = JSON.parse(savedApplications);
-            if (Array.isArray(parsed)) {
-                setApplications(parsed);
-            }
-        } catch (err) {
-            console.error('Failed to load applications from storage', err);
-            setError('Could not load saved applications.');
-        }
-    }, []);
+    const mapApiApplication = (app) => ({
+    id: app.id,
+    jobTitle: app.job_title || app.position || 'Untitled Position',
+    department: app.department_name || app.department || 'General',
+    position: app.job_title || app.position || 'N/A',
+    firstName: app.first_name || app.firstName || '',
+    lastName: app.last_name || app.lastName || '',
+    email: app.email || '',
+    phone: app.phone || '',
+    location: app.location || 'N/A',
+    experience: app.experience_years ? `${app.experience_years} years` : (app.years_experience ? `${app.years_experience} years` : 'N/A'),
+    education: app.education || 'N/A',
+    skills: Array.isArray(app.skills) ? app.skills : [],
+    expectedSalary: app.salary_expectation || 'N/A',
+    currentCompany: app.current_company || 'N/A',
+    noticePeriod: app.notice_period || 'N/A',
+    coverLetter: app.cover_letter || '',
+    resumeUrl: app.resume_url || '',
+    portfolioUrl: app.portfolio_url || '',
+    linkedInUrl: app.linkedin_url || '',
+    githubUrl: app.github_url || '',
+    currentStage: app.status || 'pending',
+    stageHistory: app.stage_history || [],
+    priority: app.priority || 'medium',
+    tags: app.tags || [],
+    notes: app.notes || [],
+    ratings: app.ratings || {},
+    interviews: app.interviews || [],
+    status: app.status || 'pending',
+    appliedDate: app.created_at || app.appliedDate || new Date().toISOString(),
+    createdAt: app.created_at || new Date().toISOString(),
+    updatedAt: app.updated_at || new Date().toISOString()
+});
 
-    // Save to localStorage
-    useEffect(() => {
-        if (applications.length > 0) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(applications));
-        }
-    }, [applications]);
+const fetchApplications = async () => {
+    try {
+        setError('');
+        const { data } = await api.get('/hr/applications', { params: { limit: 200 } });
+        const rows = Array.isArray(data) ? data : (Array.isArray(data?.applications) ? data.applications : []);
+        setApplications(rows.map(mapApiApplication));
+    } catch (err) {
+        console.error('Failed to load applications', err);
+        setError('Could not load applications from server.');
+        setApplications([]);
+    }
+};
 
-    // Generate sample applications for demonstration
-    const generateSampleApplications = () => {
-        const firstNames = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emma', 'James', 'Lisa'];
-        const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis'];
-        const jobs = ['Senior Developer', 'Product Manager', 'UX Designer', 'Marketing Specialist', 'Sales Representative', 'HR Coordinator'];
-        const departments = ['Engineering', 'Product', 'Design', 'Marketing', 'Sales', 'HR'];
+useEffect(() => {
+    fetchApplications();
+}, []);
 
-        return Array.from({ length: 12 }, (_, i) => {
-            const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-            const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-            const jobTitle = jobs[Math.floor(Math.random() * jobs.length)];
-            const department = departments[Math.floor(Math.random() * departments.length)];
-            const stage = APPLICATION_STAGES[Math.floor(Math.random() * (APPLICATION_STAGES.length - 2))].id;
-
-            return {
-                id: `sample-${i}`,
-                jobTitle,
-                department,
-                position: jobTitle,
-                firstName,
-                lastName,
-                email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
-                phone: `+1 (555) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-                location: ['New York, NY', 'San Francisco, CA', 'Austin, TX', 'Chicago, IL', 'Boston, MA'][Math.floor(Math.random() * 5)],
-                experience: `${Math.floor(Math.random() * 10) + 2} years`,
-                education: ['Bachelor\'s in Computer Science', 'Master\'s in Business Administration', 'Bachelor\'s in Design', 'Associate Degree'][Math.floor(Math.random() * 4)],
-                skills: ['JavaScript', 'React', 'Node.js', 'Python', 'UI/UX', 'Project Management', 'Communication'].slice(0, Math.floor(Math.random() * 4) + 2),
-                expectedSalary: `$${Math.floor(Math.random() * 60) + 40}k`,
-                currentCompany: ['Tech Corp', 'Innovation Inc', 'Digital Solutions', 'Creative Agency'][Math.floor(Math.random() * 4)],
-                noticePeriod: ['Immediate', '2 weeks', '1 month'][Math.floor(Math.random() * 3)],
-                coverLetter: 'I am excited to apply for this position...',
-                currentStage: stage,
-                stageHistory: [{ stage: 'new', date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), note: 'Application received' }],
-                priority: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
-                tags: ['urgent', 'remote-ready', 'senior'].slice(0, Math.floor(Math.random() * 2) + 1),
-                notes: [
-                    { id: 1, author: 'HR Manager', content: 'Good candidate, schedule interview', date: new Date().toISOString() }
-                ],
-                ratings: { technical: 4, communication: 5, experience: 4 },
-                interviews: stage === 'interview' || stage === 'technical' ? [
-                    { id: 1, type: 'HR Screen', date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), interviewer: 'Sarah Johnson', status: 'scheduled' }
-                ] : [],
-                status: 'active',
-                appliedDate: new Date(Date.now() - Math.floor(Math.random() * 14) * 24 * 60 * 60 * 1000).toISOString(),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                createdBy: 'HR System'
-            };
-        });
-    };
-
-    // Filter applications based on search and filters
-    const filteredApplications = useMemo(() => {
+const filteredApplications = useMemo(() => {
         return applications.filter((app) => {
             const fullName = `${app.firstName || ''} ${app.lastName || ''}`.toLowerCase();
             const jobTitle = (app.jobTitle || '').toLowerCase();
@@ -240,7 +209,7 @@ const Applications = () => {
     };
 
     // Update application stage
-    const handleStageChange = (applicationId, newStage) => {
+    const handleStageChange = async (applicationId, newStage) => {
         const application = applications.find(app => app.id === applicationId);
         if (!application) return;
 
@@ -294,6 +263,8 @@ const Applications = () => {
                 ? { ...app, notes: updatedNotes, updatedAt: new Date().toISOString() }
                 : app
         ));
+
+        api.post(`/hr/applications/${selectedApplication.id}/notes`, { notes: newNote.trim() }).catch(() => {});
 
         setSelectedApplication(prev => ({
             ...prev,

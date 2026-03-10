@@ -121,17 +121,20 @@ const HRDashboard = () => {
             }));
             setRecentJobs(recentJobsRows);
 
-            const applicationLists = await Promise.all(
-                jobs.slice(0, 5).map((job) => api.get(`/hr/jobs/${job.id}/applications`).then((r) => r.data).catch(() => []))
-            );
-            const mergedApplications = applicationLists.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
-            setRecentApplications(mergedApplications.map((app) => ({
+            const applicationsRes = await api.get('/hr/applications', { params: { limit: 5 } });
+            const applications = Array.isArray(applicationsRes.data)
+                ? applicationsRes.data
+                : (Array.isArray(applicationsRes.data?.applications) ? applicationsRes.data.applications : []);
+
+            setRecentApplications(applications.map((app) => ({
                 id: app.id,
                 name: `${app.first_name || ''} ${app.last_name || ''}`.trim() || app.email,
                 position: app.job_title || '-',
-                status: app.status,
+                status: app.status || 'pending',
                 date: app.created_at ? new Date(app.created_at).toLocaleDateString() : '-',
-                experience: app.experience_years ? `${app.experience_years} years` : 'N/A'
+                experience: app.experience_years
+                    ? `${app.experience_years} years`
+                    : (app.years_experience ? `${app.years_experience} years` : 'N/A')
             })));
 
             setUpcomingInterviews((interviewsRes.data || []).slice(0, 4).map((interview) => ({
