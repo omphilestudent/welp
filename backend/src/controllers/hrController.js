@@ -223,7 +223,7 @@ const getHRDashboardStats = async (req, res) => {
     }
 };
 
-// FIXED: createJobPosting now accepts status from frontend and handles department_id better
+// FIXED: createJobPosting with proper posted_by handling
 const createJobPosting = async (req, res) => {
     try {
         // Check if table exists
@@ -304,7 +304,69 @@ const createJobPosting = async (req, res) => {
         // Set default status to 'draft' if not provided
         const jobStatus = status || 'draft';
 
-        console.log('Creating job posting with data:', {
+        res.status(500).json({
+            error: 'Failed to create job posting',
+            details: error.message
+        });
+    }
+};
+
+// Helper function to create job posting with admin user ID
+const createJobPostingWithAdminId = async (req, res, adminUserId) => {
+    const {
+        title,
+        department_id,
+        employment_type,
+        location,
+        salary_min,
+        salary_max,
+        salary_currency,
+        description,
+        requirements,
+        responsibilities,
+        benefits,
+        skills_required,
+        experience_level,
+        education_required,
+        application_deadline,
+        status
+    } = req.body;
+
+    // Set default status to 'draft' if not provided
+    const jobStatus = status || 'draft';
+
+    console.log('📥 Creating job posting with admin ID:', adminUserId);
+    console.log('Job data:', {
+        title,
+        department_id,
+        employment_type,
+        location,
+        salary_min,
+        salary_max,
+        description: description?.substring(0, 50) + '...',
+        requirements_count: requirements?.length || 0,
+        responsibilities_count: responsibilities?.length || 0,
+        benefits_count: benefits?.length || 0,
+        skills_count: skills_required?.length || 0,
+        status: jobStatus
+    });
+
+    // Properly format JSON fields for PostgreSQL
+    const requirementsJson = requirements ? JSON.stringify(requirements) : '[]';
+    const responsibilitiesJson = responsibilities ? JSON.stringify(responsibilities) : '[]';
+    const benefitsJson = benefits ? JSON.stringify(benefits) : '[]';
+    const skillsRequiredJson = skills_required ? JSON.stringify(skills_required) : '[]';
+
+    const result = await query(
+        `INSERT INTO job_postings (
+            title, department_id, employment_type, location,
+            salary_min, salary_max, salary_currency, description,
+            requirements, responsibilities, benefits, skills_required,
+            experience_level, education_required, application_deadline,
+            posted_by, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             RETURNING *`,
+        [
             title,
             department_id,
             employment_type,
@@ -325,6 +387,40 @@ const createJobPosting = async (req, res) => {
             posted_by: postedBy
         });
 
+// Helper function to create job posting with regular user ID (fallback)
+const createJobPostingWithUserId = async (req, res, userId) => {
+    const {
+        title,
+        department_id,
+        employment_type,
+        location,
+        salary_min,
+        salary_max,
+        salary_currency,
+        description,
+        requirements,
+        responsibilities,
+        benefits,
+        skills_required,
+        experience_level,
+        education_required,
+        application_deadline,
+        status
+    } = req.body;
+
+    // Set default status to 'draft' if not provided
+    const jobStatus = status || 'draft';
+
+    console.log('📥 Creating job posting with user ID (fallback):', userId);
+
+    // Properly format JSON fields for PostgreSQL
+    const requirementsJson = requirements ? JSON.stringify(requirements) : '[]';
+    const responsibilitiesJson = responsibilities ? JSON.stringify(responsibilities) : '[]';
+    const benefitsJson = benefits ? JSON.stringify(benefits) : '[]';
+    const skillsRequiredJson = skills_required ? JSON.stringify(skills_required) : '[]';
+
+    // Try to insert with user ID - this will work if the foreign key references users table
+    try {
         const result = await query(
             `INSERT INTO job_postings (
                 title,
@@ -357,7 +453,7 @@ const createJobPosting = async (req, res) => {
             RETURNING *`,
             [
                 title,
-                department_id || null,
+                department_id,
                 employment_type,
                 location || null,
                 is_remote ?? false,
@@ -377,7 +473,7 @@ const createJobPosting = async (req, res) => {
             ]
         );
 
-        console.log('✅ Job created successfully with status:', jobStatus, 'ID:', result.rows[0].id);
+        console.log('✅ Job created successfully with user ID:', result.rows[0].id);
         res.status(201).json({
             success: true,
             id: result.rows[0].id,
@@ -397,7 +493,7 @@ const createJobPosting = async (req, res) => {
     }
 };
 
-// FIXED: updateJobPosting function
+// FIXED: updateJobPosting with proper JSONB handling
 const updateJobPosting = async (req, res) => {
     try {
         const { id } = req.params;
@@ -1318,7 +1414,6 @@ const acknowledgePerformanceReview = async (req, res) => {
     }
 };
 
-// FIXED: getDepartments now returns default data when table doesn't exist
 const getDepartments = async (req, res) => {
     try {
         // Check if departments table exists
