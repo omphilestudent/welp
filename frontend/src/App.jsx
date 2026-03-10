@@ -35,6 +35,7 @@ import CompanyManagement from './pages/admin/CompanyManagement';
 import ReviewModeration from './pages/admin/ReviewModeration';
 import SubscriptionManagement from './pages/admin/SubscriptionManagement';
 import SystemSettings from './pages/admin/SystemSettings';
+import MLInteractions from './pages/admin/MLInteractions';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
@@ -145,6 +146,7 @@ function App() {
                                     <Route path="reviews" element={<ReviewModeration />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />
+                                    <Route path="ml-interactions" element={<MLInteractions />} />
                                     <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                                 </Route>
 

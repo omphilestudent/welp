@@ -50,6 +50,29 @@ const getTableColumns = async (tableName) => {
     }
 };
 
+
+// Helper to validate HR/admin privileges and return a valid poster user ID
+const getOrCreateAdminUserId = async (userId) => {
+    const userResult = await query(
+        `SELECT id, role FROM users WHERE id = $1`,
+        [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+        return null;
+    }
+
+    const role = String(userResult.rows[0].role || '').toLowerCase().trim();
+    const allowedRoles = ['hr_admin', 'admin', 'super_admin', 'system_admin', 'administrator', 'superadmin'];
+
+    if (!allowedRoles.includes(role)) {
+        return null;
+    }
+
+    // In this codebase, job_postings.posted_by references users.id.
+    return userResult.rows[0].id;
+};
+
 // Helper to ensure we only send native JS arrays to Postgres array columns
 const validateArrayField = (value, fieldName) => {
     if (value === undefined || value === null) return null;
@@ -96,38 +119,44 @@ const getHRProfile = async (req, res) => {
             });
         }
 
-        const adminUserId = await getOrCreateAdminUserId(req.user.id);
-
-        if (!adminUserId) {
-            const result = await query(
-                `SELECT au.*, u.email, u.display_name, ar.name as role_name
-                 FROM admin_users au
-                          JOIN users u ON au.user_id = u.id
-                          JOIN admin_roles ar ON au.role_id = ar.id
-                 WHERE au.user_id = $1 AND au.is_active = true`,
-                [req.user.id]
-            );
-
-            if (result.rows.length === 0) {
-                console.log('No HR profile found for user:', req.user.id);
-                return res.status(403).json({ error: 'Not an HR user' });
-            }
-
-            console.log('✅ HR profile found');
-            return res.json(result.rows[0]);
-        }
-
         const result = await query(
             `SELECT au.*, u.email, u.display_name, ar.name as role_name
              FROM admin_users au
                       JOIN users u ON au.user_id = u.id
                       JOIN admin_roles ar ON au.role_id = ar.id
-             WHERE au.id = $1`,
-            [adminUserId]
+             WHERE au.user_id = $1 AND au.is_active = true`,
+            [req.user.id]
         );
 
-        console.log('✅ HR profile found/created');
-        res.json(result.rows[0]);
+        if (result.rows.length > 0) {
+            console.log('✅ HR profile found');
+            return res.json(result.rows[0]);
+        }
+
+        const userResult = await query(
+            `SELECT id, email, role, display_name FROM users WHERE id = $1`,
+            [req.user.id]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(403).json({ error: 'User not found' });
+        }
+
+        const user = userResult.rows[0];
+        const hrRoles = ['hr_admin', 'super_admin', 'admin', 'system_admin'];
+        if (!hrRoles.includes(String(user.role || '').toLowerCase().trim())) {
+            console.log('No HR profile found for user:', req.user.id);
+            return res.status(403).json({ error: 'Not an HR user' });
+        }
+
+        console.log('✅ HR access granted via user role fallback');
+        return res.json({
+            user_id: user.id,
+            email: user.email,
+            display_name: user.display_name,
+            role_name: user.role,
+            is_active: true
+        });
 
     } catch (error) {
         console.error('❌ Get HR profile error:', error);
