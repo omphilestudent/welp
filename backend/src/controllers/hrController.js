@@ -7,7 +7,8 @@ const tableExists = async (tableName) => {
         const result = await query(
             `SELECT EXISTS (
                 SELECT FROM information_schema.tables
-                WHERE table_name = $1
+                WHERE table_schema = 'public'
+                  AND table_name = $1
             )`,
             [tableName]
         );
@@ -23,13 +24,29 @@ const columnExists = async (tableName, columnName) => {
         const result = await query(
             `SELECT EXISTS (
                 SELECT FROM information_schema.columns
-                WHERE table_name = $1 AND column_name = $2
+                WHERE table_schema = 'public'
+                  AND table_name = $1 AND column_name = $2
             )`,
             [tableName, columnName]
         );
         return result.rows[0].exists;
     } catch (error) {
         return false;
+    }
+};
+
+// Helper: fetch ALL column names that exist for a given table in one query
+const getTableColumns = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT column_name FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = $1`,
+            [tableName]
+        );
+        return result.rows.map(r => r.column_name);
+    } catch (error) {
+        console.error(`❌ Error fetching columns for ${tableName}:`, error);
+        return [];
     }
 };
 
@@ -42,12 +59,73 @@ const validateArrayField = (value, fieldName) => {
     return null;
 };
 
+// Helper function to validate UUID format
+const isValidUUID = (uuid) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// resolveJobStatus — reads the actual check constraint from Postgres so we
+// never hard-code the allowed values. Falls back gracefully if the query
+// fails. Accepts the frontend alias "open" and maps it to "published".
+// ─────────────────────────────────────────────────────────────────────────────
+const STATUS_ALIAS_MAP = {
+    open: 'published',   // frontend sends "open", DB expects "published"
+};
+
+const resolveJobStatus = async (requestedStatus) => {
+    const raw = requestedStatus || 'draft';
+    const aliased = STATUS_ALIAS_MAP[raw] ?? raw;
+
+    try {
+        const constraintResult = await query(
+            `SELECT pg_get_constraintdef(c.oid) AS def
+             FROM pg_constraint c
+             JOIN pg_class t ON c.conrelid = t.oid
+             WHERE t.relname = 'job_postings'
+               AND c.conname ILIKE '%status%'
+               AND c.contype = 'c'
+             LIMIT 1`
+        );
+
+        if (constraintResult.rows.length > 0) {
+            const def = constraintResult.rows[0].def;
+            console.log('📋 status check constraint:', def);
+            const matches = def.match(/'([^']+)'/g);
+            if (matches) {
+                const allowed = matches.map(m => m.replace(/'/g, ''));
+                console.log('📋 Allowed statuses from DB:', allowed);
+
+                if (allowed.includes(aliased)) {
+                    console.log(`✅ Status resolved: "${raw}" → "${aliased}"`);
+                    return aliased;
+                }
+                // aliased value still not in constraint — try the raw value
+                if (allowed.includes(raw)) {
+                    console.log(`✅ Status resolved (raw): "${raw}"`);
+                    return raw;
+                }
+                // Fall back to first allowed value that looks like a default
+                const fallback = allowed.includes('draft') ? 'draft' : allowed[0];
+                console.warn(`⚠️  "${aliased}" not in allowed statuses ${JSON.stringify(allowed)}, falling back to "${fallback}"`);
+                return fallback;
+            }
+        }
+    } catch (err) {
+        console.warn('⚠️  Could not read status constraint:', err.message);
+    }
+
+    // Could not read constraint — return the aliased value and hope for the best
+    console.log(`📋 Status (no constraint check): "${raw}" → "${aliased}"`);
+    return aliased;
+};
+
 // Helper function to get or create admin user ID from regular user ID
 const getOrCreateAdminUserId = async (userId) => {
     try {
         console.log('🔍 Getting/Creating admin user for user ID:', userId);
 
-        // First check if this user exists in admin_users table
         const adminResult = await query(
             `SELECT id FROM admin_users WHERE user_id = $1`,
             [userId]
@@ -58,7 +136,6 @@ const getOrCreateAdminUserId = async (userId) => {
             return adminResult.rows[0].id;
         }
 
-        // If not in admin_users, check if user has HR role in users table
         const userResult = await query(
             `SELECT id, email, display_name, role FROM users WHERE id = $1`,
             [userId]
@@ -77,14 +154,12 @@ const getOrCreateAdminUserId = async (userId) => {
             return null;
         }
 
-        // Check if admin_roles table exists
         const adminRolesExist = await tableExists('admin_roles');
         if (!adminRolesExist) {
             console.log('❌ admin_roles table does not exist');
             return null;
         }
 
-        // Get the appropriate role ID
         const roleResult = await query(
             `SELECT id FROM admin_roles WHERE name = $1`,
             [user.role === 'super_admin' ? 'super_admin' : 'hr_admin']
@@ -95,12 +170,11 @@ const getOrCreateAdminUserId = async (userId) => {
             return null;
         }
 
-        // Create admin user entry
         console.log('📝 Creating new admin user for:', user.email);
         const createResult = await query(
             `INSERT INTO admin_users (user_id, role_id, is_active, created_at, updated_at)
              VALUES ($1, $2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-             RETURNING id`,
+                 RETURNING id`,
             [userId, roleResult.rows[0].id]
         );
 
@@ -117,18 +191,14 @@ const getHRProfile = async (req, res) => {
     try {
         console.log('🔍 Getting HR profile for user:', req.user.id);
 
-        // Check if admin tables exist
         const adminUsersExist = await tableExists('admin_users');
         const adminRolesExist = await tableExists('admin_roles');
 
         if (!adminUsersExist || !adminRolesExist) {
             console.log('Admin tables not found, checking user role directly');
 
-            // Fallback: Check if user has HR role in users table
             const userResult = await query(
-                `SELECT id, email, role, display_name
-                 FROM users
-                 WHERE id = $1`,
+                `SELECT id, email, role, display_name FROM users WHERE id = $1`,
                 [req.user.id]
             );
 
@@ -154,17 +224,11 @@ const getHRProfile = async (req, res) => {
             });
         }
 
-        // Try to get or create admin user
         const adminUserId = await getOrCreateAdminUserId(req.user.id);
 
         if (!adminUserId) {
-            // If we couldn't create admin user, check if user exists in admin_users directly
             const result = await query(
-                `SELECT
-                     au.*,
-                     u.email,
-                     u.display_name,
-                     ar.name as role_name
+                `SELECT au.*, u.email, u.display_name, ar.name as role_name
                  FROM admin_users au
                           JOIN users u ON au.user_id = u.id
                           JOIN admin_roles ar ON au.role_id = ar.id
@@ -181,13 +245,8 @@ const getHRProfile = async (req, res) => {
             return res.json(result.rows[0]);
         }
 
-        // Get the admin user details
         const result = await query(
-            `SELECT
-                 au.*,
-                 u.email,
-                 u.display_name,
-                 ar.name as role_name
+            `SELECT au.*, u.email, u.display_name, ar.name as role_name
              FROM admin_users au
                       JOIN users u ON au.user_id = u.id
                       JOIN admin_roles ar ON au.role_id = ar.id
@@ -206,7 +265,6 @@ const getHRProfile = async (req, res) => {
 
 const getHRDashboardStats = async (req, res) => {
     try {
-        // Check which tables exist
         const [jobsExist, appsExist, interviewsExist, deptsExist] = await Promise.all([
             tableExists('job_postings'),
             tableExists('job_applications'),
@@ -214,7 +272,6 @@ const getHRDashboardStats = async (req, res) => {
             tableExists('departments')
         ]);
 
-        // Initialize stats with defaults
         const stats = {
             jobs: { total_jobs: 0, open_jobs: 0, closed_jobs: 0, draft_jobs: 0 },
             applications: {
@@ -227,74 +284,64 @@ const getHRDashboardStats = async (req, res) => {
             employees: { total_employees: 0, active_employees: 0 }
         };
 
-        // Get job stats
         if (jobsExist) {
+            // Use both 'open' and 'published' for open_jobs to handle either schema
             const jobStats = await query(
-                `SELECT
-                     COUNT(*) as total_jobs,
-                     COUNT(CASE WHEN status = 'open' THEN 1 END) as open_jobs,
-                     COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_jobs,
-                     COUNT(CASE WHEN status = 'draft' THEN 1 END) as draft_jobs
+                `SELECT COUNT(*) as total_jobs,
+                        COUNT(CASE WHEN status IN ('open', 'published') THEN 1 END) as open_jobs,
+                        COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_jobs,
+                        COUNT(CASE WHEN status = 'draft' THEN 1 END) as draft_jobs
                  FROM job_postings`
             );
             stats.jobs = jobStats.rows[0];
         }
 
-        // Get application stats
         if (appsExist) {
             const applicationStats = await query(
-                `SELECT
-                     COUNT(*) as total_applications,
-                     COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_applications,
-                     COUNT(CASE WHEN status = 'reviewed' THEN 1 END) as reviewed_applications,
-                     COUNT(CASE WHEN status = 'shortlisted' THEN 1 END) as shortlisted_applications,
-                     COUNT(CASE WHEN status = 'interviewed' THEN 1 END) as interviewed_applications,
-                     COUNT(CASE WHEN status = 'hired' THEN 1 END) as hired_applications,
-                     COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected_applications
+                `SELECT COUNT(*) as total_applications,
+                        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_applications,
+                        COUNT(CASE WHEN status = 'reviewed' THEN 1 END) as reviewed_applications,
+                        COUNT(CASE WHEN status = 'shortlisted' THEN 1 END) as shortlisted_applications,
+                        COUNT(CASE WHEN status = 'interviewed' THEN 1 END) as interviewed_applications,
+                        COUNT(CASE WHEN status = 'hired' THEN 1 END) as hired_applications,
+                        COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected_applications
                  FROM job_applications`
             );
             stats.applications = applicationStats.rows[0];
         }
 
-        // Get interview stats
         if (interviewsExist) {
             const interviewStats = await query(
-                `SELECT
-                     COUNT(*) as total_interviews,
-                     COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as scheduled_interviews,
-                     COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_interviews,
-                     COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_interviews
+                `SELECT COUNT(*) as total_interviews,
+                        COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as scheduled_interviews,
+                        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_interviews,
+                        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_interviews
                  FROM interviews`
             );
             stats.interviews = interviewStats.rows[0];
         }
 
-        // Get department stats
         if (deptsExist) {
             const hasManagerId = await columnExists('departments', 'manager_id');
-
             if (hasManagerId) {
                 const departmentStats = await query(
-                    `SELECT
-                         COUNT(*) as total_departments,
-                         COUNT(CASE WHEN manager_id IS NOT NULL THEN 1 END) as departments_with_manager
+                    `SELECT COUNT(*) as total_departments,
+                            COUNT(CASE WHEN manager_id IS NOT NULL THEN 1 END) as departments_with_manager
                      FROM departments`
                 );
                 stats.departments = departmentStats.rows[0];
             } else {
-                const deptCount = await query('SELECT COUNT(*) as total_departments FROM departments');
+                const deptCount = await query('SELECT COUNT(*) as cnt FROM departments');
                 stats.departments = {
-                    total_departments: parseInt(deptCount.rows[0].count),
+                    total_departments: parseInt(deptCount.rows[0].cnt || 0),
                     departments_with_manager: 0
                 };
             }
         }
 
-        // Get employee stats from users table
         const employeeStats = await query(
-            `SELECT
-                 COUNT(*) as total_employees,
-                 COUNT(CASE WHEN is_active = true OR is_active IS NULL THEN 1 END) as active_employees
+            `SELECT COUNT(*) as total_employees,
+                    COUNT(CASE WHEN is_active = true OR is_active IS NULL THEN 1 END) as active_employees
              FROM users WHERE role IN ('employee', 'hr_admin', 'admin', 'super_admin')`
         );
         stats.employees = employeeStats.rows[0];
@@ -302,7 +349,6 @@ const getHRDashboardStats = async (req, res) => {
         res.json(stats);
     } catch (error) {
         console.error('❌ Get HR dashboard stats error:', error);
-        // Return default stats instead of failing
         res.json({
             jobs: { total_jobs: 0, open_jobs: 0, closed_jobs: 0, draft_jobs: 0 },
             applications: {
@@ -317,207 +363,303 @@ const getHRDashboardStats = async (req, res) => {
     }
 };
 
-// FIXED: createJobPosting with proper posted_by handling
+// ─────────────────────────────────────────────────────────────────────────────
+// getDepartments — returns BOTH `id` and `department_id` so the frontend
+// never has to guess which field to use.
+// ─────────────────────────────────────────────────────────────────────────────
+const getDepartments = async (req, res) => {
+    try {
+        const deptsExist = await tableExists('departments');
+        if (!deptsExist) {
+            console.log('Departments table does not exist');
+            return res.json([]);
+        }
+
+        const existingCols = await getTableColumns('departments');
+        const has = (col) => existingCols.includes(col);
+
+        console.log('📋 departments columns detected:', existingCols);
+
+        let selectCols = `d.id, d.id AS department_id, d.name`;
+        if (has('description'))          selectCols += `, d.description`;
+        if (has('parent_department_id')) selectCols += `, d.parent_department_id`;
+        if (has('manager_id'))           selectCols += `, d.manager_id`;
+        if (has('created_at'))           selectCols += `, d.created_at`;
+        if (has('updated_at'))           selectCols += `, d.updated_at`;
+
+        let joinClause = '';
+        if (has('manager_id')) {
+            selectCols += `, u.display_name AS manager_name`;
+            joinClause = `LEFT JOIN users u ON d.manager_id = u.id`;
+        }
+
+        const result = await query(
+            `SELECT ${selectCols} FROM departments d ${joinClause} ORDER BY d.name`
+        );
+
+        console.log(`✅ Returning ${result.rows.length} departments`);
+        if (result.rows.length > 0) {
+            console.log('📋 Department IDs in DB:', result.rows.map(r => `${r.name}: ${r.id}`));
+        }
+
+        res.json(result.rows);
+
+    } catch (error) {
+        console.error('❌ Get departments error:', error);
+        res.json([]);
+    }
+};
+
+// Helper: get departments list (used internally for error responses)
+const getValidDepartments = async () => {
+    try {
+        const deptsExist = await tableExists('departments');
+        if (!deptsExist) return [];
+        const existingCols = await getTableColumns('departments');
+        const has = (col) => existingCols.includes(col);
+        const selectCols = has('description') ? `id, name, description` : `id, name`;
+        const result = await query(`SELECT ${selectCols} FROM departments ORDER BY name`);
+        return result.rows;
+    } catch (error) {
+        console.error('❌ Error getting departments:', error);
+        return [];
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// createJobPosting — reads actual DB columns first, only inserts what exists.
+// Status is normalised via resolveJobStatus() to satisfy the DB check constraint.
+// ─────────────────────────────────────────────────────────────────────────────
 const createJobPosting = async (req, res) => {
     try {
-        // Check if table exists
         const jobsExist = await tableExists('job_postings');
         if (!jobsExist) {
             return res.status(503).json({ error: 'Job postings table not initialized' });
         }
 
         const {
-            title,
-            department_id,
-            employment_type,
-            location,
-            is_remote,
-            salary_min,
-            salary_max,
-            salary_currency,
-            description,
-            requirements,
-            responsibilities,
-            benefits,
-            skills_required,
-            experience_level,
-            education_required,
-            application_deadline,
-            status
+            title, department_id, employment_type, location, is_remote,
+            salary_min, salary_max, salary_currency, description,
+            requirements, responsibilities, benefits, skills_required,
+            experience_level, education_required, application_deadline, status
         } = req.body;
 
-        // Validate required fields
+        // ── Required field validation ──────────────────────────────────────
         if (!title || !employment_type || !description) {
-            return res.status(400).json({ error: 'Missing required fields: title, employment_type, description' });
+            return res.status(400).json({
+                error: 'Missing required fields',
+                details: 'title, employment_type, and description are all required'
+            });
         }
 
-        // Validate array fields
         const arrayValidationError =
-            validateArrayField(requirements, 'requirements') ||
+            validateArrayField(requirements,     'requirements')     ||
             validateArrayField(responsibilities, 'responsibilities') ||
-            validateArrayField(benefits, 'benefits') ||
-            validateArrayField(skills_required, 'skills_required');
+            validateArrayField(benefits,         'benefits')         ||
+            validateArrayField(skills_required,  'skills_required');
 
         if (arrayValidationError) {
             return res.status(400).json({ error: arrayValidationError });
         }
 
-        // Check if department exists
-        const deptCheck = await query(
-            'SELECT id FROM departments WHERE id = $1',
-            [department_id]
-        );
-
-        if (deptCheck.rows.length === 0) {
+        if (!department_id) {
             return res.status(400).json({
-                error: 'Department not found',
-                details: `Department with ID ${department_id} does not exist`
+                error: 'Department is required',
+                field: 'department_id',
+                message: 'Please select a department from the dropdown'
             });
         }
 
-        // Get or create admin user ID for the current user
-        const adminUserId = await getOrCreateAdminUserId(req.user.id);
+        if (!isValidUUID(department_id)) {
+            return res.status(400).json({
+                error: 'Invalid department ID format',
+                field: 'department_id',
+                value: department_id,
+                message: 'The department ID must be a valid UUID'
+            });
+        }
 
+        // ── Department existence check ──────────────────────────────────────
+        console.log('🔍 Checking department existence for ID:', department_id);
+        const deptCheck = await query(
+            'SELECT id, name FROM departments WHERE id = $1',
+            [department_id]
+        );
+        console.log('📋 Department check result:', deptCheck.rows);
+
+        if (deptCheck.rows.length === 0) {
+            const availableDepts = await getValidDepartments();
+            console.log('❌ Department not found. Available IDs:', availableDepts.map(d => d.id));
+            return res.status(400).json({
+                error: 'Department not found',
+                field: 'department_id',
+                value: department_id,
+                message: `Department with ID ${department_id} does not exist in the database. Please refresh the page and select a department again.`,
+                availableDepartments: availableDepts
+            });
+        }
+
+        const adminUserId = await getOrCreateAdminUserId(req.user.id);
         if (!adminUserId) {
             return res.status(403).json({
                 error: 'User not authorized to create job postings',
-                details: 'User must have HR privileges to create job postings',
-                hint: 'Please contact your system administrator to set up your HR account'
+                details: 'User must have HR privileges (hr_admin, admin, or super_admin role) to create job postings'
             });
         }
 
-        // Set default status to 'draft' if not provided
-        const jobStatus = status || 'draft';
-        const remoteValue = is_remote !== undefined ? is_remote : false;
+        // ── Read every column that actually exists in job_postings ──────────
+        const existingCols = await getTableColumns('job_postings');
+        const has = (col) => existingCols.includes(col);
 
-        console.log('📥 Creating job posting with data:', {
-            title,
-            department_id,
-            employment_type,
-            location,
-            is_remote: remoteValue,
-            salary_min,
-            salary_max,
-            salary_currency: salary_currency || 'USD',
-            description_length: description?.length || 0,
-            requirements_count: requirements?.length || 0,
-            responsibilities_count: responsibilities?.length || 0,
-            benefits_count: benefits?.length || 0,
-            skills_count: skills_required?.length || 0,
-            experience_level,
-            education_required,
-            application_deadline,
-            status: jobStatus,
-            posted_by: adminUserId
-        });
+        console.log('📋 job_postings columns detected:', existingCols);
 
-        // Properly format JSON fields for PostgreSQL - use jsonb type for better performance
-        const requirementsJson = requirements ? JSON.stringify(requirements) : '[]';
-        const responsibilitiesJson = responsibilities ? JSON.stringify(responsibilities) : '[]';
-        const benefitsJson = benefits ? JSON.stringify(benefits) : '[]';
-        const skillsRequiredJson = skills_required ? JSON.stringify(skills_required) : '[]';
+        // ── Resolve status against the actual DB check constraint ───────────
+        // The frontend sends "open" but the DB constraint may only allow
+        // "draft" | "published" | "closed". resolveJobStatus() handles the
+        // alias mapping AND probes Postgres for the real allowed values.
+        const finalStatus = await resolveJobStatus(status);
 
-        const result = await query(
-            `INSERT INTO job_postings (
-                title, 
-                department_id, 
-                employment_type, 
-                location,
-                is_remote,
-                salary_min, 
-                salary_max, 
-                salary_currency, 
-                description,
-                requirements, 
-                responsibilities, 
-                benefits, 
-                skills_required,
-                experience_level, 
-                education_required, 
-                application_deadline,
-                posted_by, 
-                status, 
-                created_at, 
-                updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            RETURNING *`,
-            [
-                title,
-                department_id,
-                employment_type,
-                location || null,
-                remoteValue,
-                salary_min ? parseFloat(salary_min) : null,
-                salary_max ? parseFloat(salary_max) : null,
-                salary_currency || 'USD',
-                description,
-                requirementsJson,
-                responsibilitiesJson,
-                benefitsJson,
-                skillsRequiredJson,
-                experience_level || null,
-                education_required || null,
-                application_deadline || null,
-                adminUserId,
-                jobStatus
-            ]
-        );
+        const cols    = ['title', 'department_id', 'employment_type', 'posted_by', 'status'];
+        const holders = ['$1',    '$2',             '$3',              '$4',         '$5'];
+        const params  = [title, department_id, employment_type, adminUserId, finalStatus];
+        let idx = 6;
+
+        if (has('created_at')) { cols.push('created_at'); holders.push('CURRENT_TIMESTAMP'); }
+        if (has('updated_at')) { cols.push('updated_at'); holders.push('CURRENT_TIMESTAMP'); }
+
+        if (has('description')) {
+            cols.push('description'); holders.push(`$${idx}`); params.push(description); idx++;
+        }
+        if (has('location')) {
+            cols.push('location'); holders.push(`$${idx}`); params.push(location || null); idx++;
+        }
+        if (has('is_remote')) {
+            cols.push('is_remote'); holders.push(`$${idx}`); params.push(is_remote !== undefined ? is_remote : false); idx++;
+        }
+        if (has('salary_min')) {
+            cols.push('salary_min'); holders.push(`$${idx}`); params.push(salary_min ? parseFloat(salary_min) : null); idx++;
+        }
+        if (has('salary_max')) {
+            cols.push('salary_max'); holders.push(`$${idx}`); params.push(salary_max ? parseFloat(salary_max) : null); idx++;
+        }
+        if (has('salary_currency')) {
+            cols.push('salary_currency'); holders.push(`$${idx}`); params.push(salary_currency || 'USD'); idx++;
+        }
+        if (has('experience_level')) {
+            cols.push('experience_level'); holders.push(`$${idx}`); params.push(experience_level || null); idx++;
+        }
+        if (has('education_required')) {
+            cols.push('education_required'); holders.push(`$${idx}`); params.push(education_required || null); idx++;
+        }
+        if (has('application_deadline')) {
+            cols.push('application_deadline'); holders.push(`$${idx}`); params.push(application_deadline || null); idx++;
+        }
+        if (has('requirements')) {
+            cols.push('requirements'); holders.push(`$${idx}::jsonb`); params.push(JSON.stringify(requirements || [])); idx++;
+        }
+        if (has('responsibilities')) {
+            cols.push('responsibilities'); holders.push(`$${idx}::jsonb`); params.push(JSON.stringify(responsibilities || [])); idx++;
+        }
+        if (has('benefits')) {
+            cols.push('benefits'); holders.push(`$${idx}::jsonb`); params.push(JSON.stringify(benefits || [])); idx++;
+        }
+        if (has('skills_required')) {
+            cols.push('skills_required'); holders.push(`$${idx}::jsonb`); params.push(JSON.stringify(skills_required || [])); idx++;
+        }
+
+        const queryText = `
+            INSERT INTO job_postings (${cols.join(', ')})
+            VALUES (${holders.join(', ')})
+            RETURNING *
+        `;
+
+        console.log('📥 Inserting job posting, columns used:', cols);
+        console.log('📥 Final status value being inserted:', finalStatus);
+
+        const result = await query(queryText, params);
 
         console.log('✅ Job created successfully with ID:', result.rows[0].id);
-        res.status(201).json({
-            success: true,
-            id: result.rows[0].id,
-            job: result.rows[0]
-        });
+        res.status(201).json({ success: true, id: result.rows[0].id, job: result.rows[0] });
 
     } catch (error) {
         console.error('❌ Create job posting error:', error);
-        console.error('Error details:', error.message);
-        console.error('Error code:', error.code);
-
-        // Handle specific database errors
-        if (error.code === '23503') { // Foreign key violation
+        if (error.code === '23514') {
+            // Check constraint violation — surface the constraint detail
             return res.status(400).json({
-                error: 'Invalid reference',
-                details: 'The user ID or department ID is invalid',
-                hint: 'Make sure the user has admin privileges and the department exists'
+                error: 'Invalid status value',
+                details: error.detail || error.message,
+                message: 'The status value is not allowed by the database. Try using "draft" or "published".'
             });
         }
-
-        if (error.code === '23502') { // Not null violation
+        if (error.code === '23503') {
             return res.status(400).json({
-                error: 'Missing required field',
-                details: error.message
+                error: 'Invalid reference — the department ID or user ID does not exist in the database',
+                field: 'department_id',
+                details: error.detail || error.message
             });
         }
-
-        if (error.code === '22P02') { // Invalid array format
-            return res.status(400).json({
-                error: 'Invalid data format',
-                details: 'One of the array fields (requirements, responsibilities, benefits, skills_required) is malformed'
-            });
+        if (error.code === '23502') {
+            return res.status(400).json({ error: 'Missing required field', details: error.message });
         }
-
-        res.status(500).json({
-            error: 'Failed to create job posting',
-            details: error.message
-        });
+        if (error.code === '22P02') {
+            return res.status(400).json({ error: 'Invalid data format', details: 'One of the array fields is malformed' });
+        }
+        res.status(500).json({ error: 'Failed to create job posting', details: error.message });
     }
 };
 
-// FIXED: updateJobPosting with proper JSONB handling
+// ─────────────────────────────────────────────────────────────────────────────
+// updateJobPosting — skips fields that don't exist in the DB.
+// Also normalises status via resolveJobStatus() if it is being updated.
+// ─────────────────────────────────────────────────────────────────────────────
 const updateJobPosting = async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
+        const updates = { ...req.body };
 
+        // ── Normalise status if present ────────────────────────────────────
+        if (updates.status !== undefined) {
+            updates.status = await resolveJobStatus(updates.status);
+        }
+
+        // ── If department_id is being updated, validate it exists ──────────
+        if (updates.department_id) {
+            if (!isValidUUID(updates.department_id)) {
+                return res.status(400).json({
+                    error: 'Invalid department ID format',
+                    field: 'department_id',
+                    value: updates.department_id
+                });
+            }
+            const deptCheck = await query(
+                'SELECT id FROM departments WHERE id = $1',
+                [updates.department_id]
+            );
+            if (deptCheck.rows.length === 0) {
+                const availableDepts = await getValidDepartments();
+                return res.status(400).json({
+                    error: 'Department not found',
+                    field: 'department_id',
+                    value: updates.department_id,
+                    message: `Department with ID ${updates.department_id} does not exist. Please refresh and select a valid department.`,
+                    availableDepartments: availableDepts
+                });
+            }
+        }
+
+        const existingCols = await getTableColumns('job_postings');
+        const has = (col) => existingCols.includes(col);
+
+        const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
         const setClause = [];
         const values = [];
         let paramIndex = 1;
 
-        const arrayFields = ['requirements', 'responsibilities', 'benefits', 'skills_required'];
-
         for (const [key, value] of Object.entries(updates)) {
+            if (!has(key)) {
+                console.log(`⚠️  Skipping unknown column in update: ${key}`);
+                continue;
+            }
             if (arrayFields.includes(key)) {
                 const arrayValidationError = validateArrayField(value, key);
                 if (arrayValidationError) {
@@ -532,39 +674,37 @@ const updateJobPosting = async (req, res) => {
             paramIndex++;
         }
 
-        // Always update the updated_at timestamp
-        setClause.push(`updated_at = CURRENT_TIMESTAMP`);
+        if (setClause.length === 0) {
+            return res.status(400).json({ error: 'No valid fields to update' });
+        }
 
-        // Add the ID as the last parameter
+        if (has('updated_at')) setClause.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(id);
 
-        const query_text = `
-            UPDATE job_postings
-            SET ${setClause.join(', ')}
-            WHERE id = $${paramIndex}
-            RETURNING *
-        `;
-
-        const result = await query(query_text, values);
+        const result = await query(
+            `UPDATE job_postings SET ${setClause.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+            values
+        );
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Job posting not found' });
         }
 
         console.log('✅ Job updated successfully:', id);
-        res.json({
-            success: true,
-            job: result.rows[0]
-        });
+        res.json({ success: true, job: result.rows[0] });
+
     } catch (error) {
         console.error('❌ Update job posting error:', error);
-
-        if (error.code === '22P02') {
+        if (error.code === '23514') {
             return res.status(400).json({
-                error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required'
+                error: 'Invalid status value',
+                details: error.detail || error.message,
+                message: 'The status value is not allowed by the database constraint.'
             });
         }
-
+        if (error.code === '22P02') {
+            return res.status(400).json({ error: 'Invalid array format for requirements, responsibilities, benefits, or skills_required' });
+        }
         res.status(500).json({ error: 'Failed to update job posting' });
     }
 };
@@ -573,62 +713,50 @@ const getJobPostings = async (req, res) => {
     try {
         const { status, department } = req.query;
 
-        // Check if tables exist
         const jobsExist = await tableExists('job_postings');
-        if (!jobsExist) {
-            return res.json([]);
-        }
+        if (!jobsExist) return res.json([]);
 
-        const appsExist = await tableExists('job_applications');
+        const appsExist  = await tableExists('job_applications');
+        const deptsExist = await tableExists('departments');
 
-        let queryText = `
-            SELECT
-                j.*,
-                d.name as department_name,
-                u.display_name as posted_by_name
-        `;
+        let selectPart = `SELECT j.*`;
+        if (deptsExist) selectPart += `, d.name as department_name`;
+        if (appsExist)  selectPart += `, COUNT(a.id) as applications_count`;
 
-        if (appsExist) {
-            queryText += `,
-                COUNT(a.id) as applications_count
-            FROM job_postings j
-            LEFT JOIN departments d ON j.department_id = d.id
-            LEFT JOIN users u ON j.posted_by = u.id
-            LEFT JOIN job_applications a ON j.id = a.job_id
-            `;
-        } else {
-            queryText += `
-            FROM job_postings j
-            LEFT JOIN departments d ON j.department_id = d.id
-            LEFT JOIN users u ON j.posted_by = u.id
-            `;
-        }
+        let fromPart = `FROM job_postings j`;
+        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+        fromPart += ` LEFT JOIN users u ON j.posted_by = u.id`;
+        if (appsExist)  fromPart += ` LEFT JOIN job_applications a ON j.id = a.job_id`;
 
-        queryText += ` WHERE 1=1`;
+        let wherePart = `WHERE 1=1`;
         const params = [];
         let paramIndex = 1;
 
         if (status && status !== 'all') {
-            queryText += ` AND j.status = $${paramIndex}`;
-            params.push(status);
+            // Accept 'open' as a filter alias for 'published'
+            const statusFilter = STATUS_ALIAS_MAP[status] ?? status;
+            wherePart += ` AND j.status = $${paramIndex}`;
+            params.push(statusFilter);
             paramIndex++;
         }
-
-        if (department && department !== 'all') {
-            queryText += ` AND j.department_id = $${paramIndex}`;
+        if (department && department !== 'all' && deptsExist) {
+            wherePart += ` AND j.department_id = $${paramIndex}`;
             params.push(department);
             paramIndex++;
         }
 
+        let groupPart = '';
         if (appsExist) {
-            queryText += ` GROUP BY j.id, d.name, u.display_name`;
+            groupPart = `GROUP BY j.id`;
+            if (deptsExist) groupPart += `, d.name`;
         }
 
-        queryText += ` ORDER BY j.created_at DESC`;
-
-        const result = await query(queryText, params);
-
+        const result = await query(
+            `${selectPart} ${fromPart} ${wherePart} ${groupPart} ORDER BY j.created_at DESC`,
+            params
+        );
         res.json(result.rows);
+
     } catch (error) {
         console.error('❌ Get job postings error:', error);
         res.status(500).json({ error: 'Failed to fetch job postings' });
@@ -639,139 +767,37 @@ const getJobDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Check if tables exist
-        const appsExist = await tableExists('job_applications');
+        const appsExist  = await tableExists('job_applications');
+        const deptsExist = await tableExists('departments');
 
-        let queryText = `
-            SELECT
-                j.*,
-                d.name as department_name,
-                u.display_name as posted_by_name
-        `;
+        let selectPart = `SELECT j.*`;
+        if (deptsExist) selectPart += `, d.name as department_name`;
 
+        let fromPart = `FROM job_postings j`;
+        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+        fromPart += ` LEFT JOIN users u ON j.posted_by = u.id`;
+        if (appsExist) fromPart += ` LEFT JOIN job_applications a ON j.id = a.job_id`;
+
+        let groupPart = '';
         if (appsExist) {
-            queryText += `,
-                COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'id', a.id,
-                            'first_name', a.first_name,
-                            'last_name', a.last_name,
-                            'email', a.email,
-                            'status', a.status,
-                            'created_at', a.created_at
-                        ) ORDER BY a.created_at DESC
-                    ) FILTER (WHERE a.id IS NOT NULL),
-                    '[]'
-                ) as applications
-            FROM job_postings j
-            LEFT JOIN departments d ON j.department_id = d.id
-            LEFT JOIN users u ON j.posted_by = u.id
-            LEFT JOIN job_applications a ON j.id = a.job_id
-            `;
-        } else {
-            queryText += `
-            FROM job_postings j
-            LEFT JOIN departments d ON j.department_id = d.id
-            LEFT JOIN users u ON j.posted_by = u.id
-            `;
+            groupPart = `GROUP BY j.id`;
+            if (deptsExist) groupPart += `, d.name`;
         }
 
-        queryText += ` WHERE j.id = $1`;
-
-        if (appsExist) {
-            queryText += ` GROUP BY j.id, d.name, u.display_name`;
-        }
-
-        const result = await query(queryText, [id]);
+        const result = await query(
+            `${selectPart} ${fromPart} WHERE j.id = $1 ${groupPart}`,
+            [id]
+        );
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Job posting not found' });
         }
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Get job details error:', error);
         res.status(500).json({ error: 'Failed to fetch job details' });
-    }
-};
-
-const publishJob = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const result = await query(
-            `UPDATE job_postings
-             SET status = 'open',
-                 published_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1
-                 RETURNING *`,
-            [id]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Job posting not found' });
-        }
-
-        console.log('✅ Job published successfully:', id);
-        res.json({
-            success: true,
-            job: result.rows[0]
-        });
-    } catch (error) {
-        console.error('❌ Publish job error:', error);
-        res.status(500).json({ error: 'Failed to publish job' });
-    }
-};
-
-const closeJob = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const result = await query(
-            `UPDATE job_postings
-             SET status = 'closed',
-                 closed_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1
-                 RETURNING *`,
-            [id]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Job posting not found' });
-        }
-
-        console.log('✅ Job closed successfully:', id);
-        res.json({
-            success: true,
-            job: result.rows[0]
-        });
-    } catch (error) {
-        console.error('❌ Close job error:', error);
-        res.status(500).json({ error: 'Failed to close job' });
-    }
-};
-
-const deleteJobPosting = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const result = await query('DELETE FROM job_postings WHERE id = $1 RETURNING id', [id]);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Job posting not found' });
-        }
-
-        console.log('✅ Job deleted successfully:', id);
-        res.json({
-            success: true,
-            message: 'Job posting deleted successfully'
-        });
-    } catch (error) {
-        console.error('❌ Delete job posting error:', error);
-        res.status(500).json({ error: 'Failed to delete job posting' });
     }
 };
 
@@ -780,35 +806,32 @@ const getJobApplications = async (req, res) => {
         const { jobId } = req.params;
         const { status } = req.query;
 
-        // Check if applications table exists
-        const appsExist = await tableExists('job_applications');
-        if (!appsExist) {
-            return res.json([]);
-        }
+        const appsExist  = await tableExists('job_applications');
+        const deptsExist = await tableExists('departments');
 
-        let queryText = `
-            SELECT
-                a.*,
-                j.title as job_title,
-                d.name as department_name
-            FROM job_applications a
-                     JOIN job_postings j ON a.job_id = j.id
-                     JOIN departments d ON j.department_id = d.id
-            WHERE a.job_id = $1
-        `;
+        if (!appsExist) return res.json([]);
+
+        let selectPart = `SELECT a.*, j.title as job_title`;
+        if (deptsExist) selectPart += `, d.name as department_name`;
+
+        let fromPart = `FROM job_applications a JOIN job_postings j ON a.job_id = j.id`;
+        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+
         const params = [jobId];
+        let wherePart = `WHERE a.job_id = $1`;
         let paramIndex = 2;
 
         if (status && status !== 'all') {
-            queryText += ` AND a.status = $${paramIndex}`;
+            wherePart += ` AND a.status = $${paramIndex}`;
             params.push(status);
         }
 
-        queryText += ` ORDER BY a.created_at DESC`;
-
-        const result = await query(queryText, params);
-
+        const result = await query(
+            `${selectPart} ${fromPart} ${wherePart} ORDER BY a.created_at DESC`,
+            params
+        );
         res.json(result.rows);
+
     } catch (error) {
         console.error('❌ Get job applications error:', error);
         res.status(500).json({ error: 'Failed to fetch job applications' });
@@ -819,35 +842,95 @@ const getApplicationDetails = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Check if applications table exists
-        const appsExist = await tableExists('job_applications');
-        if (!appsExist) {
-            return res.status(404).json({ error: 'Application not found' });
-        }
+        const appsExist  = await tableExists('job_applications');
+        const deptsExist = await tableExists('departments');
 
-        const result = await query(
-            `SELECT
-                 a.*,
-                 j.title as job_title,
-                 j.description as job_description,
-                 d.name as department_name,
-                 u.display_name as reviewer_name
-             FROM job_applications a
-                      JOIN job_postings j ON a.job_id = j.id
-                      JOIN departments d ON j.department_id = d.id
-                      LEFT JOIN users u ON a.reviewed_by = u.id
-             WHERE a.id = $1`,
-            [id]
-        );
+        if (!appsExist) return res.status(404).json({ error: 'Application not found' });
+
+        let selectPart = `SELECT a.*, j.title as job_title, j.description as job_description`;
+        if (deptsExist) selectPart += `, d.name as department_name`;
+        selectPart += `, u.display_name as reviewer_name`;
+
+        let fromPart = `FROM job_applications a JOIN job_postings j ON a.job_id = j.id`;
+        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+        fromPart += ` LEFT JOIN users u ON a.reviewed_by = u.id`;
+
+        const result = await query(`${selectPart} ${fromPart} WHERE a.id = $1`, [id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Application not found' });
         }
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Get application details error:', error);
         res.status(500).json({ error: 'Failed to fetch application details' });
+    }
+};
+
+const publishJob = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const existingCols = await getTableColumns('job_postings');
+        const has = (col) => existingCols.includes(col);
+
+        // Resolve 'open' vs 'published' via constraint probe
+        const publishStatus = await resolveJobStatus('open');
+
+        let setPart = `status = '${publishStatus}'`;
+        if (has('published_at')) setPart += `, published_at = CURRENT_TIMESTAMP`;
+        if (has('updated_at'))   setPart += `, updated_at = CURRENT_TIMESTAMP`;
+
+        const result = await query(`UPDATE job_postings SET ${setPart} WHERE id = $1 RETURNING *`, [id]);
+
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Job posting not found' });
+
+        console.log('✅ Job published successfully:', id);
+        res.json({ success: true, job: result.rows[0] });
+
+    } catch (error) {
+        console.error('❌ Publish job error:', error);
+        res.status(500).json({ error: 'Failed to publish job' });
+    }
+};
+
+const closeJob = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const existingCols = await getTableColumns('job_postings');
+        const has = (col) => existingCols.includes(col);
+
+        let setPart = `status = 'closed'`;
+        if (has('closed_at'))  setPart += `, closed_at = CURRENT_TIMESTAMP`;
+        if (has('updated_at')) setPart += `, updated_at = CURRENT_TIMESTAMP`;
+
+        const result = await query(`UPDATE job_postings SET ${setPart} WHERE id = $1 RETURNING *`, [id]);
+
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Job posting not found' });
+
+        console.log('✅ Job closed successfully:', id);
+        res.json({ success: true, job: result.rows[0] });
+
+    } catch (error) {
+        console.error('❌ Close job error:', error);
+        res.status(500).json({ error: 'Failed to close job' });
+    }
+};
+
+const deleteJobPosting = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await query('DELETE FROM job_postings WHERE id = $1 RETURNING id', [id]);
+
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Job posting not found' });
+
+        console.log('✅ Job deleted successfully:', id);
+        res.json({ success: true, message: 'Job posting deleted successfully' });
+
+    } catch (error) {
+        console.error('❌ Delete job posting error:', error);
+        res.status(500).json({ error: 'Failed to delete job posting' });
     }
 };
 
@@ -856,23 +939,29 @@ const updateApplicationStatus = async (req, res) => {
         const { id } = req.params;
         const { status, notes } = req.body;
 
+        const existingCols = await getTableColumns('job_applications');
+        const has = (col) => existingCols.includes(col);
+
+        const setClauses = [`status = $1`];
+        const params = [status];
+        let idx = 2;
+
+        if (has('notes'))        { setClauses.push(`notes = $${idx}`);          params.push(notes);       idx++; }
+        if (has('reviewed_by'))  { setClauses.push(`reviewed_by = $${idx}`);    params.push(req.user.id); idx++; }
+        if (has('reviewed_at'))  { setClauses.push(`reviewed_at = CURRENT_TIMESTAMP`); }
+        if (has('updated_at'))   { setClauses.push(`updated_at = CURRENT_TIMESTAMP`); }
+
+        params.push(id);
+
         const result = await query(
-            `UPDATE job_applications
-             SET status = $1,
-                 notes = $2,
-                 reviewed_by = $3,
-                 reviewed_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $4
-                 RETURNING *`,
-            [status, notes, req.user.id, id]
+            `UPDATE job_applications SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+            params
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Application not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Application not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Update application status error:', error);
         res.status(500).json({ error: 'Failed to update application status' });
@@ -884,23 +973,21 @@ const addApplicationNotes = async (req, res) => {
         const { id } = req.params;
         const { notes } = req.body;
 
+        const existingCols = await getTableColumns('job_applications');
+        const has = (col) => existingCols.includes(col);
+
+        let setPart = `notes = CASE WHEN notes IS NULL THEN $1 ELSE notes || E'\\n' || $1 END`;
+        if (has('updated_at')) setPart += `, updated_at = CURRENT_TIMESTAMP`;
+
         const result = await query(
-            `UPDATE job_applications
-             SET notes = CASE
-                             WHEN notes IS NULL THEN $1
-                             ELSE notes || E'\n' || $1
-                 END,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $2
-                 RETURNING *`,
+            `UPDATE job_applications SET ${setPart} WHERE id = $2 RETURNING *`,
             [notes, id]
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Application not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Application not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Add application notes error:', error);
         res.status(500).json({ error: 'Failed to add notes' });
@@ -910,35 +997,43 @@ const addApplicationNotes = async (req, res) => {
 const scheduleInterview = async (req, res) => {
     try {
         const { id } = req.params;
-        const {
-            interviewer_id, interview_type, scheduled_at,
-            duration_minutes, location, meeting_link
-        } = req.body;
+        const { interviewer_id, interview_type, scheduled_at, duration_minutes, location, meeting_link } = req.body;
 
-        // Check if interviews table exists
         const interviewsExist = await tableExists('interviews');
-        if (!interviewsExist) {
-            return res.status(503).json({ error: 'Interviews table not initialized' });
-        }
+        if (!interviewsExist) return res.status(503).json({ error: 'Interviews table not initialized' });
+
+        const existingCols = await getTableColumns('interviews');
+        const has = (col) => existingCols.includes(col);
+
+        const cols    = ['application_id', 'status'];
+        const holders = ['$1', "'scheduled'"];
+        const params  = [id];
+        let idx = 2;
+
+        if (has('interviewer_id'))   { cols.push('interviewer_id');   holders.push(`$${idx}`); params.push(interviewer_id);   idx++; }
+        if (has('interview_type'))   { cols.push('interview_type');   holders.push(`$${idx}`); params.push(interview_type);   idx++; }
+        if (has('scheduled_at'))     { cols.push('scheduled_at');     holders.push(`$${idx}`); params.push(scheduled_at);     idx++; }
+        if (has('duration_minutes')) { cols.push('duration_minutes'); holders.push(`$${idx}`); params.push(duration_minutes); idx++; }
+        if (has('location'))         { cols.push('location');         holders.push(`$${idx}`); params.push(location);         idx++; }
+        if (has('meeting_link'))     { cols.push('meeting_link');     holders.push(`$${idx}`); params.push(meeting_link);     idx++; }
+        if (has('created_at'))       { cols.push('created_at'); holders.push('CURRENT_TIMESTAMP'); }
+        if (has('updated_at'))       { cols.push('updated_at'); holders.push('CURRENT_TIMESTAMP'); }
 
         const result = await query(
-            `INSERT INTO interviews (
-                application_id, interviewer_id, interview_type,
-                scheduled_at, duration_minutes, location, meeting_link, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled')
-                 RETURNING *`,
-            [id, interviewer_id, interview_type, scheduled_at, duration_minutes, location, meeting_link]
+            `INSERT INTO interviews (${cols.join(', ')}) VALUES (${holders.join(', ')}) RETURNING *`,
+            params
         );
 
-        // Update application status
-        await query(
-            `UPDATE job_applications
-             SET status = 'interviewed', updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1`,
-            [id]
-        );
+        const appCols = await getTableColumns('job_applications');
+        if (appCols.includes('status')) {
+            const appSetPart = appCols.includes('updated_at')
+                ? `status = 'interviewed', updated_at = CURRENT_TIMESTAMP`
+                : `status = 'interviewed'`;
+            await query(`UPDATE job_applications SET ${appSetPart} WHERE id = $1`, [id]);
+        }
 
         res.status(201).json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Schedule interview error:', error);
         res.status(500).json({ error: 'Failed to schedule interview' });
@@ -947,18 +1042,15 @@ const scheduleInterview = async (req, res) => {
 
 const getUpcomingInterviews = async (req, res) => {
     try {
-        // Check if interviews table exists
         const interviewsExist = await tableExists('interviews');
-        if (!interviewsExist) {
-            return res.json([]);
-        }
+        if (!interviewsExist) return res.json([]);
+
+        const existingCols = await getTableColumns('interviews');
+        if (!existingCols.includes('scheduled_at')) return res.json([]);
 
         const result = await query(
-            `SELECT
-                 i.*,
-                 a.first_name, a.last_name, a.email,
-                 j.title as job_title,
-                 u.display_name as interviewer_name
+            `SELECT i.*, a.first_name, a.last_name, a.email,
+                    j.title as job_title, u.display_name as interviewer_name
              FROM interviews i
                       JOIN job_applications a ON i.application_id = a.id
                       JOIN job_postings j ON a.job_id = j.id
@@ -968,6 +1060,7 @@ const getUpcomingInterviews = async (req, res) => {
         );
 
         res.json(result.rows);
+
     } catch (error) {
         console.error('❌ Get upcoming interviews error:', error);
         res.status(500).json({ error: 'Failed to fetch upcoming interviews' });
@@ -979,42 +1072,37 @@ const updateInterview = async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
 
-        // Remove undefined fields
-        Object.keys(updates).forEach(key =>
-            updates[key] === undefined && delete updates[key]
-        );
+        Object.keys(updates).forEach(key => updates[key] === undefined && delete updates[key]);
+        if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-        if (Object.keys(updates).length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
-        }
+        const existingCols = await getTableColumns('interviews');
+        const has = (col) => existingCols.includes(col);
 
         const setClause = [];
         const values = [];
         let paramIndex = 1;
 
         for (const [key, value] of Object.entries(updates)) {
+            if (!has(key)) { console.log(`⚠️  Skipping unknown column: ${key}`); continue; }
             setClause.push(`${key} = $${paramIndex}`);
             values.push(value);
             paramIndex++;
         }
 
-        setClause.push(`updated_at = CURRENT_TIMESTAMP`);
+        if (setClause.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
+
+        if (has('updated_at')) setClause.push(`updated_at = CURRENT_TIMESTAMP`);
         values.push(id);
 
-        const query_text = `
-            UPDATE interviews
-            SET ${setClause.join(', ')}
-            WHERE id = $${paramIndex}
-                RETURNING *
-        `;
+        const result = await query(
+            `UPDATE interviews SET ${setClause.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+            values
+        );
 
-        const result = await query(query_text, values);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Interview not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Interview not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Update interview error:', error);
         res.status(500).json({ error: 'Failed to update interview' });
@@ -1026,32 +1114,37 @@ const submitInterviewFeedback = async (req, res) => {
         const { id } = req.params;
         const { feedback, rating, recommended_for_next } = req.body;
 
+        const existingCols = await getTableColumns('interviews');
+        const has = (col) => existingCols.includes(col);
+
+        const setClauses = [`status = 'completed'`];
+        const params = [];
+        let idx = 1;
+
+        if (has('feedback'))             { setClauses.push(`feedback = $${idx}`);             params.push(feedback);             idx++; }
+        if (has('rating'))               { setClauses.push(`rating = $${idx}`);               params.push(rating);               idx++; }
+        if (has('recommended_for_next')) { setClauses.push(`recommended_for_next = $${idx}`); params.push(recommended_for_next); idx++; }
+        if (has('updated_at'))           { setClauses.push(`updated_at = CURRENT_TIMESTAMP`); }
+
+        params.push(id);
+
         const result = await query(
-            `UPDATE interviews
-             SET feedback = $1,
-                 rating = $2,
-                 recommended_for_next = $3,
-                 status = 'completed',
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $4
-                 RETURNING *`,
-            [feedback, rating, recommended_for_next, id]
+            `UPDATE interviews SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+            params
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Interview not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Interview not found' });
 
         if (recommended_for_next) {
             await query(
-                `UPDATE job_applications
-                 SET status = 'shortlisted', updated_at = CURRENT_TIMESTAMP
+                `UPDATE job_applications SET status = 'shortlisted', updated_at = CURRENT_TIMESTAMP
                  WHERE id = (SELECT application_id FROM interviews WHERE id = $1)`,
                 [id]
             );
         }
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Submit interview feedback error:', error);
         res.status(500).json({ error: 'Failed to submit interview feedback' });
@@ -1060,26 +1153,20 @@ const submitInterviewFeedback = async (req, res) => {
 
 const createEmployeeRelation = async (req, res) => {
     try {
-        const {
-            employee_id, issue_type, priority, subject, description
-        } = req.body;
+        const { employee_id, issue_type, priority, subject, description } = req.body;
 
-        // Check if employee_relations table exists
         const relationsExist = await tableExists('employee_relations');
-        if (!relationsExist) {
-            return res.status(503).json({ error: 'Employee relations table not initialized' });
-        }
+        if (!relationsExist) return res.status(503).json({ error: 'Employee relations table not initialized' });
 
         const result = await query(
             `INSERT INTO employee_relations (
-                employee_id, hr_representative_id, issue_type,
-                priority, subject, description, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, 'open')
-                 RETURNING *`,
+                employee_id, hr_representative_id, issue_type, priority, subject, description, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, 'open') RETURNING *`,
             [employee_id, req.user.id, issue_type, priority, subject, description]
         );
 
         res.status(201).json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Create employee relation error:', error);
         res.status(500).json({ error: 'Failed to create employee relation' });
@@ -1090,43 +1177,28 @@ const getEmployeeRelations = async (req, res) => {
     try {
         const { status, priority } = req.query;
 
-        // Check if employee_relations table exists
         const relationsExist = await tableExists('employee_relations');
-        if (!relationsExist) {
-            return res.json([]);
-        }
+        if (!relationsExist) return res.json([]);
 
         let queryText = `
-            SELECT
-                er.*,
-                u.display_name as employee_name,
-                u.email as employee_email,
-                hr.display_name as hr_name
+            SELECT er.*, u.display_name as employee_name, u.email as employee_email,
+                   hr.display_name as hr_name
             FROM employee_relations er
-                     JOIN users u ON er.employee_id = u.id
-                     LEFT JOIN users hr ON er.hr_representative_id = hr.id
+            JOIN users u ON er.employee_id = u.id
+            LEFT JOIN users hr ON er.hr_representative_id = hr.id
             WHERE 1=1
         `;
         const params = [];
         let paramIndex = 1;
 
-        if (status) {
-            queryText += ` AND er.status = $${paramIndex}`;
-            params.push(status);
-            paramIndex++;
-        }
-
-        if (priority) {
-            queryText += ` AND er.priority = $${paramIndex}`;
-            params.push(priority);
-            paramIndex++;
-        }
+        if (status)   { queryText += ` AND er.status = $${paramIndex}`;   params.push(status);   paramIndex++; }
+        if (priority) { queryText += ` AND er.priority = $${paramIndex}`; params.push(priority); paramIndex++; }
 
         queryText += ` ORDER BY er.created_at DESC`;
 
         const result = await query(queryText, params);
-
         res.json(result.rows);
+
     } catch (error) {
         console.error('❌ Get employee relations error:', error);
         res.status(500).json({ error: 'Failed to fetch employee relations' });
@@ -1138,24 +1210,19 @@ const getRelationDetails = async (req, res) => {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT
-                 er.*,
-                 u.display_name as employee_name,
-                 u.email as employee_email,
-                 u.phone_number as employee_phone,
-                 hr.display_name as hr_name
+            `SELECT er.*, u.display_name as employee_name, u.email as employee_email,
+                    u.phone_number as employee_phone, hr.display_name as hr_name
              FROM employee_relations er
-                      JOIN users u ON er.employee_id = u.id
-                      LEFT JOIN users hr ON er.hr_representative_id = hr.id
+             JOIN users u ON er.employee_id = u.id
+             LEFT JOIN users hr ON er.hr_representative_id = hr.id
              WHERE er.id = $1`,
             [id]
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Employee relation not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Employee relation not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Get relation details error:', error);
         res.status(500).json({ error: 'Failed to fetch relation details' });
@@ -1167,22 +1234,28 @@ const updateEmployeeRelation = async (req, res) => {
         const { id } = req.params;
         const { status, resolution } = req.body;
 
+        const existingCols = await getTableColumns('employee_relations');
+        const has = (col) => existingCols.includes(col);
+
+        const setClauses = [`status = $1`];
+        const params = [status];
+        let idx = 2;
+
+        if (has('resolution'))  { setClauses.push(`resolution = $${idx}`); params.push(resolution); idx++; }
+        if (has('resolved_at')) { setClauses.push(`resolved_at = CASE WHEN $1 = 'resolved' THEN CURRENT_TIMESTAMP ELSE resolved_at END`); }
+        if (has('updated_at'))  { setClauses.push(`updated_at = CURRENT_TIMESTAMP`); }
+
+        params.push(id);
+
         const result = await query(
-            `UPDATE employee_relations
-             SET status = $1,
-                 resolution = $2,
-                 resolved_at = CASE WHEN $1 = 'resolved' THEN CURRENT_TIMESTAMP ELSE resolved_at END,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $3
-                 RETURNING *`,
-            [status, resolution, id]
+            `UPDATE employee_relations SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+            params
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Employee relation not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Employee relation not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Update employee relation error:', error);
         res.status(500).json({ error: 'Failed to update employee relation' });
@@ -1191,27 +1264,20 @@ const updateEmployeeRelation = async (req, res) => {
 
 const uploadEmployeeDocument = async (req, res) => {
     try {
-        const {
-            employee_id, document_type, title, description,
-            file_url, is_confidential
-        } = req.body;
+        const { employee_id, document_type, title, description, file_url, is_confidential } = req.body;
 
-        // Check if employee_documents table exists
         const docsExist = await tableExists('employee_documents');
-        if (!docsExist) {
-            return res.status(503).json({ error: 'Employee documents table not initialized' });
-        }
+        if (!docsExist) return res.status(503).json({ error: 'Employee documents table not initialized' });
 
         const result = await query(
             `INSERT INTO employee_documents (
-                employee_id, document_type, title, description,
-                file_url, is_confidential, uploaded_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                 RETURNING *`,
+                employee_id, document_type, title, description, file_url, is_confidential, uploaded_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
             [employee_id, document_type, title, description, file_url, is_confidential, req.user.id]
         );
 
         res.status(201).json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Upload employee document error:', error);
         res.status(500).json({ error: 'Failed to upload document' });
@@ -1222,20 +1288,16 @@ const getEmployeeDocuments = async (req, res) => {
     try {
         const { employeeId } = req.params;
 
-        // Check if employee_documents table exists
         const docsExist = await tableExists('employee_documents');
-        if (!docsExist) {
-            return res.json([]);
-        }
+        if (!docsExist) return res.json([]);
 
         const result = await query(
-            `SELECT * FROM employee_documents
-             WHERE employee_id = $1
-             ORDER BY created_at DESC`,
+            `SELECT * FROM employee_documents WHERE employee_id = $1 ORDER BY created_at DESC`,
             [employeeId]
         );
 
         res.json(result.rows);
+
     } catch (error) {
         console.error('❌ Get employee documents error:', error);
         res.status(500).json({ error: 'Failed to fetch employee documents' });
@@ -1245,14 +1307,12 @@ const getEmployeeDocuments = async (req, res) => {
 const deleteEmployeeDocument = async (req, res) => {
     try {
         const { id } = req.params;
-
         const result = await query('DELETE FROM employee_documents WHERE id = $1 RETURNING id', [id]);
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Document not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Document not found' });
 
         res.json({ message: 'Document deleted successfully' });
+
     } catch (error) {
         console.error('❌ Delete employee document error:', error);
         res.status(500).json({ error: 'Failed to delete document' });
@@ -1261,25 +1321,32 @@ const deleteEmployeeDocument = async (req, res) => {
 
 const createPerformanceReview = async (req, res) => {
     try {
-        const {
-            employee_id, review_period, review_date, goals
-        } = req.body;
+        const { employee_id, review_period, review_date, goals } = req.body;
 
-        // Check if performance_reviews table exists
         const reviewsExist = await tableExists('performance_reviews');
-        if (!reviewsExist) {
-            return res.status(503).json({ error: 'Performance reviews table not initialized' });
-        }
+        if (!reviewsExist) return res.status(503).json({ error: 'Performance reviews table not initialized' });
+
+        const existingCols = await getTableColumns('performance_reviews');
+        const has = (col) => existingCols.includes(col);
+
+        const cols    = ['employee_id', 'reviewer_id', 'status'];
+        const holders = ['$1', '$2', "'draft'"];
+        const params  = [employee_id, req.user.id];
+        let idx = 3;
+
+        if (has('review_period')) { cols.push('review_period'); holders.push(`$${idx}`); params.push(review_period); idx++; }
+        if (has('review_date'))   { cols.push('review_date');   holders.push(`$${idx}`); params.push(review_date);   idx++; }
+        if (has('goals'))         { cols.push('goals');         holders.push(`$${idx}`); params.push(JSON.stringify(goals || [])); idx++; }
+        if (has('created_at'))    { cols.push('created_at'); holders.push('CURRENT_TIMESTAMP'); }
+        if (has('updated_at'))    { cols.push('updated_at'); holders.push('CURRENT_TIMESTAMP'); }
 
         const result = await query(
-            `INSERT INTO performance_reviews (
-                employee_id, reviewer_id, review_period, review_date, goals, status
-            ) VALUES ($1, $2, $3, $4, $5, 'draft')
-                 RETURNING *`,
-            [employee_id, req.user.id, review_period, review_date, JSON.stringify(goals || [])]
+            `INSERT INTO performance_reviews (${cols.join(', ')}) VALUES (${holders.join(', ')}) RETURNING *`,
+            params
         );
 
         res.status(201).json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Create performance review error:', error);
         res.status(500).json({ error: 'Failed to create performance review' });
@@ -1290,20 +1357,14 @@ const getPerformanceReviews = async (req, res) => {
     try {
         const { employee_id } = req.query;
 
-        // Check if performance_reviews table exists
         const reviewsExist = await tableExists('performance_reviews');
-        if (!reviewsExist) {
-            return res.json([]);
-        }
+        if (!reviewsExist) return res.json([]);
 
         let queryText = `
-            SELECT
-                pr.*,
-                u.display_name as employee_name,
-                r.display_name as reviewer_name
+            SELECT pr.*, u.display_name as employee_name, r.display_name as reviewer_name
             FROM performance_reviews pr
-                     JOIN users u ON pr.employee_id = u.id
-                     JOIN users r ON pr.reviewer_id = r.id
+            JOIN users u ON pr.employee_id = u.id
+            JOIN users r ON pr.reviewer_id = r.id
             WHERE 1=1
         `;
         const params = [];
@@ -1318,8 +1379,8 @@ const getPerformanceReviews = async (req, res) => {
         queryText += ` ORDER BY pr.created_at DESC`;
 
         const result = await query(queryText, params);
-
         res.json(result.rows);
+
     } catch (error) {
         console.error('❌ Get performance reviews error:', error);
         res.status(500).json({ error: 'Failed to fetch performance reviews' });
@@ -1331,23 +1392,19 @@ const getPerformanceReviewDetails = async (req, res) => {
         const { id } = req.params;
 
         const result = await query(
-            `SELECT
-                 pr.*,
-                 u.display_name as employee_name,
-                 u.email as employee_email,
-                 r.display_name as reviewer_name
+            `SELECT pr.*, u.display_name as employee_name, u.email as employee_email,
+                    r.display_name as reviewer_name
              FROM performance_reviews pr
-                      JOIN users u ON pr.employee_id = u.id
-                      JOIN users r ON pr.reviewer_id = r.id
+             JOIN users u ON pr.employee_id = u.id
+             JOIN users r ON pr.reviewer_id = r.id
              WHERE pr.id = $1`,
             [id]
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Performance review not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Performance review not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Get performance review details error:', error);
         res.status(500).json({ error: 'Failed to fetch performance review details' });
@@ -1357,32 +1414,32 @@ const getPerformanceReviewDetails = async (req, res) => {
 const updatePerformanceReview = async (req, res) => {
     try {
         const { id } = req.params;
-        const {
-            strengths, areas_for_improvement, overall_rating, comments
-        } = req.body;
+        const { strengths, areas_for_improvement, overall_rating, comments } = req.body;
+
+        const existingCols = await getTableColumns('performance_reviews');
+        const has = (col) => existingCols.includes(col);
+
+        const setClauses = [`status = 'submitted'`];
+        const params = [];
+        let idx = 1;
+
+        if (has('strengths'))             { setClauses.push(`strengths = $${idx}`);             params.push(strengths ? JSON.stringify(strengths) : null);                         idx++; }
+        if (has('areas_for_improvement')) { setClauses.push(`areas_for_improvement = $${idx}`); params.push(areas_for_improvement ? JSON.stringify(areas_for_improvement) : null); idx++; }
+        if (has('overall_rating'))        { setClauses.push(`overall_rating = $${idx}`);        params.push(overall_rating); idx++; }
+        if (has('comments'))              { setClauses.push(`comments = $${idx}`);              params.push(comments);       idx++; }
+        if (has('updated_at'))            { setClauses.push(`updated_at = CURRENT_TIMESTAMP`); }
+
+        params.push(id);
 
         const result = await query(
-            `UPDATE performance_reviews
-             SET strengths = $1,
-                 areas_for_improvement = $2,
-                 overall_rating = $3,
-                 comments = $4,
-                 status = 'submitted',
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $5
-                 RETURNING *`,
-            [
-                strengths ? JSON.stringify(strengths) : null,
-                areas_for_improvement ? JSON.stringify(areas_for_improvement) : null,
-                overall_rating, comments, id
-            ]
+            `UPDATE performance_reviews SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+            params
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Performance review not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Performance review not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Update performance review error:', error);
         res.status(500).json({ error: 'Failed to update performance review' });
@@ -1393,21 +1450,22 @@ const submitPerformanceReview = async (req, res) => {
     try {
         const { id } = req.params;
 
+        const existingCols = await getTableColumns('performance_reviews');
+        const has = (col) => existingCols.includes(col);
+
+        let setPart = `status = 'submitted'`;
+        if (has('review_date')) setPart += `, review_date = CURRENT_DATE`;
+        if (has('updated_at'))  setPart += `, updated_at = CURRENT_TIMESTAMP`;
+
         const result = await query(
-            `UPDATE performance_reviews
-             SET status = 'submitted',
-                 review_date = CURRENT_DATE,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1
-                 RETURNING *`,
+            `UPDATE performance_reviews SET ${setPart} WHERE id = $1 RETURNING *`,
             [id]
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Performance review not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Performance review not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Submit performance review error:', error);
         res.status(500).json({ error: 'Failed to submit performance review' });
@@ -1418,98 +1476,26 @@ const acknowledgePerformanceReview = async (req, res) => {
     try {
         const { id } = req.params;
 
+        const existingCols = await getTableColumns('performance_reviews');
+        const has = (col) => existingCols.includes(col);
+
+        const setClauses = [`status = 'acknowledged'`];
+        if (has('employee_acknowledged'))    setClauses.push(`employee_acknowledged = true`);
+        if (has('employee_acknowledged_at')) setClauses.push(`employee_acknowledged_at = CURRENT_TIMESTAMP`);
+        if (has('updated_at'))               setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+
         const result = await query(
-            `UPDATE performance_reviews
-             SET employee_acknowledged = true,
-                 employee_acknowledged_at = CURRENT_TIMESTAMP,
-                 status = 'acknowledged',
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1
-                 RETURNING *`,
+            `UPDATE performance_reviews SET ${setClauses.join(', ')} WHERE id = $1 RETURNING *`,
             [id]
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Performance review not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Performance review not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Acknowledge performance review error:', error);
         res.status(500).json({ error: 'Failed to acknowledge performance review' });
-    }
-};
-
-const getDepartments = async (req, res) => {
-    try {
-        // Check if departments table exists
-        const deptsExist = await tableExists('departments');
-        if (!deptsExist) {
-            console.log('Departments table does not exist, returning default departments');
-            // Return default departments with UUIDs
-            return res.json([
-                { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
-                { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
-                { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
-                { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
-                { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
-                { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
-                { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
-                { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
-                { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
-            ]);
-        }
-
-        const hasUsersDepartmentId = await columnExists('users', 'department_id');
-        const hasUsersDepartment = await columnExists('users', 'department');
-
-        let employeeCountSelect = '0';
-        if (hasUsersDepartmentId) {
-            employeeCountSelect = '(SELECT COUNT(*) FROM users WHERE department_id = d.id)';
-        } else if (hasUsersDepartment) {
-            employeeCountSelect = "(SELECT COUNT(*) FROM users WHERE department = d.name)";
-        }
-
-        const result = await query(
-            `SELECT
-                 d.*,
-                 u.display_name as manager_name,
-                 ${employeeCountSelect} as employee_count
-             FROM departments d
-                      LEFT JOIN users u ON d.manager_id = u.id
-             ORDER BY d.name`
-        );
-
-        // If no departments in database, return defaults
-        if (result.rows.length === 0) {
-            return res.json([
-                { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
-                { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
-                { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
-                { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
-                { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
-                { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
-                { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
-                { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
-                { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
-            ]);
-        }
-
-        res.json(result.rows);
-    } catch (error) {
-        console.error('❌ Get departments error:', error);
-        // Return default departments on error
-        res.json([
-            { id: '5f8f6f2e-1d4a-4c7a-9b11-1a2b3c4d5e61', name: 'General' },
-            { id: '6a9c2d10-3f44-4b90-a4d3-2b3c4d5e6f72', name: 'Engineering' },
-            { id: '7b1d3e21-5a66-4f83-b5e4-3c4d5e6f7a83', name: 'Product' },
-            { id: '8c2e4f32-6b78-42a1-8c95-4d5e6f7a8b94', name: 'Design' },
-            { id: '9d3f5a43-7c8a-4d2b-9da6-5e6f7a8b9ca5', name: 'Marketing' },
-            { id: 'ae4a6b54-8d9c-4e3c-aeb7-6f7a8b9cadb6', name: 'Sales' },
-            { id: 'bf5b7c65-9e0f-4f4d-bfc8-7a8b9cadbec7', name: 'Human Resources' },
-            { id: 'c06c8d76-af12-4a5e-80d9-8b9cadbecfd8', name: 'Finance' },
-            { id: 'd17d9e87-b234-4b6f-91ea-9cadbecfd0e9', name: 'Operations' }
-        ]);
     }
 };
 
@@ -1517,20 +1503,30 @@ const createDepartment = async (req, res) => {
     try {
         const { name, description, manager_id, parent_department_id } = req.body;
 
-        // Check if departments table exists
         const deptsExist = await tableExists('departments');
-        if (!deptsExist) {
-            return res.status(503).json({ error: 'Departments table not initialized' });
-        }
+        if (!deptsExist) return res.status(503).json({ error: 'Departments table not initialized' });
+
+        const existingCols = await getTableColumns('departments');
+        const has = (col) => existingCols.includes(col);
+
+        const cols    = ['name'];
+        const holders = ['$1'];
+        const params  = [name];
+        let idx = 2;
+
+        if (has('description')          && description          !== undefined) { cols.push('description');          holders.push(`$${idx}`); params.push(description || null);          idx++; }
+        if (has('manager_id')           && manager_id           !== undefined) { cols.push('manager_id');           holders.push(`$${idx}`); params.push(manager_id || null);           idx++; }
+        if (has('parent_department_id') && parent_department_id !== undefined) { cols.push('parent_department_id'); holders.push(`$${idx}`); params.push(parent_department_id || null); idx++; }
+        if (has('created_at')) { cols.push('created_at'); holders.push('CURRENT_TIMESTAMP'); }
+        if (has('updated_at')) { cols.push('updated_at'); holders.push('CURRENT_TIMESTAMP'); }
 
         const result = await query(
-            `INSERT INTO departments (name, description, manager_id, parent_department_id)
-             VALUES ($1, $2, $3, $4)
-                 RETURNING *`,
-            [name, description, manager_id, parent_department_id]
+            `INSERT INTO departments (${cols.join(', ')}) VALUES (${holders.join(', ')}) RETURNING *`,
+            params
         );
 
         res.status(201).json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Create department error:', error);
         res.status(500).json({ error: 'Failed to create department' });
@@ -1542,22 +1538,31 @@ const updateDepartment = async (req, res) => {
         const { id } = req.params;
         const { name, description, manager_id } = req.body;
 
+        const deptsExist = await tableExists('departments');
+        if (!deptsExist) return res.status(503).json({ error: 'Departments table not initialized' });
+
+        const existingCols = await getTableColumns('departments');
+        const has = (col) => existingCols.includes(col);
+
+        const setClauses = [`name = COALESCE($1, name)`];
+        const params = [name];
+        let idx = 2;
+
+        if (has('description')) { setClauses.push(`description = COALESCE($${idx}, description)`); params.push(description); idx++; }
+        if (has('manager_id'))  { setClauses.push(`manager_id = COALESCE($${idx}, manager_id)`);   params.push(manager_id);  idx++; }
+        if (has('updated_at'))  { setClauses.push(`updated_at = CURRENT_TIMESTAMP`); }
+
+        params.push(id);
+
         const result = await query(
-            `UPDATE departments
-             SET name = COALESCE($1, name),
-                 description = COALESCE($2, description),
-                 manager_id = COALESCE($3, manager_id),
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $4
-                 RETURNING *`,
-            [name, description, manager_id, id]
+            `UPDATE departments SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+            params
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Department not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Department not found' });
 
         res.json(result.rows[0]);
+
     } catch (error) {
         console.error('❌ Update department error:', error);
         res.status(500).json({ error: 'Failed to update department' });
@@ -1566,18 +1571,14 @@ const updateDepartment = async (req, res) => {
 
 const getHiringAnalytics = async (req, res) => {
     try {
-        // Check if job_applications table exists
         const appsExist = await tableExists('job_applications');
-        if (!appsExist) {
-            return res.json([]);
-        }
+        if (!appsExist) return res.json([]);
 
         const result = await query(
-            `SELECT
-                 DATE_TRUNC('month', created_at) as month,
-                COUNT(*) as applications,
-                COUNT(CASE WHEN status = 'hired' THEN 1 END) as hires,
-                COUNT(DISTINCT job_id) as jobs_posted
+            `SELECT DATE_TRUNC('month', created_at) as month,
+                    COUNT(*) as applications,
+                    COUNT(CASE WHEN status = 'hired' THEN 1 END) as hires,
+                    COUNT(DISTINCT job_id) as jobs_posted
              FROM job_applications
              WHERE created_at >= CURRENT_DATE - INTERVAL '12 months'
              GROUP BY DATE_TRUNC('month', created_at)
@@ -1585,6 +1586,7 @@ const getHiringAnalytics = async (req, res) => {
         );
 
         res.json(result.rows);
+
     } catch (error) {
         console.error('❌ Get hiring analytics error:', error);
         res.status(500).json({ error: 'Failed to fetch hiring analytics' });
@@ -1593,36 +1595,33 @@ const getHiringAnalytics = async (req, res) => {
 
 const getEmployeeAnalytics = async (req, res) => {
     try {
-        // Check if departments table exists
-        const deptsExist = await tableExists('departments');
+        const hasDepartment = await columnExists('users', 'department');
 
-        if (deptsExist) {
+        if (hasDepartment) {
             const result = await query(
-                `SELECT
-                     d.name as department,
-                     COUNT(u.id) as total_employees,
-                     COUNT(CASE WHEN u.is_active = true THEN 1 END) as active_employees,
-                     COALESCE(AVG(EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.created_at))), 0) as avg_tenure_years
-                 FROM departments d
-                          LEFT JOIN users u ON u.department_id = d.id AND u.role IN ('employee', 'hr_admin', 'admin')
-                 GROUP BY d.name
-                 ORDER BY d.name`
+                `SELECT u.department as department,
+                        COUNT(*) as total_employees,
+                        COUNT(CASE WHEN u.is_active = true THEN 1 END) as active_employees,
+                        COALESCE(AVG(EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.created_at))), 0) as avg_tenure_years
+                 FROM users u
+                 WHERE u.role IN ('employee', 'hr_admin', 'admin', 'super_admin')
+                 GROUP BY u.department
+                 ORDER BY u.department`
             );
             res.json(result.rows);
         } else {
-            // Fallback: just count users by role
             const result = await query(
-                `SELECT
-                     role as department,
-                     COUNT(*) as total_employees,
-                     COUNT(*) as active_employees,
-                     0 as avg_tenure_years
+                `SELECT role as department,
+                        COUNT(*) as total_employees,
+                        COUNT(*) as active_employees,
+                        0 as avg_tenure_years
                  FROM users
                  WHERE role IN ('employee', 'hr_admin', 'admin', 'super_admin')
                  GROUP BY role`
             );
             res.json(result.rows);
         }
+
     } catch (error) {
         console.error('❌ Get employee analytics error:', error);
         res.status(500).json({ error: 'Failed to fetch employee analytics' });
