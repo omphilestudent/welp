@@ -1,349 +1,540 @@
-// backend/src/controllers/authController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
-const { getTokenFromRequest } = require('../middleware/auth');
 
-const getCookieOptions = () => ({
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000
-});
+const tableExists = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = $1
+            )`,
+            [tableName]
+        );
+        return result.rows[0].exists;
+    } catch (error) {
+        return false;
+    }
+};
 
-const signUserToken = (user) => jwt.sign(
+const columnExists = async (tableName, columnName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+            )`,
+            [tableName, columnName]
+        );
+        return result.rows[0].exists;
+    } catch (error) {
+        return false;
+    }
+};
+
+const generateToken = (user) => jwt.sign(
     {
         userId: user.id,
         role: user.role,
         tokenVersion: Number(user.token_version ?? 0)
     },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    process.env.JWT_SECRET || 'changeme',
+    { expiresIn: process.env.JWT_EXPIRE || process.env.JWT_EXPIRES_IN || '7d' }
 );
 
-const register = async (req, res) => {
+const registerEmployee = async (req, res) => {
     try {
-        const { email, password, role, isAnonymous, displayName } = req.body;
+        const { email, password, displayName, isAnonymous = false } = req.body;
 
-        // Handle anonymous registration
-        if (isAnonymous) {
-            const result = await query(
-                `INSERT INTO users (role, is_anonymous, display_name)
-                 VALUES ($1, $2, $3)
-                     RETURNING id, role, is_anonymous, display_name, token_version`,
-                [role || 'user', true, displayName || `Anonymous_${Date.now()}`]
-            );
-
-            const user = result.rows[0];
-            const token = signUserToken(user);
-
-            res.cookie('token', token, getCookieOptions());
-
-            return res.status(201).json({
-                success: true,
-                user: {
-                    id: user.id,
-                    role: user.role,
-                    isAnonymous: user.is_anonymous,
-                    displayName: user.display_name
-                }
-            });
-        }
-
-        // Validate email and password for regular registration
         if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                error: 'Email and password are required'
-            });
+            return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        // Check if user already exists
-        const existingUser = await query(
-            'SELECT id FROM users WHERE email = $1',
-            [email.toLowerCase()]
-        );
-
-        if (existingUser.rows.length > 0) {
-            return res.status(409).json({
-                success: false,
-                error: 'Email already registered'
-            });
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
         }
 
-        // Hash password and create user
-        const hashedPassword = await bcrypt.hash(password, 12);
-        const displayNameValue = displayName || email.split('@')[0];
+        const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+
+        const hasIsActive = await columnExists('users', 'is_active');
+        const hasIsVerified = await columnExists('users', 'is_verified');
+        const hasIsAnonymous = await columnExists('users', 'is_anonymous');
+
+        const cols = ['email', 'password_hash', 'role', 'display_name'];
+        const placeholders = ['$1', '$2', '$3', '$4'];
+        const params = [email.toLowerCase(), passwordHash, 'employee', displayName || email.split('@')[0]];
+        let idx = 5;
+
+        if (hasIsActive) {
+            cols.push('is_active');
+            placeholders.push(`$${idx}`);
+            params.push(true);
+            idx += 1;
+        }
+        if (hasIsVerified) {
+            cols.push('is_verified');
+            placeholders.push(`$${idx}`);
+            params.push(true);
+            idx += 1;
+        }
+        if (hasIsAnonymous) {
+            cols.push('is_anonymous');
+            placeholders.push(`$${idx}`);
+            params.push(Boolean(isAnonymous));
+            idx += 1;
+        }
 
         const result = await query(
-            `INSERT INTO users (email, password_hash, role, is_anonymous, display_name, is_verified)
-             VALUES ($1, $2, $3, $4, $5, $6)
-                 RETURNING id, email, role, is_anonymous, display_name, token_version, created_at`,
-            [email.toLowerCase(), hashedPassword, role || 'user', false, displayNameValue, false]
+            `INSERT INTO users (${cols.join(', ')})
+             VALUES (${placeholders.join(', ')})
+             RETURNING id, email, display_name, role, token_version, created_at`,
+            params
         );
 
         const user = result.rows[0];
-        const token = signUserToken(user);
+        const token = generateToken(user);
 
-        res.cookie('token', token, getCookieOptions());
-
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
+            message: 'Account created successfully',
+            token,
             user: {
                 id: user.id,
                 email: user.email,
-                role: user.role,
                 displayName: user.display_name,
-                isAnonymous: user.is_anonymous
+                role: user.role
             }
         });
     } catch (error) {
-        console.error('❌ Registration error:', error);
-        console.error('Error stack:', error.stack);
-
-        // Handle specific database errors
-        if (error.code === '23505') { // Unique violation
-            return res.status(409).json({
-                success: false,
-                error: 'Email already registered'
-            });
+        console.error('Register employee error:', error);
+        if (error.code === '23505') {
+            return res.status(409).json({ error: 'An account with this email already exists' });
         }
-
-        if (error.code === '42P01') { // Table doesn't exist
-            console.error('❌ Users table does not exist. Please run database migrations.');
-            return res.status(503).json({
-                success: false,
-                error: 'Database not initialized'
-            });
-        }
-
-        res.status(500).json({
-            success: false,
-            error: 'Registration failed. Please try again.'
-        });
+        return res.status(500).json({ error: 'Registration failed. Please try again.' });
     }
 };
 
-// FIXED LOGIN FUNCTION - Now returns correct admin role
+const registerPsychologist = async (req, res) => {
+    try {
+        const {
+            email,
+            password,
+            displayName,
+            licenseNumber,
+            licenseBody,
+            licenseExpiry,
+            yearsExperience,
+            qualifications,
+            specialisations,
+            therapyTypes,
+            languages,
+            sessionFormats,
+            practiceLocation,
+            bio,
+            website
+        } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
+        }
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        }
+        if (!licenseNumber || !licenseBody) {
+            return res.status(400).json({ error: 'License number and licensing body are required' });
+        }
+
+        const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+
+        const hasIsActive = await columnExists('users', 'is_active');
+        const hasIsVerified = await columnExists('users', 'is_verified');
+        const hasStatus = await columnExists('users', 'status');
+
+        const cols = ['email', 'password_hash', 'role', 'display_name'];
+        const placeholders = ['$1', '$2', '$3', '$4'];
+        const params = [email.toLowerCase(), passwordHash, 'psychologist', displayName || email.split('@')[0]];
+        let idx = 5;
+
+        if (hasIsActive) {
+            cols.push('is_active');
+            placeholders.push(`$${idx}`);
+            params.push(false);
+            idx += 1;
+        }
+        if (hasIsVerified) {
+            cols.push('is_verified');
+            placeholders.push(`$${idx}`);
+            params.push(false);
+            idx += 1;
+        }
+        if (hasStatus) {
+            cols.push('status');
+            placeholders.push(`$${idx}`);
+            params.push('pending');
+            idx += 1;
+        }
+
+        const userResult = await query(
+            `INSERT INTO users (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id, email, display_name, role`,
+            params
+        );
+        const user = userResult.rows[0];
+
+        const appTableAvailable = await tableExists('psychologist_applications');
+        if (appTableAvailable) {
+            const appCols = ['user_id', 'status', 'license_number', 'license_body'];
+            const appPlaceholders = ['$1', '$2', '$3', '$4'];
+            const appParams = [user.id, 'pending', licenseNumber, licenseBody];
+            let appIdx = 5;
+
+            const optionalFields = {
+                license_expiry: licenseExpiry || null,
+                years_experience: yearsExperience || null,
+                qualifications: qualifications || null,
+                specialisations: specialisations ? JSON.stringify(specialisations) : null,
+                therapy_types: therapyTypes ? JSON.stringify(therapyTypes) : null,
+                session_formats: sessionFormats ? JSON.stringify(sessionFormats) : null,
+                languages: languages || null,
+                practice_location: practiceLocation || null,
+                bio: bio || null,
+                website: website || null
+            };
+
+            for (const [column, value] of Object.entries(optionalFields)) {
+                if (value === null) {
+                    continue;
+                }
+                const exists = await columnExists('psychologist_applications', column);
+                if (exists) {
+                    appCols.push(column);
+                    const jsonColumns = ['specialisations', 'therapy_types', 'session_formats'];
+                    appPlaceholders.push(jsonColumns.includes(column) ? `$${appIdx}::jsonb` : `$${appIdx}`);
+                    appParams.push(value);
+                    appIdx += 1;
+                }
+            }
+
+            await query(
+                `INSERT INTO psychologist_applications (${appCols.join(', ')}) VALUES (${appPlaceholders.join(', ')})`,
+                appParams
+            );
+        } else {
+            const hasMetadata = await columnExists('users', 'metadata');
+            if (hasMetadata) {
+                await query(
+                    'UPDATE users SET metadata = $1 WHERE id = $2',
+                    [JSON.stringify({
+                        applicationData: {
+                            licenseNumber,
+                            licenseBody,
+                            licenseExpiry,
+                            yearsExperience,
+                            qualifications,
+                            specialisations,
+                            therapyTypes,
+                            practiceLocation,
+                            bio,
+                            website
+                        },
+                        appliedAt: new Date()
+                    }), user.id]
+                );
+            }
+            console.warn('psychologist_applications table not found, application data stored in user metadata.');
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: 'Application submitted successfully. You will be notified by email once reviewed.',
+            userId: user.id
+        });
+    } catch (error) {
+        console.error('Register psychologist error:', error);
+        if (error.code === '23505') {
+            return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+        return res.status(500).json({ error: 'Application submission failed. Please try again.' });
+    }
+};
+
+const registerBusiness = async (req, res) => {
+    try {
+        const {
+            email,
+            password,
+            displayName,
+            jobTitle,
+            companyName,
+            companyWebsite,
+            industry,
+            companySize,
+            country,
+            companyDescription,
+            linkedinUrl,
+            registrationNumber,
+            claimExistingProfile,
+            howDidYouHear
+        } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
+        }
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        }
+        if (!companyName) {
+            return res.status(400).json({ error: 'Company name is required' });
+        }
+
+        const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+
+        const hasIsActive = await columnExists('users', 'is_active');
+        const hasIsVerified = await columnExists('users', 'is_verified');
+        const hasStatus = await columnExists('users', 'status');
+        const hasJobTitle = await columnExists('users', 'job_title');
+
+        const cols = ['email', 'password_hash', 'role', 'display_name'];
+        const placeholders = ['$1', '$2', '$3', '$4'];
+        const params = [email.toLowerCase(), passwordHash, 'business', displayName || email.split('@')[0]];
+        let idx = 5;
+
+        if (hasIsActive) {
+            cols.push('is_active');
+            placeholders.push(`$${idx}`);
+            params.push(false);
+            idx += 1;
+        }
+        if (hasIsVerified) {
+            cols.push('is_verified');
+            placeholders.push(`$${idx}`);
+            params.push(false);
+            idx += 1;
+        }
+        if (hasStatus) {
+            cols.push('status');
+            placeholders.push(`$${idx}`);
+            params.push('pending');
+            idx += 1;
+        }
+        if (hasJobTitle && jobTitle) {
+            cols.push('job_title');
+            placeholders.push(`$${idx}`);
+            params.push(jobTitle);
+            idx += 1;
+        }
+
+        const userResult = await query(
+            `INSERT INTO users (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id, email, display_name, role`,
+            params
+        );
+        const user = userResult.rows[0];
+
+        const appTableAvailable = await tableExists('business_applications');
+        if (appTableAvailable) {
+            const appCols = ['user_id', 'status', 'company_name'];
+            const appPlaceholders = ['$1', '$2', '$3'];
+            const appParams = [user.id, 'pending', companyName];
+            let appIdx = 4;
+
+            const optionalFields = {
+                job_title: jobTitle || null,
+                company_website: companyWebsite || null,
+                industry: industry || null,
+                company_size: companySize || null,
+                country: country || null,
+                company_description: companyDescription || null,
+                linkedin_url: linkedinUrl || null,
+                registration_number: registrationNumber || null,
+                claim_existing_profile: claimExistingProfile ?? false,
+                how_did_you_hear: howDidYouHear || null
+            };
+
+            for (const [column, value] of Object.entries(optionalFields)) {
+                if (value === null || value === undefined) {
+                    continue;
+                }
+                const exists = await columnExists('business_applications', column);
+                if (exists) {
+                    appCols.push(column);
+                    appPlaceholders.push(`$${appIdx}`);
+                    appParams.push(value);
+                    appIdx += 1;
+                }
+            }
+
+            await query(
+                `INSERT INTO business_applications (${appCols.join(', ')}) VALUES (${appPlaceholders.join(', ')})`,
+                appParams
+            );
+        } else {
+            const hasMetadata = await columnExists('users', 'metadata');
+            if (hasMetadata) {
+                await query(
+                    'UPDATE users SET metadata = $1 WHERE id = $2',
+                    [JSON.stringify({
+                        applicationData: {
+                            jobTitle,
+                            companyName,
+                            companyWebsite,
+                            industry,
+                            companySize,
+                            country,
+                            companyDescription,
+                            linkedinUrl,
+                            registrationNumber,
+                            claimExistingProfile,
+                            howDidYouHear
+                        },
+                        appliedAt: new Date()
+                    }), user.id]
+                );
+            }
+            console.warn('business_applications table not found, application data stored in user metadata.');
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: 'Application submitted successfully. Our team will review your information and reach out within 1–2 business days.',
+            userId: user.id
+        });
+    } catch (error) {
+        console.error('Register business error:', error);
+        if (error.code === '23505') {
+            return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+        return res.status(500).json({ error: 'Application submission failed. Please try again.' });
+    }
+};
+
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Validate input
         if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                error: 'Email and password are required'
-            });
+            return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        // FIXED QUERY - Join with admin tables to get correct role
         const result = await query(
             `SELECT
                  u.id,
                  u.email,
                  u.password_hash,
-                 u.is_anonymous,
                  u.display_name,
                  u.token_version,
-                 u.is_verified,
-                 u.created_at,
+                 COALESCE(u.is_active, true) as is_active,
+                 COALESCE(u.status, 'active') as status,
                  COALESCE(ar.name, u.role) as role
              FROM users u
-                      LEFT JOIN admin_users au ON u.id = au.user_id
-                      LEFT JOIN admin_roles ar ON au.role_id = ar.id
+             LEFT JOIN admin_users au ON u.id = au.user_id
+             LEFT JOIN admin_roles ar ON au.role_id = ar.id
              WHERE u.email = $1`,
             [email.toLowerCase()]
         );
 
         if (result.rows.length === 0) {
-            // Use generic message for security
-            return res.status(401).json({
-                success: false,
-                error: 'Invalid email or password'
-            });
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
         const user = result.rows[0];
-
-        // Check if user has a password (not OAuth only)
-        if (!user.password_hash) {
-            return res.status(401).json({
-                success: false,
-                error: 'This account uses a different login method. Please try social login.'
-            });
-        }
-
-        // Verify password
-        const validPassword = await bcrypt.compare(password, user.password_hash);
+        const validPassword = await bcrypt.compare(password, user.password_hash || '');
         if (!validPassword) {
-            return res.status(401).json({
-                success: false,
-                error: 'Invalid email or password'
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        if (user.status === 'pending' || user.is_active === false) {
+            const roleMessage = {
+                psychologist: 'Your psychologist application is under review. You will be notified once approved.',
+                business: 'Your business application is under review. You will be notified once approved.'
+            };
+            return res.status(403).json({
+                error: roleMessage[user.role] || 'Your account is pending approval.',
+                status: 'pending'
             });
         }
 
-        // Generate token with the CORRECT role
-        const token = jwt.sign(
-            {
-                userId: user.id,
-                role: user.role, // This will be 'super_admin' for admin users
-                tokenVersion: Number(user.token_version ?? 0)
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRE || '7d' }
-        );
+        const token = generateToken(user);
 
-        // Set cookie
-        res.cookie('token', token, getCookieOptions());
-
-        // Return success with CORRECT role
-        res.json({
+        return res.json({
             success: true,
-            token, // Send token to client for localStorage
+            token,
             user: {
                 id: user.id,
                 email: user.email,
-                role: user.role, // This will be 'super_admin' not 'employee'
                 displayName: user.display_name,
-                isAnonymous: user.is_anonymous,
-                isVerified: user.is_verified
+                role: user.role
             }
         });
     } catch (error) {
-        console.error('❌ Login error:', error);
-        console.error('Error stack:', error.stack);
-
-        // Handle specific database errors
-        if (error.code === '42P01') { // Table doesn't exist
-            console.error('❌ Users table does not exist. Please run database migrations.');
-            return res.status(503).json({
-                success: false,
-                error: 'Database not initialized'
-            });
-        }
-
-        if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
-            return res.status(503).json({
-                success: false,
-                error: 'Database connection error. Please try again.'
-            });
-        }
-
-        res.status(500).json({
-            success: false,
-            error: 'Login failed. Please try again.'
-        });
+        console.error('Login error:', error);
+        return res.status(500).json({ error: 'Login failed. Please try again.' });
     }
 };
 
-const logout = (req, res) => {
+const getMe = async (req, res) => {
     try {
-        res.clearCookie('token', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            path: '/'
-        });
-
-        res.json({
-            success: true,
-            message: 'Logged out successfully'
-        });
-    } catch (error) {
-        console.error('❌ Logout error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Logout failed'
-        });
-    }
-};
-
-const getCurrentUser = async (req, res) => {
-    try {
-        const token = getTokenFromRequest(req);
-
-        if (!token) {
-            return res.json({
-                success: true,
-                user: null
-            });
-        }
-
-        // Verify token
-        let decoded;
-        try {
-            decoded = jwt.verify(token, process.env.JWT_SECRET);
-        } catch (jwtError) {
-            console.error('❌ Token verification failed:', jwtError.message);
-            return res.json({
-                success: true,
-                user: null
-            });
-        }
-
-        // FIXED QUERY - Join with admin tables to get correct role
         const result = await query(
             `SELECT
                  u.id,
                  u.email,
-                 u.is_anonymous,
                  u.display_name,
-                 u.avatar_url,
-                 u.token_version,
-                 u.is_verified,
                  u.created_at,
+                 COALESCE(u.is_active, true) as is_active,
+                 COALESCE(u.is_anonymous, false) as is_anonymous,
                  COALESCE(ar.name, u.role) as role
              FROM users u
-                      LEFT JOIN admin_users au ON u.id = au.user_id
-                      LEFT JOIN admin_roles ar ON au.role_id = ar.id
+             LEFT JOIN admin_users au ON u.id = au.user_id
+             LEFT JOIN admin_roles ar ON au.role_id = ar.id
              WHERE u.id = $1`,
-            [decoded.userId]
+            [req.user.id]
         );
 
         if (result.rows.length === 0) {
-            return res.json({
-                success: true,
-                user: null
-            });
+            return res.status(404).json({ error: 'User not found' });
         }
 
         const user = result.rows[0];
-        const tokenVersion = Number(decoded.tokenVersion ?? 0);
-
-        // Check if token version matches (for logout/invalidate)
-        if (tokenVersion !== Number(user.token_version ?? 0)) {
-            return res.json({
-                success: true,
-                user: null
-            });
-        }
-
-        res.json({
+        return res.json({
             success: true,
             user: {
                 id: user.id,
                 email: user.email,
-                role: user.role,
                 displayName: user.display_name,
+                role: user.role,
                 isAnonymous: user.is_anonymous,
-                avatarUrl: user.avatar_url,
-                isVerified: user.is_verified
+                isActive: user.is_active,
+                createdAt: user.created_at
             }
         });
     } catch (error) {
-        console.error('❌ Get current user error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to get user information'
-        });
+        console.error('Get me error:', error);
+        return res.status(500).json({ error: 'Failed to fetch user profile' });
     }
 };
 
+const logout = async (req, res) => {
+    return res.json({ success: true, message: 'Logged out successfully' });
+};
+
 module.exports = {
-    register,
+    registerEmployee,
+    registerPsychologist,
+    registerBusiness,
     login,
-    logout,
-    getCurrentUser,
-    getCookieOptions
+    getMe,
+    logout
 };

@@ -1,0 +1,46 @@
+# JS to Java Migration Map
+
+Auto-generated mapping of JavaScript backend files to Java scaffold files.
+
+- `backend/src/services/mlServices.js` → `backend-java/src/main/java/com/welp/backend/legacy/services/MlServices.java`
+- `backend/src/test-email.js` → `backend-java/src/main/java/com/welp/backend/legacy/./TestEmail.java`
+- `backend/src/server.js` → `backend-java/src/main/java/com/welp/backend/legacy/./Server.java`
+- `backend/src/middleware/rbacAuth.js` → `backend-java/src/main/java/com/welp/backend/legacy/middleware/RbacAuth.java`
+- `backend/src/middleware/adminAuth.js` → `backend-java/src/main/java/com/welp/backend/legacy/middleware/AdminAuth.java`
+- `backend/src/middleware/validation.js` → `backend-java/src/main/java/com/welp/backend/legacy/middleware/Validation.java`
+- `backend/src/middleware/rateLimiter.js` → `backend-java/src/main/java/com/welp/backend/legacy/middleware/RateLimiter.java`
+- `backend/src/middleware/auth.js` → `backend-java/src/main/java/com/welp/backend/legacy/middleware/Auth.java`
+- `backend/src/controllers/pricingController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/PricingController.java`
+- `backend/src/controllers/authController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/AuthController.java`
+- `backend/src/controllers/psychologistController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/PsychologistController.java`
+- `backend/src/controllers/messageController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/MessageController.java`
+- `backend/src/controllers/adminController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/AdminController.java`
+- `backend/src/controllers/hrController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/HrController.java`
+- `backend/src/controllers/userController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/UserController.java`
+- `backend/src/controllers/roleController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/RoleController.java`
+- `backend/src/controllers/reviewController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/ReviewController.java`
+- `backend/src/controllers/kycController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/KycController.java`
+- `backend/src/controllers/subcriptionController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/SubcriptionController.java`
+- `backend/src/controllers/companyController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/CompanyController.java`
+- `backend/src/controllers/rbacUserController.js` → `backend-java/src/main/java/com/welp/backend/legacy/controllers/RbacUserController.java`
+- `backend/src/seed.js` → `backend-java/src/main/java/com/welp/backend/legacy/./Seed.java`
+- `backend/src/utils/database.js` → `backend-java/src/main/java/com/welp/backend/legacy/utils/Database.java`
+- `backend/src/utils/emailService.js` → `backend-java/src/main/java/com/welp/backend/legacy/utils/EmailService.java`
+- `backend/src/config/database.js` → `backend-java/src/main/java/com/welp/backend/legacy/config/Database.java`
+- `backend/src/seeders/seedRoles.js` → `backend-java/src/main/java/com/welp/backend/legacy/seeders/SeedRoles.java`
+- `backend/src/models/index.js` → `backend-java/src/main/java/com/welp/backend/legacy/models/Index.java`
+- `backend/src/models/Role.js` → `backend-java/src/main/java/com/welp/backend/legacy/models/Role.java`
+- `backend/src/models/User.js` → `backend-java/src/main/java/com/welp/backend/legacy/models/User.java`
+- `backend/src/routes/messageRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/MessageRoutes.java`
+- `backend/src/routes/rbacUserRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/RbacUserRoutes.java`
+- `backend/src/routes/pricingRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/PricingRoutes.java`
+- `backend/src/routes/userRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/UserRoutes.java`
+- `backend/src/routes/kycRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/KycRoutes.java`
+- `backend/src/routes/reviewRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/ReviewRoutes.java`
+- `backend/src/routes/adminRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/AdminRoutes.java`
+- `backend/src/routes/authRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/AuthRoutes.java`
+- `backend/src/routes/hrRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/HrRoutes.java`
+- `backend/src/routes/authV2Routes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/AuthV2Routes.java`
+- `backend/src/routes/companyRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/CompanyRoutes.java`
+- `backend/src/routes/roleRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/RoleRoutes.java`
+- `backend/src/routes/psychologistRoutes.js` → `backend-java/src/main/java/com/welp/backend/legacy/routes/PsychologistRoutes.java`

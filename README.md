@@ -31,11 +31,33 @@ Welp is a company review platform focused on employee experience and wellbeing, 
 - Axios for API calls
 - Socket.io-client for real-time updates
 
-## Project Structure
+## Repository Structure
 
-## ML Microservices (new)
+Use this as the source of truth for naming and navigation.
 
-Welp now includes independently deployable Python ML services under `ml-services/`:
+- [`frontend/`](frontend/README.md) — React app (UI, pages, components, routing)
+- [`backend/`](backend/README.md) — Node.js API (controllers, routes, DB integration)
+- [`backend-java/`](backend-java/README.md) — Spring Boot migration scaffold
+- [`ml-services/`](ml-services/README.md) — standalone Python ML microservices
+- [`docker-compose.yml`](docker-compose.yml) — local service orchestration
+
+## Naming + Organization Guidelines
+
+These conventions keep files easy to find and link correctly:
+
+- **React components/pages:** `PascalCase.jsx`
+  - Example: `CompanyProfile.jsx`, `ReviewCard.jsx`
+- **Hooks:** `camelCase` with `use` prefix
+  - Example: `useAuth.js`, `useTheme.js`
+- **Service modules:** lowercase in `frontend/src/services/`
+  - Example: `api.js`, `socket.js`
+- **Backend routes/controllers:** `camelCase` + role/feature suffix
+  - Example: `userRoutes.js`, `adminController.js`
+- **Shared docs:** always use `README.md` at folder root and link from parent README.
+
+## ML Microservices
+
+Welp includes independently deployable Python ML services under `ml-services/`:
 
 - `content-moderation` (`POST /moderate-review`)
 - `sentiment-analysis` (`POST /analyze-sentiment`)
@@ -43,4 +65,4 @@ Welp now includes independently deployable Python ML services under `ml-services
 - `image-analysis` (`POST /analyze-image`)
 - `fraud-detection` (`POST /detect-fraud`)
 
-The backend review creation flow now calls moderation and sentiment services before inserting a review. Moderation can block submission, and sentiment label/score are persisted with each review.
+The backend review creation flow calls moderation and sentiment services before inserting a review. Moderation can block submission, and sentiment label/score are persisted with each review.
