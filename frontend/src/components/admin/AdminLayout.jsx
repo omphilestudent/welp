@@ -21,7 +21,8 @@ import {
     FaSignOutAlt,
     FaBell,
     FaSearch,
-    FaUserCircle
+    FaUserCircle,
+    FaRobot
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
@@ -35,6 +36,9 @@ const AdminLayout = () => {
         role_name: 'admin',
         department: 'Administration'
     });
+
+    const userRole = String(user?.role || adminInfo?.role_name || '').toLowerCase().trim();
+    const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(userRole);
 
     useEffect(() => {
         fetchAdminInfo();
@@ -116,6 +120,15 @@ const AdminLayout = () => {
         }
     ];
 
+    const superAdminNavItems = [
+        {
+            path: '/admin/ml-interactions',
+            icon: <FaRobot />,
+            label: 'ML Interactions',
+            color: '#38b2ac'
+        }
+    ];
+
     const hrNavItems = [
         {
             path: '/hr/dashboard',
@@ -183,7 +196,7 @@ const AdminLayout = () => {
                     </div>
                     <div className="admin-info">
                         <h4>{user?.display_name || 'Admin User'}</h4>
-                        <p className="admin-role">{adminInfo.role_name.replace('_', ' ').toUpperCase()}</p>
+                        <p className="admin-role">{String(adminInfo?.role_name || user?.role || 'admin').replace(/_/g, ' ').toUpperCase()}</p>
                         <p className="admin-dept">{adminInfo.department}</p>
                     </div>
                 </div>
@@ -210,6 +223,25 @@ const AdminLayout = () => {
                             </NavLink>
                         ))}
                     </div>
+
+                    {isSuperAdmin && (
+                        <div className="nav-section">
+                            <h3>Super Admin</h3>
+                            {superAdminNavItems.map(item => (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    className={({ isActive }) =>
+                                        `nav-link ${isActive ? 'active' : ''}`
+                                    }
+                                    style={{ '--item-color': item.color }}
+                                >
+                                    <span className="nav-icon">{item.icon}</span>
+                                    {sidebarOpen && <span className="nav-label">{item.label}</span>}
+                                </NavLink>
+                            ))}
+                        </div>
+                    )}
 
                     <div className="nav-section">
                         <h3>Human Resources</h3>
