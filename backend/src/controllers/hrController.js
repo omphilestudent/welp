@@ -237,6 +237,7 @@ const createJobPosting = async (req, res) => {
             department_id,
             employment_type,
             location,
+            is_remote,
             salary_min,
             salary_max,
             salary_currency,
@@ -274,6 +275,7 @@ const createJobPosting = async (req, res) => {
             department_id,
             employment_type,
             location,
+            is_remote,
             salary_min,
             salary_max,
             salary_currency,
@@ -286,7 +288,7 @@ const createJobPosting = async (req, res) => {
             education_required,
             application_deadline,
             status: jobStatus,
-            posted_by: req.user.id
+            posted_by: postedBy
         });
 
         const result = await query(
@@ -303,6 +305,7 @@ const createJobPosting = async (req, res) => {
                 department_id || null,
                 employment_type,
                 location || null,
+                is_remote ?? false,
                 salary_min ? parseFloat(salary_min) : null,
                 salary_max ? parseFloat(salary_max) : null,
                 salary_currency || 'USD',
@@ -314,8 +317,8 @@ const createJobPosting = async (req, res) => {
                 experience_level || null,
                 education_required || null,
                 application_deadline || null,
-                req.user.id,
-                jobStatus
+                jobStatus,
+                postedBy
             ]
         );
 
