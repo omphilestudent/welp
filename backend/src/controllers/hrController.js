@@ -1732,6 +1732,7 @@ module.exports = {
     publishJob,
     closeJob,
     deleteJobPosting,
+    getAllApplications,
     getJobApplications,
     getApplicationDetails,
     updateApplicationStatus,
