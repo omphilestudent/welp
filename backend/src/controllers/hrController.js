@@ -929,6 +929,48 @@ const getJobApplications = async (req, res) => {
     }
 };
 
+const getAllApplications = async (req, res) => {
+    try {
+        const { status, jobId } = req.query;
+
+        const appsExist = await tableExists('job_applications');
+        const deptsExist = await tableExists('departments');
+
+        if (!appsExist) return res.json([]);
+
+        let selectPart = `SELECT a.*, j.title as job_title`;
+        if (deptsExist) selectPart += `, d.name as department_name`;
+
+        let fromPart = `FROM job_applications a JOIN job_postings j ON a.job_id = j.id`;
+        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+
+        const whereClauses = [];
+        const params = [];
+
+        if (status && status !== 'all') {
+            params.push(status);
+            whereClauses.push(`a.status = $${params.length}`);
+        }
+
+        if (jobId) {
+            params.push(jobId);
+            whereClauses.push(`a.job_id = $${params.length}`);
+        }
+
+        const wherePart = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+        const result = await query(
+            `${selectPart} ${fromPart} ${wherePart} ORDER BY a.created_at DESC`,
+            params
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error('❌ Get all applications error:', error);
+        res.status(500).json({ error: 'Failed to fetch applications' });
+    }
+};
+
 const getApplicationDetails = async (req, res) => {
     try {
         const { id } = req.params;
