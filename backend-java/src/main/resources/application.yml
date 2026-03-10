@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: welp-backend-java
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/welp}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+server:
+  port: ${PORT:8080}
