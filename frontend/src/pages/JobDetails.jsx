@@ -38,79 +38,48 @@ const JobDetails = () => {
     const fetchJobDetails = async () => {
         setLoading(true);
         try {
+            const [{ data: jobData }, { data: jobsData }] = await Promise.all([
+                api.get(`/hr/public/jobs/${id}`),
+                api.get('/hr/public/jobs')
+            ]);
 
-            const mockJob = {
-                id: 1,
-                title: 'Senior Frontend Developer',
-                department: 'Engineering',
-                location: 'Remote',
-                type: 'Full-time',
-                experience: '5+ years',
-                salary: '$120k - $150k',
-                description: 'We are looking for an experienced Frontend Developer to join our team and help build the future of work. You will work on challenging problems and create solutions that impact millions of users.',
-                responsibilities: [
-                    'Build responsive and performant web applications using React and Next.js',
-                    'Collaborate with designers and backend engineers to implement new features',
-                    'Mentor junior developers and conduct code reviews',
-                    'Participate in architectural decisions and technical planning',
-                    'Optimize applications for maximum speed and scalability',
-                    'Stay up-to-date with emerging trends and technologies'
-                ],
-                requirements: [
-                    '5+ years of experience with React and modern JavaScript',
-                    'Strong TypeScript skills and type safety practices',
-                    'Experience with Next.js and server-side rendering',
-                    'Understanding of web performance optimization techniques',
-                    'Experience with state management (Redux, MobX, or Context API)',
-                    'Knowledge of modern CSS (Tailwind, CSS-in-JS)',
-                    'Excellent communication and collaboration skills'
-                ],
-                benefits: [
-                    'Competitive salary and equity package',
-                    'Comprehensive health, dental, and vision insurance',
-                    'Unlimited PTO and flexible working hours',
-                    'Home office stipend and learning budget',
-                    'Regular team events and retreats',
-                    '401k matching program'
-                ],
-                postedDate: '2024-01-15',
-                deadline: '2024-02-15',
-                applications: 23,
+            const normalizedJob = {
+                ...jobData,
+                department: jobData.department_name || jobData.department || 'Unassigned',
+                type: jobData.employment_type || jobData.type || 'full-time',
+                experience: jobData.experience_level || jobData.experience || 'Not specified',
+                salary: jobData.salary_min || jobData.salary_max
+                    ? `${jobData.salary_currency || 'USD'} ${jobData.salary_min || 0} - ${jobData.salary_max || 0}`
+                    : null,
+                postedDate: jobData.created_at,
+                deadline: jobData.application_deadline,
+                applications: Number(jobData.applications_count || 0),
                 company: {
                     name: 'Welp',
                     logo: null,
-                    size: '150+ employees',
+                    size: 'Growing team',
                     industry: 'Technology',
                     founded: '2020',
                     rating: 4.8
                 }
             };
-            setJob(mockJob);
 
+            setJob(normalizedJob);
 
-            setSimilarJobs([
-                {
-                    id: 2,
-                    title: 'Frontend Developer',
-                    location: 'Remote',
-                    type: 'Full-time',
-                    salary: '$90k - $120k'
-                },
-                {
-                    id: 3,
-                    title: 'Full Stack Developer',
-                    location: 'San Francisco',
-                    type: 'Full-time',
-                    salary: '$130k - $160k'
-                },
-                {
-                    id: 4,
-                    title: 'UI Engineer',
-                    location: 'Remote',
-                    type: 'Full-time',
-                    salary: '$100k - $130k'
-                }
-            ]);
+            const list = Array.isArray(jobsData) ? jobsData : (jobsData?.data ?? jobsData?.jobs ?? []);
+            const similar = list
+                .filter((j) => j.id !== jobData.id)
+                .slice(0, 3)
+                .map((j) => ({
+                    id: j.id,
+                    title: j.title,
+                    location: j.location || 'Remote',
+                    type: j.employment_type || j.type || 'full-time',
+                    salary: j.salary_min || j.salary_max
+                        ? `${j.salary_currency || 'USD'} ${j.salary_min || 0} - ${j.salary_max || 0}`
+                        : 'Competitive'
+                }));
+            setSimilarJobs(similar);
         } catch (error) {
             console.error('Failed to fetch job details:', error);
             toast.error('Failed to load job details');
@@ -176,7 +145,7 @@ const JobDetails = () => {
                             </div>
 
                             <div className="job-meta">
-                                <span><FaBuilding /> {job.department}</span>
+                                <span><FaBuilding /> {job.department_name || job.department}</span>
                                 <span><FaMapMarkerAlt /> {job.location}</span>
                                 <span><FaBriefcase /> {job.type}</span>
                                 <span><FaClock /> {job.experience}</span>
@@ -292,7 +261,7 @@ const JobDetails = () => {
                             </div>
                             <div className="overview-item">
                                 <span>Department:</span>
-                                <strong>{job.department}</strong>
+                                <strong>{job.department_name || job.department}</strong>
                             </div>
                         </div>
 

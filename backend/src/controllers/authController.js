@@ -32,15 +32,28 @@ const columnExists = async (tableName, columnName) => {
     }
 };
 
-const generateToken = (user) => jwt.sign(
-    {
+const generateToken = (user) => {
+    const role = String(user?.role || '').toLowerCase().trim();
+    const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(role);
+
+    const payload = {
         userId: user.id,
         role: user.role,
         tokenVersion: Number(user.token_version ?? 0)
-    },
-    process.env.JWT_SECRET || 'changeme',
-    { expiresIn: process.env.JWT_EXPIRE || process.env.JWT_EXPIRES_IN || '7d' }
-);
+    };
+
+    // Super admins keep a non-expiring token to avoid server-side session timeout.
+    // Other roles keep configured JWT expiry.
+    if (isSuperAdmin) {
+        return jwt.sign(payload, process.env.JWT_SECRET || 'changeme');
+    }
+
+    return jwt.sign(
+        payload,
+        process.env.JWT_SECRET || 'changeme',
+        { expiresIn: process.env.JWT_EXPIRE || process.env.JWT_EXPIRES_IN || '7d' }
+    );
+};
 
 const registerEmployee = async (req, res) => {
     try {

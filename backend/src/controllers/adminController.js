@@ -820,6 +820,111 @@ const updateSystemSettings = async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to update settings' }); }
 };
 
+
+const superAdminRoles = ['super_admin', 'superadmin', 'system_admin'];
+
+const ensureSuperAdmin = (req, res) => {
+    const role = String(req?.user?.role || '').toLowerCase().trim();
+    if (!superAdminRoles.includes(role)) {
+        res.status(403).json({ error: 'Super admin access required' });
+        return false;
+    }
+    return true;
+};
+
+const getMlInteractions = async (req, res) => {
+    try {
+        if (!ensureSuperAdmin(req, res)) return;
+
+        const { page = 1, limit = 50, status } = req.query;
+        const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+        const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+        const offset = (pageNum - 1) * limitNum;
+
+        if (!await tableExists('ml_interactions')) {
+            return res.json({ interactions: [], pagination: { page: pageNum, limit: limitNum, total: 0, pages: 0 } });
+        }
+
+        const params = [];
+        let whereClause = 'WHERE 1=1';
+
+        if (status && status !== 'all') {
+            params.push(String(status).toLowerCase());
+            whereClause += ` AND LOWER(COALESCE(status, '')) = $${params.length}`;
+        }
+
+        params.push(limitNum, offset);
+
+        const rowsPromise = query(
+            `SELECT * FROM ml_interactions ${whereClause} ORDER BY created_at DESC NULLS LAST LIMIT $${params.length - 1} OFFSET $${params.length}`,
+            params
+        );
+
+        const countPromise = query(
+            `SELECT COUNT(*)::int AS total FROM ml_interactions ${whereClause}`,
+            params.slice(0, params.length - 2)
+        );
+
+        const [rowsResult, countResult] = await Promise.all([rowsPromise, countPromise]);
+        const total = Number(countResult.rows[0]?.total || 0);
+
+        return res.json({
+            interactions: rowsResult.rows,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total,
+                pages: Math.ceil(total / limitNum)
+            }
+        });
+    } catch (error) {
+        console.error('Get ML interactions error:', error);
+        return res.status(500).json({ error: 'Failed to fetch ML interactions' });
+    }
+};
+
+const updateMlInteraction = async (req, res) => {
+    try {
+        if (!ensureSuperAdmin(req, res)) return;
+
+        const { id } = req.params;
+        const { status, notes } = req.body;
+
+        if (!await tableExists('ml_interactions')) {
+            return res.status(404).json({ error: 'ML interactions table not found' });
+        }
+
+        const hasUpdatedAt = await columnExists('ml_interactions', 'updated_at');
+        const hasNotes = await columnExists('ml_interactions', 'notes');
+
+        const params = [id, status || 'edited'];
+        let setClause = `status = $2`;
+
+        if (hasNotes && notes !== undefined) {
+            params.push(notes);
+            setClause += `, notes = $${params.length}`;
+        }
+
+        if (hasUpdatedAt) {
+            setClause += `, updated_at = CURRENT_TIMESTAMP`;
+        }
+
+        const result = await query(
+            `UPDATE ml_interactions SET ${setClause} WHERE id = $1 RETURNING *`,
+            params
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Interaction not found' });
+        }
+
+        return res.json({ success: true, interaction: result.rows[0] });
+    } catch (error) {
+        console.error('Update ML interaction error:', error);
+        return res.status(500).json({ error: 'Failed to update ML interaction' });
+    }
+};
+
 const getAuditLogs = async (req, res) => {
     try {
         const { page = 1, limit = 50 } = req.query;
@@ -900,6 +1005,8 @@ module.exports = {
     updateCountryPricing,
     getSystemSettings,
     updateSystemSettings,
+    getMlInteractions,
+    updateMlInteraction,
     getAuditLogs,
     getRevenueAnalytics,
     getUserAnalytics,
