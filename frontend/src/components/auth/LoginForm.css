@@ -340,13 +340,13 @@
 }
 
 /* Loading button */
-.btn.loading {
+.auth-form .btn.loading {
     color: transparent;
     pointer-events: none;
     position: relative;
 }
 
-.spinner {
+.auth-form .spinner {
     position: absolute;
     left: 50%;
     top: 50%;
@@ -366,7 +366,7 @@
     }
 }
 
-.loading-text {
+.auth-form .loading-text {
     position: absolute;
     width: 1px;
     height: 1px;

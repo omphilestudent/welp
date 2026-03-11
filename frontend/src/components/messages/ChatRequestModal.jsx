@@ -72,7 +72,10 @@ const ChatRequestModal = ({ isOpen, onClose, onSuccess }) => {
 
                 <div className="modal-body">
                     {fetching ? (
-                        <div className="loading-spinner">Loading psychologists...</div>
+                        <div className="loading-inline">
+                            <span className="spinner" aria-hidden="true"></span>
+                            <span>Loading psychologists...</span>
+                        </div>
                     ) : (
                         <>
                             <div className="psychologists-list">

@@ -90,67 +90,6 @@ const Messages = () => {
     const canRequestSupport = user?.role === 'employee' && visibleConversations.length === 0 && !!featuredPsychologist;
     const canStartVideoCall = Boolean(activeConversation) && !isConversationExpired;
 
-    useEffect(() => {
-        fetchConversations();
-    }, []);
-
-    useEffect(() => {
-        if (user?.role === 'psychologist') {
-            fetchPsychologistSidebar();
-        }
-    }, [user]);
-
-    useEffect(() => {
-        if (user?.role === 'employee') {
-            fetchSubscription();
-            fetchAvailablePsychologists();
-        }
-    }, [user]);
-
-    useEffect(() => {
-        const conversationId = searchParams.get('conversation');
-        if (conversationId && visibleConversations.length > 0) {
-            const found = visibleConversations.find(c => c.id === conversationId);
-            if (found) {
-                setActiveConversation(found);
-                fetchMessages(found.id);
-            }
-        }
-    }, [searchParams, visibleConversations]);
-
-    useEffect(() => {
-        if (visibleConversations.length === 0) {
-            setActiveConversation(null);
-            setMessages([]);
-            return;
-        }
-
-        if (!activeConversation || !visibleConversations.some(c => c.id === activeConversation.id)) {
-            setActiveConversation(visibleConversations[0]);
-        }
-    }, [visibleConversations, activeConversation]);
-
-    useEffect(() => {
-        if (activeConversation) {
-            fetchMessages(activeConversation.id);
-        } else {
-            setMessages([]);
-        }
-    }, [activeConversation, fetchMessages]);
-
-    useEffect(() => {
-        if (user) {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            if (token) {
-                socketService.connect(token);
-            }
-
-            return () => {
-                socketService.disconnect();
-            };
-        }
-    }, [user]);
-
     const fetchConversations = async () => {
         try {
             const { data } = await api.get('/messages/conversations');
@@ -196,6 +135,76 @@ const Messages = () => {
         }
     };
 
+    const fetchMessages = useCallback(async (conversationId) => {
+        try {
+            const { data } = await api.get(`/messages/conversations/${conversationId}/messages`);
+            setMessages(data || []);
+        } catch (error) {
+            console.error('Failed to fetch messages:', error);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchConversations();
+    }, []);
+
+    useEffect(() => {
+        if (user?.role === 'psychologist') {
+            fetchPsychologistSidebar();
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (user?.role === 'employee') {
+            fetchSubscription();
+            fetchAvailablePsychologists();
+        }
+    }, [user]);
+
+    useEffect(() => {
+        const conversationId = searchParams.get('conversation');
+        if (conversationId && visibleConversations.length > 0) {
+            const found = visibleConversations.find(c => c.id === conversationId);
+            if (found) {
+                setActiveConversation(found);
+                fetchMessages(found.id);
+            }
+        }
+    }, [searchParams, visibleConversations, fetchMessages]);
+
+    useEffect(() => {
+        if (visibleConversations.length === 0) {
+            setActiveConversation(null);
+            setMessages([]);
+            return;
+        }
+
+        if (!activeConversation || !visibleConversations.some(c => c.id === activeConversation.id)) {
+            setActiveConversation(visibleConversations[0]);
+        }
+    }, [visibleConversations, activeConversation]);
+
+    useEffect(() => {
+        if (activeConversation) {
+            fetchMessages(activeConversation.id);
+        } else {
+            setMessages([]);
+        }
+    }, [activeConversation, fetchMessages]);
+
+    useEffect(() => {
+        if (user) {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            if (token) {
+                socketService.connect(token);
+            }
+
+            return () => {
+                socketService.disconnect();
+            };
+        }
+    }, [user]);
+
     const handleRequestPsychologist = async (psychologist) => {
         if (!psychologist) return;
         setIsRequestingSupport(true);
@@ -233,7 +242,7 @@ const Messages = () => {
         toast('Refreshing message history...');
     };
 
-    const formatTimeRemaining = (milliseconds) => {
+    function formatTimeRemaining(milliseconds) {
         if (milliseconds == null) return 'No timer';
         if (milliseconds <= 0) return 'Expired';
         const totalMinutes = Math.floor(milliseconds / 60000);
@@ -243,16 +252,8 @@ const Messages = () => {
             return `${hours}h ${minutes}m remaining`;
         }
         return `${minutes}m remaining`;
-    };
+    }
 
-    const fetchMessages = useCallback(async (conversationId) => {
-        try {
-            const { data } = await api.get(`/messages/conversations/${conversationId}/messages`);
-            setMessages(data || []);
-        } catch (error) {
-            console.error('Failed to fetch messages:', error);
-        }
-    }, []);
 
     const handleSelectConversation = (conversation) => {
         setActiveConversation(conversation);
