@@ -6,7 +6,7 @@ import api from '../services/api';
 import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
-import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit } from 'react-icons/fa';
+import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit, FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo } from 'react-icons/fa';
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';
@@ -228,8 +228,25 @@ const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('reviews');
     const [error, setError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
+    const [psychLeads, setPsychLeads] = useState([]);
+    const [psychSchedule, setPsychSchedule] = useState([]);
+    const [psychPermissions, setPsychPermissions] = useState(null);
+    const [scheduleDraft, setScheduleDraft] = useState({
+        title: '',
+        date: '',
+        time: '',
+        type: 'meeting',
+        location: ''
+    });
 
     useEffect(() => {
+        if (user?.role === 'psychologist') {
+            setActiveTab('overview');
+        } else if (user?.role === 'business') {
+            setActiveTab('companies');
+        } else {
+            setActiveTab('reviews');
+        }
         fetchDashboardData();
     }, [user]);
 
@@ -248,8 +265,16 @@ const Dashboard = () => {
                 const companiesRes = await api.get('/companies/my-companies');
                 setMyCompanies(companiesRes.data || []);
             } else if (user?.role === 'psychologist') {
-                const conversationsRes = await api.get('/messages/conversations');
-                setPendingRequests(conversationsRes.data?.filter(c => c.status === 'pending') || []);
+                const [pendingRes, leadsRes, scheduleRes, permissionsRes] = await Promise.all([
+                    api.get('/messages/conversations/pending').catch(() => ({ data: [] })),
+                    api.get('/psychologists/dashboard/leads').catch(() => ({ data: [] })),
+                    api.get('/psychologists/dashboard/schedule').catch(() => ({ data: [] })),
+                    api.get('/psychologists/dashboard/permissions').catch(() => ({ data: null }))
+                ]);
+                setPendingRequests(pendingRes.data || []);
+                setPsychLeads(leadsRes.data || []);
+                setPsychSchedule(scheduleRes.data || []);
+                setPsychPermissions(permissionsRes.data || null);
             }
         } catch (error) {
             setError('Failed to load dashboard data');
@@ -288,6 +313,40 @@ const Dashboard = () => {
             fetchDashboardData();
         } catch (error) {
             toast.error('Failed to reject request');
+        }
+    };
+
+    const handleScheduleSubmit = async (e) => {
+        e.preventDefault();
+        if (!scheduleDraft.title || !scheduleDraft.date || !scheduleDraft.time) {
+            toast.error('Please complete title, date, and time.');
+            return;
+        }
+
+        const scheduledFor = new Date(`${scheduleDraft.date}T${scheduleDraft.time}`).toISOString();
+        try {
+            const { data } = await api.post('/psychologists/dashboard/schedule', {
+                title: scheduleDraft.title,
+                scheduledFor,
+                type: scheduleDraft.type,
+                location: scheduleDraft.location
+            });
+            setPsychSchedule((prev) => [data, ...prev]);
+            setScheduleDraft({ title: '', date: '', time: '', type: 'meeting', location: '' });
+            toast.success('Schedule updated');
+        } catch (error) {
+            toast.error('Failed to add schedule item');
+        }
+    };
+
+    const handleLeadMessage = async (leadId) => {
+        try {
+            await api.post(`/psychologists/dashboard/leads/${leadId}/message`, {
+                message: 'Hello, I am here to support you whenever you are ready to talk.'
+            });
+            toast.success('Message queued');
+        } catch (error) {
+            toast.error('Failed to send lead message');
         }
     };
 
@@ -355,6 +414,12 @@ const Dashboard = () => {
 
                     {user?.role === 'psychologist' && (
                         <>
+                            <button
+                                className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('overview')}
+                            >
+                                Dashboard
+                            </button>
                             <button
                                 className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('requests')}
@@ -557,6 +622,127 @@ const Dashboard = () => {
                             ) : (
                                 <p className="empty-message">No pending message requests.</p>
                             )}
+                        </div>
+                    )}
+
+                    {user?.role === 'psychologist' && activeTab === 'overview' && (
+                        <div className="psych-dashboard-grid">
+                            <section className="psych-card">
+                                <header className="psych-card__header">
+                                    <h3><FaCalendarAlt /> Schedule</h3>
+                                    <p>Plan meetings and activities. Items are stored client-side with stubbed sync.</p>
+                                </header>
+                                <form className="psych-schedule-form" onSubmit={handleScheduleSubmit}>
+                                    <input
+                                        type="text"
+                                        placeholder="Title"
+                                        value={scheduleDraft.title}
+                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, title: e.target.value })}
+                                    />
+                                    <input
+                                        type="date"
+                                        value={scheduleDraft.date}
+                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, date: e.target.value })}
+                                    />
+                                    <input
+                                        type="time"
+                                        value={scheduleDraft.time}
+                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, time: e.target.value })}
+                                    />
+                                    <select
+                                        value={scheduleDraft.type}
+                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, type: e.target.value })}
+                                    >
+                                        <option value="meeting">Meeting</option>
+                                        <option value="video">Video</option>
+                                        <option value="voice">Voice</option>
+                                        <option value="note">Note</option>
+                                    </select>
+                                    <input
+                                        type="text"
+                                        placeholder="Location / link"
+                                        value={scheduleDraft.location}
+                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })}
+                                    />
+                                    <button type="submit" className="btn btn-primary btn-small">Add</button>
+                                </form>
+                                <div className="psych-schedule-list">
+                                    {psychSchedule.length > 0 ? (
+                                        psychSchedule.map(item => (
+                                            <div key={item.id} className="psych-schedule-item">
+                                                <div>
+                                                    <strong>{item.title}</strong>
+                                                    <span className="psych-schedule-meta">
+                                                        {new Date(item.scheduled_for || item.scheduledFor || item.scheduled_at).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="psych-schedule-tags">
+                                                    <span>{item.type}</span>
+                                                    <span>{item.status}</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="empty-message">No scheduled items yet.</p>
+                                    )}
+                                </div>
+                            </section>
+
+                            <section className="psych-card">
+                                <header className="psych-card__header">
+                                    <h3><FaEnvelopeOpenText /> Leads</h3>
+                                    <p>Individuals flagged as potentially stressed or depressed.</p>
+                                </header>
+                                <div className="psych-leads-list">
+                                    {psychLeads.length > 0 ? (
+                                        psychLeads.map(lead => (
+                                            <div key={lead.id} className="psych-lead-card">
+                                                <div>
+                                                    <h4>{lead.display_name}</h4>
+                                                    <p>{lead.summary}</p>
+                                                    <span className={`lead-badge lead-${lead.risk_level}`}>{lead.risk_level} risk</span>
+                                                </div>
+                                                <button
+                                                    className="btn btn-secondary btn-small"
+                                                    onClick={() => handleLeadMessage(lead.id)}
+                                                >
+                                                    Send message
+                                                </button>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="empty-message">No new leads right now.</p>
+                                    )}
+                                </div>
+                            </section>
+
+                            <section className="psych-card">
+                                <header className="psych-card__header">
+                                    <h3><FaVideo /> Call Options</h3>
+                                    <p>Voice and video calls are enabled with plan-based limits.</p>
+                                </header>
+                                <div className="psych-call-summary">
+                                    <div>
+                                        <p className="psych-call-plan">
+                                            Plan: {psychPermissions?.plan || 'Free'}
+                                        </p>
+                                        <p className="psych-call-limit">
+                                            Free profiles: {psychPermissions?.callLimits?.minutesPerClient || 120} minutes per client.
+                                        </p>
+                                        <p className="psych-call-note">
+                                            Premium profiles unlock more features as outlined on the pricing page.
+                                        </p>
+                                    </div>
+                                    <div className="psych-call-actions">
+                                        <button className="btn btn-outline btn-small" disabled>
+                                            <FaPhoneAlt /> Voice
+                                        </button>
+                                        <button className="btn btn-outline btn-small" disabled>
+                                            <FaVideo /> Video
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     )}
 

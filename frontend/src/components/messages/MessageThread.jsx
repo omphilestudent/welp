@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import socketService from '../../services/socket';
 import api from '../../services/api';
 
-const MessageThread = ({ conversation, messages: initialMessages, onSendMessage }) => {
+const MessageThread = ({ conversation, messages: initialMessages, onSendMessage, callConfig }) => {
     const { user } = useAuth();
     const [messages, setMessages] = useState(initialMessages || []);
     const [newMessage, setNewMessage] = useState('');
@@ -110,6 +110,19 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage 
             </span>
                     )}
                 </div>
+                {user?.role === 'psychologist' && callConfig?.roleFlags?.voice_video_calls && (
+                    <div className="thread-actions">
+                        <button className="btn btn-outline btn-small" disabled>
+                            Voice
+                        </button>
+                        <button className="btn btn-outline btn-small" disabled>
+                            Video
+                        </button>
+                        <span className="thread-call-limit">
+                            Free limit: {callConfig?.callLimits?.minutesPerClient || 120} min / client
+                        </span>
+                    </div>
+                )}
             </div>
 
             <div className="messages-container">

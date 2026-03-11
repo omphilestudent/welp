@@ -164,6 +164,10 @@
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
   background: var(--card-bg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
 }
 
 .thread-participant {
@@ -310,5 +314,113 @@
   display: flex;
   gap: 1rem;
   justify-content: center;
+}
+
+.psych-sidebar {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: var(--card-bg);
+}
+
+.psych-search label {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.psych-search-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  background: var(--input-bg);
+}
+
+.psych-search-input input {
+  border: none;
+  outline: none;
+  background: transparent;
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.psych-search-results {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.psych-search-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  align-items: center;
+}
+
+.psych-search-item span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.psych-search-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.psych-sidebar-section h3 {
+  font-size: 1rem;
+  margin-bottom: 0.6rem;
+  color: var(--text-primary);
+}
+
+.psych-lead-row,
+.psych-favorite-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+}
+
+.psych-lead-row:last-child,
+.psych-favorite-row:last-child {
+  border-bottom: none;
+}
+
+.psych-lead-row span,
+.psych-favorite-row span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.psych-empty {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0;
+}
+
+.thread-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.thread-call-limit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 

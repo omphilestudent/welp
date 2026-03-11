@@ -131,34 +131,75 @@ const sendMessageRequest = async (req, res) => {
 
 const getPendingRequests = async (req, res) => {
     try {
-        const result = await query(
-            `SELECT
-        c.*,
-        json_build_object(
-          'id', u.id,
-          'displayName', u.display_name,
-          'avatarUrl', u.avatar_url,
-          'specialization', u.specialization,
-          'years_of_experience', u.years_of_experience
-        ) as psychologist,
-        (
-          SELECT json_build_object(
-            'content', content,
-            'createdAt', created_at
-          )
-          FROM messages
-          WHERE conversation_id = c.id
-          ORDER BY created_at ASC
-          LIMIT 1
-        ) as initial_message
-       FROM conversations c
-       JOIN users u ON c.psychologist_id = u.id
-       WHERE c.employee_id = $1 AND c.status = 'pending'
-       ORDER BY c.created_at DESC`,
-            [req.user.id]
-        );
+        if (req.user.role === 'employee') {
+            const result = await query(
+                `SELECT
+            c.*,
+            json_build_object(
+              'id', u.id,
+              'display_name', u.display_name,
+              'avatar_url', u.avatar_url,
+              'specialization', u.specialization,
+              'years_of_experience', u.years_of_experience
+            ) as psychologist,
+            (
+              SELECT json_build_object(
+                'content', content,
+                'createdAt', created_at
+              )
+              FROM messages
+              WHERE conversation_id = c.id
+              ORDER BY created_at ASC
+              LIMIT 1
+            ) as initial_message
+           FROM conversations c
+           JOIN users u ON c.psychologist_id = u.id
+           WHERE c.employee_id = $1 AND c.status = 'pending'
+           ORDER BY c.created_at DESC`,
+                [req.user.id]
+            );
 
-        res.json(result.rows);
+            return res.json(result.rows);
+        }
+
+        if (req.user.role === 'psychologist') {
+            const result = await query(
+                `SELECT
+            c.*,
+            json_build_object(
+              'id', u.id,
+              'display_name', u.display_name,
+              'avatar_url', u.avatar_url,
+              'occupation', u.occupation,
+              'is_anonymous', u.is_anonymous,
+              'workplace', json_build_object(
+                'id', c2.id,
+                'name', c2.name,
+                'logo_url', c2.logo_url
+              )
+            ) as employee,
+            (
+              SELECT json_build_object(
+                'content', content,
+                'createdAt', created_at
+              )
+              FROM messages
+              WHERE conversation_id = c.id
+              ORDER BY created_at ASC
+              LIMIT 1
+            ) as initial_message
+           FROM conversations c
+           JOIN users u ON c.employee_id = u.id
+           LEFT JOIN companies c2 ON u.workplace_id = c2.id
+           WHERE c.psychologist_id = $1 AND c.status = 'pending'
+           ORDER BY c.created_at DESC`,
+                [req.user.id]
+            );
+
+            return res.json(result.rows);
+        }
+
+        return res.status(403).json({ error: 'Not authorized' });
     } catch (error) {
         console.error('Get pending requests error:', error);
         res.status(500).json({ error: 'Failed to fetch pending requests' });
@@ -255,14 +296,14 @@ const getConversations = async (req, res) => {
         c.*,
         json_build_object(
           'id', employee.id,
-          'displayName', employee.display_name,
-          'avatarUrl', employee.avatar_url,
-          'isAnonymous', employee.is_anonymous
+          'display_name', employee.display_name,
+          'avatar_url', employee.avatar_url,
+          'is_anonymous', employee.is_anonymous
         ) as employee,
         json_build_object(
           'id', psychologist.id,
-          'displayName', psychologist.display_name,
-          'avatarUrl', psychologist.avatar_url,
+          'display_name', psychologist.display_name,
+          'avatar_url', psychologist.avatar_url,
           'specialization', psychologist.specialization
         ) as psychologist,
         (

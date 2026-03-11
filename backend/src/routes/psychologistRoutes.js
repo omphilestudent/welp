@@ -1,10 +1,12 @@
 
 const express = require('express');
 const { body } = require('express-validator');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
+const { checkRoleFlag } = require('../middleware/roleFlags');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
 const psychologistController = require('../controllers/psychologistController');
+const psychologistDashboardController = require('../controllers/psychologistDashboardController');
 
 const router = express.Router();
 
@@ -46,6 +48,70 @@ router.post('/upload-license/:applicationId',
     authenticate,
     apiLimiter,
     psychologistController.uploadLicenseDocument
+);
+
+// Psychologist dashboard (stub endpoints)
+router.get('/dashboard/permissions',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('dashboard'),
+    psychologistDashboardController.getDashboardPermissions
+);
+
+router.get('/dashboard/schedule',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.getSchedule
+);
+
+router.post('/dashboard/schedule',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.addScheduleItem
+);
+
+router.get('/dashboard/leads',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('leads'),
+    psychologistDashboardController.getLeads
+);
+
+router.post('/dashboard/leads/:leadId/message',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('leads'),
+    psychologistDashboardController.sendLeadMessage
+);
+
+router.get('/dashboard/favorites',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('favorites'),
+    psychologistDashboardController.getFavorites
+);
+
+router.post('/dashboard/favorites',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('favorites'),
+    psychologistDashboardController.addFavorite
+);
+
+router.delete('/dashboard/favorites/:favoriteId',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('favorites'),
+    psychologistDashboardController.removeFavorite
+);
+
+router.get('/dashboard/employees/search',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('employee_search'),
+    psychologistDashboardController.searchEmployees
 );
 
 module.exports = router;

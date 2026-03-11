@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import StarRating from './StarRating';
+import toast from 'react-hot-toast';
 
 const ReviewCard = ({ review, onReplyAdded }) => {
     const { user } = useAuth();
@@ -55,6 +56,27 @@ const ReviewCard = ({ review, onReplyAdded }) => {
         }
     };
 
+    const handlePrivateMessage = async () => {
+        const authorId = review.author?.id || review.author_id;
+        if (!authorId) {
+            toast.error('This reviewer cannot be messaged.');
+            return;
+        }
+        if (review.author?.isAnonymous || review.author?.is_anonymous) {
+            toast.error('Anonymous reviewers cannot be messaged.');
+            return;
+        }
+        try {
+            await api.post('/messages/conversations/request', {
+                employeeId: authorId,
+                initialMessage: 'Hello, I read your review and wanted to offer private support.'
+            });
+            toast.success('Private message request sent');
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to send private message');
+        }
+    };
+
     return (
         <div className="review-card">
             <div className="review-header">
@@ -81,6 +103,14 @@ const ReviewCard = ({ review, onReplyAdded }) => {
                 <div className="review-actions">
                     <button className="btn btn-secondary btn-small">Edit</button>
                     <button onClick={handleDelete} className="btn btn-secondary btn-small">Delete</button>
+                </div>
+            )}
+
+            {user?.role === 'psychologist' && (
+                <div className="review-actions">
+                    <button onClick={handlePrivateMessage} className="btn btn-primary btn-small">
+                        Private encrypted message
+                    </button>
                 </div>
             )}
 

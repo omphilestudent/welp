@@ -2,6 +2,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
+const { checkRoleFlag } = require('../middleware/roleFlags');
 const { messageLimiter, apiLimiter } = require('../middleware/rateLimiter');
 const { validate, messageValidation } = require('../middleware/validation');
 const messageController = require('../controllers/messageController');
@@ -12,20 +13,26 @@ const router = express.Router();
 router.post('/conversations/request',
     authenticate,
     authorize('psychologist'),
-    validate(messageValidation),
+    checkRoleFlag('message_request'),
+    validate([
+        body('employeeId').isUUID(),
+        body('initialMessage').optional().trim().isLength({ max: 2000 })
+    ]),
     messageController.sendMessageRequest
 );
 
 
 router.get('/conversations/pending',
     authenticate,
-    authorize('employee'),
+    authorize('employee', 'psychologist'),
+    checkRoleFlag('conversation_approval'),
     messageController.getPendingRequests
 );
 
 router.patch('/conversations/:conversationId/status',
     authenticate,
-    authorize('employee'),
+    authorize('employee', 'psychologist'),
+    checkRoleFlag('conversation_approval'),
     messageController.updateConversationStatus
 );
 

@@ -1,6 +1,7 @@
 
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
+const { getRoleFlags } = require('./roleFlags');
 
 const getTokenFromRequest = (req) => {
     const cookieToken = req.cookies?.token;
@@ -41,7 +42,10 @@ const authenticate = async (req, res, next) => {
             return res.status(401).json({ error: 'Session expired. Please login again.' });
         }
 
-        req.user = user;
+        req.user = {
+            ...user,
+            role_flags: getRoleFlags(user.role)
+        };
         next();
     } catch (error) {
         return res.status(401).json({ error: 'Invalid token' });
