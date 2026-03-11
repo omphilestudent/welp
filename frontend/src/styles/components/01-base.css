@@ -1,2 +1,55 @@
+/* Base variables + reset */
+:root {
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-heading: 'Poppins', 'Inter', sans-serif;
+  --color-bg: #0b0d17;
+  --color-surface: #131820;
+  --color-card: #1f2233;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-muted: rgba(255, 255, 255, 0.65);
+  --color-primary: #38bdf8;
+  --color-secondary: #6366f1;
+  --text-primary: #f8fafc;
+  --text-muted: rgba(248, 250, 252, 0.75);
+  --shadow-soft: 0 20px 60px rgba(15, 23, 42, 0.45);
+  --border-radius: 18px;
+  --transition-fast: 200ms ease;
+}
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--text-primary);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+img,
+video {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
