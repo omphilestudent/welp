@@ -335,7 +335,7 @@ const addPsychologistProfile = async (req, res) => {
             [
                 req.user.id, licenseNumber, licenseIssuingBody, yearsOfExperience,
                 specialization || [], qualifications || [], biography, consultationModes || [],
-                languages || ['English'], acceptedAgeGroups || [], hourlyRate, availability || {}
+                languages || [], acceptedAgeGroups || [], hourlyRate, availability || {}
             ]
         );
 

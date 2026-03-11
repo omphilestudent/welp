@@ -282,12 +282,37 @@
   padding: 1.5rem;
   margin-bottom: 1rem;
   display: flex;
+  gap: 1rem;
   justify-content: space-between;
   align-items: center;
   animation: slideIn 0.3s ease-out;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+}
+
+.section-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.request-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  border: 2px solid var(--card-bg);
+  box-shadow: var(--card-shadow);
 }
 
 .request-card::before {

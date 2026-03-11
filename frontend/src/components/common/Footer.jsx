@@ -40,7 +40,7 @@ const Footer = () => {
                     <div className="footer-section">
                         <h4>For Psychologists</h4>
                         <ul className="footer-links">
-                            <li><Link to="/psychologist/join">Join as Psychologist</Link></li>
+                            <li><Link to="/register/psychologist">Join as Psychologist</Link></li>
                             <li><Link to="/pricing?role=psychologist">Psychologist Pricing</Link></li>
                             <li><Link to="/resources">Resources</Link></li>
                         </ul>

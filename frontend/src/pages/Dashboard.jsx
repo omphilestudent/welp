@@ -412,6 +412,9 @@ const Dashboard = () => {
 
     if (loading) return <Loading />;
 
+    const outgoingRequests = pendingRequests.filter((request) => request.initial_message?.senderId === user?.id);
+    const incomingRequests = pendingRequests.filter((request) => request.initial_message?.senderId && request.initial_message?.senderId !== user?.id);
+
     return (
         <div className="dashboard-page">
             <div className="container">
@@ -513,38 +516,80 @@ const Dashboard = () => {
 
                     {user?.role === 'employee' && activeTab === 'messages' && (
                         <div className="message-requests-section">
-                            <h3>Message Requests from Psychologists</h3>
-                            {pendingRequests.length > 0 ? (
-                                <div className="requests-list">
-                                    {pendingRequests.map(request => (
-                                        <div key={request.id} className="request-card">
-                                            <div className="request-info">
-                                                <h4>{request.psychologist?.display_name || 'Unknown'}</h4>
-                                                <p className="request-message">
-                                                    {request.initial_message?.content}
-                                                </p>
-                                                <p className="request-date">
-                                                    Received: {new Date(request.created_at).toLocaleDateString()}
-                                                </p>
+                            <h3>Message Requests</h3>
+
+                            {outgoingRequests.length > 0 && (
+                                <>
+                                    <p className="section-subtitle">Requests you sent</p>
+                                    <div className="requests-list">
+                                        {outgoingRequests.map(request => (
+                                            <div key={request.id} className="request-card">
+                                                <div className="request-avatar">
+                                                    {request.psychologist?.display_name?.charAt(0) || 'P'}
+                                                </div>
+                                                <div className="request-info">
+                                                    <h4>{request.psychologist?.display_name || 'Unknown'}</h4>
+                                                    <p className="request-message">
+                                                        {request.initial_message?.content || 'No message provided.'}
+                                                    </p>
+                                                    <p className="request-status">Status: {request.status}</p>
+                                                    <p className="request-date">
+                                                        Sent: {new Date(request.created_at).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                                <div className="request-actions">
+                                                    <button
+                                                        onClick={() => window.location.href = `/messages?conversation=${request.id}`}
+                                                        className="btn btn-outline btn-small"
+                                                    >
+                                                        Open Chat
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="request-actions">
-                                                <button
-                                                    onClick={() => handleAcceptRequest(request.id)}
-                                                    className="btn btn-primary btn-small"
-                                                >
-                                                    Accept
-                                                </button>
-                                                <button
-                                                    onClick={() => handleRejectRequest(request.id)}
-                                                    className="btn btn-secondary btn-small"
-                                                >
-                                                    Decline
-                                                </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
+                            {incomingRequests.length > 0 && (
+                                <>
+                                    <p className="section-subtitle">Requests sent to you</p>
+                                    <div className="requests-list">
+                                        {incomingRequests.map(request => (
+                                            <div key={request.id} className="request-card">
+                                                <div className="request-avatar">
+                                                    {request.psychologist?.display_name?.charAt(0) || 'P'}
+                                                </div>
+                                                <div className="request-info">
+                                                    <h4>{request.psychologist?.display_name || 'Unknown'}</h4>
+                                                    <p className="request-message">
+                                                        {request.initial_message?.content || 'No message provided.'}
+                                                    </p>
+                                                    <p className="request-date">
+                                                        Received: {new Date(request.created_at).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                                <div className="request-actions">
+                                                    <button
+                                                        onClick={() => handleAcceptRequest(request.id)}
+                                                        className="btn btn-primary btn-small"
+                                                    >
+                                                        Accept
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRejectRequest(request.id)}
+                                                        className="btn btn-secondary btn-small"
+                                                    >
+                                                        Decline
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
+                            {pendingRequests.length === 0 && (
                                 <p className="empty-message">No pending message requests.</p>
                             )}
                         </div>
@@ -649,6 +694,11 @@ const Dashboard = () => {
                                                 {request.employee?.workplace && (
                                                     <p className="user-workplace-small">
                                                         <FaBuilding /> {request.employee.workplace.name}
+                                                    </p>
+                                                )}
+                                                {request.initial_message?.content && (
+                                                    <p className="request-message">
+                                                        {request.initial_message.content}
                                                     </p>
                                                 )}
                                                 <p className="request-status">Status: {request.status}</p>

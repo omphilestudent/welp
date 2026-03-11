@@ -198,7 +198,8 @@ const getPendingRequests = async (req, res) => {
             (
               SELECT json_build_object(
                 'content', content,
-                'createdAt', created_at
+                'createdAt', created_at,
+                'senderId', sender_id
               )
               FROM messages
               WHERE conversation_id = c.id
@@ -234,7 +235,8 @@ const getPendingRequests = async (req, res) => {
             (
               SELECT json_build_object(
                 'content', content,
-                'createdAt', created_at
+                'createdAt', created_at,
+                'senderId', sender_id
               )
               FROM messages
               WHERE conversation_id = c.id
@@ -513,6 +515,14 @@ const sendMessage = async (req, res) => {
             ...result.rows[0],
             sender: sender.rows[0]
         });
+
+        const io = req.app?.get('io');
+        if (io) {
+            io.to(`conversation-${conversationId}`).emit('new-message', {
+                ...result.rows[0],
+                sender: sender.rows[0]
+            });
+        }
     } catch (error) {
         console.error('Send message error:', error);
         res.status(500).json({ error: 'Failed to send message' });

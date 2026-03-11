@@ -4,8 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FaComment, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
-import ChatRequestModal from '../messages/ChatRequestModal';
-import toast from 'react-hot-toast';
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';
@@ -17,7 +15,6 @@ const resolveMediaUrl = (url) => {
 const Navbar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const [showChatModal, setShowChatModal] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const [isHR, setIsHR] = useState(false);
 
@@ -60,14 +57,14 @@ const Navbar = () => {
                         <Link to="/search" className="navbar-link">
                             Companies
                         </Link>
+                        <Link to="/pricing" className="navbar-link">
+                            Pricing
+                        </Link>
 
                         {!user && (
                             <>
-                                <Link to="/psychologist/join" className="navbar-link">
+                                <Link to="/register/psychologist" className="navbar-link">
                                     Join as Psychologist
-                                </Link>
-                                <Link to="/pricing" className="navbar-link">
-                                    Pricing
                                 </Link>
                             </>
                         )}
@@ -78,9 +75,6 @@ const Navbar = () => {
                                     <>
                                         <Link to="/dashboard" className="btn btn-primary navbar-dashboard-btn">
                                             Dashboard
-                                        </Link>
-                                        <Link to="/pricing" className="navbar-link">
-                                            Pricing
                                         </Link>
                                     </>
                                 )}
@@ -93,9 +87,6 @@ const Navbar = () => {
                                         <Link to="/messages" className="navbar-link">
                                             Messages
                                         </Link>
-                                        <Link to="/pricing" className="navbar-link">
-                                            Pricing
-                                        </Link>
                                     </>
                                 )}
 
@@ -106,9 +97,6 @@ const Navbar = () => {
                                         </Link>
                                         <Link to="/dashboard" className="navbar-link">
                                             Business Dashboard
-                                        </Link>
-                                        <Link to="/pricing" className="navbar-link">
-                                            Pricing
                                         </Link>
                                     </>
                                 )}
@@ -155,12 +143,9 @@ const Navbar = () => {
                                 </Link>
 
                                 {user.role === 'employee' && (
-                                    <button
-                                        onClick={() => setShowChatModal(true)}
-                                        className="btn btn-primary"
-                                    >
-                                        <FaComment /> Chat
-                                    </button>
+                                    <Link to="/messages" className="btn btn-primary">
+                                        <FaComment /> Messages
+                                    </Link>
                                 )}
 
                                 <Link to="/settings" className="navbar-avatar" aria-label="Profile">
@@ -179,9 +164,6 @@ const Navbar = () => {
                             </>
                         ) : (
                             <>
-                                <Link to="/pricing" className="navbar-link">
-                                    Pricing
-                                </Link>
                                 <Link to="/login" className="btn btn-primary">
                                     Login
                                 </Link>
@@ -194,14 +176,6 @@ const Navbar = () => {
                 </div>
             </nav>
 
-            {}
-            <ChatRequestModal
-                isOpen={showChatModal}
-                onClose={() => setShowChatModal(false)}
-                onSuccess={() => {
-                    toast.success('Chat request sent successfully');
-                }}
-            />
         </>
     );
 };

@@ -315,16 +315,20 @@ const AdminLayout = () => {
                             {showNotifications && (
                                 <div className="notification-menu">
                                     <h4>Notifications</h4>
-                                    {notifications.map(n => (
-                                        <div
-                                            key={n.id}
-                                            className={`notification-item ${n.read ? 'read' : 'unread'}`}
-                                            onClick={() => markAsRead(n.id)}
-                                        >
-                                            <p>{n.text}</p>
-                                            <small>{n.time}</small>
-                                        </div>
-                                    ))}
+                                    {notifications.length === 0 ? (
+                                        <div className="notification-empty">No notifications yet.</div>
+                                    ) : (
+                                        notifications.map(n => (
+                                            <div
+                                                key={n.id}
+                                                className={`notification-item ${n.read ? 'read' : 'unread'}`}
+                                                onClick={() => markAsRead(n.id)}
+                                            >
+                                                <p>{n.text}</p>
+                                                <small>{n.time}</small>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             )}
                         </div>

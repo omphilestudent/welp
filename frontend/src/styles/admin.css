@@ -308,6 +308,10 @@
     padding: 0.5rem;
 }
 
+.notification-dropdown {
+    position: relative;
+}
+
 .notification-badge {
     position: absolute;
     top: 0;
@@ -362,6 +366,12 @@
 
 .notification-item small {
     color: #a0aec0;
+}
+
+.notification-empty {
+    padding: 1rem;
+    color: #718096;
+    font-size: 0.9rem;
 }
 
 .admin-date {

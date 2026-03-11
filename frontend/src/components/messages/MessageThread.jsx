@@ -27,7 +27,12 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage,
             socketService.joinConversation(conversation.id);
 
             const handleNewMessage = (message) => {
-                setMessages(prev => [...prev, message]);
+                setMessages(prev => {
+                    if (prev.some((item) => item.id === message.id)) {
+                        return prev;
+                    }
+                    return [...prev, message];
+                });
             };
 
             socketService.onNewMessage(handleNewMessage);
@@ -182,17 +187,33 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage,
 
             {conversation.status === 'pending' && conversation.employee?.id === user?.id && (
                 <div className="pending-message">
-                    <p>This conversation request is pending your approval.</p>
-                    <div className="pending-actions">
-                        <button onClick={handleAcceptRequest} className="btn btn-primary">Accept</button>
-                        <button onClick={handleRejectRequest} className="btn btn-secondary">Decline</button>
-                    </div>
+                    {conversation.last_message?.senderId === user?.id ? (
+                        <p>Waiting for the psychologist to accept your request...</p>
+                    ) : (
+                        <>
+                            <p>This conversation request is pending your approval.</p>
+                            <div className="pending-actions">
+                                <button onClick={handleAcceptRequest} className="btn btn-primary">Accept</button>
+                                <button onClick={handleRejectRequest} className="btn btn-secondary">Decline</button>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
             {conversation.status === 'pending' && conversation.psychologist?.id === user?.id && (
                 <div className="pending-message">
-                    <p>Waiting for the employee to accept your message request...</p>
+                    {conversation.last_message?.senderId === user?.id ? (
+                        <p>Waiting for the employee to accept your message request...</p>
+                    ) : (
+                        <>
+                            <p>New request from an employee.</p>
+                            <div className="pending-actions">
+                                <button onClick={handleAcceptRequest} className="btn btn-primary">Accept</button>
+                                <button onClick={handleRejectRequest} className="btn btn-secondary">Decline</button>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
         </div>

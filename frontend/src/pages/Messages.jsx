@@ -264,9 +264,24 @@ const Messages = () => {
 
         setSendingMessage(true);
         try {
-            await api.post(`/messages/conversations/${activeConversation.id}/messages`, {
+            const { data } = await api.post(`/messages/conversations/${activeConversation.id}/messages`, {
                 content
             });
+            if (data) {
+                setMessages((prev) => [...prev, data]);
+                setConversations((prev) => prev.map((conv) => {
+                    if (conv.id !== activeConversation.id) return conv;
+                    return {
+                        ...conv,
+                        last_message: {
+                            content: data.content,
+                            createdAt: data.created_at || data.createdAt,
+                            senderId: data.sender_id || data.senderId
+                        },
+                        updated_at: data.created_at || data.createdAt || conv.updated_at
+                    };
+                }));
+            }
         } catch (error) {
             throw error;
         } finally {

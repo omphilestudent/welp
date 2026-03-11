@@ -27,7 +27,7 @@ const empty = {
     qualifications: '', licenseExpiry: '',
     // Step 3 — practice
     specialisations: [], therapyTypes: [],
-    languages: 'English', sessionFormats: [],
+    languages: '', sessionFormats: [],
     practiceLocation: '', bio: '', website: '',
     agreeTerms: false,
 };

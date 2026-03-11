@@ -72,7 +72,7 @@ const Settings = () => {
         qualifications: [],
         biography: '',
         consultationModes: [],
-        languages: ['English'],
+        languages: [],
         acceptedAgeGroups: [],
         hourlyRate: '',
         availability: {}

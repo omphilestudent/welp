@@ -87,7 +87,7 @@ const applyAsPsychologist = async (req, res) => {
                 fullName, email, licenseNumber, licenseIssuingBody,
                 yearsOfExperience, specialization || [], qualifications || [], biography,
                 phoneNumber, address, website, linkedin, consultationModes || [],
-                languages || ['English'], acceptedAgeGroups || [], emergencyContact || {}, avatarUrl
+                languages || [], acceptedAgeGroups || [], emergencyContact || {}, avatarUrl
             ]
         );
 

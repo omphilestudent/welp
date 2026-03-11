@@ -22,6 +22,8 @@ import JobDetails from './pages/JobDetails';
 import ApplyJob from './pages/ApplyJob';
 import Benefits from './pages/Benefits';
 import Internships from './pages/Internships';
+import GeneralApplication from './pages/GeneralApplication';
+import MentalHealthResources from './pages/MentalHealthResources';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
@@ -81,8 +83,10 @@ function App() {
                                 <Route path="/careers" element={<Careers />} />
                                 <Route path="/careers/jobs/:id" element={<JobDetails />} />
                                 <Route path="/careers/apply/:id" element={<ApplyJob />} />
+                                <Route path="/careers/apply" element={<GeneralApplication />} />
                                 <Route path="/careers/benefits" element={<Benefits />} />
                                 <Route path="/careers/internships" element={<Internships />} />
+                                <Route path="/resources" element={<MentalHealthResources />} />
 
                                 {/* Protected Routes */}
                                 <Route
