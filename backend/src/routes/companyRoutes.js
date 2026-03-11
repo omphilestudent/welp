@@ -26,7 +26,7 @@ router.post('/scrape',
 );
 router.post('/',
     authenticate,
-    authorize('employee'),
+    authorize('employee', 'business'),
     validate(companyValidation),
     companyController.createCompany
 );

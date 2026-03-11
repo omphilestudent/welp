@@ -143,11 +143,33 @@ const createCompany = async (req, res) => {
             return res.status(400).json({ error: 'Company already exists' });
         }
 
+        let scrapedLogoUrl = null;
+        let scrapedDescription = null;
+        if (website) {
+            try {
+                const scraped = await scrapeCompanyFromWebsite(website);
+                scrapedLogoUrl = scraped?.logo_url || null;
+                scrapedDescription = scraped?.description || null;
+            } catch (scrapeError) {
+                console.warn('Company scrape failed during create:', scrapeError.message);
+            }
+        }
+
         const result = await query(
-            `INSERT INTO companies (name, description, industry, website, email, phone, address, created_by_user_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `INSERT INTO companies (name, description, industry, website, email, phone, address, logo_url, created_by_user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                  RETURNING *`,
-            [name.trim(), description, industry, website, email, phone, address, req.user.id]
+            [
+                name.trim(),
+                description || scrapedDescription,
+                industry,
+                website,
+                email,
+                phone,
+                address,
+                scrapedLogoUrl,
+                req.user.id
+            ]
         );
 
         const company = result.rows[0];

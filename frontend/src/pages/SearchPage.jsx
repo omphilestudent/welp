@@ -176,7 +176,7 @@ const SearchPage = () => {
                                 ? 'There are no unclaimed companies matching your criteria.'
                                 : 'Try adjusting your search or browse all companies.'}
                         </p>
-                        {filter !== 'unclaimed' && query && user?.role === 'employee' && (
+                        {filter !== 'unclaimed' && query && (user?.role === 'employee' || user?.role === 'business') && (
                             <form onSubmit={handleCreateCompany} className="company-create-form" style={{ marginTop: '1rem', maxWidth: 520 }}>
                                 <h4 style={{ marginBottom: '0.5rem' }}>Add this company so you can review it</h4>
                                 {createError && <div className="alert alert-error">{createError}</div>}
@@ -225,7 +225,7 @@ const SearchPage = () => {
                         )}
                         {filter !== 'unclaimed' && query && !user && (
                             <p style={{ marginTop: '1rem' }}>
-                                Log in as an employee to add this company and leave a review.
+                                Log in as an employee or business user to add this company and leave a review.
                             </p>
                         )}
                     </div>
