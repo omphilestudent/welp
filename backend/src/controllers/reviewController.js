@@ -1,6 +1,7 @@
 
 const { query } = require('../utils/database');
 const { moderateReview, analyzeSentiment } = require('../services/mlServices');
+const { createAdminNotification } = require('../utils/adminNotifications');
 
 
 const updateReviewsTable = async () => {
@@ -11,7 +12,8 @@ const updateReviewsTable = async () => {
             ADD COLUMN IF NOT EXISTS author_workplace_id UUID REFERENCES companies(id),
             ADD COLUMN IF NOT EXISTS sentiment_label VARCHAR(32),
             ADD COLUMN IF NOT EXISTS sentiment_score NUMERIC(5,4),
-            ADD COLUMN IF NOT EXISTS moderation_reason VARCHAR(255)
+            ADD COLUMN IF NOT EXISTS moderation_reason VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(32)
         `);
         console.log('✅ Reviews table schema updated successfully');
     } catch (error) {
@@ -78,13 +80,6 @@ const createReview = async (req, res) => {
             console.warn('ML moderation unavailable, allowing review:', err.message);
         }
 
-        if (moderation.is_flagged) {
-            return res.status(400).json({
-                error: 'Review flagged by moderation',
-                reason: moderation.reason
-            });
-        }
-
         let sentiment = { sentiment: 'neutral', score: 0 };
         try {
             const sentimentResult = await analyzeSentiment(content);
@@ -93,6 +88,21 @@ const createReview = async (req, res) => {
             }
         } catch (err) {
             console.warn('ML sentiment unavailable, defaulting to neutral:', err.message);
+        }
+
+        const decisionRaw = String(
+            moderation?.decision ||
+            moderation?.action ||
+            moderation?.status ||
+            moderation?.result ||
+            ''
+        ).toLowerCase();
+
+        let moderationStatus = 'approved';
+        if (moderation?.is_flagged || decisionRaw === 'flag' || decisionRaw === 'flagged') {
+            moderationStatus = 'flagged';
+        } else if (moderation?.is_rejected || decisionRaw === 'reject' || decisionRaw === 'rejected') {
+            moderationStatus = 'rejected';
         }
 
         const result = await query(
@@ -106,9 +116,12 @@ const createReview = async (req, res) => {
                 author_workplace_id,
                 sentiment_label,
                 sentiment_score,
-                moderation_reason
+                moderation_reason,
+                moderation_status,
+                is_flagged,
+                flag_reason
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
              RETURNING *`,
             [
                 companyId,
@@ -120,6 +133,9 @@ const createReview = async (req, res) => {
                 user.rows[0]?.workplace_id,
                 sentiment.sentiment,
                 sentiment.score,
+                moderation.reason,
+                moderationStatus,
+                moderationStatus === 'flagged',
                 moderation.reason
             ]
         );
@@ -146,10 +162,19 @@ const createReview = async (req, res) => {
             [req.user.id]
         );
 
-        res.status(201).json({
+        const reviewPayload = {
             ...review,
             author: author.rows[0]
+        };
+
+        await createAdminNotification({
+            type: 'review_moderation',
+            message: `Review auto ${moderationStatus} for company ${companyId}`,
+            entityType: 'review',
+            entityId: review.id
         });
+
+        res.status(201).json(reviewPayload);
     } catch (error) {
         console.error('Create review error:', error);
         res.status(500).json({ error: 'Failed to create review' });

@@ -768,6 +768,12 @@
     font-size: 0.9rem;
 }
 
+.review-card__status {
+    color: #374151;
+    font-size: 0.85rem;
+    margin: 0.35rem 0 0.75rem;
+}
+
 .review-card__actions {
     display: flex;
     flex-wrap: wrap;

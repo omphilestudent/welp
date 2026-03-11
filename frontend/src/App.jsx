@@ -35,6 +35,7 @@ import ReviewModeration from './pages/admin/ReviewModeration';
 import SubscriptionManagement from './pages/admin/SubscriptionManagement';
 import SystemSettings from './pages/admin/SystemSettings';
 import MLInteractions from './pages/admin/MLInteractions';
+import RegistrationApplications from './pages/admin/RegistrationApplications';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
@@ -142,6 +143,7 @@ function App() {
                                     <Route path="pricing" element={<PricingManagement />} />
                                     <Route path="companies" element={<CompanyManagement />} />
                                     <Route path="reviews" element={<ReviewModeration />} />
+                                    <Route path="applications" element={<RegistrationApplications />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />
                                     <Route path="ml-interactions" element={<MLInteractions />} />

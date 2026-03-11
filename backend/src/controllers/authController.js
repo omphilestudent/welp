@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
+const { createAdminNotification } = require('../utils/adminNotifications');
 
 const tableExists = async (tableName) => {
     try {
@@ -301,6 +302,13 @@ const registerPsychologist = async (req, res) => {
             console.warn('psychologist_applications table not found, application data stored in user metadata.');
         }
 
+        await createAdminNotification({
+            type: 'psychologist_application',
+            message: `New psychologist application from ${email}`,
+            entityType: 'psychologist_application',
+            entityId: user.id
+        });
+
         return res.status(201).json({
             success: true,
             message: 'Application submitted successfully. You will be notified by email once reviewed.',
@@ -454,6 +462,13 @@ const registerBusiness = async (req, res) => {
             }
             console.warn('business_applications table not found, application data stored in user metadata.');
         }
+
+        await createAdminNotification({
+            type: 'business_application',
+            message: `New business application from ${email}`,
+            entityType: 'business_application',
+            entityId: user.id
+        });
 
         return res.status(201).json({
             success: true,

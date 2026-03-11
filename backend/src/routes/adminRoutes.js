@@ -51,6 +51,7 @@ router.patch('/reviews/:id/moderate',
     adminController.moderateReview
 );
 router.delete('/reviews/:id', adminController.deleteReview);
+router.patch('/reviews/:id/visibility', adminController.setReviewVisibility);
 
 
 router.get('/subscriptions', adminController.getSubscriptions);
@@ -127,6 +128,14 @@ router.patch('/settings', adminController.updateSystemSettings);
 
 
 router.get('/audit-logs', adminController.getAuditLogs);
+
+// Admin notifications
+router.get('/notifications', adminController.listAdminNotifications);
+router.patch('/notifications/:id/read', adminController.markNotificationRead);
+
+// Registration applications
+router.get('/registration-applications', adminController.getRegistrationApplications);
+router.patch('/registration-applications/:id', adminController.reviewRegistrationApplication);
 
 
 router.get('/analytics/revenue', adminController.getRevenueAnalytics);

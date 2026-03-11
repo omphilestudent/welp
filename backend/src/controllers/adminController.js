@@ -1,6 +1,7 @@
 // backend/src/controllers/adminController.js
 const { query } = require('../utils/database');
 const bcrypt = require('bcryptjs');
+const { getAdminNotifications, markAdminNotificationRead } = require('../utils/adminNotifications');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const tableExists = async (tableName) => {
@@ -593,15 +594,28 @@ const getReviews = async (req, res) => {
         if (!await tableExists('reviews')) return res.json({ reviews: [], pagination: { page: parseInt(page), limit: parseInt(limit), total: 0, pages: 0 } });
 
         const hasIsPublic = await columnExists('reviews', 'is_public');
+        const hasModerationStatus = await columnExists('reviews', 'moderation_status');
         let where = `WHERE 1=1`;
-        if (status === 'pending'  && hasIsPublic) where += ` AND r.is_public = false`;
-        if (status === 'approved' && hasIsPublic) where += ` AND r.is_public = true`;
+
+        if (status !== 'all') {
+            if (hasModerationStatus && ['approved', 'rejected', 'flagged', 'pending'].includes(status)) {
+                where += ` AND COALESCE(r.moderation_status, 'approved') = $3`;
+            } else if (hasIsPublic) {
+                if (status === 'pending') where += ` AND r.is_public = false`;
+                if (status === 'approved') where += ` AND r.is_public = true`;
+            }
+        }
+
+        const params = [limit, offset];
+        if (status !== 'all' && hasModerationStatus && ['approved', 'rejected', 'flagged', 'pending'].includes(status)) {
+            params.push(status);
+        }
 
         const [result, countResult] = await Promise.all([
             query(`SELECT r.*, u.display_name as author_name, u.email as author_email, c.name as company_name
                    FROM reviews r JOIN users u ON r.author_id = u.id JOIN companies c ON r.company_id = c.id
-                   ${where} ORDER BY r.created_at DESC LIMIT $1 OFFSET $2`, [limit, offset]),
-            query(`SELECT COUNT(*) FROM reviews r ${where}`)
+                   ${where} ORDER BY r.created_at DESC LIMIT $1 OFFSET $2`, params),
+            query(`SELECT COUNT(*) FROM reviews r ${where}`, params.slice(2))
         ]);
 
         res.json({
@@ -631,6 +645,7 @@ const getPendingReviews = async (req, res) => {
 
 const moderateReview = async (req, res) => {
     try {
+        if (!ensureSuperAdmin(req, res)) return;
         const { id } = req.params;
         const { action, reason } = req.body;
 
@@ -643,16 +658,11 @@ const moderateReview = async (req, res) => {
         let q = '';
         let params = [];
 
-        if (action === 'approve' || action === 'reject') {
-            q = `UPDATE reviews SET is_public = ${action === 'approve'}`;
+        if (action === 'hide' || action === 'show') {
+            q = `UPDATE reviews SET is_public = ${action === 'show'}`;
             if (hasModeratedBy) { q += `, moderated_by = $1`; params.push(req.user.id); }
             if (hasModeratedAt)  q += `, moderated_at = CURRENT_TIMESTAMP`;
             if (hasModerationReason && reason) { q += `, moderation_reason = $${params.length + 1}`; params.push(reason); }
-        } else if (action === 'flag') {
-            q = `UPDATE reviews SET is_flagged = true`;
-            if (hasFlaggedBy) { q += `, flagged_by = $1`; params.push(req.user.id); }
-            if (hasFlaggedAt) q += `, flagged_at = CURRENT_TIMESTAMP`;
-            if (hasFlagReason && reason) { q += `, flag_reason = $${params.length + 1}`; params.push(reason); }
         } else {
             return res.status(400).json({ error: 'Invalid action' });
         }
@@ -672,6 +682,7 @@ const moderateReview = async (req, res) => {
 
 const deleteReview = async (req, res) => {
     try {
+        if (!ensureSuperAdmin(req, res)) return;
         const { id } = req.params;
         const review = await query('SELECT * FROM reviews WHERE id = $1', [id]);
         if (review.rows.length === 0) return res.status(404).json({ error: 'Review not found' });
@@ -681,6 +692,170 @@ const deleteReview = async (req, res) => {
     } catch (error) {
         console.error('Delete review error:', error);
         res.status(500).json({ error: 'Failed to delete review' });
+    }
+};
+
+const setReviewVisibility = async (req, res) => {
+    try {
+        if (!ensureSuperAdmin(req, res)) return;
+        const { id } = req.params;
+        const { isPublic, reason } = req.body;
+
+        if (!await columnExists('reviews', 'is_public')) {
+            return res.status(400).json({ error: 'is_public column not available' });
+        }
+
+        const params = [Boolean(isPublic), id];
+        let q = `UPDATE reviews SET is_public = $1, updated_at = CURRENT_TIMESTAMP`;
+        if (await columnExists('reviews', 'moderation_reason') && reason) {
+            q += `, moderation_reason = $3`;
+            params.push(reason);
+        }
+        q += ` WHERE id = $2 RETURNING *`;
+
+        const result = await query(q, params);
+        if (!result.rows.length) return res.status(404).json({ error: 'Review not found' });
+
+        res.json({ success: true, review: result.rows[0] });
+    } catch (error) {
+        console.error('Set review visibility error:', error);
+        res.status(500).json({ error: 'Failed to update review visibility' });
+    }
+};
+
+const listAdminNotifications = async (req, res) => {
+    try {
+        const rows = await getAdminNotifications(40);
+        res.json({ notifications: rows });
+    } catch (error) {
+        console.error('Get admin notifications error:', error);
+        res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+};
+
+const markNotificationRead = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const row = await markAdminNotificationRead(id);
+        if (!row) return res.status(404).json({ error: 'Notification not found' });
+        res.json({ notification: row });
+    } catch (error) {
+        console.error('Mark notification read error:', error);
+        res.status(500).json({ error: 'Failed to update notification' });
+    }
+};
+
+const getRegistrationApplications = async (req, res) => {
+    try {
+        if (!ensureSuperAdmin(req, res)) return;
+        const { status = 'all', type = 'all' } = req.query;
+
+        const apps = [];
+
+        if (type === 'all' || type === 'psychologist') {
+            if (await tableExists('psychologist_applications')) {
+                const result = await query(
+                    `SELECT pa.*, u.email as user_email, u.display_name as user_name
+                     FROM psychologist_applications pa
+                     JOIN users u ON pa.user_id = u.id
+                     ${status !== 'all' ? 'WHERE pa.status = $1' : ''}
+                     ORDER BY pa.created_at DESC`,
+                    status !== 'all' ? [status] : []
+                );
+                result.rows.forEach(r => apps.push({ ...r, application_type: 'psychologist' }));
+            }
+        }
+
+        if (type === 'all' || type === 'business') {
+            if (await tableExists('business_applications')) {
+                const result = await query(
+                    `SELECT ba.*, u.email as user_email, u.display_name as user_name
+                     FROM business_applications ba
+                     JOIN users u ON ba.user_id = u.id
+                     ${status !== 'all' ? 'WHERE ba.status = $1' : ''}
+                     ORDER BY ba.created_at DESC`,
+                    status !== 'all' ? [status] : []
+                );
+                result.rows.forEach(r => apps.push({ ...r, application_type: 'business' }));
+            }
+        }
+
+        res.json({ applications: apps });
+    } catch (error) {
+        console.error('Get registration applications error:', error);
+        res.status(500).json({ error: 'Failed to fetch applications' });
+    }
+};
+
+const reviewRegistrationApplication = async (req, res) => {
+    try {
+        if (!ensureSuperAdmin(req, res)) return;
+        const { id } = req.params;
+        const { type, status, notes } = req.body;
+
+        if (!['psychologist', 'business'].includes(type)) {
+            return res.status(400).json({ error: 'Invalid application type' });
+        }
+        if (!['approved', 'rejected'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+
+        const table = type === 'psychologist' ? 'psychologist_applications' : 'business_applications';
+        if (!await tableExists(table)) {
+            return res.status(404).json({ error: 'Applications table not found' });
+        }
+
+        await query(
+            `ALTER TABLE ${table}
+                ADD COLUMN IF NOT EXISTS admin_notes TEXT,
+                ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS reviewed_by UUID`
+        );
+
+        const appResult = await query(
+            `UPDATE ${table}
+             SET status = $1,
+                 admin_notes = $2,
+                 reviewed_at = CURRENT_TIMESTAMP,
+                 reviewed_by = $3,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $4
+             RETURNING *`,
+            [status, notes || null, req.user.id, id]
+        );
+
+        if (!appResult.rows.length) {
+            return res.status(404).json({ error: 'Application not found' });
+        }
+
+        const app = appResult.rows[0];
+
+        const hasIsActive = await columnExists('users', 'is_active');
+        const hasIsVerified = await columnExists('users', 'is_verified');
+        const hasStatus = await columnExists('users', 'status');
+
+        if (status === 'approved') {
+            const updates = [];
+            const params = [];
+            let idx = 1;
+
+            if (hasIsActive) { updates.push(`is_active = $${idx++}`); params.push(true); }
+            if (hasIsVerified) { updates.push(`is_verified = $${idx++}`); params.push(true); }
+            if (hasStatus) { updates.push(`status = $${idx++}`); params.push('active'); }
+            if (updates.length > 0) {
+                params.push(app.user_id);
+                await query(`UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`, params);
+            }
+        }
+
+        if (status === 'rejected' && hasStatus) {
+            await query('UPDATE users SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', ['rejected', app.user_id]);
+        }
+
+        res.json({ success: true, application: app });
+    } catch (error) {
+        console.error('Review registration application error:', error);
+        res.status(500).json({ error: 'Failed to update application' });
     }
 };
 
@@ -1187,6 +1362,11 @@ module.exports = {
     getPendingReviews,
     moderateReview,
     deleteReview,
+    setReviewVisibility,
+    listAdminNotifications,
+    markNotificationRead,
+    getRegistrationApplications,
+    reviewRegistrationApplication,
     getSubscriptions,
     getSubscriptionDetails,
     cancelSubscription,

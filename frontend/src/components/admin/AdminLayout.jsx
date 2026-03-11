@@ -62,12 +62,18 @@ const AdminLayout = () => {
     };
 
     const fetchNotifications = async () => {
-
-        setNotifications([
-            { id: 1, text: 'New user registered', time: '5 min ago', read: false },
-            { id: 2, text: 'Pending review moderation', time: '1 hour ago', read: false },
-            { id: 3, text: 'Subscription expiring soon', time: '2 hours ago', read: true },
-        ]);
+        try {
+            const { data } = await api.get('/admin/notifications');
+            const rows = Array.isArray(data?.notifications) ? data.notifications : [];
+            setNotifications(rows.map((n) => ({
+                id: n.id,
+                text: n.message,
+                time: new Date(n.created_at).toLocaleString(),
+                read: !!n.read_at
+            })));
+        } catch (error) {
+            setNotifications([]);
+        }
     };
 
     const handleLogout = async () => {
@@ -76,10 +82,16 @@ const AdminLayout = () => {
         navigate('/login');
     };
 
-    const markAsRead = (id) => {
-        setNotifications(notifications.map(n =>
-            n.id === id ? { ...n, read: true } : n
-        ));
+    const markAsRead = async (id) => {
+        try {
+            await api.patch(`/admin/notifications/${id}/read`);
+        } catch {
+            // ignore
+        } finally {
+            setNotifications(notifications.map(n =>
+                n.id === id ? { ...n, read: true } : n
+            ));
+        }
     };
 
     const navItems = [
@@ -112,6 +124,12 @@ const AdminLayout = () => {
             icon: <FaStar />,
             label: 'Review Moderation',
             color: '#f687b3'
+        },
+        {
+            path: '/admin/applications',
+            icon: <FaClipboardList />,
+            label: 'Registration Applications',
+            color: '#63b3ed'
         },
         {
             path: '/admin/subscriptions',
