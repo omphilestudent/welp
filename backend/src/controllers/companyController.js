@@ -1,6 +1,7 @@
 
 const { query } = require('../utils/database');
 const { sendClaimInvitation } = require('../utils/emailService');
+const { scrapeCompanyFromWebsite } = require('../services/companyScraperService');
 
 
 const searchCompanies = async (req, res) => {
@@ -653,6 +654,40 @@ const rejectClaimRequest = async (req, res) => {
     }
 };
 
+const scrapeCompany = async (req, res) => {
+    try {
+        const { website } = req.body;
+
+        if (!website) {
+            return res.status(400).json({ error: 'Website URL is required' });
+        }
+
+        const scraped = await scrapeCompanyFromWebsite(website);
+
+        const result = await query(
+            `INSERT INTO companies (name, description, website, logo_url, created_by_user_id)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (name)
+             DO UPDATE SET
+                description = COALESCE(EXCLUDED.description, companies.description),
+                website = COALESCE(EXCLUDED.website, companies.website),
+                logo_url = COALESCE(EXCLUDED.logo_url, companies.logo_url),
+                updated_at = CURRENT_TIMESTAMP
+             RETURNING *`,
+            [scraped.name, scraped.description, scraped.website, scraped.logo_url, req.user.id]
+        );
+
+        return res.status(201).json({
+            message: 'Company data scraped and stored successfully',
+            company: result.rows[0],
+            scraped
+        });
+    } catch (error) {
+        console.error('Scrape company error:', error);
+        return res.status(500).json({ error: error.message || 'Failed to scrape company data' });
+    }
+};
+
 
 module.exports = {
     searchCompanies,
@@ -668,6 +703,7 @@ module.exports = {
     getMyClaimRequests,
     verifyBusinessEmail,
     confirmEmailVerification,
+    scrapeCompany,
     getPendingClaimRequests,
     approveClaimRequest,
     rejectClaimRequest

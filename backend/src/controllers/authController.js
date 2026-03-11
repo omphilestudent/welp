@@ -32,7 +32,7 @@ const columnExists = async (tableName, columnName) => {
     }
 };
 
-const generateToken = (user) => {
+const generateToken = (user, options = {}) => {
     const role = String(user?.role || '').toLowerCase().trim();
     const isAdminRole = ['super_admin', 'superadmin', 'system_admin', 'admin', 'hr_admin'].includes(role);
 
@@ -43,15 +43,17 @@ const generateToken = (user) => {
     };
 
     // Admin roles keep a non-expiring token to avoid frequent forced re-logins.
-    // Other roles keep configured JWT expiry.
     if (isAdminRole) {
         return jwt.sign(payload, process.env.JWT_SECRET || 'changeme');
     }
 
+    const rememberExpiry = process.env.JWT_REMEMBER_EXPIRES_IN || '30d';
+    const defaultExpiry = process.env.JWT_EXPIRE || process.env.JWT_EXPIRES_IN || '7d';
+
     return jwt.sign(
         payload,
         process.env.JWT_SECRET || 'changeme',
-        { expiresIn: process.env.JWT_EXPIRE || process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: options.rememberMe ? rememberExpiry : defaultExpiry }
     );
 };
 
@@ -469,7 +471,7 @@ const registerBusiness = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, rememberMe = false } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
@@ -498,7 +500,7 @@ const login = async (req, res) => {
             });
         }
 
-        const token = generateToken(user);
+        const token = generateToken(user, { rememberMe: Boolean(rememberMe) });
 
         return res.json({
             success: true,

@@ -1187,7 +1187,7 @@ const getUpcomingInterviews = async (req, res) => {
              FROM interviews i
                       JOIN job_applications a ON i.application_id = a.id
                       JOIN job_postings j ON a.job_id = j.id
-                      JOIN users u ON i.interviewer_id = u.id
+                      LEFT JOIN users u ON i.interviewer_id = u.id
              WHERE i.scheduled_at >= CURRENT_TIMESTAMP
              ORDER BY i.scheduled_at ASC`
         );
