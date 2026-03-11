@@ -3,7 +3,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaGlobe } from 'react-icons/fa';
+import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaUser, FaEnvelope } from 'react-icons/fa';
+
+const resolveMediaUrl = (url) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const ProfileSettings = ({ onUpdate }) => {
     const { user, updateUser } = useAuth();
@@ -182,10 +189,10 @@ const ProfileSettings = ({ onUpdate }) => {
                 <div className="avatar-upload-container">
                     <div className="current-avatar">
                         {profile.avatarUrl ? (
-                            <img src={profile.avatarUrl} alt={profile.displayName} />
+                            <img src={resolveMediaUrl(profile.avatarUrl)} alt={profile.displayName} />
                         ) : (
                             <div className="avatar-placeholder-large">
-                                {profile.displayName?.charAt(0) || user?.displayName?.charAt(0) || 'U'}
+                                {profile.displayName?.charAt(0) || user?.display_name?.charAt(0) || 'U'}
                             </div>
                         )}
 

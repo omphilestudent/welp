@@ -63,10 +63,10 @@ const HRDashboard = () => {
         setLoading(true);
         try {
             const [statsRes, jobsRes, interviewsRes, hiringRes] = await Promise.all([
-                api.get('/hr/dashboard/stats'),
-                api.get('/hr/jobs'),
-                api.get('/hr/interviews/upcoming'),
-                api.get('/hr/analytics/hiring')
+                api.get('/hr/dashboard/stats', { params: { dateRange, department: selectedDepartment } }),
+                api.get('/hr/jobs', { params: { department: selectedDepartment } }),
+                api.get('/hr/interviews/upcoming', { params: { dateRange, department: selectedDepartment } }),
+                api.get('/hr/analytics/hiring', { params: { dateRange, department: selectedDepartment } })
             ]);
 
             const dashboard = statsRes.data || {};
@@ -149,7 +149,7 @@ const HRDashboard = () => {
             setHiringTrend((hiringRes.data || []).slice().reverse().map((row) => ({
                 week: new Date(row.month).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }),
                 applications: Number(row.applications || 0),
-                interviews: Number(row.hires || 0)
+                hires: Number(row.hires || 0)
             })));
         } catch (error) {
             console.error('Failed to fetch dashboard data', error);
@@ -325,7 +325,7 @@ const HRDashboard = () => {
                             <YAxis />
                             <Tooltip />
                             <Area type="monotone" dataKey="applications" stackId="1" stroke="#4299e1" fill="#4299e180" />
-                            <Area type="monotone" dataKey="interviews" stackId="1" stroke="#48bb78" fill="#48bb7880" />
+                            <Area type="monotone" dataKey="hires" stackId="1" stroke="#48bb78" fill="#48bb7880" />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

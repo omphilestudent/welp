@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuth = async () => {
         try {
-            const token = localStorage.getItem("token");
+            const token = localStorage.getItem("token") || sessionStorage.getItem("token");
 
             if (!token) {
                 setLoading(false);
@@ -87,6 +87,7 @@ export const AuthProvider = ({ children }) => {
                 // Don't remove token for rate limit errors
             } else {
                 localStorage.removeItem("token");
+                sessionStorage.removeItem("token");
                 delete api.defaults.headers.common["Authorization"];
                 setUser(null);
             }
@@ -101,7 +102,7 @@ export const AuthProvider = ({ children }) => {
     ---------------------------------------
     */
 
-    const login = async (email, password) => {
+    const login = async (email, password, rememberMe = false) => {
         try {
             if (!email || !password) {
                 return {
@@ -114,7 +115,8 @@ export const AuthProvider = ({ children }) => {
 
             const { data } = await api.post("/auth/login", {
                 email,
-                password
+                password,
+                rememberMe
             });
 
             if (!data.token || !data.user) {
@@ -122,7 +124,13 @@ export const AuthProvider = ({ children }) => {
             }
 
             // Save token
-            localStorage.setItem("token", data.token);
+            sessionStorage.removeItem("token");
+            localStorage.removeItem("token");
+            if (rememberMe) {
+                localStorage.setItem("token", data.token);
+            } else {
+                sessionStorage.setItem("token", data.token);
+            }
             api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
             setUser(data.user);
             setRateLimitInfo(null);
@@ -181,6 +189,7 @@ export const AuthProvider = ({ children }) => {
             // Only clear token for non-rate-limit errors
             if (error.response?.status !== 429) {
                 localStorage.removeItem("token");
+                sessionStorage.removeItem("token");
                 delete api.defaults.headers.common["Authorization"];
             }
 
@@ -296,6 +305,7 @@ export const AuthProvider = ({ children }) => {
             console.error("Logout error:", error);
         } finally {
             localStorage.removeItem("token");
+            sessionStorage.removeItem("token");
             delete api.defaults.headers.common["Authorization"];
             setUser(null);
             setRateLimitInfo(null);

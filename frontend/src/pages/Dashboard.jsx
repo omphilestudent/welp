@@ -8,6 +8,12 @@ import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit } from 'react-icons/fa';
 
+const resolveMediaUrl = (url) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const ProfileSection = ({ user, onUpdate }) => {
     const [uploading, setUploading] = useState(false);
@@ -91,7 +97,7 @@ const ProfileSection = ({ user, onUpdate }) => {
             <div className="profile-avatar-container">
                 <div className="profile-avatar">
                     {user?.avatar_url ? (
-                        <img src={user.avatar_url} alt={user.display_name} />
+                        <img src={resolveMediaUrl(user.avatar_url)} alt={user.display_name} />
                     ) : (
                         <div className="avatar-placeholder-large">
                             {user?.display_name?.charAt(0) || 'U'}

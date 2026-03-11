@@ -15,6 +15,15 @@ router.get('/unclaimed', apiLimiter, companyController.getUnclaimedCompanies);
 router.get('/:id', apiLimiter, companyController.getCompany);
 
 
+
+router.post('/scrape',
+    authenticate,
+    authorize('admin', 'super_admin', 'hr_admin'),
+    validate([
+        body('website').isString().trim().notEmpty().withMessage('Website URL is required')
+    ]),
+    companyController.scrapeCompany
+);
 router.post('/',
     authenticate,
     authorize('employee'),
