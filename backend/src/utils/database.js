@@ -1,6 +1,7 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+// ── Connection pool ────────────────────────────────────────────────────────────
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -8,27 +9,33 @@ const pool = new Pool({
         require: true
     },
     connectionTimeoutMillis: 30000,
-    idleTimeoutMillis: 30000,
-    max: 20,
+    idleTimeoutMillis:       30000,
+    max:                     20,
+    min:                     0,   // don't hold idle connections (Neon suspends on inactivity)
+});
+
+pool.on('error', (err) => {
+    console.error('❌ Unexpected database pool error:', err.message);
 });
 
 pool.connect((err, client, release) => {
     if (err) {
-        console.error('Error connecting to database:', err.message);
-        console.error('Please check your DATABASE_URL in .env file');
-        console.error('Make sure you are connected to the internet');
+        console.error('❌ Error connecting to database:', err.message);
+        console.error('   → Check your DATABASE_URL in .env');
+        console.error('   → Make sure your Neon project is not suspended');
+        console.error('   → Verify you are using the POOLED connection string from Neon console');
     } else {
         console.log('✅ Successfully connected to Neon PostgreSQL database');
         release();
     }
 });
 
+// ── Table creation ─────────────────────────────────────────────────────────────
 const createTables = async () => {
     try {
         await pool.query('SELECT NOW()');
         console.log('✅ Database connection test successful');
 
-        // Create tables in correct order (with dependencies)
         const queries = `
             -- Enable UUID extension
             CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -63,11 +70,13 @@ const createTables = async () => {
                 password_hash VARCHAR(255),
                 role VARCHAR(50) NOT NULL CHECK (role IN ('employee', 'psychologist', 'business', 'admin', 'super_admin', 'hr_admin')),
                 is_anonymous BOOLEAN DEFAULT false,
+                is_active BOOLEAN DEFAULT true,
+                is_verified BOOLEAN DEFAULT false,
+                status VARCHAR(50) DEFAULT 'active',
                 display_name VARCHAR(100),
                 avatar_url TEXT,
                 occupation VARCHAR(255),
                 workplace_id UUID REFERENCES companies(id) ON DELETE SET NULL,
-                is_verified BOOLEAN DEFAULT false,
                 token_version INT DEFAULT 0,
                 last_login TIMESTAMP,
                 last_active TIMESTAMP,
@@ -86,7 +95,9 @@ const createTables = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
-            -- Job Postings table (for HR module)
+            -- Job Postings table
+            -- status includes both 'open' and 'published' so the frontend filter
+            -- and resolveJobStatus() helper always have a valid value to insert.
             CREATE TABLE IF NOT EXISTS job_postings (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 title VARCHAR(255) NOT NULL,
@@ -106,7 +117,7 @@ const createTables = async () => {
                 education_required VARCHAR(255),
                 application_deadline DATE,
                 posted_by UUID REFERENCES users(id) ON DELETE SET NULL,
-                status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'closed')),
+                status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'published', 'closed')),
                 published_at TIMESTAMP,
                 closed_at TIMESTAMP,
                 views_count INTEGER DEFAULT 0,
@@ -125,6 +136,17 @@ const createTables = async () => {
                 phone VARCHAR(50),
                 resume_url TEXT,
                 cover_letter TEXT,
+                linkedin_url TEXT,
+                github_url TEXT,
+                portfolio_url TEXT,
+                years_experience INTEGER,
+                current_company VARCHAR(255),
+                current_position VARCHAR(255),
+                skills JSONB DEFAULT '[]',
+                salary_expectation VARCHAR(100),
+                available_start_date DATE,
+                work_authorization VARCHAR(100),
+                remote_preference VARCHAR(50),
                 status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'shortlisted', 'interviewed', 'hired', 'rejected')),
                 notes TEXT,
                 reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -200,7 +222,7 @@ const createTables = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
-            -- Company owners (business users who own/claim companies)
+            -- Company owners
             CREATE TABLE IF NOT EXISTS company_owners (
                 company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
                 user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -300,7 +322,7 @@ const createTables = async () => {
                 UNIQUE(review_id, reporter_id)
             );
 
-            -- Admin tables
+            -- Admin roles table
             CREATE TABLE IF NOT EXISTS admin_roles (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 name VARCHAR(50) UNIQUE NOT NULL,
@@ -311,6 +333,7 @@ const createTables = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            -- Admin users table
             CREATE TABLE IF NOT EXISTS admin_users (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -328,7 +351,7 @@ const createTables = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
-            -- User Roles (RBAC)
+            -- User roles (RBAC)
             CREATE TABLE IF NOT EXISTS user_roles (
                 user_id UUID REFERENCES users(id) ON DELETE CASCADE,
                 role_id UUID REFERENCES admin_roles(id) ON DELETE CASCADE,
@@ -336,7 +359,48 @@ const createTables = async () => {
                 PRIMARY KEY (user_id, role_id)
             );
 
-            -- Add psychologist-specific fields to users
+            -- Psychologist applications
+            CREATE TABLE IF NOT EXISTS psychologist_applications (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                status VARCHAR(50) DEFAULT 'pending',
+                license_number VARCHAR(100),
+                license_body VARCHAR(255),
+                license_expiry DATE,
+                years_experience INTEGER,
+                qualifications TEXT,
+                specialisations JSONB,
+                therapy_types JSONB,
+                session_formats JSONB,
+                languages TEXT,
+                practice_location TEXT,
+                bio TEXT,
+                website TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Business applications
+            CREATE TABLE IF NOT EXISTS business_applications (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                status VARCHAR(50) DEFAULT 'pending',
+                company_name VARCHAR(255),
+                job_title VARCHAR(100),
+                company_website TEXT,
+                industry VARCHAR(100),
+                company_size VARCHAR(50),
+                country VARCHAR(100),
+                company_description TEXT,
+                linkedin_url TEXT,
+                registration_number VARCHAR(100),
+                claim_existing_profile BOOLEAN DEFAULT false,
+                how_did_you_hear TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Psychologist-specific user columns
             ALTER TABLE users ADD COLUMN IF NOT EXISTS specialization TEXT[];
             ALTER TABLE users ADD COLUMN IF NOT EXISTS years_of_experience INTEGER;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS consultation_modes TEXT[];
@@ -344,70 +408,66 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS biography TEXT;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10,2);
 
-            -- Create indexes for better performance
-            CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-            CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-            CREATE INDEX IF NOT EXISTS idx_users_workplace ON users(workplace_id);
-            CREATE INDEX IF NOT EXISTS idx_users_occupation ON users(occupation);
-            CREATE INDEX IF NOT EXISTS idx_reviews_company_id ON reviews(company_id);
-            CREATE INDEX IF NOT EXISTS idx_reviews_author_id ON reviews(author_id);
-            CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
-            CREATE INDEX IF NOT EXISTS idx_companies_industry ON companies(industry);
-            CREATE INDEX IF NOT EXISTS idx_conversations_employee ON conversations(employee_id);
-            CREATE INDEX IF NOT EXISTS idx_conversations_psychologist ON conversations(psychologist_id);
-            CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status);
-            CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
-            CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(conversation_id, is_read, sender_id);
-            CREATE INDEX IF NOT EXISTS idx_claim_requests_status ON claim_requests(status);
-            CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email);
-            CREATE INDEX IF NOT EXISTS idx_review_reports_status ON review_reports(status);
-            
-            -- HR Module Indexes
-            CREATE INDEX IF NOT EXISTS idx_job_postings_department ON job_postings(department_id);
-            CREATE INDEX IF NOT EXISTS idx_job_postings_status ON job_postings(status);
-            CREATE INDEX IF NOT EXISTS idx_job_postings_posted_by ON job_postings(posted_by);
-            CREATE INDEX IF NOT EXISTS idx_job_applications_job_id ON job_applications(job_id);
-            CREATE INDEX IF NOT EXISTS idx_job_applications_status ON job_applications(status);
-            CREATE INDEX IF NOT EXISTS idx_interviews_application_id ON interviews(application_id);
-            CREATE INDEX IF NOT EXISTS idx_interviews_scheduled_at ON interviews(scheduled_at);
-            CREATE INDEX IF NOT EXISTS idx_employee_relations_employee_id ON employee_relations(employee_id);
-            CREATE INDEX IF NOT EXISTS idx_employee_relations_status ON employee_relations(status);
-            CREATE INDEX IF NOT EXISTS idx_employee_documents_employee_id ON employee_documents(employee_id);
-            CREATE INDEX IF NOT EXISTS idx_performance_reviews_employee_id ON performance_reviews(employee_id);
+            -- Indexes
+            CREATE INDEX IF NOT EXISTS idx_users_role                       ON users(role);
+            CREATE INDEX IF NOT EXISTS idx_users_email                      ON users(email);
+            CREATE INDEX IF NOT EXISTS idx_users_workplace                  ON users(workplace_id);
+            CREATE INDEX IF NOT EXISTS idx_reviews_company_id               ON reviews(company_id);
+            CREATE INDEX IF NOT EXISTS idx_reviews_author_id                ON reviews(author_id);
+            CREATE INDEX IF NOT EXISTS idx_companies_name                   ON companies(name);
+            CREATE INDEX IF NOT EXISTS idx_companies_industry               ON companies(industry);
+            CREATE INDEX IF NOT EXISTS idx_conversations_employee           ON conversations(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_conversations_psychologist       ON conversations(psychologist_id);
+            CREATE INDEX IF NOT EXISTS idx_conversations_status             ON conversations(status);
+            CREATE INDEX IF NOT EXISTS idx_messages_conversation            ON messages(conversation_id);
+            CREATE INDEX IF NOT EXISTS idx_messages_read                    ON messages(conversation_id, is_read, sender_id);
+            CREATE INDEX IF NOT EXISTS idx_claim_requests_status            ON claim_requests(status);
+            CREATE INDEX IF NOT EXISTS idx_email_verifications_email        ON email_verifications(email);
+            CREATE INDEX IF NOT EXISTS idx_review_reports_status            ON review_reports(status);
+            CREATE INDEX IF NOT EXISTS idx_job_postings_department          ON job_postings(department_id);
+            CREATE INDEX IF NOT EXISTS idx_job_postings_status              ON job_postings(status);
+            CREATE INDEX IF NOT EXISTS idx_job_postings_posted_by           ON job_postings(posted_by);
+            CREATE INDEX IF NOT EXISTS idx_job_applications_job_id          ON job_applications(job_id);
+            CREATE INDEX IF NOT EXISTS idx_job_applications_status          ON job_applications(status);
+            CREATE INDEX IF NOT EXISTS idx_interviews_application_id        ON interviews(application_id);
+            CREATE INDEX IF NOT EXISTS idx_interviews_scheduled_at          ON interviews(scheduled_at);
+            CREATE INDEX IF NOT EXISTS idx_employee_relations_employee_id   ON employee_relations(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_employee_relations_status        ON employee_relations(status);
+            CREATE INDEX IF NOT EXISTS idx_employee_documents_employee_id   ON employee_documents(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_performance_reviews_employee_id  ON performance_reviews(employee_id);
         `;
 
         await pool.query(queries);
         console.log('✅ Database tables initialized successfully');
     } catch (error) {
         console.error('❌ Error creating tables:', error.message);
-        console.error('Please check your database connection and permissions');
+        console.error('   Check your database connection and permissions');
     }
 };
 
+// ── Default seed data ──────────────────────────────────────────────────────────
 const insertDefaultData = async () => {
     try {
-        // Insert default admin roles
         await pool.query(`
             INSERT INTO admin_roles (name, description, is_system_role, permissions)
-            VALUES 
-                ('super_admin', 'Full system access', true, '{"all": true}'::jsonb),
-                ('admin', 'Administrative access', true, '{"users": true, "companies": true, "reviews": true}'::jsonb),
-                ('hr_admin', 'HR access', true, '{"jobs": true, "applications": true, "employees": true}'::jsonb)
+            VALUES
+                ('super_admin', 'Full system access',     true, '{"all": true}'::jsonb),
+                ('admin',       'Administrative access',  true, '{"users": true, "companies": true, "reviews": true}'::jsonb),
+                ('hr_admin',    'HR access',               true, '{"jobs": true, "applications": true, "employees": true}'::jsonb)
             ON CONFLICT (name) DO NOTHING;
         `);
 
-        // Insert default departments
         await pool.query(`
             INSERT INTO departments (id, name, description) VALUES
-                ('11111111-1111-1111-1111-111111111111', 'General', 'General department'),
-                ('22222222-2222-2222-2222-222222222222', 'Engineering', 'Software engineering department'),
-                ('33333333-3333-3333-3333-333333333333', 'Product', 'Product management'),
-                ('44444444-4444-4444-4444-444444444444', 'Design', 'UI/UX design'),
-                ('55555555-5555-5555-5555-555555555555', 'Marketing', 'Marketing and communications'),
-                ('66666666-6666-6666-6666-666666666666', 'Sales', 'Sales department'),
-                ('77777777-7777-7777-7777-777777777777', 'Human Resources', 'HR department'),
-                ('88888888-8888-8888-8888-888888888888', 'Finance', 'Finance department'),
-                ('99999999-9999-9999-9999-999999999999', 'Operations', 'Operations department')
+                ('11111111-1111-1111-1111-111111111111', 'General',          'General department'),
+                ('22222222-2222-2222-2222-222222222222', 'Engineering',      'Software engineering department'),
+                ('33333333-3333-3333-3333-333333333333', 'Product',          'Product management'),
+                ('44444444-4444-4444-4444-444444444444', 'Design',           'UI/UX design'),
+                ('55555555-5555-5555-5555-555555555555', 'Marketing',        'Marketing and communications'),
+                ('66666666-6666-6666-6666-666666666666', 'Sales',            'Sales department'),
+                ('77777777-7777-7777-7777-777777777777', 'Human Resources',  'HR department'),
+                ('88888888-8888-8888-8888-888888888888', 'Finance',          'Finance department'),
+                ('99999999-9999-9999-9999-999999999999', 'Operations',       'Operations department')
             ON CONFLICT (name) DO NOTHING;
         `);
 
@@ -417,7 +477,106 @@ const insertDefaultData = async () => {
     }
 };
 
-// Run all database setup
+// ── Migrations ─────────────────────────────────────────────────────────────────
+const runMigrations = async () => {
+    try {
+        const migrations = [
+            // Users
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation VARCHAR(255);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS workplace_id UUID REFERENCES companies(id);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';",
+
+            // Messages
+            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_system_message BOOLEAN DEFAULT false;",
+            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;",
+
+            // Conversations
+            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP;",
+            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS rejected_reason TEXT;",
+
+            // Companies
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS verified_by UUID;",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP;",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS claimed_by UUID;",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';",
+
+            // Reviews
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS moderated_by UUID;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS moderated_at TIMESTAMP;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS moderation_reason TEXT;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_flagged BOOLEAN DEFAULT false;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_by UUID;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flag_reason TEXT;",
+
+            // Job Applications — extra columns for public apply form
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS linkedin_url TEXT;",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS github_url TEXT;",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS portfolio_url TEXT;",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS years_experience INTEGER;",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS current_company VARCHAR(255);",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS current_position VARCHAR(255);",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS skills JSONB DEFAULT '[]';",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS salary_expectation VARCHAR(100);",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS available_start_date DATE;",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS work_authorization VARCHAR(100);",
+            "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS remote_preference VARCHAR(50);",
+
+            // ── KEY FIX: add 'published' to the job_postings status constraint ──
+            // The old constraint only had ('draft','open','closed').
+            // hrController.resolveJobStatus() can emit 'published', causing a
+            // CHECK violation that exhausts the connection pool → ETIMEDOUT.
+            // This block drops the old constraint and recreates it with all 4 values.
+            `DO $$
+             DECLARE
+                 con_name text;
+                 con_def  text;
+             BEGIN
+                 SELECT conname, pg_get_constraintdef(oid)
+                 INTO   con_name, con_def
+                 FROM   pg_constraint
+                 WHERE  conrelid = 'job_postings'::regclass
+                   AND  contype  = 'c'
+                   AND  pg_get_constraintdef(oid) LIKE '%status%'
+                 LIMIT 1;
+
+                 IF con_name IS NOT NULL AND con_def NOT LIKE '%published%' THEN
+                     EXECUTE 'ALTER TABLE job_postings DROP CONSTRAINT ' || quote_ident(con_name);
+                     ALTER TABLE job_postings
+                         ADD CONSTRAINT job_postings_status_check
+                         CHECK (status IN ('draft', 'open', 'published', 'closed'));
+                     RAISE NOTICE 'job_postings status constraint updated to include published';
+                 END IF;
+             END $$;`
+        ];
+
+        for (const migration of migrations) {
+            try {
+                await pool.query(migration);
+                if (migration.length < 80) {
+                    console.log(`✅ Migration: ${migration.substring(0, 70)}`);
+                }
+            } catch (err) {
+                if (!err.message.includes('already exists')) {
+                    console.log(`⚠️  Migration note: ${err.message.substring(0, 120)}`);
+                }
+            }
+        }
+
+        console.log('✅ Database migrations completed');
+    } catch (error) {
+        console.error('❌ Error running migrations:', error.message);
+    }
+};
+
+// ── Run setup then migrations ──────────────────────────────────────────────────
 const setupDatabase = async () => {
     await createTables();
     await insertDefaultData();
@@ -425,54 +584,11 @@ const setupDatabase = async () => {
 
 setupDatabase();
 
-const runMigrations = async () => {
-    try {
-        const migrations = [
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation VARCHAR(255);",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS workplace_id UUID REFERENCES companies(id);",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 0;",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP;",
-            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_system_message BOOLEAN DEFAULT false;",
-            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;",
-            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP;",
-            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS rejected_reason TEXT;",
-            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;",
-            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS verified_by UUID;",
-            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP;",
-            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS claimed_by UUID;",
-            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';",
-            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS moderated_by UUID;",
-            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS moderated_at TIMESTAMP;",
-            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS moderation_reason TEXT;",
-            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_flagged BOOLEAN DEFAULT false;",
-            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_by UUID;",
-            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP;",
-            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flag_reason TEXT;"
-        ];
-
-        for (const migration of migrations) {
-            try {
-                await pool.query(migration);
-                console.log(`✅ Migration applied: ${migration.substring(0, 50)}...`);
-            } catch (err) {
-                if (!err.message.includes('already exists')) {
-                    console.log(`⚠️ Migration note: ${err.message}`);
-                }
-            }
-        }
-        console.log('✅ Database migrations completed');
-    } catch (error) {
-        console.error('❌ Error running migrations:', error.message);
-    }
-};
-
-// Run migrations after a short delay
 setTimeout(() => {
     runMigrations();
 }, 2000);
 
+// ── Exports ────────────────────────────────────────────────────────────────────
 module.exports = {
     query: (text, params) => pool.query(text, params),
     pool
