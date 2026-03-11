@@ -1,5 +1,6 @@
 const { query } = require('../utils/database');
 const { getRoleFlags } = require('../middleware/roleFlags');
+const { analyzeSentiment } = require('../services/mlServices');
 
 const buildDefaultSchedule = () => ([
     {
@@ -43,60 +44,134 @@ const buildDefaultFavorites = () => ([
     }
 ]);
 
-const seedDefaultsIfEmpty = async (psychologistId) => {
-    const schedule = await query(
+const ensureScheduleDefaults = async (psychologistId) => {
+    const existing = await query(
         'SELECT id FROM psychologist_schedule_items WHERE psychologist_id = $1 LIMIT 1',
         [psychologistId]
     );
-    if (schedule.rows.length === 0) {
-        const defaults = buildDefaultSchedule();
-        for (const item of defaults) {
-            await query(
-                `INSERT INTO psychologist_schedule_items
-                 (psychologist_id, title, scheduled_for, type, status, location)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [psychologistId, item.title, item.scheduled_for, item.type, item.status, item.location]
-            );
-        }
-    }
+    if (existing.rows.length > 0) return;
 
-    const leads = await query(
-        'SELECT id FROM psychologist_leads WHERE psychologist_id = $1 LIMIT 1',
-        [psychologistId]
-    );
-    if (leads.rows.length === 0) {
-        const defaults = buildDefaultLeads();
-        for (const lead of defaults) {
-            await query(
-                `INSERT INTO psychologist_leads
-                 (psychologist_id, display_name, risk_level, summary, company, status)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [
-                    psychologistId,
-                    lead.display_name,
-                    lead.risk_level,
-                    lead.summary,
-                    lead.company,
-                    lead.status
-                ]
-            );
-        }
+    const defaults = buildDefaultSchedule();
+    for (const item of defaults) {
+        await query(
+            `INSERT INTO psychologist_schedule_items
+             (psychologist_id, title, scheduled_for, type, status, location)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [psychologistId, item.title, item.scheduled_for, item.type, item.status, item.location]
+        );
     }
+};
 
-    const favorites = await query(
+const ensureFavoritesDefaults = async (psychologistId) => {
+    const existing = await query(
         'SELECT id FROM psychologist_favorites WHERE psychologist_id = $1 LIMIT 1',
         [psychologistId]
     );
-    if (favorites.rows.length === 0) {
-        const defaults = buildDefaultFavorites();
-        for (const favorite of defaults) {
-            await query(
-                `INSERT INTO psychologist_favorites
-                 (psychologist_id, display_name, notes, last_session)
-                 VALUES ($1, $2, $3, $4)`,
-                [psychologistId, favorite.display_name, favorite.notes, favorite.last_session]
-            );
+    if (existing.rows.length > 0) return;
+
+    const defaults = buildDefaultFavorites();
+    for (const favorite of defaults) {
+        await query(
+            `INSERT INTO psychologist_favorites
+             (psychologist_id, display_name, notes, last_session)
+             VALUES ($1, $2, $3, $4)`,
+            [psychologistId, favorite.display_name, favorite.notes, favorite.last_session]
+        );
+    }
+};
+
+const determineRiskLevel = (sentiment, score, rating = 3) => {
+    if (sentiment === 'negative') {
+        if (score >= 0.7) return 'critical';
+        if (score >= 0.4) return 'high';
+        return 'medium';
+    }
+    if (rating <= 2) return 'high';
+    if (score >= 0.65) return 'low';
+    return 'medium';
+};
+
+const generateMlLeads = async (psychologistId) => {
+    const reviewResult = await query(
+        `SELECT
+             r.id,
+             r.content,
+             r.rating,
+             json_build_object(
+                 'id', u.id,
+                 'display_name', COALESCE(u.display_name, 'Employee'),
+                 'occupation', COALESCE(u.occupation, 'Employee')
+             ) as author,
+             c.name as company_name
+         FROM reviews r
+         JOIN users u ON r.author_id = u.id
+         LEFT JOIN companies c ON r.company_id = c.id
+         WHERE u.role = 'employee'
+           AND (r.rating <= 2 OR r.is_flagged = true OR r.content ILIKE '%stress%' OR r.content ILIKE '%burnout%' OR r.content ILIKE '%anxiety%')
+           AND (FALSE = COALESCE(u.is_anonymous, false))
+         ORDER BY r.created_at DESC
+         LIMIT 6`
+    );
+
+    if (reviewResult.rows.length === 0) return false;
+
+    let inserted = 0;
+    for (const review of reviewResult.rows) {
+        const trimmed = String(review.content || '').trim().replace(/\s+/g, ' ');
+        const summary = trimmed ? trimmed.slice(0, 160) : 'No additional context provided.';
+        let risk = determineRiskLevel('negative', 0.5, review.rating);
+
+        try {
+            const sentiment = await analyzeSentiment(review.content || ' ');
+            risk = determineRiskLevel(sentiment.sentiment, sentiment.score, review.rating);
+        } catch (err) {
+            console.warn('Sentiment service unavailable, using heuristic risk level:', err.message);
         }
+
+        await query(
+            `INSERT INTO psychologist_leads
+             (psychologist_id, employee_id, display_name, risk_level, summary, company, status)
+             VALUES ($1, $2, $3, $4, $5, $6, 'new')`,
+            [
+                psychologistId,
+                review.author?.id || null,
+                review.author?.display_name || 'Employee',
+                risk,
+                summary,
+                review.company_name || 'Unknown'
+            ]
+        );
+        inserted++;
+    }
+
+    return inserted > 0;
+};
+
+const ensureLeadsForPsychologist = async (psychologistId) => {
+    const existing = await query(
+        'SELECT id FROM psychologist_leads WHERE psychologist_id = $1 LIMIT 1',
+        [psychologistId]
+    );
+    if (existing.rows.length > 0) return;
+
+    const created = await generateMlLeads(psychologistId);
+    if (created) return;
+
+    const defaults = buildDefaultLeads();
+    for (const lead of defaults) {
+        await query(
+            `INSERT INTO psychologist_leads
+             (psychologist_id, display_name, risk_level, summary, company, status)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+                psychologistId,
+                lead.display_name,
+                lead.risk_level,
+                lead.summary,
+                lead.company,
+                lead.status
+            ]
+        );
     }
 };
 
@@ -113,7 +188,7 @@ const getDashboardPermissions = async (req, res) => {
 
 const getSchedule = async (req, res) => {
     try {
-        await seedDefaultsIfEmpty(req.user.id);
+        await ensureScheduleDefaults(req.user.id);
         const result = await query(
             `SELECT *
              FROM psychologist_schedule_items

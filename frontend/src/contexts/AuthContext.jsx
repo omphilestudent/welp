@@ -1,8 +1,26 @@
 // context/AuthContext.jsx
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useState, useEffect, useCallback } from "react";
 import api from "../services/api";
 
 export const AuthContext = createContext();
+
+const getStoredToken = () => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("token") || sessionStorage.getItem("token");
+};
+
+const setRequestToken = (token) => {
+    if (token) {
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    } else {
+        delete api.defaults.headers.common["Authorization"];
+    }
+};
+
+const initialToken = getStoredToken();
+if (initialToken) {
+    setRequestToken(initialToken);
+}
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
@@ -13,33 +31,16 @@ export const AuthProvider = ({ children }) => {
     // Derived state
     const isAuthenticated = !!user;
 
-    // Initialize auth on app load
-    useEffect(() => {
-        initializeAuth();
-    }, []);
-
-    const initializeAuth = async () => {
-        await checkBackendHealth();
-        await checkAuth();
-    };
-
-    /*
-    ---------------------------------------
-    BACKEND HEALTH CHECK
-    ---------------------------------------
-    */
-
-    const checkBackendHealth = async () => {
+    const checkBackendHealth = useCallback(async () => {
         try {
             await api.get("/health");
-            console.log("✅ Backend is healthy");
+            console.log("Backend is healthy");
             setIsBackendAvailable(true);
             setRateLimitInfo(null);
         } catch (error) {
-            console.error("❌ Backend health check failed:", error.message);
+            console.error("Backend health check failed:", error.message);
             setIsBackendAvailable(false);
 
-            // Check if it's a rate limit error
             if (error.response?.status === 429) {
                 setRateLimitInfo({
                     type: 'health',
@@ -48,53 +49,70 @@ export const AuthProvider = ({ children }) => {
                 });
             }
         }
-    };
+    }, []);
 
-    /*
-    ---------------------------------------
-    CHECK AUTH SESSION
-    ---------------------------------------
-    */
-
-    const checkAuth = async () => {
+    const checkAuth = useCallback(async () => {
+        setLoading(true);
         try {
-            const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-
+            const token = getStoredToken();
             if (!token) {
                 setLoading(false);
                 return;
             }
 
-            // Attach token to API
-            api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
+            setRequestToken(token);
             const { data } = await api.get("/auth/me");
 
-            console.log("✅ Auth restored:", data);
+            console.log("Auth restored:", data);
             setUser(data.user);
             setRateLimitInfo(null);
-
         } catch (error) {
-            console.error("❌ Auth check failed:", error.message);
+            console.error("Auth check failed:", error.message);
 
-            // Handle rate limiting specially
             if (error.response?.status === 429) {
                 setRateLimitInfo({
                     type: 'auth',
                     retryAfter: error.response.headers?.['retry-after'],
                     message: error.response.data?.error || 'Too many authentication attempts'
                 });
-                // Don't remove token for rate limit errors
-            } else {
+            }
+
+            if (error.response?.status === 401) {
                 localStorage.removeItem("token");
                 sessionStorage.removeItem("token");
-                delete api.defaults.headers.common["Authorization"];
-                setUser(null);
+                setRequestToken(null);
             }
+
+            setUser(null);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    const initializeAuth = useCallback(async () => {
+        await checkBackendHealth();
+        await checkAuth();
+    }, [checkBackendHealth, checkAuth]);
+
+    useEffect(() => {
+        initializeAuth();
+    }, [initializeAuth]);
+
+    useEffect(() => {
+        const handleStorage = (event) => {
+            if (event.key !== "token") return;
+            if (event.newValue) {
+                setRequestToken(event.newValue);
+                checkAuth();
+            } else {
+                setRequestToken(null);
+                setUser(null);
+            }
+        };
+
+        window.addEventListener("storage", handleStorage);
+        return () => window.removeEventListener("storage", handleStorage);
+    }, [checkAuth]);
 
     /*
     ---------------------------------------
