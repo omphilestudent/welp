@@ -125,7 +125,7 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage,
                 )}
             </div>
 
-            <div className={`messages-container ${isExpired ? 'is-expired' : ''}`}>
+            <div className={`messages-thread-container ${isExpired ? 'is-expired' : ''}`}>
                 {isExpired && (
                     <div className="messages-time-flag">
                         {timeRemainingLabel} • Messages are archived when time expires.

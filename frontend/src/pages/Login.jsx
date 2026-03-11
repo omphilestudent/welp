@@ -234,7 +234,7 @@ const Login = () => {
 
                 // Navigate based on user role
                 const userRole = result.user?.role;
-                const adminRoles = ['admin', 'super_admin', 'system_admin'];
+                const adminRoles = ['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'];
 
                 if (adminRoles.includes(userRole)) {
                     navigate('/admin/dashboard', { replace: true });

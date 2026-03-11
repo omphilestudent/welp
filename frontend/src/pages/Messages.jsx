@@ -144,7 +144,7 @@ const Messages = () => {
 
     useEffect(() => {
         if (user) {
-            const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             if (token) {
                 socketService.connect(token);
             }

@@ -18,7 +18,7 @@ const { validate, loginValidation } = require('../middleware/validation');
 router.post('/register', authLimiter, registerEmployee);
 router.post('/register/psychologist', authLimiter, registerPsychologist);
 router.post('/register/business', authLimiter, registerBusiness);
-router.post('/login', authLimiter, loginLimiter, validate(loginValidation), login);
+router.post('/login', loginLimiter, validate(loginValidation), login);
 router.post('/logout', logout);
 
 // Protected

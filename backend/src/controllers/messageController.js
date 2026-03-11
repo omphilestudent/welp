@@ -364,7 +364,7 @@ const getConversations = async (req, res) => {
     try {
         await expireConversations();
 
-        const statusFilter = req.user.role === 'employee' ? ['accepted', 'ended'] : ['accepted'];
+        const statusFilter = ['pending', 'accepted', 'rejected', 'blocked', 'ended'];
         let whereClause = '';
         if (req.user.role === 'employee') {
             whereClause = 'c.employee_id = $1 AND c.status = ANY($2::text[])';

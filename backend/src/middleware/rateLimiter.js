@@ -26,8 +26,8 @@ const limits = {
         health: { windowMs: 60 * 1000, max: 5000 }      // 5000 per minute
     },
     production: {
-        auth: { windowMs: 60 * 60 * 1000, max: 5 },          // 5 per hour
-        login: { windowMs: 15 * 60 * 1000, max: 5 },         // 5 per 15 min
+        auth: { windowMs: 15 * 60 * 1000, max: 20 },         // 20 per 15 min
+        login: { windowMs: 15 * 60 * 1000, max: 20 },        // 20 per 15 min
         api: { windowMs: 15 * 60 * 1000, max: 100 },         // 100 per 15 min
         account: { windowMs: 15 * 60 * 1000, max: 5 },       // 5 per 15 min
         review: { windowMs: 24 * 60 * 60 * 1000, max: 3 },   // 3 per day

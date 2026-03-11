@@ -492,15 +492,25 @@ const login = async (req, res) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        const result = await getUserByEmailForLogin(email);
+        const loginStart = Date.now();
+        const loginEmail = String(email || '').toLowerCase().trim();
+        const loginIp = req.ip;
+        const userAgent = req.headers['user-agent'];
+
+        const result = await getUserByEmailForLogin(loginEmail);
 
         if (result.rows.length === 0) {
+            console.warn('Login failed: user_not_found', { email: loginEmail, ip: loginIp, ua: userAgent });
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
         const user = result.rows[0];
+        const normalizedRole = String(user.role || '').toLowerCase().trim();
+        const isAdminRole = ['super_admin', 'superadmin', 'system_admin', 'admin', 'hr_admin'].includes(normalizedRole);
+
         const validPassword = await bcrypt.compare(password, user.password_hash || '');
         if (!validPassword) {
+            console.warn('Login failed: invalid_password', { email: loginEmail, role: normalizedRole, isAdminRole, ip: loginIp });
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
@@ -509,6 +519,14 @@ const login = async (req, res) => {
                 psychologist: 'Your psychologist application is under review. You will be notified once approved.',
                 business: 'Your business application is under review. You will be notified once approved.'
             };
+            console.warn('Login blocked: inactive_or_pending', {
+                email: loginEmail,
+                role: normalizedRole,
+                isAdminRole,
+                status: user.status,
+                is_active: user.is_active,
+                ip: loginIp
+            });
             return res.status(403).json({
                 error: roleMessage[user.role] || 'Your account is pending approval.',
                 status: 'pending'
@@ -523,10 +541,18 @@ const login = async (req, res) => {
             sameSite: 'lax',
             secure: process.env.NODE_ENV === 'production'
         };
-        if (rememberMe) {
+        if (rememberMe || isAdminRole) {
             const rememberDays = Number(process.env.JWT_REMEMBER_COOKIE_DAYS || 30);
             cookieOptions.maxAge = rememberDays * 24 * 60 * 60 * 1000;
         }
+
+        console.info('Login success', {
+            email: loginEmail,
+            role: normalizedRole,
+            isAdminRole,
+            rememberMe: Boolean(rememberMe),
+            durationMs: Date.now() - loginStart
+        });
         res.cookie('token', token, cookieOptions);
 
         return res.json({

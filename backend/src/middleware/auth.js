@@ -37,8 +37,10 @@ const authenticate = async (req, res, next) => {
 
         const user = result.rows[0];
         const tokenVersion = Number(decoded.tokenVersion ?? 0);
+        const normalizedRole = String(user.role || '').toLowerCase().trim();
+        const isAdminRole = ['super_admin', 'superadmin', 'system_admin', 'admin', 'hr_admin'].includes(normalizedRole);
 
-        if (tokenVersion !== Number(user.token_version ?? 0)) {
+        if (!isAdminRole && tokenVersion !== Number(user.token_version ?? 0)) {
             return res.status(401).json({ error: 'Session expired. Please login again.' });
         }
 

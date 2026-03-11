@@ -144,7 +144,10 @@ export const AuthProvider = ({ children }) => {
             // Save token
             sessionStorage.removeItem("token");
             localStorage.removeItem("token");
-            if (rememberMe) {
+            const normalizedRole = String(data.user?.role || '').toLowerCase().trim();
+            const adminRoles = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
+            const storePersistently = rememberMe || adminRoles.has(normalizedRole);
+            if (storePersistently) {
                 localStorage.setItem("token", data.token);
             } else {
                 sessionStorage.setItem("token", data.token);

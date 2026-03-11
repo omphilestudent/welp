@@ -2,15 +2,13 @@
 :root {
   --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-heading: 'Poppins', 'Inter', sans-serif;
-  --color-bg: #0b0d17;
-  --color-surface: #131820;
-  --color-card: #1f2233;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-muted: rgba(255, 255, 255, 0.65);
-  --color-primary: #38bdf8;
-  --color-secondary: #6366f1;
-  --text-primary: #f8fafc;
-  --text-muted: rgba(248, 250, 252, 0.75);
+  --color-bg: var(--bg-primary);
+  --color-surface: var(--bg-secondary);
+  --color-card: var(--card-bg);
+  --color-border: var(--border-color);
+  --color-muted: var(--text-muted);
+  --color-primary: var(--accent-color);
+  --color-secondary: var(--accent-hover);
   --shadow-soft: 0 20px 60px rgba(15, 23, 42, 0.45);
   --border-radius: 18px;
   --transition-fast: 200ms ease;
