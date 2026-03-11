@@ -286,6 +286,55 @@ const createTables = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            -- Psychologist schedule items
+            CREATE TABLE IF NOT EXISTS psychologist_schedule_items (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                scheduled_for TIMESTAMP NOT NULL,
+                type VARCHAR(50) DEFAULT 'meeting',
+                status VARCHAR(50) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled', 'rescheduled')),
+                location TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Psychologist leads
+            CREATE TABLE IF NOT EXISTS psychologist_leads (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                employee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                display_name VARCHAR(120) NOT NULL,
+                risk_level VARCHAR(20) DEFAULT 'medium' CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
+                summary TEXT,
+                company VARCHAR(255),
+                status VARCHAR(20) DEFAULT 'new' CHECK (status IN ('new', 'review', 'contacted', 'archived')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Psychologist lead messages
+            CREATE TABLE IF NOT EXISTS psychologist_lead_messages (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                lead_id UUID NOT NULL REFERENCES psychologist_leads(id) ON DELETE CASCADE,
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Psychologist favorites
+            CREATE TABLE IF NOT EXISTS psychologist_favorites (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                employee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                display_name VARCHAR(120) NOT NULL,
+                notes TEXT,
+                last_session TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(psychologist_id, employee_id)
+            );
+
             -- Claim requests table
             CREATE TABLE IF NOT EXISTS claim_requests (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -435,6 +484,10 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_employee_relations_status        ON employee_relations(status);
             CREATE INDEX IF NOT EXISTS idx_employee_documents_employee_id   ON employee_documents(employee_id);
             CREATE INDEX IF NOT EXISTS idx_performance_reviews_employee_id  ON performance_reviews(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_psych_schedule_psychologist      ON psychologist_schedule_items(psychologist_id);
+            CREATE INDEX IF NOT EXISTS idx_psych_leads_psychologist         ON psychologist_leads(psychologist_id);
+            CREATE INDEX IF NOT EXISTS idx_psych_leads_status               ON psychologist_leads(status);
+            CREATE INDEX IF NOT EXISTS idx_psych_favorites_psychologist     ON psychologist_favorites(psychologist_id);
         `;
 
         await pool.query(queries);
@@ -515,6 +568,7 @@ const runMigrations = async () => {
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_by UUID;",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP;",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flag_reason TEXT;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;",
 
             // Job Applications — extra columns for public apply form
             "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS linkedin_url TEXT;",
@@ -555,6 +609,53 @@ const runMigrations = async () => {
                      RAISE NOTICE 'job_postings status constraint updated to include published';
                  END IF;
              END $$;`
+            ,
+            // Psychologist dashboard tables
+            `CREATE TABLE IF NOT EXISTS psychologist_schedule_items (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                scheduled_for TIMESTAMP NOT NULL,
+                type VARCHAR(50) DEFAULT 'meeting',
+                status VARCHAR(50) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled', 'rescheduled')),
+                location TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS psychologist_leads (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                employee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                display_name VARCHAR(120) NOT NULL,
+                risk_level VARCHAR(20) DEFAULT 'medium' CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
+                summary TEXT,
+                company VARCHAR(255),
+                status VARCHAR(20) DEFAULT 'new' CHECK (status IN ('new', 'review', 'contacted', 'archived')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS psychologist_lead_messages (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                lead_id UUID NOT NULL REFERENCES psychologist_leads(id) ON DELETE CASCADE,
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS psychologist_favorites (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                employee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                display_name VARCHAR(120) NOT NULL,
+                notes TEXT,
+                last_session TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(psychologist_id, employee_id)
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_psych_schedule_psychologist ON psychologist_schedule_items(psychologist_id);",
+            "CREATE INDEX IF NOT EXISTS idx_psych_leads_psychologist ON psychologist_leads(psychologist_id);",
+            "CREATE INDEX IF NOT EXISTS idx_psych_leads_status ON psychologist_leads(status);",
+            "CREATE INDEX IF NOT EXISTS idx_psych_favorites_psychologist ON psychologist_favorites(psychologist_id);"
         ];
 
         for (const migration of migrations) {

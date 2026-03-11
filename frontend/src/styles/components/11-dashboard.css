@@ -465,6 +465,150 @@
   color: var(--text-primary);
 }
 
+.psych-calendar-controls {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.psych-calendar-nav,
+.psych-calendar-view {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.psych-calendar-title {
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.psych-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.psych-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.psych-calendar-weekdays span {
+  text-align: center;
+}
+
+.psych-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.psych-calendar-day {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  padding: 0.65rem;
+  min-height: 120px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.psych-calendar-day:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-color);
+  box-shadow: var(--card-shadow);
+}
+
+.psych-calendar-day.is-muted {
+  opacity: 0.5;
+}
+
+.psych-calendar-day.is-today {
+  border-color: var(--accent-color);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.psych-calendar-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.psych-calendar-count {
+  background: var(--gradient-primary);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+}
+
+.psych-calendar-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.psych-calendar-item {
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.psych-calendar-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.psych-calendar-item span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.psych-calendar-item--video {
+  border-left: 3px solid #6366f1;
+}
+
+.psych-calendar-item--voice {
+  border-left: 3px solid #0ea5e9;
+}
+
+.psych-calendar-item--meeting {
+  border-left: 3px solid #22c55e;
+}
+
+.psych-calendar-item--note {
+  border-left: 3px solid #f59e0b;
+}
+
+.psych-calendar-more {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.psych-calendar--week .psych-calendar-day {
+  min-height: 160px;
+}
+
 .psych-schedule-list {
   display: flex;
   flex-direction: column;
@@ -570,5 +714,25 @@
 .psych-call-actions {
   display: flex;
   gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .psych-calendar-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .psych-calendar-title {
+    text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .psych-calendar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .psych-calendar-weekdays {
+    display: none;
+  }
 }
 

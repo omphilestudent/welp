@@ -1,13 +1,8 @@
 const { query } = require('../utils/database');
 const { getRoleFlags } = require('../middleware/roleFlags');
 
-const scheduleStore = new Map();
-const leadsStore = new Map();
-const favoritesStore = new Map();
-
 const buildDefaultSchedule = () => ([
     {
-        id: 'sched-1',
         title: 'Follow-up check-in',
         scheduled_for: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
         type: 'video',
@@ -15,7 +10,6 @@ const buildDefaultSchedule = () => ([
         location: 'Virtual room'
     },
     {
-        id: 'sched-2',
         title: 'New client intake',
         scheduled_for: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         type: 'voice',
@@ -26,7 +20,6 @@ const buildDefaultSchedule = () => ([
 
 const buildDefaultLeads = () => ([
     {
-        id: 'lead-1',
         display_name: 'Anonymous Employee',
         risk_level: 'high',
         summary: 'Self-reported burnout symptoms and low sleep quality.',
@@ -34,7 +27,6 @@ const buildDefaultLeads = () => ([
         status: 'new'
     },
     {
-        id: 'lead-2',
         display_name: 'Team Member',
         risk_level: 'medium',
         summary: 'Mentions anxiety about workload and deadlines.',
@@ -45,12 +37,68 @@ const buildDefaultLeads = () => ([
 
 const buildDefaultFavorites = () => ([
     {
-        id: 'fav-1',
         display_name: 'A. Client',
         notes: 'Prefers afternoon sessions',
         last_session: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
     }
 ]);
+
+const seedDefaultsIfEmpty = async (psychologistId) => {
+    const schedule = await query(
+        'SELECT id FROM psychologist_schedule_items WHERE psychologist_id = $1 LIMIT 1',
+        [psychologistId]
+    );
+    if (schedule.rows.length === 0) {
+        const defaults = buildDefaultSchedule();
+        for (const item of defaults) {
+            await query(
+                `INSERT INTO psychologist_schedule_items
+                 (psychologist_id, title, scheduled_for, type, status, location)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [psychologistId, item.title, item.scheduled_for, item.type, item.status, item.location]
+            );
+        }
+    }
+
+    const leads = await query(
+        'SELECT id FROM psychologist_leads WHERE psychologist_id = $1 LIMIT 1',
+        [psychologistId]
+    );
+    if (leads.rows.length === 0) {
+        const defaults = buildDefaultLeads();
+        for (const lead of defaults) {
+            await query(
+                `INSERT INTO psychologist_leads
+                 (psychologist_id, display_name, risk_level, summary, company, status)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [
+                    psychologistId,
+                    lead.display_name,
+                    lead.risk_level,
+                    lead.summary,
+                    lead.company,
+                    lead.status
+                ]
+            );
+        }
+    }
+
+    const favorites = await query(
+        'SELECT id FROM psychologist_favorites WHERE psychologist_id = $1 LIMIT 1',
+        [psychologistId]
+    );
+    if (favorites.rows.length === 0) {
+        const defaults = buildDefaultFavorites();
+        for (const favorite of defaults) {
+            await query(
+                `INSERT INTO psychologist_favorites
+                 (psychologist_id, display_name, notes, last_session)
+                 VALUES ($1, $2, $3, $4)`,
+                [psychologistId, favorite.display_name, favorite.notes, favorite.last_session]
+            );
+        }
+    }
+};
 
 const getDashboardPermissions = async (req, res) => {
     const roleFlags = req.user?.role_flags || getRoleFlags(req.user?.role);
@@ -64,94 +112,172 @@ const getDashboardPermissions = async (req, res) => {
 };
 
 const getSchedule = async (req, res) => {
-    const existing = scheduleStore.get(req.user.id);
-    if (!existing) {
-        const defaults = buildDefaultSchedule();
-        scheduleStore.set(req.user.id, defaults);
-        return res.json(defaults);
+    try {
+        await seedDefaultsIfEmpty(req.user.id);
+        const result = await query(
+            `SELECT *
+             FROM psychologist_schedule_items
+             WHERE psychologist_id = $1
+             ORDER BY scheduled_for ASC`,
+            [req.user.id]
+        );
+        return res.json(result.rows);
+    } catch (error) {
+        console.error('Get schedule error:', error);
+        return res.status(500).json({ error: 'Failed to load schedule' });
     }
-    return res.json(existing);
 };
 
 const addScheduleItem = async (req, res) => {
-    const { title, scheduledFor, type = 'meeting', location = '' } = req.body || {};
-    if (!title || !scheduledFor) {
-        return res.status(400).json({ error: 'Title and scheduledFor are required' });
-    }
+    try {
+        const { title, scheduledFor, type = 'meeting', location = '' } = req.body || {};
+        if (!title || !scheduledFor) {
+            return res.status(400).json({ error: 'Title and scheduledFor are required' });
+        }
 
-    const existing = scheduleStore.get(req.user.id) || [];
-    const newItem = {
-        id: `sched-${Date.now()}`,
-        title,
-        scheduled_for: new Date(scheduledFor).toISOString(),
-        type,
-        status: 'scheduled',
-        location
-    };
-    const updated = [newItem, ...existing];
-    scheduleStore.set(req.user.id, updated);
-    return res.status(201).json(newItem);
+        const result = await query(
+            `INSERT INTO psychologist_schedule_items
+             (psychologist_id, title, scheduled_for, type, status, location)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING *`,
+            [req.user.id, title, new Date(scheduledFor).toISOString(), type, 'scheduled', location]
+        );
+        return res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('Add schedule item error:', error);
+        return res.status(500).json({ error: 'Failed to add schedule item' });
+    }
 };
 
 const getLeads = async (req, res) => {
-    const existing = leadsStore.get(req.user.id);
-    if (!existing) {
-        const defaults = buildDefaultLeads();
-        leadsStore.set(req.user.id, defaults);
-        return res.json(defaults);
+    try {
+        await seedDefaultsIfEmpty(req.user.id);
+        const result = await query(
+            `SELECT *
+             FROM psychologist_leads
+             WHERE psychologist_id = $1
+             ORDER BY created_at DESC`,
+            [req.user.id]
+        );
+        return res.json(result.rows);
+    } catch (error) {
+        console.error('Get leads error:', error);
+        return res.status(500).json({ error: 'Failed to load leads' });
     }
-    return res.json(existing);
 };
 
 const sendLeadMessage = async (req, res) => {
-    const { leadId } = req.params;
-    const { message } = req.body || {};
-    const leads = leadsStore.get(req.user.id) || buildDefaultLeads();
-    const lead = leads.find((item) => item.id === leadId);
-    if (!lead) {
-        return res.status(404).json({ error: 'Lead not found' });
+    try {
+        const { leadId } = req.params;
+        const { message } = req.body || {};
+        const lead = await query(
+            `SELECT id
+             FROM psychologist_leads
+             WHERE id = $1 AND psychologist_id = $2`,
+            [leadId, req.user.id]
+        );
+        if (lead.rows.length === 0) {
+            return res.status(404).json({ error: 'Lead not found' });
+        }
+
+        const content = (message || '').trim();
+        if (!content) {
+            return res.status(400).json({ error: 'Message is required' });
+        }
+
+        await query(
+            `INSERT INTO psychologist_lead_messages
+             (lead_id, psychologist_id, message)
+             VALUES ($1, $2, $3)`,
+            [leadId, req.user.id, content]
+        );
+
+        await query(
+            `UPDATE psychologist_leads
+             SET status = 'contacted', updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1 AND psychologist_id = $2`,
+            [leadId, req.user.id]
+        );
+
+        return res.json({
+            success: true,
+            leadId,
+            message: content,
+            status: 'queued'
+        });
+    } catch (error) {
+        console.error('Send lead message error:', error);
+        return res.status(500).json({ error: 'Failed to send lead message' });
     }
-    return res.json({
-        success: true,
-        leadId,
-        message: message || 'Message queued for delivery',
-        status: 'queued'
-    });
 };
 
 const getFavorites = async (req, res) => {
-    const existing = favoritesStore.get(req.user.id);
-    if (!existing) {
-        const defaults = buildDefaultFavorites();
-        favoritesStore.set(req.user.id, defaults);
-        return res.json(defaults);
+    try {
+        await seedDefaultsIfEmpty(req.user.id);
+        const result = await query(
+            `SELECT *
+             FROM psychologist_favorites
+             WHERE psychologist_id = $1
+             ORDER BY created_at DESC`,
+            [req.user.id]
+        );
+        return res.json(result.rows);
+    } catch (error) {
+        console.error('Get favorites error:', error);
+        return res.status(500).json({ error: 'Failed to load favorites' });
     }
-    return res.json(existing);
 };
 
 const addFavorite = async (req, res) => {
-    const { displayName, notes } = req.body || {};
-    if (!displayName) {
-        return res.status(400).json({ error: 'displayName is required' });
+    try {
+        const { displayName, notes, employeeId } = req.body || {};
+        let finalName = displayName;
+        let employeeIdValue = employeeId || null;
+
+        if (employeeIdValue) {
+            const employee = await query(
+                'SELECT id, display_name FROM users WHERE id = $1 AND role = $2',
+                [employeeIdValue, 'employee']
+            );
+            if (employee.rows.length === 0) {
+                return res.status(404).json({ error: 'Employee not found' });
+            }
+            finalName = employee.rows[0].display_name;
+        }
+
+        if (!finalName) {
+            return res.status(400).json({ error: 'displayName is required' });
+        }
+
+        const result = await query(
+            `INSERT INTO psychologist_favorites
+             (psychologist_id, employee_id, display_name, notes)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (psychologist_id, employee_id)
+             DO UPDATE SET notes = EXCLUDED.notes, updated_at = CURRENT_TIMESTAMP
+             RETURNING *`,
+            [req.user.id, employeeIdValue, finalName, notes || '']
+        );
+        return res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('Add favorite error:', error);
+        return res.status(500).json({ error: 'Failed to add favorite' });
     }
-    const existing = favoritesStore.get(req.user.id) || [];
-    const newItem = {
-        id: `fav-${Date.now()}`,
-        display_name: displayName,
-        notes: notes || '',
-        last_session: null
-    };
-    const updated = [newItem, ...existing];
-    favoritesStore.set(req.user.id, updated);
-    return res.status(201).json(newItem);
 };
 
 const removeFavorite = async (req, res) => {
-    const { favoriteId } = req.params;
-    const existing = favoritesStore.get(req.user.id) || [];
-    const updated = existing.filter((item) => item.id !== favoriteId);
-    favoritesStore.set(req.user.id, updated);
-    return res.json({ success: true });
+    try {
+        const { favoriteId } = req.params;
+        await query(
+            `DELETE FROM psychologist_favorites
+             WHERE id = $1 AND psychologist_id = $2`,
+            [favoriteId, req.user.id]
+        );
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Remove favorite error:', error);
+        return res.status(500).json({ error: 'Failed to remove favorite' });
+    }
 };
 
 const searchEmployees = async (req, res) => {

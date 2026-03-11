@@ -13,6 +13,8 @@ const ReviewCard = ({ review, onReplyAdded }) => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
+    const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+
     const canReply = () => {
         if (!user) return false;
         if (user.role === 'employee') return true;
@@ -60,6 +62,10 @@ const ReviewCard = ({ review, onReplyAdded }) => {
         const authorId = review.author?.id || review.author_id;
         if (!authorId) {
             toast.error('This reviewer cannot be messaged.');
+            return;
+        }
+        if (!isUuid(authorId)) {
+            toast.error('This reviewer cannot be messaged yet.');
             return;
         }
         if (review.author?.isAnonymous || review.author?.is_anonymous) {

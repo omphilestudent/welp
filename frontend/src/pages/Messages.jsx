@@ -157,6 +157,7 @@ const Messages = () => {
     const handleFavoriteAdd = async (employee) => {
         try {
             const { data } = await api.post('/psychologists/dashboard/favorites', {
+                employeeId: employee.id,
                 displayName: employee.display_name || employee.displayName,
                 notes: 'Connected via messages'
             });

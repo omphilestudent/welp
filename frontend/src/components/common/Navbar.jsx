@@ -86,6 +86,9 @@ const Navbar = () => {
 
                                 {user.role === 'psychologist' && (
                                     <>
+                                        <Link to="/dashboard" className="btn btn-secondary">
+                                            Dashboard
+                                        </Link>
                                         <Link to="/messages" className="navbar-link">
                                             Messages
                                         </Link>

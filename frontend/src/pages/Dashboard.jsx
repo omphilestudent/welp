@@ -7,6 +7,20 @@ import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit, FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo } from 'react-icons/fa';
+import {
+    addDays,
+    addMonths,
+    addWeeks,
+    endOfMonth,
+    endOfWeek,
+    format,
+    isSameDay,
+    isSameMonth,
+    startOfMonth,
+    startOfWeek,
+    subMonths,
+    subWeeks
+} from 'date-fns';
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';
@@ -238,6 +252,8 @@ const Dashboard = () => {
         type: 'meeting',
         location: ''
     });
+    const [calendarView, setCalendarView] = useState('month');
+    const [calendarDate, setCalendarDate] = useState(new Date());
 
     useEffect(() => {
         if (user?.role === 'psychologist') {
@@ -323,7 +339,8 @@ const Dashboard = () => {
             return;
         }
 
-        const scheduledFor = new Date(`${scheduleDraft.date}T${scheduleDraft.time}`).toISOString();
+        const scheduledDate = new Date(`${scheduleDraft.date}T${scheduleDraft.time}`);
+        const scheduledFor = scheduledDate.toISOString();
         try {
             const { data } = await api.post('/psychologists/dashboard/schedule', {
                 title: scheduleDraft.title,
@@ -333,6 +350,7 @@ const Dashboard = () => {
             });
             setPsychSchedule((prev) => [data, ...prev]);
             setScheduleDraft({ title: '', date: '', time: '', type: 'meeting', location: '' });
+            setCalendarDate(scheduledDate);
             toast.success('Schedule updated');
         } catch (error) {
             toast.error('Failed to add schedule item');
@@ -348,6 +366,48 @@ const Dashboard = () => {
         } catch (error) {
             toast.error('Failed to send lead message');
         }
+    };
+
+    const scheduleItems = psychSchedule
+        .map((item) => {
+            const raw = item.scheduled_for || item.scheduledFor || item.scheduled_at;
+            const date = raw ? new Date(raw) : null;
+            return date && !Number.isNaN(date.getTime())
+                ? { ...item, scheduledDate: date }
+                : null;
+        })
+        .filter(Boolean);
+
+    const itemsByDate = scheduleItems.reduce((acc, item) => {
+        const key = format(item.scheduledDate, 'yyyy-MM-dd');
+        acc[key] = acc[key] || [];
+        acc[key].push(item);
+        return acc;
+    }, {});
+
+    const weekStartsOn = 1;
+    const calendarStart = calendarView === 'month'
+        ? startOfWeek(startOfMonth(calendarDate), { weekStartsOn })
+        : startOfWeek(calendarDate, { weekStartsOn });
+    const calendarEnd = calendarView === 'month'
+        ? endOfWeek(endOfMonth(calendarDate), { weekStartsOn })
+        : endOfWeek(calendarDate, { weekStartsOn });
+
+    const calendarDays = [];
+    for (let day = calendarStart; day <= calendarEnd; day = addDays(day, 1)) {
+        calendarDays.push(day);
+    }
+
+    const handleCalendarPrev = () => {
+        setCalendarDate((prev) => (calendarView === 'month' ? subMonths(prev, 1) : subWeeks(prev, 1)));
+    };
+
+    const handleCalendarNext = () => {
+        setCalendarDate((prev) => (calendarView === 'month' ? addMonths(prev, 1) : addWeeks(prev, 1)));
+    };
+
+    const handleCalendarToday = () => {
+        setCalendarDate(new Date());
     };
 
     if (loading) return <Loading />;
@@ -630,8 +690,40 @@ const Dashboard = () => {
                             <section className="psych-card">
                                 <header className="psych-card__header">
                                     <h3><FaCalendarAlt /> Schedule</h3>
-                                    <p>Plan meetings and activities. Items are stored client-side with stubbed sync.</p>
+                                    <p>Plan meetings and activities with a live calendar view.</p>
                                 </header>
+                                <div className="psych-calendar-controls">
+                                    <div className="psych-calendar-nav">
+                                        <button className="btn btn-secondary btn-small" onClick={handleCalendarPrev}>
+                                            Prev
+                                        </button>
+                                        <button className="btn btn-outline btn-small" onClick={handleCalendarToday}>
+                                            Today
+                                        </button>
+                                        <button className="btn btn-secondary btn-small" onClick={handleCalendarNext}>
+                                            Next
+                                        </button>
+                                    </div>
+                                    <div className="psych-calendar-title">
+                                        {calendarView === 'month'
+                                            ? format(calendarDate, 'MMMM yyyy')
+                                            : `${format(calendarStart, 'MMM d')} - ${format(calendarEnd, 'MMM d')}`}
+                                    </div>
+                                    <div className="psych-calendar-view">
+                                        <button
+                                            className={`btn btn-small ${calendarView === 'month' ? 'btn-primary' : 'btn-outline'}`}
+                                            onClick={() => setCalendarView('month')}
+                                        >
+                                            Month
+                                        </button>
+                                        <button
+                                            className={`btn btn-small ${calendarView === 'week' ? 'btn-primary' : 'btn-outline'}`}
+                                            onClick={() => setCalendarView('week')}
+                                        >
+                                            Week
+                                        </button>
+                                    </div>
+                                </div>
                                 <form className="psych-schedule-form" onSubmit={handleScheduleSubmit}>
                                     <input
                                         type="text"
@@ -666,23 +758,48 @@ const Dashboard = () => {
                                     />
                                     <button type="submit" className="btn btn-primary btn-small">Add</button>
                                 </form>
-                                <div className="psych-schedule-list">
-                                    {psychSchedule.length > 0 ? (
-                                        psychSchedule.map(item => (
-                                            <div key={item.id} className="psych-schedule-item">
-                                                <div>
-                                                    <strong>{item.title}</strong>
-                                                    <span className="psych-schedule-meta">
-                                                        {new Date(item.scheduled_for || item.scheduledFor || item.scheduled_at).toLocaleString()}
-                                                    </span>
-                                                </div>
-                                                <div className="psych-schedule-tags">
-                                                    <span>{item.type}</span>
-                                                    <span>{item.status}</span>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
+                                <div className={`psych-calendar psych-calendar--${calendarView}`}>
+                                    <div className="psych-calendar-weekdays">
+                                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
+                                            <span key={label}>{label}</span>
+                                        ))}
+                                    </div>
+                                    <div className="psych-calendar-grid">
+                                        {calendarDays.map((day) => {
+                                            const key = format(day, 'yyyy-MM-dd');
+                                            const items = itemsByDate[key] || [];
+                                            const isMuted = calendarView === 'month' && !isSameMonth(day, calendarDate);
+                                            const isToday = isSameDay(day, new Date());
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={key}
+                                                    className={`psych-calendar-day ${isMuted ? 'is-muted' : ''} ${isToday ? 'is-today' : ''}`}
+                                                    onClick={() => setScheduleDraft((prev) => ({
+                                                        ...prev,
+                                                        date: format(day, 'yyyy-MM-dd')
+                                                    }))}
+                                                >
+                                                    <div className="psych-calendar-day-header">
+                                                        <span>{format(day, 'd')}</span>
+                                                        {items.length > 0 && <span className="psych-calendar-count">{items.length}</span>}
+                                                    </div>
+                                                    <div className="psych-calendar-items">
+                                                        {items.slice(0, 2).map((item) => (
+                                                            <div key={item.id} className={`psych-calendar-item psych-calendar-item--${item.type}`}>
+                                                                <strong>{item.title}</strong>
+                                                                <span>{format(item.scheduledDate, 'p')}</span>
+                                                            </div>
+                                                        ))}
+                                                        {items.length > 2 && (
+                                                            <div className="psych-calendar-more">+{items.length - 2} more</div>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {psychSchedule.length === 0 && (
                                         <p className="empty-message">No scheduled items yet.</p>
                                     )}
                                 </div>
