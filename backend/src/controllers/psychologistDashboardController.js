@@ -2,84 +2,6 @@ const { query } = require('../utils/database');
 const { getRoleFlags } = require('../middleware/roleFlags');
 const { analyzeSentiment } = require('../services/mlServices');
 
-const buildDefaultSchedule = () => ([
-    {
-        title: 'Follow-up check-in',
-        scheduled_for: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-        type: 'video',
-        status: 'scheduled',
-        location: 'Virtual room'
-    },
-    {
-        title: 'New client intake',
-        scheduled_for: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        type: 'voice',
-        status: 'scheduled',
-        location: 'Phone call'
-    }
-]);
-
-const buildDefaultLeads = () => ([
-    {
-        display_name: 'Anonymous Employee',
-        risk_level: 'high',
-        summary: 'Self-reported burnout symptoms and low sleep quality.',
-        company: 'Unspecified',
-        status: 'new'
-    },
-    {
-        display_name: 'Team Member',
-        risk_level: 'medium',
-        summary: 'Mentions anxiety about workload and deadlines.',
-        company: 'Product Team',
-        status: 'review'
-    }
-]);
-
-const buildDefaultFavorites = () => ([
-    {
-        display_name: 'A. Client',
-        notes: 'Prefers afternoon sessions',
-        last_session: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-    }
-]);
-
-const ensureScheduleDefaults = async (psychologistId) => {
-    const existing = await query(
-        'SELECT id FROM psychologist_schedule_items WHERE psychologist_id = $1 LIMIT 1',
-        [psychologistId]
-    );
-    if (existing.rows.length > 0) return;
-
-    const defaults = buildDefaultSchedule();
-    for (const item of defaults) {
-        await query(
-            `INSERT INTO psychologist_schedule_items
-             (psychologist_id, title, scheduled_for, type, status, location)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [psychologistId, item.title, item.scheduled_for, item.type, item.status, item.location]
-        );
-    }
-};
-
-const ensureFavoritesDefaults = async (psychologistId) => {
-    const existing = await query(
-        'SELECT id FROM psychologist_favorites WHERE psychologist_id = $1 LIMIT 1',
-        [psychologistId]
-    );
-    if (existing.rows.length > 0) return;
-
-    const defaults = buildDefaultFavorites();
-    for (const favorite of defaults) {
-        await query(
-            `INSERT INTO psychologist_favorites
-             (psychologist_id, display_name, notes, last_session)
-             VALUES ($1, $2, $3, $4)`,
-            [psychologistId, favorite.display_name, favorite.notes, favorite.last_session]
-        );
-    }
-};
-
 const determineRiskLevel = (sentiment, score, rating = 3) => {
     if (sentiment === 'negative') {
         if (score >= 0.7) return 'critical';
@@ -117,6 +39,17 @@ const generateMlLeads = async (psychologistId) => {
 
     let inserted = 0;
     for (const review of reviewResult.rows) {
+        const existing = await query(
+            `SELECT 1 FROM psychologist_leads
+             WHERE psychologist_id = $1
+               AND source_review_id = $2
+             LIMIT 1`,
+            [psychologistId, review.id]
+        );
+        if (existing.rows.length > 0) {
+            continue;
+        }
+
         const trimmed = String(review.content || '').trim().replace(/\s+/g, ' ');
         const summary = trimmed ? trimmed.slice(0, 160) : 'No additional context provided.';
         let risk = determineRiskLevel('negative', 0.5, review.rating);
@@ -130,49 +63,22 @@ const generateMlLeads = async (psychologistId) => {
 
         await query(
             `INSERT INTO psychologist_leads
-             (psychologist_id, employee_id, display_name, risk_level, summary, company, status)
-             VALUES ($1, $2, $3, $4, $5, $6, 'new')`,
+             (psychologist_id, employee_id, display_name, risk_level, summary, company, status, source_review_id)
+             VALUES ($1, $2, $3, $4, $5, $6, 'new', $7)`,
             [
                 psychologistId,
                 review.author?.id || null,
                 review.author?.display_name || 'Employee',
                 risk,
                 summary,
-                review.company_name || 'Unknown'
+                review.company_name || 'Unknown',
+                review.id
             ]
         );
         inserted++;
     }
 
     return inserted > 0;
-};
-
-const ensureLeadsForPsychologist = async (psychologistId) => {
-    const existing = await query(
-        'SELECT id FROM psychologist_leads WHERE psychologist_id = $1 LIMIT 1',
-        [psychologistId]
-    );
-    if (existing.rows.length > 0) return;
-
-    const created = await generateMlLeads(psychologistId);
-    if (created) return;
-
-    const defaults = buildDefaultLeads();
-    for (const lead of defaults) {
-        await query(
-            `INSERT INTO psychologist_leads
-             (psychologist_id, display_name, risk_level, summary, company, status)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [
-                psychologistId,
-                lead.display_name,
-                lead.risk_level,
-                lead.summary,
-                lead.company,
-                lead.status
-            ]
-        );
-    }
 };
 
 const getDashboardPermissions = async (req, res) => {
@@ -188,7 +94,6 @@ const getDashboardPermissions = async (req, res) => {
 
 const getSchedule = async (req, res) => {
     try {
-        await ensureScheduleDefaults(req.user.id);
         const result = await query(
             `SELECT *
              FROM psychologist_schedule_items
@@ -226,7 +131,12 @@ const addScheduleItem = async (req, res) => {
 
 const getLeads = async (req, res) => {
     try {
-        await ensureLeadsForPsychologist(req.user.id);
+        try {
+            await generateMlLeads(req.user.id);
+        } catch (err) {
+            console.warn('ML lead refresh failed:', err.message);
+        }
+
         const result = await query(
             `SELECT *
              FROM psychologist_leads
@@ -288,7 +198,6 @@ const sendLeadMessage = async (req, res) => {
 
 const getFavorites = async (req, res) => {
     try {
-        await ensureFavoritesDefaults(req.user.id);
         const result = await query(
             `SELECT *
              FROM psychologist_favorites

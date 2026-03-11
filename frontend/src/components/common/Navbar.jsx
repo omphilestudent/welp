@@ -5,6 +5,7 @@ import { FaComment, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import ChatRequestModal from '../messages/ChatRequestModal';
+import toast from 'react-hot-toast';
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';
@@ -75,7 +76,7 @@ const Navbar = () => {
                             <>
                                 {user.role === 'employee' && (
                                     <>
-                                        <Link to="/dashboard" className="navbar-link">
+                                        <Link to="/dashboard" className="btn btn-primary navbar-dashboard-btn">
                                             Dashboard
                                         </Link>
                                         <Link to="/pricing" className="navbar-link">

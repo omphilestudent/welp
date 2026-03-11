@@ -204,14 +204,19 @@ const Login = () => {
         setErrors({});
 
         console.log('=== Login Attempt ===');
-        console.log('Email:', submitData.email);
-        console.log('Remember Me:', submitData.rememberMe);
+        const payload = submitData && typeof submitData === 'object' ? submitData : formData;
+        const payloadEmail = (payload.email || formData.email || '').trim();
+        const payloadPassword = payload.password || formData.password;
+        const payloadRemember = payload.rememberMe ?? formData.rememberMe ?? false;
+
+        console.log('Email:', payloadEmail);
+        console.log('Remember Me:', payloadRemember);
 
         try {
             const result = await login(
-                submitData.email,
-                submitData.password,
-                submitData.rememberMe
+                payloadEmail,
+                payloadPassword,
+                payloadRemember
             );
 
             if (!mounted.current) return;

@@ -1,6 +1,70 @@
 
 const { query } = require('../utils/database');
 
+const getActiveSubscription = async (userId) => {
+    const result = await query(
+        `SELECT plan_type, chat_hours_per_day
+         FROM subscriptions
+         WHERE user_id = $1 AND status = 'active'
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [userId]
+    );
+    return result.rows[0] || null;
+};
+
+const determineTimeLimitMinutes = (subscription) => {
+    if (!subscription) return 120;
+    if (subscription.plan_type === 'premium') {
+        const premiumHours = Number(subscription.chat_hours_per_day) || 4;
+        return Math.max(120, premiumHours * 60);
+    }
+    const freeHours = Number(subscription.chat_hours_per_day) || 2;
+    return Math.min(120, freeHours * 60);
+};
+
+const expireConversations = async () => {
+    const expired = await query(
+        `SELECT id
+         FROM conversations
+         WHERE status = 'accepted'
+           AND expires_at IS NOT NULL
+           AND expires_at <= CURRENT_TIMESTAMP`
+    );
+
+    if (expired.rows.length === 0) {
+        return;
+    }
+
+    const ids = expired.rows.map((row) => row.id);
+
+    await query(
+        `DELETE FROM messages
+         WHERE conversation_id = ANY($1::uuid[])`,
+        [ids]
+    );
+
+    await query(
+        `UPDATE conversations
+         SET status = 'ended', ended_at = CURRENT_TIMESTAMP
+         WHERE id = ANY($1::uuid[])`,
+        [ids]
+    );
+};
+
+const expireConversationById = async (conversationId) => {
+    await query(
+        `DELETE FROM messages
+         WHERE conversation_id = $1`,
+        [conversationId]
+    );
+    await query(
+        `UPDATE conversations
+         SET status = 'ended', ended_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [conversationId]
+    );
+};
 
 const requestChatWithPsychologist = async (req, res) => {
     try {
@@ -209,6 +273,7 @@ const getPendingRequests = async (req, res) => {
 
 const updateConversationStatus = async (req, res) => {
     try {
+        await expireConversations();
         const { conversationId } = req.params;
         const { status } = req.body;
 
@@ -237,13 +302,30 @@ const updateConversationStatus = async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const result = await query(
-            `UPDATE conversations
+        let result;
+        if (status === 'accepted') {
+            const subscription = await getActiveSubscription(conversation.rows[0].employee_id);
+            const timeLimit = determineTimeLimitMinutes(subscription);
+            result = await query(
+                `UPDATE conversations
+       SET status = $1,
+           started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+           expires_at = CURRENT_TIMESTAMP + make_interval(mins => $2),
+           time_limit_minutes = $2,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING *`,
+                [status, timeLimit, conversationId]
+            );
+        } else {
+            result = await query(
+                `UPDATE conversations
        SET status = $1, updated_at = CURRENT_TIMESTAMP
        WHERE id = $2
        RETURNING *`,
-            [status, conversationId]
-        );
+                [status, conversationId]
+            );
+        }
 
 
         let systemMessage = '';
@@ -280,16 +362,19 @@ const updateConversationStatus = async (req, res) => {
 
 const getConversations = async (req, res) => {
     try {
-        let whereClause = '';
-        let params = [req.user.id, 'accepted'];
+        await expireConversations();
 
+        const statusFilter = req.user.role === 'employee' ? ['accepted', 'ended'] : ['accepted'];
+        let whereClause = '';
         if (req.user.role === 'employee') {
-            whereClause = 'c.employee_id = $1 AND c.status = $2';
+            whereClause = 'c.employee_id = $1 AND c.status = ANY($2::text[])';
         } else if (req.user.role === 'psychologist') {
-            whereClause = 'c.psychologist_id = $1 AND c.status = $2';
+            whereClause = 'c.psychologist_id = $1 AND c.status = ANY($2::text[])';
         } else {
             return res.status(403).json({ error: 'Not authorized' });
         }
+
+        const params = [req.user.id, statusFilter];
 
         const result = await query(
             `SELECT
@@ -343,8 +428,8 @@ const getConversations = async (req, res) => {
 
 const getConversationMessages = async (req, res) => {
     try {
+        await expireConversations();
         const { conversationId } = req.params;
-
 
         const conversation = await query(
             `SELECT * FROM conversations
@@ -354,6 +439,10 @@ const getConversationMessages = async (req, res) => {
 
         if (conversation.rows.length === 0) {
             return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        if (conversation.rows[0].status !== 'accepted') {
+            return res.json([]);
         }
 
         const result = await query(
@@ -381,6 +470,7 @@ const getConversationMessages = async (req, res) => {
 
 const sendMessage = async (req, res) => {
     try {
+        await expireConversations();
         const { conversationId } = req.params;
         const { content } = req.body;
 
@@ -397,6 +487,17 @@ const sendMessage = async (req, res) => {
 
         if (conversation.rows.length === 0) {
             return res.status(403).json({ error: 'Not authorized or conversation not accepted' });
+        }
+
+        const convo = conversation.rows[0];
+        if (convo.status !== 'accepted') {
+            return res.status(403).json({ error: 'Conversation is not active' });
+        }
+
+        const now = new Date();
+        if (convo.expires_at && new Date(convo.expires_at) <= now) {
+            await expireConversationById(convo.id);
+            return res.status(403).json({ error: 'Conversation time has expired' });
         }
 
         const result = await query(

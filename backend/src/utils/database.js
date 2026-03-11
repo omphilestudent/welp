@@ -266,6 +266,9 @@ const createTables = async () => {
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 employee_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                time_limit_minutes INT DEFAULT 120,
+                started_at TIMESTAMP,
+                expires_at TIMESTAMP,
                 status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'blocked', 'ended')),
                 ended_at TIMESTAMP,
                 rejected_reason TEXT,
@@ -308,6 +311,7 @@ const createTables = async () => {
                 risk_level VARCHAR(20) DEFAULT 'medium' CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
                 summary TEXT,
                 company VARCHAR(255),
+                source_review_id UUID REFERENCES reviews(id),
                 status VARCHAR(20) DEFAULT 'new' CHECK (status IN ('new', 'review', 'contacted', 'archived')),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -484,9 +488,12 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_employee_relations_status        ON employee_relations(status);
             CREATE INDEX IF NOT EXISTS idx_employee_documents_employee_id   ON employee_documents(employee_id);
             CREATE INDEX IF NOT EXISTS idx_performance_reviews_employee_id  ON performance_reviews(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_conversations_expires_at        ON conversations(expires_at);
+            CREATE INDEX IF NOT EXISTS idx_conversations_started_at        ON conversations(started_at);
             CREATE INDEX IF NOT EXISTS idx_psych_schedule_psychologist      ON psychologist_schedule_items(psychologist_id);
             CREATE INDEX IF NOT EXISTS idx_psych_leads_psychologist         ON psychologist_leads(psychologist_id);
             CREATE INDEX IF NOT EXISTS idx_psych_leads_status               ON psychologist_leads(status);
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_psych_leads_source_review ON psychologist_leads(psychologist_id, source_review_id) WHERE source_review_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_psych_favorites_psychologist     ON psychologist_favorites(psychologist_id);
         `;
 
@@ -568,6 +575,11 @@ const runMigrations = async () => {
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_by UUID;",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP;",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flag_reason TEXT;",
+            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS time_limit_minutes INTEGER DEFAULT 120;",
+            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS started_at TIMESTAMP;",
+            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;",
+            "CREATE INDEX IF NOT EXISTS idx_conversations_started_at ON conversations(started_at);",
+            "CREATE INDEX IF NOT EXISTS idx_conversations_expires_at ON conversations(expires_at);",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;",
 
             // Job Applications — extra columns for public apply form
@@ -630,6 +642,7 @@ const runMigrations = async () => {
                 risk_level VARCHAR(20) DEFAULT 'medium' CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
                 summary TEXT,
                 company VARCHAR(255),
+                source_review_id UUID REFERENCES reviews(id),
                 status VARCHAR(20) DEFAULT 'new' CHECK (status IN ('new', 'review', 'contacted', 'archived')),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -652,9 +665,11 @@ const runMigrations = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(psychologist_id, employee_id)
             );`,
+            "ALTER TABLE psychologist_leads ADD COLUMN IF NOT EXISTS source_review_id UUID REFERENCES reviews(id);",
             "CREATE INDEX IF NOT EXISTS idx_psych_schedule_psychologist ON psychologist_schedule_items(psychologist_id);",
             "CREATE INDEX IF NOT EXISTS idx_psych_leads_psychologist ON psychologist_leads(psychologist_id);",
             "CREATE INDEX IF NOT EXISTS idx_psych_leads_status ON psychologist_leads(status);",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_psych_leads_source_review ON psychologist_leads(psychologist_id, source_review_id) WHERE source_review_id IS NOT NULL;",
             "CREATE INDEX IF NOT EXISTS idx_psych_favorites_psychologist ON psychologist_favorites(psychologist_id);"
         ];
 

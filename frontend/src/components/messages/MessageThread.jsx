@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import socketService from '../../services/socket';
 import api from '../../services/api';
 
-const MessageThread = ({ conversation, messages: initialMessages, onSendMessage, callConfig }) => {
+const MessageThread = ({ conversation, messages: initialMessages, onSendMessage, callConfig, isExpired, timeRemainingLabel }) => {
     const { user } = useAuth();
     const [messages, setMessages] = useState(initialMessages || []);
     const [newMessage, setNewMessage] = useState('');
@@ -100,7 +100,7 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage,
     const other = getOtherParticipant();
 
     return (
-        <div className="message-thread" ref={threadRef}>
+        <div className={`message-thread ${isExpired ? 'is-expired' : ''}`} ref={threadRef}>
             <div className="thread-header">
                 <div className="thread-participant">
                     <h3>{other?.display_name || 'Unknown'}</h3>
@@ -125,7 +125,12 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage,
                 )}
             </div>
 
-            <div className="messages-container">
+            <div className={`messages-container ${isExpired ? 'is-expired' : ''}`}>
+                {isExpired && (
+                    <div className="messages-time-flag">
+                        {timeRemainingLabel} • Messages are archived when time expires.
+                    </div>
+                )}
                 {error && <div className="alert alert-error">{error}</div>}
 
                 {messages.map((message, index) => {
@@ -155,7 +160,7 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage,
                 <div ref={messagesEndRef} />
             </div>
 
-            {conversation.status === 'accepted' && (
+            {conversation.status === 'accepted' && !isExpired && (
                 <form onSubmit={handleSend} className="message-input-form">
                     <input
                         type="text"

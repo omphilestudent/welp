@@ -17,6 +17,7 @@ const psychologistRoutes = require('./routes/psychologistRoutes');
 const pricingRoutes = require('./routes/pricingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const hrRoutes = require('./routes/hrRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 // Database connection with better error handling
 const { sequelize, testConnection } = require('./models');
@@ -141,6 +142,7 @@ app.use('/api/psychologists', psychologistRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hr', hrRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {
