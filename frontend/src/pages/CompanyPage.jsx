@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
@@ -8,6 +8,7 @@ import ReviewForm from '../components/reviews/ReviewForm';
 import StarRating from '../components/reviews/StarRating';
 import Loading from '../components/common/Loading';
 import toast from 'react-hot-toast';
+import { buildLogoUrls } from '../utils/companyLogos';
 
 const CompanyPage = () => {
     const { id } = useParams();
@@ -19,12 +20,17 @@ const CompanyPage = () => {
     const [error, setError] = useState('');
     const [showReviewForm, setShowReviewForm] = useState(false);
     const [showClaimButton, setShowClaimButton] = useState(false);
+    const [logoIndex, setLogoIndex] = useState(0);
 
     useEffect(() => {
         if (id) {
             fetchCompanyData();
         }
     }, [id]);
+
+    useEffect(() => {
+        setLogoIndex(0);
+    }, [company?.id]);
 
     useEffect(() => {
 
@@ -37,6 +43,15 @@ const CompanyPage = () => {
         console.log('Company claimed:', company?.is_claimed);
         console.log('Show claim button:', showClaimButton);
     }, [user, company]);
+
+    const logoUrls = useMemo(() => {
+        if (!company) return [];
+        const nameLower = (company.name || '').toLowerCase().trim();
+        return buildLogoUrls(company, nameLower);
+    }, [company]);
+
+    const currentLogoUrl = logoIndex < logoUrls.length ? logoUrls[logoIndex] : null;
+    const handleLogoError = useCallback(() => setLogoIndex(i => i + 1), []);
 
     const fetchCompanyData = async () => {
         setLoading(true);
@@ -59,7 +74,16 @@ const CompanyPage = () => {
             console.log('Reviews data:', reviewsRes.data);
 
             setCompany(companyRes.data);
-            setReviews(reviewsRes.data.reviews || []);
+            const reviewsPayload = reviewsRes.data;
+            const normalizedReviews = Array.isArray(reviewsPayload)
+                ? reviewsPayload
+                : Array.isArray(reviewsPayload?.reviews)
+                    ? reviewsPayload.reviews
+                    : Array.isArray(reviewsPayload?.data)
+                        ? reviewsPayload.data
+                        : [];
+
+            setReviews(normalizedReviews);
         } catch (error) {
             console.error('Failed to fetch company data:', error);
             if (error.response?.status === 404) {
@@ -107,8 +131,16 @@ const CompanyPage = () => {
             <div className="company-header">
                 <div className="container">
                     <div className="company-info">
-                        {company.logo_url ? (
-                            <img src={company.logo_url} alt={company.name} className="company-logo" />
+                        {currentLogoUrl ? (
+                            <img
+                                key={currentLogoUrl}
+                                src={currentLogoUrl}
+                                alt={company.name}
+                                className="company-logo"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                onError={handleLogoError}
+                            />
                         ) : (
                             <div className="company-logo-placeholder">
                                 {company.name?.charAt(0).toUpperCase()}

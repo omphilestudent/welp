@@ -20,8 +20,9 @@ const ReviewCard = ({ review, onReplyAdded }) => {
         return false;
     };
 
+    const reviewCreatedAt = review.created_at || review.createdAt;
     const canEdit = user && user.id === review.author_id &&
-        new Date() - new Date(review.created_at) < 24 * 60 * 60 * 1000;
+        new Date() - new Date(reviewCreatedAt) < 24 * 60 * 60 * 1000;
 
     const handleSubmitReply = async (e) => {
         e.preventDefault();
@@ -59,10 +60,12 @@ const ReviewCard = ({ review, onReplyAdded }) => {
             <div className="review-header">
                 <div className="review-author">
           <span className="review-author-name">
-            {review.author?.is_anonymous ? 'Anonymous' : (review.author?.display_name || 'Unknown')}
+            {review.author?.isAnonymous || review.author?.is_anonymous
+                ? 'Anonymous'
+                : (review.author?.display_name || review.author?.displayName || 'Unknown')}
           </span>
                     <span className="review-date">
-            {formatDistanceToNow(new Date(review.created_at))} ago
+            {formatDistanceToNow(new Date(reviewCreatedAt))} ago
           </span>
                 </div>
                 <div className="review-rating">
@@ -87,14 +90,14 @@ const ReviewCard = ({ review, onReplyAdded }) => {
                         <div key={reply.id} className="reply">
                             <div className="reply-header">
                 <span className="reply-author">
-                  {reply.author?.display_name || 'Unknown'}
+                  {reply.author?.display_name || reply.author?.displayName || 'Unknown'}
                 </span>
                                 <span className="reply-role">
-                  {reply.author_role === 'business' ? 'Business' :
-                      reply.author_role === 'psychologist' ? 'Psychologist' : 'Employee'}
+                  {(reply.authorRole || reply.author_role) === 'business' ? 'Business' :
+                      (reply.authorRole || reply.author_role) === 'psychologist' ? 'Psychologist' : 'Employee'}
                 </span>
                                 <span className="reply-date">
-                  {formatDistanceToNow(new Date(reply.created_at))} ago
+                  {formatDistanceToNow(new Date(reply.createdAt || reply.created_at))} ago
                 </span>
                             </div>
                             <p className="reply-content">{reply.content}</p>

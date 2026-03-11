@@ -6,6 +6,7 @@ import CompanyCard from '../components/companies/CompanyCard';
 import CompanySearch from '../components/companies/CompanySearch';
 import Loading from '../components/common/Loading';
 import { FaBuilding, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
+import { useAuth } from '../hooks/useAuth';
 
 const SearchPage = () => {
     const [searchParams] = useSearchParams();
@@ -15,6 +16,8 @@ const SearchPage = () => {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [createError, setCreateError] = useState('');
+    const [creating, setCreating] = useState(false);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 20,
@@ -22,10 +25,21 @@ const SearchPage = () => {
         pages: 0
     });
     const [filter, setFilter] = useState(unclaimed ? 'unclaimed' : 'all');
+    const { user } = useAuth();
+    const [createForm, setCreateForm] = useState({
+        name: query || '',
+        website: '',
+        industry: '',
+        description: ''
+    });
 
     useEffect(() => {
         searchCompanies(1);
     }, [query, filter]);
+
+    useEffect(() => {
+        setCreateForm(prev => ({ ...prev, name: query || '' }));
+    }, [query]);
 
     const searchCompanies = async (page) => {
         setLoading(true);
@@ -65,6 +79,27 @@ const SearchPage = () => {
 
     const handleClaimClick = (companyId) => {
         navigate(`/claim/${companyId}`);
+    };
+
+    const handleCreateCompany = async (e) => {
+        e.preventDefault();
+        setCreateError('');
+        setCreating(true);
+        try {
+            const payload = {
+                name: createForm.name?.trim(),
+                website: createForm.website?.trim() || undefined,
+                industry: createForm.industry?.trim() || undefined,
+                description: createForm.description?.trim() || undefined
+            };
+            const response = await api.post('/companies', payload);
+            navigate(`/companies/${response.data.id}`);
+        } catch (err) {
+            const message = err.response?.data?.error || 'Failed to create company';
+            setCreateError(message);
+        } finally {
+            setCreating(false);
+        }
     };
 
     return (
@@ -141,6 +176,58 @@ const SearchPage = () => {
                                 ? 'There are no unclaimed companies matching your criteria.'
                                 : 'Try adjusting your search or browse all companies.'}
                         </p>
+                        {filter !== 'unclaimed' && query && user?.role === 'employee' && (
+                            <form onSubmit={handleCreateCompany} className="company-create-form" style={{ marginTop: '1rem', maxWidth: 520 }}>
+                                <h4 style={{ marginBottom: '0.5rem' }}>Add this company so you can review it</h4>
+                                {createError && <div className="alert alert-error">{createError}</div>}
+                                <div className="form-group">
+                                    <label>Company name *</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={createForm.name}
+                                        onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Website (optional)</label>
+                                    <input
+                                        type="url"
+                                        className="form-input"
+                                        placeholder="https://example.com"
+                                        value={createForm.website}
+                                        onChange={(e) => setCreateForm(prev => ({ ...prev, website: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Industry (optional)</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={createForm.industry}
+                                        onChange={(e) => setCreateForm(prev => ({ ...prev, industry: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Description (optional)</label>
+                                    <textarea
+                                        className="form-textarea"
+                                        rows={3}
+                                        value={createForm.description}
+                                        onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                                    />
+                                </div>
+                                <button className="btn btn-primary" type="submit" disabled={creating}>
+                                    {creating ? 'Creating...' : 'Create Company'}
+                                </button>
+                            </form>
+                        )}
+                        {filter !== 'unclaimed' && query && !user && (
+                            <p style={{ marginTop: '1rem' }}>
+                                Log in as an employee to add this company and leave a review.
+                            </p>
+                        )}
                     </div>
                 )}
 

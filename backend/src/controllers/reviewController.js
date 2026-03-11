@@ -68,7 +68,16 @@ const createReview = async (req, res) => {
             [req.user.id]
         );
 
-        const moderation = await moderateReview(content);
+        let moderation = { is_flagged: false, reason: null };
+        try {
+            const moderationResult = await moderateReview(content);
+            if (moderationResult && typeof moderationResult === 'object') {
+                moderation = moderationResult;
+            }
+        } catch (err) {
+            console.warn('ML moderation unavailable, allowing review:', err.message);
+        }
+
         if (moderation.is_flagged) {
             return res.status(400).json({
                 error: 'Review flagged by moderation',
@@ -76,7 +85,15 @@ const createReview = async (req, res) => {
             });
         }
 
-        const sentiment = await analyzeSentiment(content);
+        let sentiment = { sentiment: 'neutral', score: 0 };
+        try {
+            const sentimentResult = await analyzeSentiment(content);
+            if (sentimentResult && typeof sentimentResult === 'object') {
+                sentiment = sentimentResult;
+            }
+        } catch (err) {
+            console.warn('ML sentiment unavailable, defaulting to neutral:', err.message);
+        }
 
         const result = await query(
             `INSERT INTO reviews (
@@ -170,7 +187,7 @@ const getCompanyReviews = async (req, res) => {
 
 
         const countResult = await query(
-            'SELECT COUNT(*) FROM reviews WHERE company_id = $1 AND is_public = true',
+            'SELECT COUNT(*) FROM reviews WHERE company_id = $1 AND COALESCE(is_public, true) = true',
             [companyId]
         );
         const total = parseInt(countResult.rows[0]?.count || 0);
@@ -217,7 +234,7 @@ const getCompanyReviews = async (req, res) => {
                       LEFT JOIN companies c ON r.author_workplace_id = c.id
                       LEFT JOIN replies rep ON r.id = rep.review_id
                       LEFT JOIN users au ON rep.author_id = au.id
-             WHERE r.company_id = $1 AND r.is_public = true
+             WHERE r.company_id = $1 AND COALESCE(r.is_public, true) = true
              GROUP BY r.id, u.id, c.id
              ORDER BY ${orderBy}
                  LIMIT $2 OFFSET $3`,
