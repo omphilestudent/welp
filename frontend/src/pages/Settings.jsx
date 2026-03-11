@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
@@ -21,13 +21,15 @@ import {
     FaUserMd,
     FaPlus,
     FaCheckCircle,
-    FaExclamationTriangle
+    FaExclamationTriangle,
+    FaShieldAlt
 } from 'react-icons/fa';
 
 const Settings = () => {
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
+    const { user, logout, updateUser } = useAuth();
     const { isDarkMode, toggleTheme } = useTheme();
+    const fileInputRef = useRef(null);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('profile');
     const [profile, setProfile] = useState({
@@ -44,7 +46,16 @@ const Settings = () => {
         theme: isDarkMode ? 'dark' : 'light',
         emailNotifications: true,
         messageNotifications: true,
-        reviewNotifications: true
+        reviewNotifications: true,
+        marketingNotifications: false,
+        productUpdates: true,
+        securityAlerts: true,
+        profileVisibility: 'public',
+        dataSharing: false,
+        language: 'en',
+        timezone: 'UTC',
+        twoFactorEnabled: false,
+        loginAlerts: true
     });
 
     const [passwordData, setPasswordData] = useState({
@@ -91,10 +102,63 @@ const Settings = () => {
         }
     };
 
+    const resolveMediaUrl = (url) => {
+        if (!url) return '';
+        if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+        const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+        return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
+
+    const handleAvatarUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file');
+            return;
+        }
+
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error('File size must be less than 2MB');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('avatar', file);
+
+        setLoading(true);
+        try {
+            const { data } = await api.post('/users/upload-avatar', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setProfile(prev => ({ ...prev, avatarUrl: data.avatarUrl }));
+            updateUser?.({ ...user, avatar_url: data.avatarUrl });
+            toast.success('Profile picture updated!');
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to upload image');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const fetchSettings = async () => {
         try {
             const { data } = await api.get('/users/settings');
-            setSettings(data);
+            setSettings({
+                theme: data.theme || 'light',
+                emailNotifications: data.email_notifications ?? true,
+                messageNotifications: data.message_notifications ?? true,
+                reviewNotifications: data.review_notifications ?? true,
+                marketingNotifications: data.marketing_notifications ?? false,
+                productUpdates: data.product_updates ?? true,
+                securityAlerts: data.security_alerts ?? true,
+                profileVisibility: data.profile_visibility || 'public',
+                dataSharing: data.data_sharing ?? false,
+                language: data.language || 'en',
+                timezone: data.timezone || 'UTC',
+                twoFactorEnabled: data.two_factor_enabled ?? false,
+                loginAlerts: data.login_alerts ?? true
+            });
         } catch (error) {
             console.error('Failed to fetch settings:', error);
         }
@@ -104,6 +168,7 @@ const Settings = () => {
         setLoading(true);
         try {
             await api.patch('/users/profile', profile);
+            updateUser?.({ ...user, display_name: profile.displayName, avatar_url: profile.avatarUrl });
             toast.success('Profile updated successfully');
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to update profile');
@@ -115,7 +180,21 @@ const Settings = () => {
     const handleSettingsUpdate = async () => {
         setLoading(true);
         try {
-            await api.patch('/users/settings', settings);
+            await api.patch('/users/settings', {
+                theme: settings.theme,
+                emailNotifications: settings.emailNotifications,
+                messageNotifications: settings.messageNotifications,
+                reviewNotifications: settings.reviewNotifications,
+                marketingNotifications: settings.marketingNotifications,
+                productUpdates: settings.productUpdates,
+                securityAlerts: settings.securityAlerts,
+                profileVisibility: settings.profileVisibility,
+                dataSharing: settings.dataSharing,
+                language: settings.language,
+                timezone: settings.timezone,
+                twoFactorEnabled: settings.twoFactorEnabled,
+                loginAlerts: settings.loginAlerts
+            });
 
 
             if (settings.theme === 'dark' !== isDarkMode) {
@@ -233,6 +312,24 @@ const Settings = () => {
                                 <FaBell /> Notifications
                             </button>
                             <button
+                                className={`settings-nav-item ${activeTab === 'privacy' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('privacy')}
+                            >
+                                <FaShieldAlt /> Privacy
+                            </button>
+                            <button
+                                className={`settings-nav-item ${activeTab === 'security' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('security')}
+                            >
+                                <FaLock /> Security
+                            </button>
+                            <button
+                                className={`settings-nav-item ${activeTab === 'preferences' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('preferences')}
+                            >
+                                <FaGlobe /> Preferences
+                            </button>
+                            <button
                                 className={`settings-nav-item ${activeTab === 'appearance' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('appearance')}
                             >
@@ -259,6 +356,32 @@ const Settings = () => {
                         {activeTab === 'profile' && (
                             <div className="settings-section">
                                 <h2>Profile Settings</h2>
+
+                                <div className="profile-avatar-container" style={{ marginBottom: '1.5rem' }}>
+                                    <div className="profile-avatar">
+                                        {profile.avatarUrl ? (
+                                            <img src={resolveMediaUrl(profile.avatarUrl)} alt={profile.displayName} />
+                                        ) : (
+                                            <div className="avatar-placeholder-large">
+                                                {(profile.displayName || user?.display_name || 'U').charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button
+                                        className="avatar-upload-btn"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={loading}
+                                    >
+                                        <FaUser /> {loading ? 'Uploading...' : 'Upload Photo'}
+                                    </button>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleAvatarUpload}
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
+                                    />
+                                </div>
 
                                 <div className="form-group">
                                     <label className="form-label">Display Name</label>
@@ -475,6 +598,153 @@ const Settings = () => {
                                         <span>Review Notifications</span>
                                     </label>
                                     <p className="checkbox-help">Get notified when someone replies to your reviews</p>
+
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.marketingNotifications}
+                                            onChange={(e) => setSettings({ ...settings, marketingNotifications: e.target.checked })}
+                                        />
+                                        <span>Marketing Emails</span>
+                                    </label>
+                                    <p className="checkbox-help">Receive occasional product and partner offers</p>
+
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.productUpdates}
+                                            onChange={(e) => setSettings({ ...settings, productUpdates: e.target.checked })}
+                                        />
+                                        <span>Product Updates</span>
+                                    </label>
+                                    <p className="checkbox-help">News about new features and improvements</p>
+
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.securityAlerts}
+                                            onChange={(e) => setSettings({ ...settings, securityAlerts: e.target.checked })}
+                                        />
+                                        <span>Security Alerts</span>
+                                    </label>
+                                    <p className="checkbox-help">Alerts about important security events</p>
+
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.loginAlerts}
+                                            onChange={(e) => setSettings({ ...settings, loginAlerts: e.target.checked })}
+                                        />
+                                        <span>Login Alerts</span>
+                                    </label>
+                                    <p className="checkbox-help">Notify me when a new device signs in</p>
+                                </div>
+
+                                <div className="form-actions">
+                                    <button
+                                        onClick={handleSettingsUpdate}
+                                        disabled={loading}
+                                        className="btn btn-primary"
+                                    >
+                                        <FaSave /> {loading ? 'Saving...' : 'Save Preferences'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'privacy' && (
+                            <div className="settings-section">
+                                <h2>Privacy Settings</h2>
+
+                                <div className="form-group">
+                                    <label className="form-label">Profile Visibility</label>
+                                    <select
+                                        className="form-input"
+                                        value={settings.profileVisibility}
+                                        onChange={(e) => setSettings({ ...settings, profileVisibility: e.target.value })}
+                                    >
+                                        <option value="public">Public</option>
+                                        <option value="private">Private</option>
+                                    </select>
+                                </div>
+
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.dataSharing}
+                                        onChange={(e) => setSettings({ ...settings, dataSharing: e.target.checked })}
+                                    />
+                                    <span>Share anonymized usage data</span>
+                                </label>
+                                <p className="checkbox-help">Help us improve the platform with anonymous analytics.</p>
+
+                                <div className="form-actions">
+                                    <button
+                                        onClick={handleSettingsUpdate}
+                                        disabled={loading}
+                                        className="btn btn-primary"
+                                    >
+                                        <FaSave /> {loading ? 'Saving...' : 'Save Privacy Settings'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'security' && (
+                            <div className="settings-section">
+                                <h2>Security Settings</h2>
+
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.twoFactorEnabled}
+                                        onChange={(e) => setSettings({ ...settings, twoFactorEnabled: e.target.checked })}
+                                    />
+                                    <span>Enable Two-Factor Authentication</span>
+                                </label>
+                                <p className="checkbox-help">Adds an extra layer of security to your account.</p>
+
+                                <div className="form-actions">
+                                    <button
+                                        onClick={handleSettingsUpdate}
+                                        disabled={loading}
+                                        className="btn btn-primary"
+                                    >
+                                        <FaSave /> {loading ? 'Saving...' : 'Save Security Settings'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'preferences' && (
+                            <div className="settings-section">
+                                <h2>Preferences</h2>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label className="form-label">Language</label>
+                                        <select
+                                            className="form-input"
+                                            value={settings.language}
+                                            onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+                                        >
+                                            <option value="en">English</option>
+                                            <option value="es">Spanish</option>
+                                            <option value="fr">French</option>
+                                            <option value="de">German</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Timezone</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            value={settings.timezone}
+                                            onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                                            placeholder="UTC"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="form-actions">

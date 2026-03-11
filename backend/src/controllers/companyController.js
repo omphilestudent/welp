@@ -710,6 +710,59 @@ const scrapeCompany = async (req, res) => {
     }
 };
 
+const scrapeMissingCompanyInfo = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const companyResult = await query('SELECT * FROM companies WHERE id = $1', [id]);
+        if (companyResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        const company = companyResult.rows[0];
+        const website = company.website;
+        if (!website) {
+            return res.status(400).json({ error: 'Company website is required to scrape data' });
+        }
+
+        if (req.user.role === 'business') {
+            const ownership = await query(
+                'SELECT * FROM company_owners WHERE company_id = $1 AND user_id = $2',
+                [id, req.user.id]
+            );
+            if (ownership.rows.length === 0) {
+                return res.status(403).json({ error: 'Not authorized to update this company' });
+            }
+        }
+
+        const scraped = await scrapeCompanyFromWebsite(website);
+
+        const description = company.description && company.description.trim() !== '' ? company.description : scraped.description;
+        const logoUrl = company.logo_url && company.logo_url.trim() !== '' ? company.logo_url : scraped.logo_url;
+        const websiteFinal = company.website && company.website.trim() !== '' ? company.website : scraped.website;
+
+        const result = await query(
+            `UPDATE companies
+             SET description = $1,
+                 logo_url = $2,
+                 website = $3,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $4
+             RETURNING *`,
+            [description || company.description, logoUrl || company.logo_url, websiteFinal || company.website, id]
+        );
+
+        return res.json({
+            message: 'Company information updated successfully',
+            company: result.rows[0],
+            scraped
+        });
+    } catch (error) {
+        console.error('Scrape missing company info error:', error);
+        return res.status(500).json({ error: error.message || 'Failed to update company information' });
+    }
+};
+
 
 module.exports = {
     searchCompanies,
@@ -726,6 +779,7 @@ module.exports = {
     verifyBusinessEmail,
     confirmEmailVerification,
     scrapeCompany,
+    scrapeMissingCompanyInfo,
     getPendingClaimRequests,
     approveClaimRequest,
     rejectClaimRequest

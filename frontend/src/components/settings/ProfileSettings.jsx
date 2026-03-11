@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaUser, FaEnvelope } from 'react-icons/fa';
+import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaGlobe } from 'react-icons/fa';
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';

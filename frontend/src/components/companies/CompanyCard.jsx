@@ -40,8 +40,15 @@ const CompanyCard = ({ company }) => {
     const handleLogoError = useCallback(() => setUrlIndex(i => i + 1), []);
 
     const handleClick = useCallback(() => {
-        if (company.id) navigate(`/companies/${company.id}`);
-    }, [company.id, navigate]);
+        if (!company.id) return;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(String(company.id))) {
+            navigate(`/companies/${company.id}`);
+            return;
+        }
+        const fallbackName = encodeURIComponent(company.name || '');
+        navigate(`/search?q=${fallbackName}`);
+    }, [company.id, company.name, navigate]);
 
     const handleKeyPress = useCallback((e) => {
         if (e.key === 'Enter' || e.key === ' ') handleClick();

@@ -139,9 +139,30 @@ const getSettings = async (req, res) => {
                 email_notifications BOOLEAN DEFAULT true,
                 message_notifications BOOLEAN DEFAULT true,
                 review_notifications BOOLEAN DEFAULT true,
+                marketing_notifications BOOLEAN DEFAULT false,
+                product_updates BOOLEAN DEFAULT true,
+                security_alerts BOOLEAN DEFAULT true,
+                profile_visibility VARCHAR(20) DEFAULT 'public',
+                data_sharing BOOLEAN DEFAULT false,
+                language VARCHAR(10) DEFAULT 'en',
+                timezone VARCHAR(50) DEFAULT 'UTC',
+                two_factor_enabled BOOLEAN DEFAULT false,
+                login_alerts BOOLEAN DEFAULT true,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
+        `);
+        await query(`
+            ALTER TABLE user_settings
+                ADD COLUMN IF NOT EXISTS marketing_notifications BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS product_updates BOOLEAN DEFAULT true,
+                ADD COLUMN IF NOT EXISTS security_alerts BOOLEAN DEFAULT true,
+                ADD COLUMN IF NOT EXISTS profile_visibility VARCHAR(20) DEFAULT 'public',
+                ADD COLUMN IF NOT EXISTS data_sharing BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'en',
+                ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'UTC',
+                ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS login_alerts BOOLEAN DEFAULT true;
         `);
 
         const result = await query(
@@ -155,7 +176,16 @@ const getSettings = async (req, res) => {
                 theme: 'light',
                 email_notifications: true,
                 message_notifications: true,
-                review_notifications: true
+                review_notifications: true,
+                marketing_notifications: false,
+                product_updates: true,
+                security_alerts: true,
+                profile_visibility: 'public',
+                data_sharing: false,
+                language: 'en',
+                timezone: 'UTC',
+                two_factor_enabled: false,
+                login_alerts: true
             });
         }
 
@@ -173,20 +203,65 @@ const updateSettings = async (req, res) => {
             theme,
             emailNotifications,
             messageNotifications,
-            reviewNotifications
+            reviewNotifications,
+            marketingNotifications,
+            productUpdates,
+            securityAlerts,
+            profileVisibility,
+            dataSharing,
+            language,
+            timezone,
+            twoFactorEnabled,
+            loginAlerts
         } = req.body;
 
+        const current = await query(
+            `SELECT * FROM user_settings WHERE user_id = $1`,
+            [req.user.id]
+        );
+        const existing = current.rows[0] || {};
+        const resolve = (value, fallback) => value !== undefined ? value : fallback;
+
         await query(
-            `INSERT INTO user_settings (user_id, theme, email_notifications, message_notifications, review_notifications)
-            VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO user_settings (
+                user_id, theme, email_notifications, message_notifications, review_notifications,
+                marketing_notifications, product_updates, security_alerts,
+                profile_visibility, data_sharing, language, timezone,
+                two_factor_enabled, login_alerts
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             ON CONFLICT (user_id)
             DO UPDATE SET
                 theme = $2,
                 email_notifications = $3,
                 message_notifications = $4,
                 review_notifications = $5,
+                marketing_notifications = $6,
+                product_updates = $7,
+                security_alerts = $8,
+                profile_visibility = $9,
+                data_sharing = $10,
+                language = $11,
+                timezone = $12,
+                two_factor_enabled = $13,
+                login_alerts = $14,
                 updated_at = CURRENT_TIMESTAMP`,
-            [req.user.id, theme, emailNotifications, messageNotifications, reviewNotifications]
+            [
+                req.user.id,
+                resolve(theme, existing.theme || 'light'),
+                resolve(emailNotifications, existing.email_notifications ?? true),
+                resolve(messageNotifications, existing.message_notifications ?? true),
+                resolve(reviewNotifications, existing.review_notifications ?? true),
+                resolve(marketingNotifications, existing.marketing_notifications ?? false),
+                resolve(productUpdates, existing.product_updates ?? true),
+                resolve(securityAlerts, existing.security_alerts ?? true),
+                resolve(profileVisibility, existing.profile_visibility || 'public'),
+                resolve(dataSharing, existing.data_sharing ?? false),
+                resolve(language, existing.language || 'en'),
+                resolve(timezone, existing.timezone || 'UTC'),
+                resolve(twoFactorEnabled, existing.two_factor_enabled ?? false),
+                resolve(loginAlerts, existing.login_alerts ?? true)
+            ]
         );
 
         res.json({ message: 'Settings updated successfully' });

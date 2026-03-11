@@ -3,13 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaComment, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
-import { useTheme } from '../../hooks/useTheme';
 import api from '../../services/api';
 import ChatRequestModal from '../messages/ChatRequestModal';
 
+const resolveMediaUrl = (url) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const Navbar = () => {
     const { user, logout } = useAuth();
-    const { isDarkMode, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [showChatModal, setShowChatModal] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -154,9 +159,15 @@ const Navbar = () => {
                                     </button>
                                 )}
 
-                                <button onClick={toggleTheme} className="btn btn-secondary">
-                                    {isDarkMode ? '☀️' : '🌙'}
-                                </button>
+                                <Link to="/settings" className="navbar-avatar" aria-label="Profile">
+                                    {user?.avatar_url ? (
+                                        <img src={resolveMediaUrl(user.avatar_url)} alt={user.display_name || 'Profile'} />
+                                    ) : (
+                                        <span className="navbar-avatar-placeholder">
+                                            {(user?.display_name || user?.email || 'U').charAt(0).toUpperCase()}
+                                        </span>
+                                    )}
+                                </Link>
 
                                 <button onClick={handleLogout} className="btn btn-primary">
                                     Logout
@@ -167,9 +178,6 @@ const Navbar = () => {
                                 <Link to="/pricing" className="navbar-link">
                                     Pricing
                                 </Link>
-                                <button onClick={toggleTheme} className="btn btn-secondary">
-                                    {isDarkMode ? '☀️' : '🌙'}
-                                </button>
                                 <Link to="/login" className="btn btn-primary">
                                     Login
                                 </Link>

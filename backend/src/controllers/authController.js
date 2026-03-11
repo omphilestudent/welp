@@ -80,9 +80,9 @@ const getUserByIdForProfile = async (userId) => {
     const hasIsAnonymous = await columnExists('users', 'is_anonymous');
     const hasIsActive = await columnExists('users', 'is_active');
 
-    let selectPart = `SELECT id, email, role, display_name, created_at`;
-    selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
-    selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
+        let selectPart = `SELECT id, email, role, display_name, created_at, avatar_url`;
+        selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
+        selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
 
     return query(
         `${selectPart} FROM users WHERE id = $1 LIMIT 1`,
@@ -548,7 +548,9 @@ const getMe = async (req, res) => {
                 role: user.role,
                 isAnonymous: user.is_anonymous,
                 isActive: user.is_active,
-                createdAt: user.created_at
+                createdAt: user.created_at,
+                avatarUrl: user.avatar_url,
+                avatar_url: user.avatar_url
             }
         });
     } catch (error) {
