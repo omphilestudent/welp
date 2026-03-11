@@ -54,12 +54,8 @@ const Messages = () => {
     }, [sortedConversations]);
 
     const visibleConversations = useMemo(() => {
-        if (user?.role === 'employee' && isFreeEmployee) {
-            const pool = prioritizedConversations.length > 0 ? prioritizedConversations : archivedConversations;
-            return pool.slice(0, 1);
-        }
         return [...prioritizedConversations, ...archivedConversations];
-    }, [prioritizedConversations, archivedConversations, isFreeEmployee, user?.role]);
+    }, [prioritizedConversations, archivedConversations]);
     const featuredPsychologist = availablePsychologists[0];
     const featuredSpecialization = formatList(
         featuredPsychologist?.specialization ||

@@ -39,12 +39,6 @@ const expireConversations = async () => {
     const ids = expired.rows.map((row) => row.id);
 
     await query(
-        `DELETE FROM messages
-         WHERE conversation_id = ANY($1::uuid[])`,
-        [ids]
-    );
-
-    await query(
         `UPDATE conversations
          SET status = 'ended', ended_at = CURRENT_TIMESTAMP
          WHERE id = ANY($1::uuid[])`,
@@ -53,11 +47,6 @@ const expireConversations = async () => {
 };
 
 const expireConversationById = async (conversationId) => {
-    await query(
-        `DELETE FROM messages
-         WHERE conversation_id = $1`,
-        [conversationId]
-    );
     await query(
         `UPDATE conversations
          SET status = 'ended', ended_at = CURRENT_TIMESTAMP
@@ -441,7 +430,8 @@ const getConversationMessages = async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        if (conversation.rows[0].status !== 'accepted') {
+        const allowedStatuses = ['accepted', 'ended', 'pending', 'rejected', 'blocked'];
+        if (!allowedStatuses.includes(conversation.rows[0].status)) {
             return res.json([]);
         }
 
