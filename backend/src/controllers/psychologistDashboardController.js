@@ -226,7 +226,7 @@ const addScheduleItem = async (req, res) => {
 
 const getLeads = async (req, res) => {
     try {
-        await seedDefaultsIfEmpty(req.user.id);
+        await ensureLeadsForPsychologist(req.user.id);
         const result = await query(
             `SELECT *
              FROM psychologist_leads
@@ -288,7 +288,7 @@ const sendLeadMessage = async (req, res) => {
 
 const getFavorites = async (req, res) => {
     try {
-        await seedDefaultsIfEmpty(req.user.id);
+        await ensureFavoritesDefaults(req.user.id);
         const result = await query(
             `SELECT *
              FROM psychologist_favorites
