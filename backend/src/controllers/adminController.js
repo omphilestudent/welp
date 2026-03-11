@@ -28,6 +28,20 @@ const columnExists = async (tableName, columnName) => {
     } catch { return false; }
 };
 
+const getTableColumns = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = $1`,
+            [tableName]
+        );
+        return result.rows.map(r => r.column_name);
+    } catch {
+        return [];
+    }
+};
+
 const logAdminAction = async (adminId, action, entityType, entityId, oldValues, newValues) => {
     try {
         if (!await tableExists('audit_logs')) return;
@@ -747,36 +761,82 @@ const markNotificationRead = async (req, res) => {
 
 const getRegistrationApplications = async (req, res) => {
     try {
-        if (!ensureSuperAdmin(req, res)) return;
         const { status = 'all', type = 'all' } = req.query;
 
         const apps = [];
 
         if (type === 'all' || type === 'psychologist') {
             if (await tableExists('psychologist_applications')) {
-                const result = await query(
-                    `SELECT pa.*, u.email as user_email, u.display_name as user_name
-                     FROM psychologist_applications pa
-                     JOIN users u ON pa.user_id = u.id
-                     ${status !== 'all' ? 'WHERE pa.status = $1' : ''}
-                     ORDER BY pa.created_at DESC`,
-                    status !== 'all' ? [status] : []
-                );
-                result.rows.forEach(r => apps.push({ ...r, application_type: 'psychologist' }));
+                const columns = await getTableColumns('psychologist_applications');
+                const hasUserId = columns.includes('user_id');
+                const hasEmail = columns.includes('email');
+                const hasFullName = columns.includes('full_name');
+
+                const baseWhere = status !== 'all' ? 'WHERE pa.status = $1' : '';
+                const params = status !== 'all' ? [status] : [];
+
+                if (hasUserId) {
+                    const result = await query(
+                        `SELECT pa.*, u.email as user_email, u.display_name as user_name
+                         FROM psychologist_applications pa
+                         JOIN users u ON pa.user_id = u.id
+                         ${baseWhere}
+                         ORDER BY pa.created_at DESC`,
+                        params
+                    );
+                    result.rows.forEach(r => apps.push({ ...r, application_type: 'psychologist' }));
+                } else {
+                    const result = await query(
+                        `SELECT pa.*
+                         FROM psychologist_applications pa
+                         ${baseWhere}
+                         ORDER BY pa.created_at DESC`,
+                        params
+                    );
+                    result.rows.forEach(r => apps.push({
+                        ...r,
+                        user_email: hasEmail ? r.email : null,
+                        user_name: hasFullName ? r.full_name : null,
+                        application_type: 'psychologist'
+                    }));
+                }
             }
         }
 
         if (type === 'all' || type === 'business') {
             if (await tableExists('business_applications')) {
-                const result = await query(
-                    `SELECT ba.*, u.email as user_email, u.display_name as user_name
-                     FROM business_applications ba
-                     JOIN users u ON ba.user_id = u.id
-                     ${status !== 'all' ? 'WHERE ba.status = $1' : ''}
-                     ORDER BY ba.created_at DESC`,
-                    status !== 'all' ? [status] : []
-                );
-                result.rows.forEach(r => apps.push({ ...r, application_type: 'business' }));
+                const columns = await getTableColumns('business_applications');
+                const hasUserId = columns.includes('user_id');
+                const hasEmail = columns.includes('email');
+
+                const baseWhere = status !== 'all' ? 'WHERE ba.status = $1' : '';
+                const params = status !== 'all' ? [status] : [];
+
+                if (hasUserId) {
+                    const result = await query(
+                        `SELECT ba.*, u.email as user_email, u.display_name as user_name
+                         FROM business_applications ba
+                         JOIN users u ON ba.user_id = u.id
+                         ${baseWhere}
+                         ORDER BY ba.created_at DESC`,
+                        params
+                    );
+                    result.rows.forEach(r => apps.push({ ...r, application_type: 'business' }));
+                } else {
+                    const result = await query(
+                        `SELECT ba.*
+                         FROM business_applications ba
+                         ${baseWhere}
+                         ORDER BY ba.created_at DESC`,
+                        params
+                    );
+                    result.rows.forEach(r => apps.push({
+                        ...r,
+                        user_email: hasEmail ? r.email : null,
+                        user_name: r.company_name || null,
+                        application_type: 'business'
+                    }));
+                }
             }
         }
 
@@ -789,7 +849,6 @@ const getRegistrationApplications = async (req, res) => {
 
 const reviewRegistrationApplication = async (req, res) => {
     try {
-        if (!ensureSuperAdmin(req, res)) return;
         const { id } = req.params;
         const { type, status, notes } = req.body;
 
@@ -834,6 +893,17 @@ const reviewRegistrationApplication = async (req, res) => {
         const hasIsVerified = await columnExists('users', 'is_verified');
         const hasStatus = await columnExists('users', 'status');
 
+        let userId = app.user_id;
+        if (!userId) {
+            const columns = await getTableColumns(table);
+            const emailColumn = columns.includes('email') ? 'email' : null;
+            const fallbackEmail = emailColumn ? app[emailColumn] : null;
+            if (fallbackEmail) {
+                const userResult = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [fallbackEmail]);
+                userId = userResult.rows[0]?.id;
+            }
+        }
+
         if (status === 'approved') {
             const updates = [];
             const params = [];
@@ -843,13 +913,15 @@ const reviewRegistrationApplication = async (req, res) => {
             if (hasIsVerified) { updates.push(`is_verified = $${idx++}`); params.push(true); }
             if (hasStatus) { updates.push(`status = $${idx++}`); params.push('active'); }
             if (updates.length > 0) {
-                params.push(app.user_id);
-                await query(`UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`, params);
+                if (userId) {
+                    params.push(userId);
+                    await query(`UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`, params);
+                }
             }
         }
 
-        if (status === 'rejected' && hasStatus) {
-            await query('UPDATE users SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', ['rejected', app.user_id]);
+        if (status === 'rejected' && hasStatus && userId) {
+            await query('UPDATE users SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', ['rejected', userId]);
         }
 
         res.json({ success: true, application: app });
