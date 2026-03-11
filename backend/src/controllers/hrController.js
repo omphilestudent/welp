@@ -935,14 +935,19 @@ const getAllApplications = async (req, res) => {
 
         const appsExist = await tableExists('job_applications');
         const deptsExist = await tableExists('departments');
+        const jobsExist = await tableExists('job_postings');
 
         if (!appsExist) return res.json([]);
 
-        let selectPart = `SELECT a.*, j.title as job_title`;
+        let selectPart = `SELECT a.*`;
+        if (jobsExist) selectPart += `, j.title as job_title`;
         if (deptsExist) selectPart += `, d.name as department_name`;
 
-        let fromPart = `FROM job_applications a JOIN job_postings j ON a.job_id = j.id`;
-        if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+        let fromPart = `FROM job_applications a`;
+        if (jobsExist) {
+            fromPart += ` LEFT JOIN job_postings j ON a.job_id = j.id`;
+            if (deptsExist) fromPart += ` LEFT JOIN departments d ON j.department_id = d.id`;
+        }
 
         const whereClauses = [];
         const params = [];

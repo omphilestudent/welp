@@ -20,7 +20,7 @@ const authorizeAdmin = (requiredPermissions = []) => {
 
             if (adminResult.rows.length === 0) {
                 const normalizedUserRole = req.user.role?.toLowerCase();
-                const isLegacyAdminRole = ['admin', 'super_admin'].includes(normalizedUserRole);
+                const isLegacyAdminRole = ['admin', 'super_admin', 'system_admin'].includes(normalizedUserRole);
 
                 if (!isLegacyAdminRole) {
                     return res.status(403).json({ error: 'Admin access required' });
@@ -79,13 +79,13 @@ const authorizeHR = () => {
                  FROM admin_users au
                  JOIN admin_roles ar ON au.role_id = ar.id
                  WHERE au.user_id = $1 AND au.is_active = true
-                 AND (ar.name = 'hr_admin' OR ar.name = 'super_admin')`,
+                 AND (ar.name = 'hr_admin' OR ar.name = 'super_admin' OR ar.name = 'system_admin' OR ar.name = 'admin')`,
                 [req.user.id]
             );
 
             if (adminResult.rows.length === 0) {
                 const normalizedUserRole = req.user.role?.toLowerCase();
-                const isLegacyHRRole = ['hr', 'hr_admin', 'super_admin', 'admin'].includes(normalizedUserRole);
+                const isLegacyHRRole = ['hr', 'hr_admin', 'super_admin', 'admin', 'system_admin'].includes(normalizedUserRole);
 
                 if (!isLegacyHRRole) {
                     return res.status(403).json({ error: 'HR access required' });

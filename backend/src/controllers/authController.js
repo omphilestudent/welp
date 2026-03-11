@@ -502,6 +502,18 @@ const login = async (req, res) => {
 
         const token = generateToken(user, { rememberMe: Boolean(rememberMe) });
 
+        // Set httpOnly cookie to support cookie-based auth (e.g., HR departments page)
+        const cookieOptions = {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production'
+        };
+        if (rememberMe) {
+            const rememberDays = Number(process.env.JWT_REMEMBER_COOKIE_DAYS || 30);
+            cookieOptions.maxAge = rememberDays * 24 * 60 * 60 * 1000;
+        }
+        res.cookie('token', token, cookieOptions);
+
         return res.json({
             success: true,
             token,
@@ -546,6 +558,11 @@ const getMe = async (req, res) => {
 };
 
 const logout = async (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+    });
     return res.json({ success: true, message: 'Logged out successfully' });
 };
 

@@ -105,6 +105,24 @@ router.patch('/ml-interactions/:id',
     adminController.updateMlInteraction
 );
 
+// ML admin endpoints (matches frontend /admin/ml/* calls)
+router.get('/ml/interactions', adminController.getMlInteractions);
+router.patch('/ml/interactions/:id',
+    validate([
+        body('status').optional().isIn(['pending', 'edited', 'approved', 'rejected']),
+        body('notes').optional().isString().trim()
+    ]),
+    adminController.updateMlInteraction
+);
+router.get('/ml/models', adminController.getMlModels);
+router.patch('/ml/models/:id/toggle', adminController.toggleMlModel);
+router.get('/ml/metrics', adminController.getMlMetrics);
+router.get('/ml/predictions', adminController.getMlPredictions);
+router.get('/ml/performance', adminController.getMlPerformance);
+router.get('/ml/export', adminController.exportMlInteractions);
+router.post('/ml/train', adminController.trainMlModel);
+router.post('/ml/predict', adminController.predictMl);
+
 router.patch('/settings', adminController.updateSystemSettings);
 
 
