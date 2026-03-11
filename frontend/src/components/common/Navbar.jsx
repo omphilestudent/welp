@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaComment, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
+import { FaComment, FaShieldAlt, FaBriefcase, FaBell } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
+import socketService from '../../services/socket';
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';
@@ -17,9 +18,21 @@ const Navbar = () => {
     const navigate = useNavigate();
     const [isAdmin, setIsAdmin] = useState(false);
     const [isHR, setIsHR] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [showNotifications, setShowNotifications] = useState(false);
 
     useEffect(() => {
         checkAdminStatus();
+        if (user) {
+            fetchNotifications();
+            connectNotificationSocket();
+        } else {
+            setNotifications([]);
+        }
+
+        return () => {
+            socketService.offNotification();
+        };
     }, [user]);
 
     const checkAdminStatus = async () => {
@@ -43,6 +56,47 @@ const Navbar = () => {
     const handleLogout = async () => {
         await logout();
         navigate('/');
+    };
+
+    const fetchNotifications = async () => {
+        try {
+            const { data } = await api.get('/notifications?limit=20');
+            const rows = Array.isArray(data?.notifications) ? data.notifications : [];
+            setNotifications(rows);
+        } catch (error) {
+            setNotifications([]);
+        }
+    };
+
+    const connectNotificationSocket = () => {
+        const candidateKeys = ['token', 'admin_access', 'hr_access', 'access_token'];
+        const token = candidateKeys.map((key) => localStorage.getItem(key) || sessionStorage.getItem(key)).find(Boolean);
+        if (!token) return;
+        socketService.connect(token);
+        socketService.onNotification((notification) => {
+            setNotifications((prev) => {
+                const exists = prev.some((item) => item.id === notification.id);
+                return exists ? prev : [notification, ...prev].slice(0, 20);
+            });
+        });
+    };
+
+    const handleNotificationClick = async (notification) => {
+        try {
+            if (!notification.is_read) {
+                await api.patch(`/notifications/${notification.id}/read`);
+                setNotifications((prev) => prev.map((item) => (
+                    item.id === notification.id ? { ...item, is_read: true } : item
+                )));
+            }
+        } catch (error) {
+            // ignore
+        } finally {
+            if (notification.entity_type === 'conversation' && notification.entity_id) {
+                navigate(`/messages?conversation=${notification.entity_id}`);
+                setShowNotifications(false);
+            }
+        }
     };
 
     return (
@@ -147,6 +201,40 @@ const Navbar = () => {
                                         <FaComment /> Messages
                                     </Link>
                                 )}
+
+                                <div className="nav-notification">
+                                    <button
+                                        className="notification-btn"
+                                        onClick={() => setShowNotifications(!showNotifications)}
+                                        aria-label="Notifications"
+                                    >
+                                        <FaBell />
+                                        {notifications.filter((n) => !n.is_read).length > 0 && (
+                                            <span className="notification-badge">
+                                                {notifications.filter((n) => !n.is_read).length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    {showNotifications && (
+                                        <div className="notification-menu">
+                                            <h4>Notifications</h4>
+                                            {notifications.length === 0 ? (
+                                                <div className="notification-empty">No notifications yet.</div>
+                                            ) : (
+                                                notifications.map((notification) => (
+                                                    <div
+                                                        key={notification.id}
+                                                        className={`notification-item ${notification.is_read ? 'read' : 'unread'}`}
+                                                        onClick={() => handleNotificationClick(notification)}
+                                                    >
+                                                        <p>{notification.message}</p>
+                                                        <small>{new Date(notification.created_at).toLocaleString()}</small>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
 
                                 <Link to="/settings" className="navbar-avatar" aria-label="Profile">
                                     {user?.avatar_url ? (

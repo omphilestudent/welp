@@ -179,8 +179,9 @@ const Messages = () => {
             return;
         }
 
-        if (!activeConversation || !visibleConversations.some(c => c.id === activeConversation.id)) {
-            setActiveConversation(visibleConversations[0]);
+        if (activeConversation && !visibleConversations.some(c => c.id === activeConversation.id)) {
+            setActiveConversation(null);
+            setMessages([]);
         }
     }, [visibleConversations, activeConversation]);
 

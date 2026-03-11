@@ -551,6 +551,24 @@ const runMigrations = async () => {
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';",
+            `CREATE TABLE IF NOT EXISTS user_settings (
+                user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                theme VARCHAR(10) DEFAULT 'light',
+                email_notifications BOOLEAN DEFAULT true,
+                message_notifications BOOLEAN DEFAULT true,
+                review_notifications BOOLEAN DEFAULT true,
+                marketing_notifications BOOLEAN DEFAULT false,
+                product_updates BOOLEAN DEFAULT true,
+                security_alerts BOOLEAN DEFAULT true,
+                profile_visibility VARCHAR(20) DEFAULT 'public',
+                data_sharing BOOLEAN DEFAULT false,
+                language VARCHAR(10) DEFAULT 'en',
+                timezone VARCHAR(50) DEFAULT 'UTC',
+                two_factor_enabled BOOLEAN DEFAULT false,
+                login_alerts BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
 
             // Messages
             "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_system_message BOOLEAN DEFAULT false;",
@@ -671,6 +689,19 @@ const runMigrations = async () => {
             "CREATE INDEX IF NOT EXISTS idx_psych_leads_status ON psychologist_leads(status);",
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_psych_leads_source_review ON psychologist_leads(psychologist_id, source_review_id) WHERE source_review_id IS NOT NULL;",
             "CREATE INDEX IF NOT EXISTS idx_psych_favorites_psychologist ON psychologist_favorites(psychologist_id);",
+            `CREATE TABLE IF NOT EXISTS user_notifications (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                type VARCHAR(50) NOT NULL,
+                message TEXT NOT NULL,
+                entity_type VARCHAR(50),
+                entity_id UUID,
+                is_read BOOLEAN DEFAULT false,
+                read_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_user_notifications_user ON user_notifications(user_id);",
+            "CREATE INDEX IF NOT EXISTS idx_user_notifications_unread ON user_notifications(user_id, is_read) WHERE is_read = false;",
             `CREATE TABLE IF NOT EXISTS mental_health_resources (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 title TEXT NOT NULL,

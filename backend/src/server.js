@@ -19,6 +19,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const hrRoutes = require('./routes/hrRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const resourcesRoutes = require('./routes/resourcesRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 // Database connection with better error handling
 const { sequelize, testConnection } = require('./models');
@@ -147,6 +148,7 @@ app.use('/api/resources', resourcesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {
@@ -239,6 +241,7 @@ io.use((socket, next) => {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
     console.log('🔌 User connected:', socket.userId, 'Role:', socket.userRole);
+    socket.join(`user-${socket.userId}`);
 
     socket.on('join-conversation', (conversationId) => {
         if (!conversationId) {
@@ -270,7 +273,7 @@ io.on('connection', (socket) => {
 
             // Check conversation access
             const conversationAccess = await query(
-                `SELECT id FROM conversations
+                `SELECT id, employee_id, psychologist_id FROM conversations
                  WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
                 [conversationId, socket.userId]
             );
@@ -306,6 +309,22 @@ io.on('connection', (socket) => {
 
             // Emit to all in conversation
             io.to(`conversation-${conversationId}`).emit('new-message', message);
+
+            const { createUserNotification } = require('./utils/userNotifications');
+            const convo = conversationAccess.rows[0];
+            const recipientId = convo.employee_id === socket.userId ? convo.psychologist_id : convo.employee_id;
+            const senderName = message.sender?.display_name || 'Someone';
+            const notification = await createUserNotification({
+                userId: recipientId,
+                type: 'message',
+                message: `${senderName} sent you a message`,
+                entityType: 'conversation',
+                entityId: conversationId
+            });
+
+            if (notification) {
+                io.to(`user-${recipientId}`).emit('notification', notification);
+            }
 
             console.log(`Message sent in conversation ${conversationId} by user ${socket.userId}`);
 

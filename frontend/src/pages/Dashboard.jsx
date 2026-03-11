@@ -6,7 +6,7 @@ import api from '../services/api';
 import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
-import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit, FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo } from 'react-icons/fa';
+import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit, FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import {
     addDays,
     addMonths,
@@ -254,6 +254,11 @@ const Dashboard = () => {
     });
     const [calendarView, setCalendarView] = useState('month');
     const [calendarDate, setCalendarDate] = useState(new Date());
+    const [psychCardCollapse, setPsychCardCollapse] = useState({
+        schedule: false,
+        leads: false,
+        calls: false
+    });
 
     useEffect(() => {
         if (user?.role === 'psychologist') {
@@ -408,6 +413,13 @@ const Dashboard = () => {
 
     const handleCalendarToday = () => {
         setCalendarDate(new Date());
+    };
+
+    const togglePsychCard = (key) => {
+        setPsychCardCollapse((prev) => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
     };
 
     if (loading) return <Loading />;
@@ -739,176 +751,224 @@ const Dashboard = () => {
                         <div className="psych-dashboard-grid">
                             <section className="psych-card">
                                 <header className="psych-card__header">
-                                    <h3><FaCalendarAlt /> Schedule</h3>
-                                    <p>Plan meetings and activities with a live calendar view.</p>
-                                </header>
-                                <div className="psych-calendar-controls">
-                                    <div className="psych-calendar-nav">
-                                        <button className="btn btn-secondary btn-small" onClick={handleCalendarPrev}>
-                                            Prev
-                                        </button>
-                                        <button className="btn btn-outline btn-small" onClick={handleCalendarToday}>
-                                            Today
-                                        </button>
-                                        <button className="btn btn-secondary btn-small" onClick={handleCalendarNext}>
-                                            Next
-                                        </button>
+                                    <div>
+                                        <h3><FaCalendarAlt /> Schedule</h3>
+                                        <p>Plan meetings and activities with a live calendar view.</p>
                                     </div>
-                                    <div className="psych-calendar-title">
-                                        {calendarView === 'month'
-                                            ? format(calendarDate, 'MMMM yyyy')
-                                            : `${format(calendarStart, 'MMM d')} - ${format(calendarEnd, 'MMM d')}`}
-                                    </div>
-                                    <div className="psych-calendar-view">
-                                        <button
-                                            className={`btn btn-small ${calendarView === 'month' ? 'btn-primary' : 'btn-outline'}`}
-                                            onClick={() => setCalendarView('month')}
-                                        >
-                                            Month
-                                        </button>
-                                        <button
-                                            className={`btn btn-small ${calendarView === 'week' ? 'btn-primary' : 'btn-outline'}`}
-                                            onClick={() => setCalendarView('week')}
-                                        >
-                                            Week
-                                        </button>
-                                    </div>
-                                </div>
-                                <form className="psych-schedule-form" onSubmit={handleScheduleSubmit}>
-                                    <input
-                                        type="text"
-                                        placeholder="Title"
-                                        value={scheduleDraft.title}
-                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, title: e.target.value })}
-                                    />
-                                    <input
-                                        type="date"
-                                        value={scheduleDraft.date}
-                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, date: e.target.value })}
-                                    />
-                                    <input
-                                        type="time"
-                                        value={scheduleDraft.time}
-                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, time: e.target.value })}
-                                    />
-                                    <select
-                                        value={scheduleDraft.type}
-                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, type: e.target.value })}
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-small psych-card__toggle"
+                                        onClick={() => togglePsychCard('schedule')}
+                                        aria-label={psychCardCollapse.schedule ? 'Maximize schedule card' : 'Minimize schedule card'}
                                     >
-                                        <option value="meeting">Meeting</option>
-                                        <option value="video">Video</option>
-                                        <option value="voice">Voice</option>
-                                        <option value="note">Note</option>
-                                    </select>
-                                    <input
-                                        type="text"
-                                        placeholder="Location / link"
-                                        value={scheduleDraft.location}
-                                        onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })}
-                                    />
-                                    <button type="submit" className="btn btn-primary btn-small">Add</button>
-                                </form>
-                                <div className={`psych-calendar psych-calendar--${calendarView}`}>
-                                    <div className="psych-calendar-weekdays">
-                                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
-                                            <span key={label}>{label}</span>
-                                        ))}
-                                    </div>
-                                    <div className="psych-calendar-grid">
-                                        {calendarDays.map((day) => {
-                                            const key = format(day, 'yyyy-MM-dd');
-                                            const items = itemsByDate[key] || [];
-                                            const isMuted = calendarView === 'month' && !isSameMonth(day, calendarDate);
-                                            const isToday = isSameDay(day, new Date());
-                                            return (
-                                                <button
-                                                    type="button"
-                                                    key={key}
-                                                    className={`psych-calendar-day ${isMuted ? 'is-muted' : ''} ${isToday ? 'is-today' : ''}`}
-                                                    onClick={() => setScheduleDraft((prev) => ({
-                                                        ...prev,
-                                                        date: format(day, 'yyyy-MM-dd')
-                                                    }))}
-                                                >
-                                                    <div className="psych-calendar-day-header">
-                                                        <span>{format(day, 'd')}</span>
-                                                        {items.length > 0 && <span className="psych-calendar-count">{items.length}</span>}
-                                                    </div>
-                                                    <div className="psych-calendar-items">
-                                                        {items.slice(0, 2).map((item) => (
-                                                            <div key={item.id} className={`psych-calendar-item psych-calendar-item--${item.type}`}>
-                                                                <strong>{item.title}</strong>
-                                                                <span>{format(item.scheduledDate, 'p')}</span>
-                                                            </div>
-                                                        ))}
-                                                        {items.length > 2 && (
-                                                            <div className="psych-calendar-more">+{items.length - 2} more</div>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    {psychSchedule.length === 0 && (
-                                        <p className="empty-message">No scheduled items yet.</p>
-                                    )}
-                                </div>
-                            </section>
-
-                            <section className="psych-card">
-                                <header className="psych-card__header">
-                                    <h3><FaEnvelopeOpenText /> Leads</h3>
-                                    <p>Individuals flagged as potentially stressed or depressed.</p>
+                                        {psychCardCollapse.schedule ? <FaChevronDown /> : <FaChevronUp />}
+                                        {psychCardCollapse.schedule ? 'Maximize' : 'Minimize'}
+                                    </button>
                                 </header>
-                                <div className="psych-leads-list">
-                                    {psychLeads.length > 0 ? (
-                                        psychLeads.map(lead => (
-                                            <div key={lead.id} className="psych-lead-card">
-                                                <div>
-                                                    <h4>{lead.display_name}</h4>
-                                                    <p>{lead.summary}</p>
-                                                    <span className={`lead-badge lead-${lead.risk_level}`}>{lead.risk_level} risk</span>
-                                                </div>
-                                                <button
-                                                    className="btn btn-secondary btn-small"
-                                                    onClick={() => handleLeadMessage(lead.id)}
-                                                >
-                                                    Send message
+                                {!psychCardCollapse.schedule && (
+                                    <div className="psych-card__body">
+                                        <div className="psych-calendar-controls">
+                                            <div className="psych-calendar-nav">
+                                                <button type="button" className="btn btn-secondary btn-small" onClick={handleCalendarPrev}>
+                                                    Prev
+                                                </button>
+                                                <button type="button" className="btn btn-outline btn-small" onClick={handleCalendarToday}>
+                                                    Today
+                                                </button>
+                                                <button type="button" className="btn btn-secondary btn-small" onClick={handleCalendarNext}>
+                                                    Next
                                                 </button>
                                             </div>
-                                        ))
-                                    ) : (
-                                        <p className="empty-message">No new leads right now.</p>
-                                    )}
-                                </div>
+                                            <div className="psych-calendar-title">
+                                                {calendarView === 'month'
+                                                    ? format(calendarDate, 'MMMM yyyy')
+                                                    : `${format(calendarStart, 'MMM d')} - ${format(calendarEnd, 'MMM d')}`}
+                                            </div>
+                                            <div className="psych-calendar-view">
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-small ${calendarView === 'month' ? 'btn-primary' : 'btn-outline'}`}
+                                                    onClick={() => setCalendarView('month')}
+                                                >
+                                                    Month
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-small ${calendarView === 'week' ? 'btn-primary' : 'btn-outline'}`}
+                                                    onClick={() => setCalendarView('week')}
+                                                >
+                                                    Week
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <form className="psych-schedule-form" onSubmit={handleScheduleSubmit}>
+                                            <input
+                                                type="text"
+                                                placeholder="Title"
+                                                value={scheduleDraft.title}
+                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, title: e.target.value })}
+                                            />
+                                            <input
+                                                type="date"
+                                                value={scheduleDraft.date}
+                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, date: e.target.value })}
+                                            />
+                                            <input
+                                                type="time"
+                                                value={scheduleDraft.time}
+                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, time: e.target.value })}
+                                            />
+                                            <select
+                                                value={scheduleDraft.type}
+                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, type: e.target.value })}
+                                            >
+                                                <option value="meeting">Meeting</option>
+                                                <option value="video">Video</option>
+                                                <option value="voice">Voice</option>
+                                                <option value="note">Note</option>
+                                            </select>
+                                            <input
+                                                type="text"
+                                                placeholder="Location / link"
+                                                value={scheduleDraft.location}
+                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })}
+                                            />
+                                            <button type="submit" className="btn btn-primary btn-small">Add</button>
+                                        </form>
+                                        <div className={`psych-calendar psych-calendar--${calendarView}`}>
+                                            <div className="psych-calendar-weekdays">
+                                                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
+                                                    <span key={label}>{label}</span>
+                                                ))}
+                                            </div>
+                                            <div className="psych-calendar-grid">
+                                                {calendarDays.map((day) => {
+                                                    const key = format(day, 'yyyy-MM-dd');
+                                                    const items = itemsByDate[key] || [];
+                                                    const isMuted = calendarView === 'month' && !isSameMonth(day, calendarDate);
+                                                    const isToday = isSameDay(day, new Date());
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            key={key}
+                                                            className={`psych-calendar-day ${isMuted ? 'is-muted' : ''} ${isToday ? 'is-today' : ''}`}
+                                                            onClick={() => setScheduleDraft((prev) => ({
+                                                                ...prev,
+                                                                date: format(day, 'yyyy-MM-dd')
+                                                            }))}
+                                                        >
+                                                            <div className="psych-calendar-day-header">
+                                                                <span>{format(day, 'd')}</span>
+                                                                {items.length > 0 && <span className="psych-calendar-count">{items.length}</span>}
+                                                            </div>
+                                                            <div className="psych-calendar-items">
+                                                                {items.slice(0, 2).map((item) => (
+                                                                    <div key={item.id} className={`psych-calendar-item psych-calendar-item--${item.type}`}>
+                                                                        <strong>{item.title}</strong>
+                                                                        <span>{format(item.scheduledDate, 'p')}</span>
+                                                                    </div>
+                                                                ))}
+                                                                {items.length > 2 && (
+                                                                    <div className="psych-calendar-more">+{items.length - 2} more</div>
+                                                                )}
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {psychSchedule.length === 0 && (
+                                                <p className="empty-message">No scheduled items yet.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </section>
 
                             <section className="psych-card">
                                 <header className="psych-card__header">
-                                    <h3><FaVideo /> Call Options</h3>
-                                    <p>Voice and video calls are enabled with plan-based limits.</p>
-                                </header>
-                                <div className="psych-call-summary">
                                     <div>
-                                        <p className="psych-call-plan">
-                                            Plan: {psychPermissions?.plan || 'Free'}
-                                        </p>
-                                        <p className="psych-call-limit">
-                                            Free profiles: {psychPermissions?.callLimits?.minutesPerClient || 120} minutes per client.
-                                        </p>
-                                        <p className="psych-call-note">
-                                            Premium profiles unlock more features as outlined on the pricing page.
-                                        </p>
+                                        <h3><FaEnvelopeOpenText /> Leads</h3>
+                                        <p>Individuals flagged as potentially stressed or depressed.</p>
                                     </div>
-                                    <div className="psych-call-actions">
-                                        <button className="btn btn-outline btn-small" disabled>
-                                            <FaPhoneAlt /> Voice
-                                        </button>
-                                        <button className="btn btn-outline btn-small" disabled>
-                                            <FaVideo /> Video
-                                        </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-small psych-card__toggle"
+                                        onClick={() => togglePsychCard('leads')}
+                                        aria-label={psychCardCollapse.leads ? 'Maximize leads card' : 'Minimize leads card'}
+                                    >
+                                        {psychCardCollapse.leads ? <FaChevronDown /> : <FaChevronUp />}
+                                        {psychCardCollapse.leads ? 'Maximize' : 'Minimize'}
+                                    </button>
+                                </header>
+                                {!psychCardCollapse.leads && (
+                                    <div className="psych-card__body">
+                                        <div className="psych-leads-list">
+                                            {psychLeads.length > 0 ? (
+                                                psychLeads.map(lead => (
+                                                    <div key={lead.id} className="psych-lead-card">
+                                                        <div>
+                                                            <h4>{lead.display_name}</h4>
+                                                            <p>{lead.summary}</p>
+                                                            <span className={`lead-badge lead-${lead.risk_level}`}>{lead.risk_level} risk</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary btn-small"
+                                                            onClick={() => handleLeadMessage(lead.id)}
+                                                        >
+                                                            Send message
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="empty-message">No new leads right now.</p>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+                            </section>
+
+                            <section className="psych-card">
+                                <header className="psych-card__header">
+                                    <div>
+                                        <h3><FaVideo /> Call Options</h3>
+                                        <p>Voice and video calls are enabled with plan-based limits.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-small psych-card__toggle"
+                                        onClick={() => togglePsychCard('calls')}
+                                        aria-label={psychCardCollapse.calls ? 'Maximize call options card' : 'Minimize call options card'}
+                                    >
+                                        {psychCardCollapse.calls ? <FaChevronDown /> : <FaChevronUp />}
+                                        {psychCardCollapse.calls ? 'Maximize' : 'Minimize'}
+                                    </button>
+                                </header>
+                                {!psychCardCollapse.calls && (
+                                    <div className="psych-card__body">
+                                        <div className="psych-call-summary">
+                                            <div>
+                                                <p className="psych-call-plan">
+                                                    Plan: {psychPermissions?.plan || 'Free'}
+                                                </p>
+                                                <p className="psych-call-limit">
+                                                    Free profiles: {psychPermissions?.callLimits?.minutesPerClient || 120} minutes per client.
+                                                </p>
+                                                <p className="psych-call-note">
+                                                    Premium profiles unlock more features as outlined on the pricing page.
+                                                </p>
+                                            </div>
+                                            <div className="psych-call-actions">
+                                                <button type="button" className="btn btn-outline btn-small" disabled>
+                                                    <FaPhoneAlt /> Voice
+                                                </button>
+                                                <button type="button" className="btn btn-outline btn-small" disabled>
+                                                    <FaVideo /> Video
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </section>
                         </div>
                     )}

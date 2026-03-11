@@ -7,6 +7,9 @@ class SocketService {
     }
 
     connect(token) {
+        if (this.socket) {
+            return this.socket;
+        }
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const baseURL = API_URL.replace('/api', '');
 
@@ -65,6 +68,18 @@ class SocketService {
     offNewMessage() {
         if (this.socket) {
             this.socket.off('new-message');
+        }
+    }
+
+    onNotification(callback) {
+        if (this.socket) {
+            this.socket.on('notification', callback);
+        }
+    }
+
+    offNotification() {
+        if (this.socket) {
+            this.socket.off('notification');
         }
     }
 

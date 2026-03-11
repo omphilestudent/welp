@@ -1,5 +1,6 @@
 
 const { query } = require('../utils/database');
+const { createUserNotification } = require('../utils/userNotifications');
 
 const getActiveSubscription = async (userId) => {
     const result = await query(
@@ -98,6 +99,23 @@ const requestChatWithPsychologist = async (req, res) => {
             [conversation.rows[0].id, req.user.id, initialMessage || 'Hello, I would like to chat with you.']
         );
 
+        const sender = await query(
+            'SELECT display_name FROM users WHERE id = $1',
+            [req.user.id]
+        );
+        const senderName = sender.rows[0]?.display_name || 'Someone';
+        const notification = await createUserNotification({
+            userId: psychologistId,
+            type: 'message_request',
+            message: `${senderName} sent you a chat request`,
+            entityType: 'conversation',
+            entityId: conversation.rows[0].id
+        });
+        const io = req.app?.get('io');
+        if (io && notification) {
+            io.to(`user-${psychologistId}`).emit('notification', notification);
+        }
+
         res.status(201).json({
             message: 'Chat request sent successfully',
             conversation: conversation.rows[0]
@@ -173,6 +191,23 @@ const sendMessageRequest = async (req, res) => {
        VALUES ($1, $2, $3)`,
             [conversation.rows[0].id, req.user.id, initialMessage]
         );
+
+        const sender = await query(
+            'SELECT display_name FROM users WHERE id = $1',
+            [req.user.id]
+        );
+        const senderName = sender.rows[0]?.display_name || 'Someone';
+        const notification = await createUserNotification({
+            userId: employeeId,
+            type: 'message_request',
+            message: `${senderName} sent you a chat request`,
+            entityType: 'conversation',
+            entityId: conversation.rows[0].id
+        });
+        const io = req.app?.get('io');
+        if (io && notification) {
+            io.to(`user-${employeeId}`).emit('notification', notification);
+        }
 
         res.status(201).json(conversation.rows[0]);
     } catch (error) {
@@ -522,6 +557,19 @@ const sendMessage = async (req, res) => {
                 ...result.rows[0],
                 sender: sender.rows[0]
             });
+        }
+
+        const recipientId = convo.employee_id === req.user.id ? convo.psychologist_id : convo.employee_id;
+        const senderName = sender.rows[0]?.display_name || 'Someone';
+        const notification = await createUserNotification({
+            userId: recipientId,
+            type: 'message',
+            message: `${senderName} sent you a message`,
+            entityType: 'conversation',
+            entityId: conversationId
+        });
+        if (io && notification) {
+            io.to(`user-${recipientId}`).emit('notification', notification);
         }
     } catch (error) {
         console.error('Send message error:', error);
