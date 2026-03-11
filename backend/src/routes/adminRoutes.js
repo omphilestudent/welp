@@ -45,7 +45,7 @@ router.get('/reviews', adminController.getReviews);
 router.get('/reviews/pending', adminController.getPendingReviews);
 router.patch('/reviews/:id/moderate',
     validate([
-        body('action').isIn(['approve', 'reject', 'flag']),
+        body('action').isIn(['approve', 'reject', 'flag', 'hide', 'show']),
         body('reason').optional().trim()
     ]),
     adminController.moderateReview
