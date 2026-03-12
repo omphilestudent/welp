@@ -16,7 +16,7 @@ const searchCompanies = async (req, res) => {
 
         const params = [];
         let paramIndex = 1;
-        const conditions = ['c.status = \\'active\\''];
+        const conditions = ["c.status = 'active'"];
 
         if (q && q.trim() !== '') {
             conditions.push('(c.name ILIKE $' + paramIndex + ' OR c.description ILIKE $' + paramIndex + ' OR c.industry ILIKE $' + paramIndex + ')');
