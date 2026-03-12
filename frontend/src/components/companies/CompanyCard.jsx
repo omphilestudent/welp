@@ -93,7 +93,14 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
                 )}
 
                 <div className="company-card-info">
-                    <h3 className="company-card-name">{name}</h3>
+                    <div className="company-card-name-row">
+                        <h3 className="company-card-name">{name}</h3>
+                        {isClaimed && (
+                            <span className="company-claimed-pill" aria-label="Business already claimed">
+                                Claimed
+                            </span>
+                        )}
+                    </div>
                     <span className="company-card-industry">{industry}</span>
                 </div>
             </div>
@@ -130,14 +137,20 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
             )}
 
             <div className="company-card-footer">
-                {!isClaimed && showClaimAction && (
-                    <button
-                        type="button"
-                        className="company-claim-btn"
-                        onClick={handleClaimClick}
-                    >
-                        Claim this business
-                    </button>
+                {isClaimed ? (
+                    <span className="company-claimed-note" aria-live="polite">
+                        Verified owner profile active
+                    </span>
+                ) : (
+                    showClaimAction && (
+                        <button
+                            type="button"
+                            className="company-claim-btn"
+                            onClick={handleClaimClick}
+                        >
+                            Claim this business
+                        </button>
+                    )
                 )}
             </div>
         </div>

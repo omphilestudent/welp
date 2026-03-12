@@ -9,6 +9,7 @@ const companyController = require('../controllers/companyController');
 const router = express.Router();
 
 const ownerRoles = ['business', 'admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'];
+const UUID_PARAM = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 
 
 router.get('/search', apiLimiter, companyController.searchCompanies);
@@ -24,7 +25,7 @@ router.post('/scrape',
 );
 
 // Scrape missing info for an existing company
-router.post('/:id/scrape-missing',
+router.post(`/:id(${UUID_PARAM})/scrape-missing`,
     authenticate,
     authorize('business', 'admin', 'super_admin', 'hr_admin'),
     companyController.scrapeMissingCompanyInfo
@@ -43,40 +44,40 @@ router.get('/my-companies',
     companyController.getMyCompanies
 );
 
-router.post('/:id/claim',
+router.post(`/:id(${UUID_PARAM})/claim`,
     authenticate,
     authorize('business'),
     companyController.claimCompany
 );
 
-router.patch('/:id',
+router.patch(`/:id(${UUID_PARAM})`,
     authenticate,
     authorize(...ownerRoles),
     validate(companyUpdateValidation),
     companyController.updateCompany
 );
 
-router.put('/:id',
+router.put(`/:id(${UUID_PARAM})`,
     authenticate,
     authorize(...ownerRoles),
     validate(companyUpdateValidation),
     companyController.updateCompany
 );
 
-router.get('/:id/business-reviews',
+router.get(`/:id(${UUID_PARAM})/business-reviews`,
     authenticate,
     authorize(...ownerRoles),
     companyController.getCompanyReviewsForBusiness
 );
 
-router.get('/:id/analytics',
+router.get(`/:id(${UUID_PARAM})/analytics`,
     authenticate,
     authorize(...ownerRoles),
     companyController.getCompanyAnalytics
 );
 
 
-router.post('/:id/request-claim',
+router.post(`/:id(${UUID_PARAM})/request-claim`,
     authenticate,
     authorize('business'),
     validate([
@@ -93,10 +94,6 @@ router.get('/my-claim-requests',
     authorize('business'),
     companyController.getMyClaimRequests
 );
-
-// Generic company lookup MUST stay after more specific routes to avoid conflicts
-router.get('/:id', apiLimiter, companyController.getCompany);
-
 
 router.post('/verify-email',
     authenticate,
@@ -116,5 +113,8 @@ router.post('/confirm-verification',
     ]),
     companyController.confirmEmailVerification
 );
+
+// Generic company lookup MUST stay after more specific routes to avoid conflicts
+router.get(`/:id(${UUID_PARAM})`, apiLimiter, companyController.getCompany);
 
 module.exports = router;

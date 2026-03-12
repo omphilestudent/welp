@@ -54,6 +54,16 @@
   font-size: 1.1rem;
 }
 
+.review-author-role {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  padding: 0.15rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
 .review-date {
   color: var(--text-muted);
   font-size: 0.875rem;

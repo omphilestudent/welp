@@ -69,6 +69,13 @@
   flex: 1;
 }
 
+.company-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .company-card-name {
   font-size: 1.35rem;
   font-weight: 700;
@@ -152,6 +159,12 @@
 
 .company-claim-btn:hover {
   background: #1d4ed8;
+}
+
+.company-claimed-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 

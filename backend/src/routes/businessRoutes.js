@@ -12,30 +12,31 @@ const reviewController = require('../controllers/reviewController');
 
 const router = express.Router();
 const ownerRoles = ['business', 'admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'];
+const UUID_PARAM = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 
 router.get('/', apiLimiter, companyController.searchCompanies);
-router.get('/:companyId', apiLimiter, companyController.getBusinessProfile);
+router.get(`/:companyId(${UUID_PARAM})`, apiLimiter, companyController.getBusinessProfile);
 
-router.get('/:companyId/analytics',
+router.get(`/:companyId(${UUID_PARAM})/analytics`,
     authenticate,
     authorize(...ownerRoles),
     companyController.getCompanyAnalytics
 );
 
-router.put('/:companyId',
+router.put(`/:companyId(${UUID_PARAM})`,
     authenticate,
     authorize(...ownerRoles),
     validate(companyUpdateValidation),
     companyController.updateCompany
 );
 
-router.get('/:companyId/reviews',
+router.get(`/:companyId(${UUID_PARAM})/reviews`,
     authenticate,
     authorize(...ownerRoles),
     companyController.getCompanyReviewsForBusiness
 );
 
-router.post('/:companyId/review',
+router.post(`/:companyId(${UUID_PARAM})/review`,
     authenticate,
     authorize('employee'),
     validate(reviewValidation),
@@ -45,7 +46,7 @@ router.post('/:companyId/review',
     }
 );
 
-router.post('/:companyId/review/:reviewId/reply',
+router.post(`/:companyId(${UUID_PARAM})/review/:reviewId(${UUID_PARAM})/reply`,
     authenticate,
     authorize(...ownerRoles),
     validate(replyValidation),

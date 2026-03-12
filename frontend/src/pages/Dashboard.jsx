@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
@@ -6,36 +5,24 @@ import api from '../services/api';
 import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
-import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit, FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import {
-    ResponsiveContainer,
-    BarChart,
-    Bar,
-    LineChart,
-    Line,
-    PieChart,
-    Pie,
-    Cell,
-    CartesianGrid,
-    XAxis,
-    YAxis,
-    Tooltip
+    FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
+    FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo,
+    FaChevronDown, FaChevronUp, FaStar, FaReply, FaCheckCircle,
+    FaTimesCircle, FaUserSecret, FaUser, FaChartBar, FaSync,
+    FaGlobe, FaMapMarkerAlt, FaEnvelope, FaPhone, FaImage,
+    FaCrown, FaShieldAlt, FaExclamationTriangle
+} from 'react-icons/fa';
+import {
+    ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart,
+    Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip, Legend
 } from 'recharts';
-const BUSINESS_PIE_COLORS = ['#4f46e5', '#f59e0b', '#0ea5e9', '#10b981', '#9333ea'];
 import {
-    addDays,
-    addMonths,
-    addWeeks,
-    endOfMonth,
-    endOfWeek,
-    format,
-    isSameDay,
-    isSameMonth,
-    startOfMonth,
-    startOfWeek,
-    subMonths,
-    subWeeks
+    addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format,
+    isSameDay, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks
 } from 'date-fns';
+
+const BUSINESS_PIE_COLORS = ['#6366f1', '#f59e0b', '#0ea5e9', '#10b981', '#ec4899'];
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';
@@ -44,6 +31,195 @@ const resolveMediaUrl = (url) => {
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
+/* ─────────────────────────────────────────────
+   Star Rating Display
+───────────────────────────────────────────── */
+const StarRating = ({ rating, size = 14 }) => {
+    return (
+        <span className="star-rating" style={{ display: 'inline-flex', gap: 2 }}>
+            {[1, 2, 3, 4, 5].map((s) => (
+                <FaStar
+                    key={s}
+                    size={size}
+                    style={{ color: s <= Math.round(rating) ? '#f59e0b' : '#d1d5db' }}
+                />
+            ))}
+        </span>
+    );
+};
+
+/* ─────────────────────────────────────────────
+   Review Card — with identity, reply, sentiment
+───────────────────────────────────────────── */
+const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
+    const [showReplyForm, setShowReplyForm] = useState(false);
+    const [replyText, setReplyText] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [existingReply, setExistingReply] = useState(review.business_reply || null);
+
+    const isAnonymous = review.is_anonymous || !review.author_name;
+    const authorLabel = isAnonymous ? 'Anonymous Employee' : (review.author_name || 'Employee');
+    const occupationLabel = review.author_occupation || review.occupation;
+    const workplaceLabel = review.author_workplace || review.workplace_name;
+    const sentimentColor = review.sentiment === 'positive'
+        ? '#10b981' : review.sentiment === 'negative' ? '#ef4444' : '#6b7280';
+
+    const handleReplySubmit = async (e) => {
+        e.preventDefault();
+        if (!replyText.trim()) return;
+        if (!replyEndpoint) { toast.error('Reply endpoint not configured'); return; }
+        setSubmitting(true);
+        try {
+            const { data } = await api.post(replyEndpoint, { reply: replyText });
+            setExistingReply(data.reply || replyText);
+            setReplyText('');
+            setShowReplyForm(false);
+            toast.success('Reply posted');
+            onReplyAdded?.();
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to post reply');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="biz-review-card">
+            <div className="biz-review-card__header">
+                <div className="biz-review-author">
+                    <div className={`biz-review-avatar ${isAnonymous ? 'biz-review-avatar--anon' : ''}`}>
+                        {isAnonymous ? <FaUserSecret size={14} /> : <FaUser size={14} />}
+                    </div>
+                    <div>
+                        <span className="biz-review-author-name">{authorLabel}</span>
+                        {(occupationLabel || workplaceLabel) && (
+                            <span className="biz-review-author-meta">
+                                {occupationLabel && <span><FaBriefcase size={10} /> {occupationLabel}</span>}
+                                {workplaceLabel && <span><FaBuilding size={10} /> {workplaceLabel}</span>}
+                            </span>
+                        )}
+                    </div>
+                    {isAnonymous && (
+                        <span className="biz-review-badge biz-review-badge--anon">Anonymous</span>
+                    )}
+                    {!isAnonymous && (
+                        <span className="biz-review-badge biz-review-badge--verified">Verified Employee</span>
+                    )}
+                </div>
+                <div className="biz-review-meta">
+                    <StarRating rating={review.rating} />
+                    <span className="biz-review-date">
+                        {review.created_at ? format(new Date(review.created_at), 'MMM d, yyyy') : ''}
+                    </span>
+                    {review.sentiment && (
+                        <span
+                            className="biz-review-sentiment"
+                            style={{ background: `${sentimentColor}18`, color: sentimentColor }}
+                        >
+                            {review.sentiment}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {review.title && <h5 className="biz-review-title">{review.title}</h5>}
+            <p className="biz-review-body">{review.content || review.body}</p>
+
+            {review.pros && (
+                <div className="biz-review-pros-cons">
+                    <span className="biz-review-pros"><FaCheckCircle size={11} /> {review.pros}</span>
+                    {review.cons && <span className="biz-review-cons"><FaTimesCircle size={11} /> {review.cons}</span>}
+                </div>
+            )}
+
+            {existingReply && (
+                <div className="biz-review-reply">
+                    <div className="biz-review-reply__label">
+                        <FaCrown size={11} /> Business response
+                    </div>
+                    <p>{existingReply}</p>
+                </div>
+            )}
+
+            {!existingReply && replyEndpoint && (
+                <div className="biz-review-reply-action">
+                    {!showReplyForm ? (
+                        <button
+                            type="button"
+                            className="btn-reply"
+                            onClick={() => setShowReplyForm(true)}
+                        >
+                            <FaReply size={11} /> Reply publicly
+                        </button>
+                    ) : (
+                        <form className="biz-review-reply-form" onSubmit={handleReplySubmit}>
+                            <textarea
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder="Write a professional response visible to all users…"
+                                rows={3}
+                            />
+                            <div className="biz-review-reply-form__actions">
+                                <button type="submit" className="btn btn-primary btn-small" disabled={submitting}>
+                                    {submitting ? 'Posting…' : 'Post reply'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary btn-small"
+                                    onClick={() => { setShowReplyForm(false); setReplyText(''); }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+/* ─────────────────────────────────────────────
+   Claim Status Banner
+───────────────────────────────────────────── */
+const ClaimStatusBanner = ({ company, onRefresh }) => {
+    if (!company) return null;
+    const isClaimed = company.is_claimed || company.claimed;
+    const isVerified = company.is_verified || company.verified;
+
+    return (
+        <div className={`claim-banner ${isClaimed ? 'claim-banner--claimed' : 'claim-banner--unclaimed'}`}>
+            <div className="claim-banner__icon">
+                {isClaimed
+                    ? <FaShieldAlt size={18} />
+                    : <FaExclamationTriangle size={18} />}
+            </div>
+            <div className="claim-banner__text">
+                <strong>
+                    {isClaimed
+                        ? isVerified ? 'Verified Business' : 'Claimed — Pending Verification'
+                        : 'Unclaimed Business Profile'}
+                </strong>
+                <span>
+                    {isClaimed
+                        ? isVerified
+                            ? 'Your business is verified. Customers see the verified badge on your profile.'
+                            : 'Your claim is being reviewed. You\'ll be notified once verified.'
+                        : 'This profile has not been claimed. Search and claim it to manage your presence.'}
+                </span>
+            </div>
+            {isClaimed && (
+                <button type="button" className="btn btn-outline btn-small" onClick={onRefresh}>
+                    <FaSync size={11} /> Sync
+                </button>
+            )}
+        </div>
+    );
+};
+
+/* ─────────────────────────────────────────────
+   Profile Section
+───────────────────────────────────────────── */
 const ProfileSection = ({ user, onUpdate }) => {
     const [uploading, setUploading] = useState(false);
     const [editing, setEditing] = useState(false);
@@ -57,33 +233,19 @@ const ProfileSection = ({ user, onUpdate }) => {
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-
-        if (!file.type.match(/image.*/)) {
-            toast.error('Please select an image file');
-            return;
-        }
-
-
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error('File size must be less than 2MB');
-            return;
-        }
-
+        if (!file.type.match(/image.*/)) { toast.error('Please select an image file'); return; }
+        if (file.size > 2 * 1024 * 1024) { toast.error('File size must be less than 2MB'); return; }
         setUploading(true);
         try {
             const formData = new FormData();
             formData.append('avatar', file);
-
             const { data } = await api.post('/users/upload-avatar', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-
             await api.patch('/users/profile', { avatarUrl: data.avatarUrl });
-
             toast.success('Profile picture updated!');
             onUpdate?.();
-        } catch (error) {
+        } catch {
             toast.error('Failed to upload image');
         } finally {
             setUploading(false);
@@ -91,37 +253,23 @@ const ProfileSection = ({ user, onUpdate }) => {
     };
 
     const searchWorkplaces = async (query) => {
-        if (query.length < 2) {
-            setSearchResults([]);
-            return;
-        }
-
+        if (query.length < 2) { setSearchResults([]); return; }
         setSearching(true);
         try {
-            const { data } = await api.get('/companies/search', {
-                params: {
-                    search: query,
-                    limit: 5
-                }
-            });
+            const { data } = await api.get('/companies/search', { params: { search: query, limit: 5 } });
             setSearchResults(data.companies || []);
-        } catch (error) {
-            console.error('Workplace search error:', error);
-        } finally {
+        } catch { /* silent */ } finally {
             setSearching(false);
         }
     };
 
     const handleSaveProfile = async () => {
         try {
-            await api.patch('/users/profile', {
-                occupation,
-                workplaceId: workplace?.id || null
-            });
+            await api.patch('/users/profile', { occupation, workplaceId: workplace?.id || null });
             toast.success('Profile updated successfully');
             setEditing(false);
             onUpdate?.();
-        } catch (error) {
+        } catch {
             toast.error('Failed to update profile');
         }
     };
@@ -133,49 +281,23 @@ const ProfileSection = ({ user, onUpdate }) => {
                     {user?.avatar_url ? (
                         <img src={resolveMediaUrl(user.avatar_url)} alt={user.display_name} />
                     ) : (
-                        <div className="avatar-placeholder-large">
-                            {user?.display_name?.charAt(0) || 'U'}
-                        </div>
+                        <div className="avatar-placeholder-large">{user?.display_name?.charAt(0) || 'U'}</div>
                     )}
-
-                    <button
-                        className="avatar-upload-btn"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                    >
+                    <button className="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                         {uploading ? <FaUpload className="spinning" /> : <FaCamera />}
                     </button>
-
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileSelect}
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                    />
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" style={{ display: 'none' }} />
                 </div>
 
                 <div className="profile-info">
                     <h3>{user?.display_name}</h3>
                     <p className="user-role">{user?.role}</p>
-
                     {!editing ? (
                         <>
-                            {user?.occupation && (
-                                <p className="user-occupation">
-                                    <FaBriefcase /> {user.occupation}
-                                </p>
-                            )}
-                            {user?.workplace && (
-                                <p className="user-workplace">
-                                    <FaBuilding /> {user.workplace.name}
-                                </p>
-                            )}
+                            {user?.occupation && <p className="user-occupation"><FaBriefcase /> {user.occupation}</p>}
+                            {user?.workplace && <p className="user-workplace"><FaBuilding /> {user.workplace.name}</p>}
                             {(user?.role === 'employee' || user?.role === 'psychologist') && (
-                                <button
-                                    className="edit-profile-btn"
-                                    onClick={() => setEditing(true)}
-                                >
+                                <button className="edit-profile-btn" onClick={() => setEditing(true)}>
                                     <FaEdit /> Add Work Info
                                 </button>
                             )}
@@ -184,41 +306,23 @@ const ProfileSection = ({ user, onUpdate }) => {
                         <div className="profile-edit-form">
                             <div className="form-group">
                                 <label>Occupation</label>
-                                <input
-                                    type="text"
-                                    value={occupation}
-                                    onChange={(e) => setOccupation(e.target.value)}
-                                    placeholder="e.g., Software Engineer"
-                                />
+                                <input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} placeholder="e.g., Software Engineer" />
                             </div>
-
                             <div className="form-group">
                                 <label>Workplace</label>
                                 <input
                                     type="text"
                                     value={workplaceSearch}
-                                    onChange={(e) => {
-                                        setWorkplaceSearch(e.target.value);
-                                        searchWorkplaces(e.target.value);
-                                    }}
+                                    onChange={(e) => { setWorkplaceSearch(e.target.value); searchWorkplaces(e.target.value); }}
                                     placeholder="Search for your company"
                                 />
                                 {searching && <div className="searching">Searching...</div>}
                                 {searchResults.length > 0 && (
                                     <div className="search-results">
                                         {searchResults.map(company => (
-                                            <div
-                                                key={company.id}
-                                                className="search-result-item"
-                                                onClick={() => {
-                                                    setWorkplace(company);
-                                                    setWorkplaceSearch(company.name);
-                                                    setSearchResults([]);
-                                                }}
-                                            >
-                                                {company.logo_url && (
-                                                    <img src={company.logo_url} alt={company.name} className="company-logo-small" />
-                                                )}
+                                            <div key={company.id} className="search-result-item"
+                                                 onClick={() => { setWorkplace(company); setWorkplaceSearch(company.name); setSearchResults([]); }}>
+                                                {company.logo_url && <img src={company.logo_url} alt={company.name} className="company-logo-small" />}
                                                 <div>
                                                     <div className="company-name">{company.name}</div>
                                                     <div className="company-industry">{company.industry}</div>
@@ -228,22 +332,9 @@ const ProfileSection = ({ user, onUpdate }) => {
                                     </div>
                                 )}
                             </div>
-
                             <div className="form-actions">
-                                <button onClick={handleSaveProfile} className="btn btn-primary btn-small">
-                                    Save
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setEditing(false);
-                                        setOccupation(user?.occupation || '');
-                                        setWorkplace(user?.workplace || null);
-                                        setWorkplaceSearch('');
-                                    }}
-                                    className="btn btn-secondary btn-small"
-                                >
-                                    Cancel
-                                </button>
+                                <button onClick={handleSaveProfile} className="btn btn-primary btn-small">Save</button>
+                                <button onClick={() => { setEditing(false); setOccupation(user?.occupation || ''); setWorkplace(user?.workplace || null); setWorkplaceSearch(''); }} className="btn btn-secondary btn-small">Cancel</button>
                             </div>
                         </div>
                     )}
@@ -253,6 +344,29 @@ const ProfileSection = ({ user, onUpdate }) => {
     );
 };
 
+/* ─────────────────────────────────────────────
+   Custom Tooltip for Charts
+───────────────────────────────────────────── */
+const ChartTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+        <div style={{
+            background: '#1e1b4b', border: '1px solid #4f46e5', borderRadius: 8,
+            padding: '8px 14px', fontSize: 13, color: '#e0e7ff'
+        }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>{label}</p>
+            {payload.map((p) => (
+                <p key={p.name} style={{ margin: '2px 0', color: p.color }}>
+                    {p.name}: <strong>{p.value}</strong>
+                </p>
+            ))}
+        </div>
+    );
+};
+
+/* ─────────────────────────────────────────────
+   Main Dashboard
+───────────────────────────────────────────── */
 const Dashboard = () => {
     const { user, refreshUser } = useAuth();
     const [userReviews, setUserReviews] = useState([]);
@@ -262,55 +376,36 @@ const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('reviews');
     const [error, setError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
+
+    // Psychologist state
     const [psychLeads, setPsychLeads] = useState([]);
     const [psychSchedule, setPsychSchedule] = useState([]);
     const [psychPermissions, setPsychPermissions] = useState(null);
     const [calendarIntegrations, setCalendarIntegrations] = useState([]);
     const [externalEvents, setExternalEvents] = useState([]);
     const [recentCalls, setRecentCalls] = useState([]);
-    const [calendarIntegrationDraft, setCalendarIntegrationDraft] = useState({
-        provider: 'google',
-        name: '',
-        icalUrl: ''
-    });
-    const [scheduleDraft, setScheduleDraft] = useState({
-        title: '',
-        date: '',
-        time: '',
-        type: 'meeting',
-        location: ''
-    });
+    const [calendarIntegrationDraft, setCalendarIntegrationDraft] = useState({ provider: 'google', name: '', icalUrl: '' });
+    const [scheduleDraft, setScheduleDraft] = useState({ title: '', date: '', time: '', type: 'meeting', location: '' });
     const [calendarView, setCalendarView] = useState('month');
     const [calendarDate, setCalendarDate] = useState(new Date());
-    const [psychCardCollapse, setPsychCardCollapse] = useState({
-        schedule: false,
-        leads: false,
-        calls: false
-    });
+    const [psychCardCollapse, setPsychCardCollapse] = useState({ schedule: false, leads: false, calls: false });
+
+    // Business state
     const [selectedCompanyId, setSelectedCompanyId] = useState(null);
     const [selectedCompany, setSelectedCompany] = useState(null);
     const [companyPanelTab, setCompanyPanelTab] = useState('reviews');
     const [companyReviews, setCompanyReviews] = useState([]);
-    const [companyReviewPagination, setCompanyReviewPagination] = useState({
-        page: 1,
-        pages: 0,
-        total: 0,
-        limit: 5
-    });
+    const [companyReviewPagination, setCompanyReviewPagination] = useState({ page: 1, pages: 0, total: 0, limit: 10 });
     const [companyAnalytics, setCompanyAnalytics] = useState(null);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
     const [businessSectionError, setBusinessSectionError] = useState('');
     const [companyInfoSaving, setCompanyInfoSaving] = useState(false);
     const [companyInfoMessage, setCompanyInfoMessage] = useState('');
-    const [editCompanyForm, setEditCompanyForm] = useState({
-        phone: '',
-        email: '',
-        address: '',
-        city: '',
-        country: '',
-        logo_url: ''
-    });
+    const [editCompanyForm, setEditCompanyForm] = useState({ phone: '', email: '', address: '', city: '', country: '', logo_url: '', website: '' });
+    const [reviewFilter, setReviewFilter] = useState({ rating: '', type: '', sort: 'newest' });
+
+    /* ── Helpers ── */
     const formatDuration = (seconds = 0) => {
         const total = Number(seconds) || 0;
         const mins = Math.floor(total / 60);
@@ -318,6 +413,7 @@ const Dashboard = () => {
         return `${mins}m ${secs}s`;
     };
 
+    /* ── Business API calls ── */
     const fetchSelectedCompanyProfile = async (companyId, options = {}) => {
         if (!companyId) return;
         try {
@@ -331,7 +427,8 @@ const Dashboard = () => {
                     address: data.address || '',
                     city: data.city || '',
                     country: data.country || '',
-                    logo_url: data.logo_url || ''
+                    logo_url: data.logo_url || '',
+                    website: data.website || ''
                 });
             }
             setBusinessSectionError('');
@@ -344,15 +441,20 @@ const Dashboard = () => {
         if (!companyId) return;
         setReviewsLoading(true);
         try {
-            const { data } = await api.get(`/business/${companyId}/reviews`, {
-                params: { page, limit: companyReviewPagination.limit || 5 }
-            });
+            const params = {
+                page,
+                limit: companyReviewPagination.limit || 10,
+                ...(reviewFilter.rating && { rating: reviewFilter.rating }),
+                ...(reviewFilter.type && { type: reviewFilter.type }),
+                sort: reviewFilter.sort
+            };
+            const { data } = await api.get(`/business/${companyId}/reviews`, { params });
             setCompanyReviews(data.reviews || []);
             setCompanyReviewPagination({
                 page: data.pagination?.page || 1,
                 pages: data.pagination?.pages || 1,
                 total: data.pagination?.total || 0,
-                limit: data.pagination?.limit || companyReviewPagination.limit || 5,
+                limit: data.pagination?.limit || 10,
                 lastViewedAt: data.lastViewedAt
             });
             setBusinessSectionError('');
@@ -381,17 +483,12 @@ const Dashboard = () => {
 
     const handleBusinessReviewPageChange = (direction) => {
         const nextPage = (companyReviewPagination.page || 1) + direction;
-        if (nextPage < 1 || nextPage > (companyReviewPagination.pages || 1)) {
-            return;
-        }
+        if (nextPage < 1 || nextPage > (companyReviewPagination.pages || 1)) return;
         fetchBusinessReviews(selectedCompanyId, nextPage);
     };
 
     const handleCompanyInfoChange = (field, value) => {
-        setEditCompanyForm((prev) => ({
-            ...prev,
-            [field]: value
-        }));
+        setEditCompanyForm((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleCompanyInfoSubmit = async (event) => {
@@ -403,9 +500,7 @@ const Dashboard = () => {
             const { data } = await api.put(`/business/${selectedCompanyId}`, editCompanyForm);
             setSelectedCompany(data);
             setMyCompanies((prev) =>
-                Array.isArray(prev)
-                    ? prev.map((company) => (company.id === data.id ? data : company))
-                    : prev
+                Array.isArray(prev) ? prev.map((c) => (c.id === data.id ? data : c)) : prev
             );
             setCompanyInfoMessage('Business profile updated.');
             toast.success('Business info updated');
@@ -432,7 +527,8 @@ const Dashboard = () => {
                 address: updated.address || '',
                 city: updated.city || '',
                 country: updated.country || '',
-                logo_url: updated.logo_url || ''
+                logo_url: updated.logo_url || '',
+                website: updated.website || ''
             });
             setCompanyInfoMessage('Latest website data applied.');
             toast.success('Company info refreshed from website');
@@ -445,6 +541,32 @@ const Dashboard = () => {
         }
     };
 
+    // Sync claim status from backend
+    const syncClaimStatus = async (companyId) => {
+        if (!companyId) return;
+        try {
+            const { data } = await api.get(`/companies/${companyId}/claim-status`);
+            setMyCompanies((prev) =>
+                Array.isArray(prev)
+                    ? prev.map((c) =>
+                        c.id === companyId
+                            ? { ...c, is_claimed: data.is_claimed, is_verified: data.is_verified, claimed: data.claimed, verified: data.verified }
+                            : c
+                    )
+                    : prev
+            );
+            setSelectedCompany((prev) =>
+                prev?.id === companyId
+                    ? { ...prev, is_claimed: data.is_claimed, is_verified: data.is_verified }
+                    : prev
+            );
+            toast.success('Claim status synced');
+        } catch {
+            // Fallback: re-fetch company profile
+            fetchSelectedCompanyProfile(companyId, { skipFormUpdate: true });
+        }
+    };
+
     const refreshBusinessSections = () => {
         if (!selectedCompanyId) return;
         fetchSelectedCompanyProfile(selectedCompanyId, { skipFormUpdate: true });
@@ -452,9 +574,10 @@ const Dashboard = () => {
         fetchBusinessAnalytics(selectedCompanyId);
     };
 
+    /* ── Chart data ── */
     const ratingChartData = companyAnalytics
         ? Object.entries(companyAnalytics.ratingDistribution || {}).map(([rating, count]) => ({
-            rating,
+            rating: `${rating}★`,
             count: Number(count || 0)
         }))
         : [];
@@ -473,14 +596,19 @@ const Dashboard = () => {
         ]
         : [];
 
+    const sentimentData = companyAnalytics?.sentimentBreakdown
+        ? [
+            { name: 'Positive', value: Number(companyAnalytics.sentimentBreakdown.positive || 0), color: '#10b981' },
+            { name: 'Neutral', value: Number(companyAnalytics.sentimentBreakdown.neutral || 0), color: '#6b7280' },
+            { name: 'Negative', value: Number(companyAnalytics.sentimentBreakdown.negative || 0), color: '#ef4444' }
+        ]
+        : [];
+
+    /* ── Lifecycle ── */
     useEffect(() => {
-        if (user?.role === 'psychologist') {
-            setActiveTab('overview');
-        } else if (user?.role === 'business') {
-            setActiveTab('companies');
-        } else {
-            setActiveTab('reviews');
-        }
+        if (user?.role === 'psychologist') setActiveTab('overview');
+        else if (user?.role === 'business') setActiveTab('companies');
+        else setActiveTab('reviews');
         fetchDashboardData();
     }, [user]);
 
@@ -492,6 +620,14 @@ const Dashboard = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedCompanyId, user?.role]);
+
+    // Re-fetch reviews when filter changes
+    useEffect(() => {
+        if (selectedCompanyId && user?.role === 'business') {
+            fetchBusinessReviews(selectedCompanyId, 1);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [reviewFilter]);
 
     const fetchDashboardData = async () => {
         setLoading(true);
@@ -506,9 +642,10 @@ const Dashboard = () => {
                 setPendingRequests(requestsRes.data || []);
             } else if (user?.role === 'business') {
                 const companiesRes = await api.get('/companies/my-companies');
-                setMyCompanies(companiesRes.data || []);
-                if (companiesRes.data?.length) {
-                    setSelectedCompanyId((prev) => prev || companiesRes.data[0].id);
+                const companies = companiesRes.data || [];
+                setMyCompanies(companies);
+                if (companies.length) {
+                    setSelectedCompanyId((prev) => prev || companies[0].id);
                 }
             } else if (user?.role === 'psychologist') {
                 const [pendingRes, leadsRes, scheduleRes, permissionsRes] = await Promise.all([
@@ -526,9 +663,9 @@ const Dashboard = () => {
                 const callsRes = await api.get('/psychologists/dashboard/calls').catch(() => ({ data: [] }));
                 setRecentCalls(callsRes.data || []);
             }
-        } catch (error) {
+        } catch (err) {
             setError('Failed to load dashboard data');
-            console.error('Failed to fetch dashboard data:', error);
+            console.error(err);
         } finally {
             setLoading(false);
         }
@@ -544,51 +681,36 @@ const Dashboard = () => {
 
     const handleAcceptRequest = async (conversationId) => {
         try {
-            await api.patch(`/messages/conversations/${conversationId}/status`, {
-                status: 'accepted'
-            });
+            await api.patch(`/messages/conversations/${conversationId}/status`, { status: 'accepted' });
             toast.success('Message request accepted!');
             fetchDashboardData();
-        } catch (error) {
-            toast.error('Failed to accept request');
-        }
+        } catch { toast.error('Failed to accept request'); }
     };
 
     const handleRejectRequest = async (conversationId) => {
         try {
-            await api.patch(`/messages/conversations/${conversationId}/status`, {
-                status: 'rejected'
-            });
+            await api.patch(`/messages/conversations/${conversationId}/status`, { status: 'rejected' });
             toast.success('Message request rejected');
             fetchDashboardData();
-        } catch (error) {
-            toast.error('Failed to reject request');
-        }
+        } catch { toast.error('Failed to reject request'); }
     };
 
+    /* ── Psychologist schedule handlers ── */
     const handleScheduleSubmit = async (e) => {
         e.preventDefault();
         if (!scheduleDraft.title || !scheduleDraft.date || !scheduleDraft.time) {
-            toast.error('Please complete title, date, and time.');
-            return;
+            toast.error('Please complete title, date, and time.'); return;
         }
-
-        const scheduledDate = new Date(`${scheduleDraft.date}T${scheduleDraft.time}`);
-        const scheduledFor = scheduledDate.toISOString();
+        const scheduledFor = new Date(`${scheduleDraft.date}T${scheduleDraft.time}`).toISOString();
         try {
             const { data } = await api.post('/psychologists/dashboard/schedule', {
-                title: scheduleDraft.title,
-                scheduledFor,
-                type: scheduleDraft.type,
-                location: scheduleDraft.location
+                title: scheduleDraft.title, scheduledFor, type: scheduleDraft.type, location: scheduleDraft.location
             });
             setPsychSchedule((prev) => [data, ...prev]);
             setScheduleDraft({ title: '', date: '', time: '', type: 'meeting', location: '' });
-            setCalendarDate(scheduledDate);
+            setCalendarDate(new Date(scheduledFor));
             toast.success('Schedule updated');
-        } catch (error) {
-            toast.error('Failed to add schedule item');
-        }
+        } catch { toast.error('Failed to add schedule item'); }
     };
 
     const handleScheduleRemove = async (itemId) => {
@@ -596,9 +718,7 @@ const Dashboard = () => {
             await api.delete(`/psychologists/dashboard/schedule/${itemId}`);
             setPsychSchedule((prev) => prev.filter((item) => item.id !== itemId));
             toast.success('Schedule item removed');
-        } catch (error) {
-            toast.error('Failed to remove schedule item');
-        }
+        } catch { toast.error('Failed to remove schedule item'); }
     };
 
     const handleLeadMessage = async (leadId) => {
@@ -607,9 +727,7 @@ const Dashboard = () => {
                 message: 'Hello, I am here to support you whenever you are ready to talk.'
             });
             toast.success('Message queued');
-        } catch (error) {
-            toast.error('Failed to send lead message');
-        }
+        } catch { toast.error('Failed to send lead message'); }
     };
 
     const handleLeadArchive = async (leadId) => {
@@ -617,17 +735,12 @@ const Dashboard = () => {
             await api.patch(`/psychologists/dashboard/leads/${leadId}/archive`);
             setPsychLeads((prev) => prev.filter((lead) => lead.id !== leadId));
             toast.success('Lead removed');
-        } catch (error) {
-            toast.error('Failed to remove lead');
-        }
+        } catch { toast.error('Failed to remove lead'); }
     };
 
     const handleAddCalendarIntegration = async (e) => {
         e.preventDefault();
-        if (!calendarIntegrationDraft.icalUrl) {
-            toast.error('Please add an iCal URL');
-            return;
-        }
+        if (!calendarIntegrationDraft.icalUrl) { toast.error('Please add an iCal URL'); return; }
         try {
             const { data } = await api.post('/psychologists/dashboard/calendar-integrations', {
                 provider: calendarIntegrationDraft.provider,
@@ -638,9 +751,7 @@ const Dashboard = () => {
             setCalendarIntegrationDraft({ provider: 'google', name: '', icalUrl: '' });
             toast.success('Calendar connected');
             await handleSyncCalendarIntegration(data.id);
-        } catch (error) {
-            toast.error('Failed to connect calendar');
-        }
+        } catch { toast.error('Failed to connect calendar'); }
     };
 
     const handleRemoveCalendarIntegration = async (integrationId) => {
@@ -649,49 +760,39 @@ const Dashboard = () => {
             setCalendarIntegrations((prev) => prev.filter((item) => item.id !== integrationId));
             setExternalEvents((prev) => prev.filter((item) => item.integration_id !== integrationId));
             toast.success('Calendar removed');
-        } catch (error) {
-            toast.error('Failed to remove calendar');
-        }
+        } catch { toast.error('Failed to remove calendar'); }
     };
 
     const handleSyncCalendarIntegration = async (integrationId) => {
         try {
             const { data } = await api.post(`/psychologists/dashboard/calendar-integrations/${integrationId}/sync`);
-            const events = (data.events || []).map((event) => ({
-                ...event,
-                integration_id: integrationId
-            }));
+            const events = (data.events || []).map((event) => ({ ...event, integration_id: integrationId }));
             setExternalEvents((prev) => [
                 ...prev.filter((item) => item.integration_id !== integrationId),
                 ...events
             ]);
             toast.success(`Synced ${data.count || events.length} events`);
-        } catch (error) {
-            toast.error('Failed to sync calendar');
-        }
+        } catch { toast.error('Failed to sync calendar'); }
     };
 
     const handleDownloadIcs = () => {
         const base = api.defaults.baseURL || '';
-        const url = `${base}/psychologists/dashboard/schedule.ics`;
-        window.open(url, '_blank');
+        window.open(`${base}/psychologists/dashboard/schedule.ics`, '_blank');
     };
 
     const handleCallAction = (type) => {
-        if (!(psychPermissions?.roleFlags?.voice_video_calls)) {
-            toast.error('Call features are not enabled for your plan.');
-            return;
+        if (!psychPermissions?.roleFlags?.voice_video_calls) {
+            toast.error('Call features are not enabled for your plan.'); return;
         }
         toast(`${type === 'voice' ? 'Voice' : 'Video'} call setup is in progress — a link will be emailed shortly.`);
     };
 
+    /* ── Calendar helpers ── */
     const scheduleItems = psychSchedule
         .map((item) => {
             const raw = item.scheduled_for || item.scheduledFor || item.scheduled_at;
             const date = raw ? new Date(raw) : null;
-            return date && !Number.isNaN(date.getTime())
-                ? { ...item, scheduledDate: date }
-                : null;
+            return date && !Number.isNaN(date.getTime()) ? { ...item, scheduledDate: date } : null;
         })
         .filter(Boolean);
 
@@ -701,8 +802,10 @@ const Dashboard = () => {
         acc[key].push(item);
         return acc;
     }, {});
+
     const selectedDateKey = format(calendarDate, 'yyyy-MM-dd');
     const selectedDateItems = itemsByDate[selectedDateKey] || [];
+
     const externalItemsByDate = externalEvents.reduce((acc, item) => {
         const raw = item.starts_at || item.startsAt;
         const date = raw ? new Date(raw) : null;
@@ -712,6 +815,7 @@ const Dashboard = () => {
         acc[key].push({ ...item, scheduledDate: date });
         return acc;
     }, {});
+
     const selectedExternalItems = externalItemsByDate[selectedDateKey] || [];
 
     const weekStartsOn = 1;
@@ -727,216 +831,161 @@ const Dashboard = () => {
         calendarDays.push(day);
     }
 
-    const handleCalendarPrev = () => {
-        setCalendarDate((prev) => (calendarView === 'month' ? subMonths(prev, 1) : subWeeks(prev, 1)));
-    };
-
-    const handleCalendarNext = () => {
-        setCalendarDate((prev) => (calendarView === 'month' ? addMonths(prev, 1) : addWeeks(prev, 1)));
-    };
-
-    const handleCalendarToday = () => {
-        setCalendarDate(new Date());
-    };
-
-    const togglePsychCard = (key) => {
-        setPsychCardCollapse((prev) => ({
-            ...prev,
-            [key]: !prev[key]
-        }));
-    };
+    const handleCalendarPrev = () => setCalendarDate((prev) => (calendarView === 'month' ? subMonths(prev, 1) : subWeeks(prev, 1)));
+    const handleCalendarNext = () => setCalendarDate((prev) => (calendarView === 'month' ? addMonths(prev, 1) : addWeeks(prev, 1)));
+    const handleCalendarToday = () => setCalendarDate(new Date());
+    const togglePsychCard = (key) => setPsychCardCollapse((prev) => ({ ...prev, [key]: !prev[key] }));
 
     if (loading) return <Loading />;
 
-    const outgoingRequests = pendingRequests.filter((request) => request.initial_message?.senderId === user?.id);
-    const incomingRequests = pendingRequests.filter((request) => request.initial_message?.senderId && request.initial_message?.senderId !== user?.id);
+    const outgoingRequests = pendingRequests.filter((r) => r.initial_message?.senderId === user?.id);
+    const incomingRequests = pendingRequests.filter((r) => r.initial_message?.senderId && r.initial_message?.senderId !== user?.id);
+
+    /* ── Analytics summary stats ── */
+    const avgRating = companyAnalytics?.averageRating
+        ? parseFloat(companyAnalytics.averageRating).toFixed(1)
+        : '—';
+    const totalReviews = companyAnalytics?.totalReviews ?? '—';
+    const responseRate = companyAnalytics?.responseRate != null
+        ? `${(companyAnalytics.responseRate * 100).toFixed(0)}%`
+        : '—';
+    const anonymousRate = companyAnalytics
+        ? (() => {
+            const total = (companyAnalytics.employeeVsAnonymous?.employee || 0) +
+                (companyAnalytics.employeeVsAnonymous?.anonymous || 0);
+            if (!total) return '—';
+            return `${((companyAnalytics.employeeVsAnonymous?.anonymous || 0) / total * 100).toFixed(0)}%`;
+        })()
+        : '—';
 
     return (
         <div className="dashboard-page">
             <div className="container">
+                {/* Header */}
                 <div className="dashboard-header">
                     <h1 className="dashboard-title">Dashboard</h1>
-                    <button
-                        onClick={handleRefresh}
-                        className="refresh-btn"
-                        disabled={refreshing}
-                    >
-                        {refreshing ? 'Refreshing...' : 'Refresh'}
+                    <button onClick={handleRefresh} className="refresh-btn" disabled={refreshing}>
+                        {refreshing ? 'Refreshing…' : 'Refresh'}
                     </button>
                 </div>
 
                 {error && <div className="alert alert-error">{error}</div>}
 
-                {}
                 <ProfileSection user={user} onUpdate={fetchDashboardData} />
 
+                {/* Tabs */}
                 <div className="dashboard-tabs">
                     {user?.role === 'employee' && (
                         <>
-                            <button
-                                className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('reviews')}
-                            >
+                            <button className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveTab('reviews')}>
                                 My Reviews ({userReviews.length})
                             </button>
-                            <button
-                                className={`tab-btn ${activeTab === 'messages' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('messages')}
-                            >
+                            <button className={`tab-btn ${activeTab === 'messages' ? 'active' : ''}`} onClick={() => setActiveTab('messages')}>
                                 Message Requests ({pendingRequests.length})
                             </button>
-                            <button
-                                className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('profile')}
-                            >
+                            <button className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
                                 Profile Settings
                             </button>
                         </>
                     )}
-
                     {user?.role === 'business' && (
                         <>
-                            <button
-                                className={`tab-btn ${activeTab === 'companies' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('companies')}
-                            >
+                            <button className={`tab-btn ${activeTab === 'companies' ? 'active' : ''}`} onClick={() => setActiveTab('companies')}>
                                 My Companies ({myCompanies.length})
                             </button>
-                            <button
-                                className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('reviews')}
-                            >
-                                Company Reviews
+                            <button className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveTab('reviews')}>
+                                Business Hub
                             </button>
                         </>
                     )}
-
                     {user?.role === 'psychologist' && (
                         <>
-                            <button
-                                className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('overview')}
-                            >
+                            <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
                                 Dashboard
                             </button>
-                            <button
-                                className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('requests')}
-                            >
+                            <button className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`} onClick={() => setActiveTab('requests')}>
                                 Pending Requests ({pendingRequests.length})
                             </button>
-                            <button
-                                className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('profile')}
-                            >
+                            <button className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
                                 Profile Settings
                             </button>
                         </>
                     )}
                 </div>
 
+                {/* ═══════════════════════════════════════
+                    TAB CONTENT
+                ═══════════════════════════════════════ */}
                 <div className="tab-content">
+
+                    {/* ── Employee: Reviews ── */}
                     {user?.role === 'employee' && activeTab === 'reviews' && (
                         <div className="my-reviews-section">
                             <h3>My Reviews</h3>
-                            {userReviews.length > 0 ? (
-                                <ReviewList reviews={userReviews} />
-                            ) : (
-                                <p className="empty-message">
-                                    You haven't written any reviews yet.{' '}
-                                    <a href="/search">Search for companies</a> to review.
-                                </p>
-                            )}
+                            {userReviews.length > 0
+                                ? <ReviewList reviews={userReviews} />
+                                : <p className="empty-message">You haven't written any reviews yet. <a href="/search">Search for companies</a> to review.</p>}
                         </div>
                     )}
 
+                    {/* ── Employee: Messages ── */}
                     {user?.role === 'employee' && activeTab === 'messages' && (
                         <div className="message-requests-section">
                             <h3>Message Requests</h3>
-
                             {outgoingRequests.length > 0 && (
                                 <>
                                     <p className="section-subtitle">Requests you sent</p>
                                     <div className="requests-list">
                                         {outgoingRequests.map(request => (
                                             <div key={request.id} className="request-card">
-                                                <div className="request-avatar">
-                                                    {request.psychologist?.display_name?.charAt(0) || 'P'}
-                                                </div>
+                                                <div className="request-avatar">{request.psychologist?.display_name?.charAt(0) || 'P'}</div>
                                                 <div className="request-info">
                                                     <h4>{request.psychologist?.display_name || 'Unknown'}</h4>
-                                                    <p className="request-message">
-                                                        {request.initial_message?.content || 'No message provided.'}
-                                                    </p>
+                                                    <p className="request-message">{request.initial_message?.content || 'No message provided.'}</p>
                                                     <p className="request-status">Status: {request.status}</p>
-                                                    <p className="request-date">
-                                                        Sent: {new Date(request.created_at).toLocaleDateString()}
-                                                    </p>
+                                                    <p className="request-date">Sent: {new Date(request.created_at).toLocaleDateString()}</p>
                                                 </div>
                                                 <div className="request-actions">
-                                                    <button
-                                                        onClick={() => window.location.href = `/messages?conversation=${request.id}`}
-                                                        className="btn btn-outline btn-small"
-                                                    >
-                                                        Open Chat
-                                                    </button>
+                                                    <button onClick={() => window.location.href = `/messages?conversation=${request.id}`} className="btn btn-outline btn-small">Open Chat</button>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 </>
                             )}
-
                             {incomingRequests.length > 0 && (
                                 <>
                                     <p className="section-subtitle">Requests sent to you</p>
                                     <div className="requests-list">
                                         {incomingRequests.map(request => (
                                             <div key={request.id} className="request-card">
-                                                <div className="request-avatar">
-                                                    {request.psychologist?.display_name?.charAt(0) || 'P'}
-                                                </div>
+                                                <div className="request-avatar">{request.psychologist?.display_name?.charAt(0) || 'P'}</div>
                                                 <div className="request-info">
                                                     <h4>{request.psychologist?.display_name || 'Unknown'}</h4>
-                                                    <p className="request-message">
-                                                        {request.initial_message?.content || 'No message provided.'}
-                                                    </p>
-                                                    <p className="request-date">
-                                                        Received: {new Date(request.created_at).toLocaleDateString()}
-                                                    </p>
+                                                    <p className="request-message">{request.initial_message?.content || 'No message provided.'}</p>
+                                                    <p className="request-date">Received: {new Date(request.created_at).toLocaleDateString()}</p>
                                                 </div>
                                                 <div className="request-actions">
-                                                    <button
-                                                        onClick={() => handleAcceptRequest(request.id)}
-                                                        className="btn btn-primary btn-small"
-                                                    >
-                                                        Accept
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleRejectRequest(request.id)}
-                                                        className="btn btn-secondary btn-small"
-                                                    >
-                                                        Decline
-                                                    </button>
+                                                    <button onClick={() => handleAcceptRequest(request.id)} className="btn btn-primary btn-small">Accept</button>
+                                                    <button onClick={() => handleRejectRequest(request.id)} className="btn btn-secondary btn-small">Decline</button>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 </>
                             )}
-
-                            {pendingRequests.length === 0 && (
-                                <p className="empty-message">No pending message requests.</p>
-                            )}
+                            {pendingRequests.length === 0 && <p className="empty-message">No pending message requests.</p>}
                         </div>
                     )}
 
-                    {user?.role === 'employee' && activeTab === 'profile' && (
+                    {/* ── Employee / Psychologist: Profile Settings ── */}
+                    {(user?.role === 'employee' || user?.role === 'psychologist') && activeTab === 'profile' && (
                         <div className="profile-tab">
                             <ProfileSettings onUpdate={fetchDashboardData} />
                         </div>
                     )}
 
+                    {/* ── Business: My Companies ── */}
                     {user?.role === 'business' && activeTab === 'companies' && (
                         <div className="my-companies-section">
                             <h3>My Companies</h3>
@@ -945,56 +994,52 @@ const Dashboard = () => {
                                     {myCompanies.map(company => (
                                         <div key={company.id} className="company-dashboard-card">
                                             <div className="company-logo">
-                                                {company.logo_url ? (
-                                                    <img src={company.logo_url} alt={company.name} />
-                                                ) : (
-                                                    <div className="logo-placeholder">
-                                                        {company.name.charAt(0)}
-                                                    </div>
-                                                )}
+                                                {company.logo_url
+                                                    ? <img src={resolveMediaUrl(company.logo_url)} alt={company.name} />
+                                                    : <div className="logo-placeholder">{company.name.charAt(0)}</div>}
                                             </div>
                                             <div className="company-info">
-                                                <h4>{company.name}</h4>
+                                                <h4>
+                                                    {company.name}
+                                                    {(company.is_claimed || company.claimed) && (
+                                                        <span className="claim-badge">
+                                                            {(company.is_verified || company.verified)
+                                                                ? <><FaShieldAlt size={11} /> Verified</>
+                                                                : <><FaCheckCircle size={11} /> Claimed</>}
+                                                        </span>
+                                                    )}
+                                                </h4>
                                                 <p>Industry: {company.industry || 'Not specified'}</p>
                                                 <p>Total Reviews: {company.review_count || 0}</p>
-                                                <p>Average Rating: {company.avg_rating || 'N/A'}</p>
+                                                <p>Average Rating: {company.avg_rating ? parseFloat(company.avg_rating).toFixed(1) : 'N/A'}</p>
                                             </div>
                                             <div className="company-actions">
-                                                <button
-                                                    onClick={() => window.location.href = `/companies/${company.id}`}
-                                                    className="btn btn-secondary btn-small"
-                                                >
+                                                <button onClick={() => syncClaimStatus(company.id)} className="btn btn-outline btn-small">
+                                                    <FaSync size={11} /> Sync Status
+                                                </button>
+                                                <button onClick={() => window.location.href = `/companies/${company.id}`} className="btn btn-secondary btn-small">
                                                     View Page
                                                 </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedCompanyId(company.id);
-                                                        setCompanyPanelTab('reviews');
-                                                        setActiveTab('reviews');
-                                                    }}
-                                                    className="btn btn-primary btn-small"
-                                                >
-                                                    Manage Reviews
+                                                <button onClick={() => { setSelectedCompanyId(company.id); setCompanyPanelTab('reviews'); setActiveTab('reviews'); }} className="btn btn-primary btn-small">
+                                                    Business Hub
                                                 </button>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="empty-message">
-                                    You haven't claimed any companies yet.{' '}
-                                    <a href="/search">Search for your company</a> to claim it.
-                                </p>
+                                <p className="empty-message">You haven't claimed any companies yet. <a href="/search">Search for your company</a> to claim it.</p>
                             )}
                         </div>
                     )}
 
+                    {/* ── Business: Hub (Reviews + Analytics + Edit) ── */}
                     {user?.role === 'business' && activeTab === 'reviews' && (
                         <div className="business-dashboard-panel">
                             <div className="business-panel-header">
                                 <div>
-                                    <h3>Business Control Center</h3>
-                                    <p>Monitor reviews, insights, and keep your public profile accurate.</p>
+                                    <h3>Business Hub</h3>
+                                    <p>Monitor reviews, analyse sentiment, and keep your public profile accurate.</p>
                                 </div>
                                 {myCompanies.length > 0 && (
                                     <div className="business-company-selector">
@@ -1004,197 +1049,221 @@ const Dashboard = () => {
                                             value={selectedCompanyId || ''}
                                             onChange={(e) => setSelectedCompanyId(e.target.value || null)}
                                         >
-                                            <option value="" disabled>
-                                                Choose a company
-                                            </option>
+                                            <option value="" disabled>Choose a company</option>
                                             {myCompanies.map((company) => (
-                                                <option key={company.id} value={company.id}>
-                                                    {company.name}
-                                                </option>
+                                                <option key={company.id} value={company.id}>{company.name}</option>
                                             ))}
                                         </select>
-                                        <button
-                                            type="button"
-                                            className="btn btn-secondary btn-small"
-                                            onClick={refreshBusinessSections}
-                                            disabled={!selectedCompanyId || reviewsLoading || analyticsLoading}
-                                        >
-                                            Refresh
+                                        <button type="button" className="btn btn-secondary btn-small" onClick={refreshBusinessSections} disabled={!selectedCompanyId || reviewsLoading || analyticsLoading}>
+                                            <FaSync size={11} /> Refresh
                                         </button>
                                     </div>
                                 )}
                             </div>
 
-                            {businessSectionError && (
-                                <div className="alert alert-error">{businessSectionError}</div>
+                            {/* Claim Status Banner */}
+                            {selectedCompany && (
+                                <ClaimStatusBanner
+                                    company={selectedCompany}
+                                    onRefresh={() => syncClaimStatus(selectedCompanyId)}
+                                />
                             )}
 
+                            {businessSectionError && <div className="alert alert-error">{businessSectionError}</div>}
+
                             {(!myCompanies || myCompanies.length === 0) ? (
-                                <p className="empty-message">
-                                    You don't have any companies yet.{' '}
-                                    <a href="/search">Search for your profile</a> to claim it.
-                                </p>
+                                <p className="empty-message">You don't have any companies yet. <a href="/search">Search for your profile</a> to claim it.</p>
                             ) : (
                                 <>
                                     <div className="business-panel-tabs">
-                                        <button
-                                            className={`business-panel-tab ${companyPanelTab === 'reviews' ? 'active' : ''}`}
-                                            onClick={() => setCompanyPanelTab('reviews')}
-                                        >
-                                            Reviews
-                                        </button>
-                                        <button
-                                            className={`business-panel-tab ${companyPanelTab === 'analytics' ? 'active' : ''}`}
-                                            onClick={() => setCompanyPanelTab('analytics')}
-                                        >
-                                            Analytics
-                                        </button>
-                                        <button
-                                            className={`business-panel-tab ${companyPanelTab === 'edit' ? 'active' : ''}`}
-                                            onClick={() => setCompanyPanelTab('edit')}
-                                        >
-                                            Edit Info
-                                        </button>
+                                        {[
+                                            { id: 'reviews', label: 'Reviews' },
+                                            { id: 'analytics', label: 'Analytics' },
+                                            { id: 'edit', label: 'Edit Profile' }
+                                        ].map((tab) => (
+                                            <button
+                                                key={tab.id}
+                                                className={`business-panel-tab ${companyPanelTab === tab.id ? 'active' : ''}`}
+                                                onClick={() => setCompanyPanelTab(tab.id)}
+                                            >
+                                                {tab.label}
+                                            </button>
+                                        ))}
                                     </div>
 
                                     <div className="business-panel-body">
+
+                                        {/* ─── Reviews Tab ─── */}
                                         {companyPanelTab === 'reviews' && (
                                             <div className="business-reviews-panel">
-                                                {reviewsLoading ? (
-                                                    <Loading />
-                                                ) : companyReviews.length > 0 ? (
+                                                {/* Filters */}
+                                                <div className="biz-review-filters">
+                                                    <select
+                                                        value={reviewFilter.rating}
+                                                        onChange={(e) => setReviewFilter((f) => ({ ...f, rating: e.target.value }))}
+                                                    >
+                                                        <option value="">All ratings</option>
+                                                        {[5, 4, 3, 2, 1].map((r) => <option key={r} value={r}>{r} ★</option>)}
+                                                    </select>
+                                                    <select
+                                                        value={reviewFilter.type}
+                                                        onChange={(e) => setReviewFilter((f) => ({ ...f, type: e.target.value }))}
+                                                    >
+                                                        <option value="">All reviewers</option>
+                                                        <option value="employee">Named employees</option>
+                                                        <option value="anonymous">Anonymous</option>
+                                                    </select>
+                                                    <select
+                                                        value={reviewFilter.sort}
+                                                        onChange={(e) => setReviewFilter((f) => ({ ...f, sort: e.target.value }))}
+                                                    >
+                                                        <option value="newest">Newest first</option>
+                                                        <option value="oldest">Oldest first</option>
+                                                        <option value="highest">Highest rating</option>
+                                                        <option value="lowest">Lowest rating</option>
+                                                    </select>
+                                                    {companyReviewPagination.total > 0 && (
+                                                        <span className="biz-review-total">
+                                                            {companyReviewPagination.total} review{companyReviewPagination.total !== 1 ? 's' : ''}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {reviewsLoading ? <Loading /> : companyReviews.length > 0 ? (
                                                     <>
                                                         {companyReviewPagination.lastViewedAt && (
                                                             <p className="business-last-seen">
-                                                                Last checked{' '}
-                                                                {new Date(companyReviewPagination.lastViewedAt).toLocaleString()}
+                                                                Last checked {new Date(companyReviewPagination.lastViewedAt).toLocaleString()}
                                                             </p>
                                                         )}
                                                         {companyReviews.map((review) => (
                                                             <ReviewCard
                                                                 key={review.id}
                                                                 review={review}
-                                                                onReplyAdded={() =>
-                                                                    fetchBusinessReviews(
-                                                                        selectedCompanyId,
-                                                                        companyReviewPagination.page || 1
-                                                                    )
-                                                                }
-                                                                replyEndpoint={
-                                                                    selectedCompanyId
-                                                                        ? `/business/${selectedCompanyId}/review/${review.id}/reply`
-                                                                        : undefined
-                                                                }
+                                                                onReplyAdded={() => fetchBusinessReviews(selectedCompanyId, companyReviewPagination.page || 1)}
+                                                                replyEndpoint={selectedCompanyId ? `/business/${selectedCompanyId}/review/${review.id}/reply` : undefined}
                                                             />
                                                         ))}
                                                         <div className="business-pagination">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleBusinessReviewPageChange(-1)}
-                                                                disabled={
-                                                                    (companyReviewPagination.page || 1) <= 1 || reviewsLoading
-                                                                }
-                                                            >
-                                                                Previous
-                                                            </button>
-                                                            <span>
-                                                                Page {companyReviewPagination.page || 1} of{' '}
-                                                                {companyReviewPagination.pages || 1}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleBusinessReviewPageChange(1)}
-                                                                disabled={
-                                                                    (companyReviewPagination.page || 1) >=
-                                                                        (companyReviewPagination.pages || 1) || reviewsLoading
-                                                                }
-                                                            >
-                                                                Next
-                                                            </button>
+                                                            <button type="button" onClick={() => handleBusinessReviewPageChange(-1)} disabled={(companyReviewPagination.page || 1) <= 1 || reviewsLoading}>Previous</button>
+                                                            <span>Page {companyReviewPagination.page || 1} of {companyReviewPagination.pages || 1}</span>
+                                                            <button type="button" onClick={() => handleBusinessReviewPageChange(1)} disabled={(companyReviewPagination.page || 1) >= (companyReviewPagination.pages || 1) || reviewsLoading}>Next</button>
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <p className="empty-message">No reviews yet.</p>
+                                                    <p className="empty-message">No reviews match your filters.</p>
                                                 )}
                                             </div>
                                         )}
 
+                                        {/* ─── Analytics Tab ─── */}
                                         {companyPanelTab === 'analytics' && (
                                             <div className="business-analytics-panel">
-                                                {analyticsLoading ? (
-                                                    <Loading />
-                                                ) : companyAnalytics ? (
+                                                {analyticsLoading ? <Loading /> : companyAnalytics ? (
                                                     <>
+                                                        {/* Summary cards */}
                                                         <div className="business-analytics-cards">
-                                                            <div className="analytics-card">
+                                                            <div className="analytics-card analytics-card--highlight">
                                                                 <p>Average rating</p>
-                                                                <strong>{companyAnalytics.averageRating}</strong>
+                                                                <strong>{avgRating}</strong>
+                                                                <StarRating rating={parseFloat(avgRating) || 0} size={12} />
                                                             </div>
                                                             <div className="analytics-card">
                                                                 <p>Total reviews</p>
-                                                                <strong>{companyAnalytics.totalReviews}</strong>
+                                                                <strong>{totalReviews}</strong>
                                                             </div>
                                                             <div className="analytics-card">
                                                                 <p>Response rate</p>
-                                                                <strong>{(companyAnalytics.responseRate * 100).toFixed(0)}%</strong>
+                                                                <strong>{responseRate}</strong>
+                                                            </div>
+                                                            <div className="analytics-card">
+                                                                <p>Anonymous reviews</p>
+                                                                <strong>{anonymousRate}</strong>
                                                             </div>
                                                         </div>
 
+                                                        {/* Charts grid */}
                                                         <div className="business-analytics-grid">
+                                                            {/* Rating distribution */}
                                                             <div className="analytics-chart">
-                                                                <h4>Rating distribution</h4>
+                                                                <h4><FaChartBar size={13} /> Rating Distribution</h4>
                                                                 <ResponsiveContainer width="100%" height={220}>
-                                                                    <BarChart data={ratingChartData}>
-                                                                        <CartesianGrid strokeDasharray="3 3" />
-                                                                        <XAxis dataKey="rating" />
-                                                                        <YAxis allowDecimals={false} />
-                                                                        <Tooltip />
-                                                                        <Bar dataKey="count" fill="#4f46e5" radius={[6, 6, 0, 0]} />
+                                                                    <BarChart data={ratingChartData} barCategoryGap="30%">
+                                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff20" />
+                                                                        <XAxis dataKey="rating" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                                                        <YAxis allowDecimals={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                                                        <Tooltip content={<ChartTooltip />} />
+                                                                        <Bar dataKey="count" name="Reviews" fill="#6366f1" radius={[6, 6, 0, 0]} />
                                                                     </BarChart>
                                                                 </ResponsiveContainer>
                                                             </div>
+
+                                                            {/* Employee vs Anonymous */}
                                                             <div className="analytics-chart">
-                                                                <h4>Anonymous vs employee</h4>
+                                                                <h4><FaUserSecret size={13} /> Reviewer Breakdown</h4>
                                                                 <ResponsiveContainer width="100%" height={220}>
                                                                     <PieChart>
-                                                                        <Pie
-                                                                            data={reviewerBreakdown}
-                                                                            dataKey="value"
-                                                                            nameKey="name"
-                                                                            innerRadius={50}
-                                                                            outerRadius={80}
-                                                                            paddingAngle={2}
-                                                                        >
+                                                                        <Pie data={reviewerBreakdown} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
                                                                             {reviewerBreakdown.map((entry, index) => (
-                                                                                <Cell
-                                                                                    key={`cell-${entry.name}`}
-                                                                                    fill={BUSINESS_PIE_COLORS[index % BUSINESS_PIE_COLORS.length]}
-                                                                                />
+                                                                                <Cell key={`cell-${entry.name}`} fill={BUSINESS_PIE_COLORS[index % BUSINESS_PIE_COLORS.length]} />
                                                                             ))}
                                                                         </Pie>
-                                                                        <Tooltip />
+                                                                        <Tooltip content={<ChartTooltip />} />
+                                                                        <Legend iconType="circle" iconSize={10} />
                                                                     </PieChart>
                                                                 </ResponsiveContainer>
                                                             </div>
                                                         </div>
 
-                                                        <div className="analytics-chart">
-                                                            <h4>Review volume</h4>
-                                                            <ResponsiveContainer width="100%" height={260}>
-                                                                <LineChart data={trendChartData}>
-                                                                    <CartesianGrid strokeDasharray="3 3" />
-                                                                    <XAxis dataKey="label" />
-                                                                    <YAxis allowDecimals={false} />
-                                                                    <Tooltip />
-                                                                    <Line
-                                                                        type="monotone"
-                                                                        dataKey="count"
-                                                                        stroke="#0ea5e9"
-                                                                        strokeWidth={2}
-                                                                    />
-                                                                </LineChart>
-                                                            </ResponsiveContainer>
-                                                        </div>
+                                                        {/* Sentiment */}
+                                                        {sentimentData.length > 0 && (
+                                                            <div className="business-analytics-grid">
+                                                                <div className="analytics-chart">
+                                                                    <h4>Sentiment Breakdown</h4>
+                                                                    <ResponsiveContainer width="100%" height={220}>
+                                                                        <PieChart>
+                                                                            <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                                                                                {sentimentData.map((entry) => (
+                                                                                    <Cell key={entry.name} fill={entry.color} />
+                                                                                ))}
+                                                                            </Pie>
+                                                                            <Tooltip content={<ChartTooltip />} />
+                                                                            <Legend iconType="circle" iconSize={10} />
+                                                                        </PieChart>
+                                                                    </ResponsiveContainer>
+                                                                </div>
+
+                                                                {/* Review volume trend */}
+                                                                <div className="analytics-chart">
+                                                                    <h4>Review Volume Trend</h4>
+                                                                    <ResponsiveContainer width="100%" height={220}>
+                                                                        <LineChart data={trendChartData}>
+                                                                            <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff20" />
+                                                                            <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                                                            <YAxis allowDecimals={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                                                            <Tooltip content={<ChartTooltip />} />
+                                                                            <Line type="monotone" dataKey="count" name="Reviews" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 4, fill: '#0ea5e9' }} />
+                                                                        </LineChart>
+                                                                    </ResponsiveContainer>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Full-width trend if no sentiment */}
+                                                        {sentimentData.length === 0 && trendChartData.length > 0 && (
+                                                            <div className="analytics-chart">
+                                                                <h4>Review Volume Trend</h4>
+                                                                <ResponsiveContainer width="100%" height={260}>
+                                                                    <LineChart data={trendChartData}>
+                                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff20" />
+                                                                        <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                                                        <YAxis allowDecimals={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                                                        <Tooltip content={<ChartTooltip />} />
+                                                                        <Line type="monotone" dataKey="count" name="Reviews" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 4, fill: '#0ea5e9' }} />
+                                                                    </LineChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                        )}
                                                     </>
                                                 ) : (
                                                     <p className="empty-message">Analytics will appear once reviews start rolling in.</p>
@@ -1202,82 +1271,70 @@ const Dashboard = () => {
                                             </div>
                                         )}
 
+                                        {/* ─── Edit Profile Tab ─── */}
                                         {companyPanelTab === 'edit' && selectedCompany && (
                                             <form className="business-edit-panel" onSubmit={handleCompanyInfoSubmit}>
+                                                <p className="business-edit-intro">
+                                                    This information is shown publicly on your company profile. Keep it accurate so customers can reach you.
+                                                </p>
+
                                                 <div className="form-grid-two">
                                                     <label>
-                                                        Public phone
-                                                        <input
-                                                            type="text"
-                                                            value={editCompanyForm.phone}
-                                                            onChange={(e) => handleCompanyInfoChange('phone', e.target.value)}
-                                                            placeholder="+1 555 123 4567"
-                                                        />
+                                                        <span className="form-label-text"><FaPhone size={11} /> Public phone</span>
+                                                        <input type="text" value={editCompanyForm.phone} onChange={(e) => handleCompanyInfoChange('phone', e.target.value)} placeholder="+27 11 123 4567" />
                                                     </label>
                                                     <label>
-                                                        Public email
-                                                        <input
-                                                            type="email"
-                                                            value={editCompanyForm.email}
-                                                            onChange={(e) => handleCompanyInfoChange('email', e.target.value)}
-                                                            placeholder="press@company.com"
-                                                        />
+                                                        <span className="form-label-text"><FaEnvelope size={11} /> Public email</span>
+                                                        <input type="email" value={editCompanyForm.email} onChange={(e) => handleCompanyInfoChange('email', e.target.value)} placeholder="press@company.com" />
                                                     </label>
                                                     <label>
-                                                        Street address
-                                                        <input
-                                                            type="text"
-                                                            value={editCompanyForm.address}
-                                                            onChange={(e) => handleCompanyInfoChange('address', e.target.value)}
-                                                            placeholder="123 Main Road"
-                                                        />
+                                                        <span className="form-label-text"><FaGlobe size={11} /> Website</span>
+                                                        <input type="url" value={editCompanyForm.website} onChange={(e) => handleCompanyInfoChange('website', e.target.value)} placeholder="https://yourcompany.com" />
                                                     </label>
                                                     <label>
-                                                        City
-                                                        <input
-                                                            type="text"
-                                                            value={editCompanyForm.city}
-                                                            onChange={(e) => handleCompanyInfoChange('city', e.target.value)}
-                                                            placeholder="Johannesburg"
-                                                        />
+                                                        <span className="form-label-text"><FaImage size={11} /> Logo URL</span>
+                                                        <input type="url" value={editCompanyForm.logo_url} onChange={(e) => handleCompanyInfoChange('logo_url', e.target.value)} placeholder="https://example.com/logo.png" />
                                                     </label>
                                                     <label>
-                                                        Country
-                                                        <input
-                                                            type="text"
-                                                            value={editCompanyForm.country}
-                                                            onChange={(e) => handleCompanyInfoChange('country', e.target.value)}
-                                                            placeholder="South Africa"
-                                                        />
+                                                        <span className="form-label-text"><FaMapMarkerAlt size={11} /> Street address</span>
+                                                        <input type="text" value={editCompanyForm.address} onChange={(e) => handleCompanyInfoChange('address', e.target.value)} placeholder="123 Main Road" />
                                                     </label>
                                                     <label>
-                                                        Logo URL
-                                                        <input
-                                                            type="url"
-                                                            value={editCompanyForm.logo_url}
-                                                            onChange={(e) => handleCompanyInfoChange('logo_url', e.target.value)}
-                                                            placeholder="https://example.com/logo.png"
-                                                        />
+                                                        <span className="form-label-text"><FaMapMarkerAlt size={11} /> City</span>
+                                                        <input type="text" value={editCompanyForm.city} onChange={(e) => handleCompanyInfoChange('city', e.target.value)} placeholder="Johannesburg" />
+                                                    </label>
+                                                    <label className="form-grid-two__full">
+                                                        <span className="form-label-text"><FaGlobe size={11} /> Country</span>
+                                                        <input type="text" value={editCompanyForm.country} onChange={(e) => handleCompanyInfoChange('country', e.target.value)} placeholder="South Africa" />
                                                     </label>
                                                 </div>
-                                                {companyInfoMessage && (
-                                                    <p className="form-hint">{companyInfoMessage}</p>
+
+                                                {/* Logo preview */}
+                                                {editCompanyForm.logo_url && (
+                                                    <div className="business-logo-preview">
+                                                        <span>Logo preview:</span>
+                                                        <img
+                                                            src={resolveMediaUrl(editCompanyForm.logo_url)}
+                                                            alt="Logo preview"
+                                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                                        />
+                                                    </div>
                                                 )}
+
+                                                {companyInfoMessage && <p className="form-hint">{companyInfoMessage}</p>}
+
                                                 <div className="business-edit-actions">
                                                     <button
                                                         type="button"
                                                         className="btn btn-secondary"
                                                         onClick={handleScrapeMissingInfo}
-                                                        disabled={companyInfoSaving || !selectedCompany?.website}
+                                                        disabled={companyInfoSaving || !editCompanyForm.website}
+                                                        title={!editCompanyForm.website ? 'Add a website URL above to enable auto-fill' : undefined}
                                                     >
-                                                        {selectedCompany?.website ? 'Auto-fill from website' : 'Add a website to enable auto-fill'}
+                                                        {editCompanyForm.website ? 'Auto-fill from website' : 'Enter website to auto-fill'}
                                                     </button>
-                                                    <button
-                                                        type="submit"
-                                                        className="btn btn-primary"
-                                                        disabled={companyInfoSaving}
-                                                    >
-                                                        {companyInfoSaving ? 'Saving...' : 'Save changes'}
+                                                    <button type="submit" className="btn btn-primary" disabled={companyInfoSaving}>
+                                                        {companyInfoSaving ? 'Saving…' : 'Save changes'}
                                                     </button>
                                                 </div>
                                             </form>
@@ -1288,6 +1345,7 @@ const Dashboard = () => {
                         </div>
                     )}
 
+                    {/* ── Psychologist: Pending Requests ── */}
                     {user?.role === 'psychologist' && activeTab === 'requests' && (
                         <div className="pending-requests-section">
                             <h3>Pending Message Requests</h3>
@@ -1296,50 +1354,17 @@ const Dashboard = () => {
                                     {pendingRequests.map(request => (
                                         <div key={request.id} className="request-card">
                                             <div className="request-info">
-                                                <h4>
-                                                    {request.employee?.is_anonymous
-                                                        ? 'Anonymous Employee'
-                                                        : request.employee?.display_name || 'Unknown'}
-                                                </h4>
-                                                {request.employee?.occupation && (
-                                                    <p className="user-occupation-small">
-                                                        <FaBriefcase /> {request.employee.occupation}
-                                                    </p>
-                                                )}
-                                                {request.employee?.workplace && (
-                                                    <p className="user-workplace-small">
-                                                        <FaBuilding /> {request.employee.workplace.name}
-                                                    </p>
-                                                )}
-                                                {request.initial_message?.content && (
-                                                    <p className="request-message">
-                                                        {request.initial_message.content}
-                                                    </p>
-                                                )}
+                                                <h4>{request.employee?.is_anonymous ? 'Anonymous Employee' : request.employee?.display_name || 'Unknown'}</h4>
+                                                {request.employee?.occupation && <p className="user-occupation-small"><FaBriefcase /> {request.employee.occupation}</p>}
+                                                {request.employee?.workplace && <p className="user-workplace-small"><FaBuilding /> {request.employee.workplace.name}</p>}
+                                                {request.initial_message?.content && <p className="request-message">{request.initial_message.content}</p>}
                                                 <p className="request-status">Status: {request.status}</p>
-                                                <p className="request-date">
-                                                    Sent: {new Date(request.created_at).toLocaleDateString()}
-                                                </p>
+                                                <p className="request-date">Sent: {new Date(request.created_at).toLocaleDateString()}</p>
                                             </div>
                                             <div className="request-actions">
-                                                <button
-                                                    onClick={() => handleAcceptRequest(request.id)}
-                                                    className="btn btn-primary btn-small"
-                                                >
-                                                    Accept
-                                                </button>
-                                                <button
-                                                    onClick={() => handleRejectRequest(request.id)}
-                                                    className="btn btn-secondary btn-small"
-                                                >
-                                                    Decline
-                                                </button>
-                                                <button
-                                                    onClick={() => window.location.href = `/messages?conversation=${request.id}`}
-                                                    className="btn btn-outline btn-small"
-                                                >
-                                                    View Details
-                                                </button>
+                                                <button onClick={() => handleAcceptRequest(request.id)} className="btn btn-primary btn-small">Accept</button>
+                                                <button onClick={() => handleRejectRequest(request.id)} className="btn btn-secondary btn-small">Decline</button>
+                                                <button onClick={() => window.location.href = `/messages?conversation=${request.id}`} className="btn btn-outline btn-small">View Details</button>
                                             </div>
                                         </div>
                                     ))}
@@ -1350,20 +1375,17 @@ const Dashboard = () => {
                         </div>
                     )}
 
+                    {/* ── Psychologist: Overview ── */}
                     {user?.role === 'psychologist' && activeTab === 'overview' && (
                         <div className="psych-dashboard-grid">
+                            {/* Schedule card */}
                             <section className="psych-card psych-card--schedule">
                                 <header className="psych-card__header">
                                     <div>
                                         <h3><FaCalendarAlt /> Schedule</h3>
                                         <p>Plan meetings and activities with a live calendar view.</p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline btn-small psych-card__toggle"
-                                        onClick={() => togglePsychCard('schedule')}
-                                        aria-label={psychCardCollapse.schedule ? 'Maximize schedule card' : 'Minimize schedule card'}
-                                    >
+                                    <button type="button" className="btn btn-outline btn-small psych-card__toggle" onClick={() => togglePsychCard('schedule')}>
                                         {psychCardCollapse.schedule ? <FaChevronDown /> : <FaChevronUp />}
                                         {psychCardCollapse.schedule ? 'Maximize' : 'Minimize'}
                                     </button>
@@ -1372,70 +1394,31 @@ const Dashboard = () => {
                                     <div className="psych-card__body">
                                         <div className="psych-calendar-controls">
                                             <div className="psych-calendar-nav">
-                                                <button type="button" className="btn btn-secondary btn-small" onClick={handleCalendarPrev}>
-                                                    Prev
-                                                </button>
-                                                <button type="button" className="btn btn-outline btn-small" onClick={handleCalendarToday}>
-                                                    Today
-                                                </button>
-                                                <button type="button" className="btn btn-secondary btn-small" onClick={handleCalendarNext}>
-                                                    Next
-                                                </button>
+                                                <button type="button" className="btn btn-secondary btn-small" onClick={handleCalendarPrev}>Prev</button>
+                                                <button type="button" className="btn btn-outline btn-small" onClick={handleCalendarToday}>Today</button>
+                                                <button type="button" className="btn btn-secondary btn-small" onClick={handleCalendarNext}>Next</button>
                                             </div>
                                             <div className="psych-calendar-title">
                                                 {calendarView === 'month'
                                                     ? format(calendarDate, 'MMMM yyyy')
-                                                    : `${format(calendarStart, 'MMM d')} - ${format(calendarEnd, 'MMM d')}`}
+                                                    : `${format(calendarStart, 'MMM d')} – ${format(calendarEnd, 'MMM d')}`}
                                             </div>
                                             <div className="psych-calendar-view">
-                                                <button
-                                                    type="button"
-                                                    className={`btn btn-small ${calendarView === 'month' ? 'btn-primary' : 'btn-outline'}`}
-                                                    onClick={() => setCalendarView('month')}
-                                                >
-                                                    Month
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className={`btn btn-small ${calendarView === 'week' ? 'btn-primary' : 'btn-outline'}`}
-                                                    onClick={() => setCalendarView('week')}
-                                                >
-                                                    Week
-                                                </button>
+                                                <button type="button" className={`btn btn-small ${calendarView === 'month' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setCalendarView('month')}>Month</button>
+                                                <button type="button" className={`btn btn-small ${calendarView === 'week' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setCalendarView('week')}>Week</button>
                                             </div>
                                         </div>
                                         <form className="psych-schedule-form" onSubmit={handleScheduleSubmit}>
-                                            <input
-                                                type="text"
-                                                placeholder="Title"
-                                                value={scheduleDraft.title}
-                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, title: e.target.value })}
-                                            />
-                                            <input
-                                                type="date"
-                                                value={scheduleDraft.date}
-                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, date: e.target.value })}
-                                            />
-                                            <input
-                                                type="time"
-                                                value={scheduleDraft.time}
-                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, time: e.target.value })}
-                                            />
-                                            <select
-                                                value={scheduleDraft.type}
-                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, type: e.target.value })}
-                                            >
+                                            <input type="text" placeholder="Title" value={scheduleDraft.title} onChange={(e) => setScheduleDraft({ ...scheduleDraft, title: e.target.value })} />
+                                            <input type="date" value={scheduleDraft.date} onChange={(e) => setScheduleDraft({ ...scheduleDraft, date: e.target.value })} />
+                                            <input type="time" value={scheduleDraft.time} onChange={(e) => setScheduleDraft({ ...scheduleDraft, time: e.target.value })} />
+                                            <select value={scheduleDraft.type} onChange={(e) => setScheduleDraft({ ...scheduleDraft, type: e.target.value })}>
                                                 <option value="meeting">Meeting</option>
                                                 <option value="video">Video</option>
                                                 <option value="voice">Voice</option>
                                                 <option value="note">Note</option>
                                             </select>
-                                            <input
-                                                type="text"
-                                                placeholder="Location / link"
-                                                value={scheduleDraft.location}
-                                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })}
-                                            />
+                                            <input type="text" placeholder="Location / link" value={scheduleDraft.location} onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })} />
                                             <button type="submit" className="btn btn-primary btn-small">Add</button>
                                         </form>
                                         <div className={`psych-calendar psych-calendar--${calendarView}`}>
@@ -1451,15 +1434,9 @@ const Dashboard = () => {
                                                     const isMuted = calendarView === 'month' && !isSameMonth(day, calendarDate);
                                                     const isToday = isSameDay(day, new Date());
                                                     return (
-                                                        <button
-                                                            type="button"
-                                                            key={key}
-                                                            className={`psych-calendar-day ${isMuted ? 'is-muted' : ''} ${isToday ? 'is-today' : ''}`}
-                                                            onClick={() => setScheduleDraft((prev) => ({
-                                                                ...prev,
-                                                                date: format(day, 'yyyy-MM-dd')
-                                                            }))}
-                                                        >
+                                                        <button type="button" key={key}
+                                                                className={`psych-calendar-day ${isMuted ? 'is-muted' : ''} ${isToday ? 'is-today' : ''}`}
+                                                                onClick={() => setScheduleDraft((prev) => ({ ...prev, date: format(day, 'yyyy-MM-dd') }))}>
                                                             <div className="psych-calendar-day-header">
                                                                 <span>{format(day, 'd')}</span>
                                                                 {items.length > 0 && <span className="psych-calendar-count">{items.length}</span>}
@@ -1471,18 +1448,15 @@ const Dashboard = () => {
                                                                         <span>{format(item.scheduledDate, 'p')}</span>
                                                                     </div>
                                                                 ))}
-                                                                {items.length > 2 && (
-                                                                    <div className="psych-calendar-more">+{items.length - 2} more</div>
-                                                                )}
+                                                                {items.length > 2 && <div className="psych-calendar-more">+{items.length - 2} more</div>}
                                                             </div>
                                                         </button>
                                                     );
                                                 })}
                                             </div>
-                                            {psychSchedule.length === 0 && (
-                                                <p className="empty-message">No scheduled items yet.</p>
-                                            )}
+                                            {psychSchedule.length === 0 && <p className="empty-message">No scheduled items yet.</p>}
                                         </div>
+                                        {/* Day detail list */}
                                         <div className="psych-schedule-list">
                                             <div className="psych-schedule-list__header">
                                                 <h4>{format(calendarDate, 'MMMM d, yyyy')}</h4>
@@ -1497,13 +1471,7 @@ const Dashboard = () => {
                                                                 <span>{format(item.scheduledDate, 'p')}</span>
                                                                 {item.location && <span>{item.location}</span>}
                                                             </div>
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-secondary btn-small"
-                                                                onClick={() => handleScheduleRemove(item.id)}
-                                                            >
-                                                                Remove
-                                                            </button>
+                                                            <button type="button" className="btn btn-secondary btn-small" onClick={() => handleScheduleRemove(item.id)}>Remove</button>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -1511,6 +1479,7 @@ const Dashboard = () => {
                                                 <p className="empty-message">No items for this day.</p>
                                             )}
                                         </div>
+                                        {/* External events */}
                                         <div className="psych-schedule-list">
                                             <div className="psych-schedule-list__header">
                                                 <h4>External calendar</h4>
@@ -1532,39 +1501,21 @@ const Dashboard = () => {
                                                 <p className="empty-message">No external items for this day.</p>
                                             )}
                                         </div>
+                                        {/* Calendar integrations */}
                                         <div className="psych-schedule-list">
                                             <div className="psych-schedule-list__header">
                                                 <h4>Calendar integrations</h4>
                                                 <span>{calendarIntegrations.length} connected</span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                className="btn btn-outline btn-small"
-                                                onClick={handleDownloadIcs}
-                                            >
-                                                Download iCal
-                                            </button>
+                                            <button type="button" className="btn btn-outline btn-small" onClick={handleDownloadIcs}>Download iCal</button>
                                             <form className="psych-schedule-form" onSubmit={handleAddCalendarIntegration}>
-                                                <select
-                                                    value={calendarIntegrationDraft.provider}
-                                                    onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, provider: e.target.value })}
-                                                >
+                                                <select value={calendarIntegrationDraft.provider} onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, provider: e.target.value })}>
                                                     <option value="google">Google Calendar</option>
                                                     <option value="outlook">Outlook</option>
                                                     <option value="ical">iCal</option>
                                                 </select>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Calendar name"
-                                                    value={calendarIntegrationDraft.name}
-                                                    onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, name: e.target.value })}
-                                                />
-                                                <input
-                                                    type="url"
-                                                    placeholder="Public iCal URL"
-                                                    value={calendarIntegrationDraft.icalUrl}
-                                                    onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, icalUrl: e.target.value })}
-                                                />
+                                                <input type="text" placeholder="Calendar name" value={calendarIntegrationDraft.name} onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, name: e.target.value })} />
+                                                <input type="url" placeholder="Public iCal URL" value={calendarIntegrationDraft.icalUrl} onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, icalUrl: e.target.value })} />
                                                 <button type="submit" className="btn btn-primary btn-small">Connect</button>
                                             </form>
                                             {calendarIntegrations.length > 0 ? (
@@ -1576,20 +1527,8 @@ const Dashboard = () => {
                                                                 <span>{integration.provider}</span>
                                                             </div>
                                                             <div className="psych-calendar-actions">
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn btn-outline btn-small"
-                                                                    onClick={() => handleSyncCalendarIntegration(integration.id)}
-                                                                >
-                                                                    Sync
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn btn-secondary btn-small"
-                                                                    onClick={() => handleRemoveCalendarIntegration(integration.id)}
-                                                                >
-                                                                    Remove
-                                                                </button>
+                                                                <button type="button" className="btn btn-outline btn-small" onClick={() => handleSyncCalendarIntegration(integration.id)}>Sync</button>
+                                                                <button type="button" className="btn btn-secondary btn-small" onClick={() => handleRemoveCalendarIntegration(integration.id)}>Remove</button>
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1602,18 +1541,14 @@ const Dashboard = () => {
                                 )}
                             </section>
 
+                            {/* Leads card */}
                             <section className="psych-card psych-card--compact">
                                 <header className="psych-card__header">
                                     <div>
                                         <h3><FaEnvelopeOpenText /> Leads</h3>
                                         <p>Individuals flagged as potentially stressed or depressed.</p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline btn-small psych-card__toggle"
-                                        onClick={() => togglePsychCard('leads')}
-                                        aria-label={psychCardCollapse.leads ? 'Maximize leads card' : 'Minimize leads card'}
-                                    >
+                                    <button type="button" className="btn btn-outline btn-small psych-card__toggle" onClick={() => togglePsychCard('leads')}>
                                         {psychCardCollapse.leads ? <FaChevronDown /> : <FaChevronUp />}
                                         {psychCardCollapse.leads ? 'Maximize' : 'Minimize'}
                                     </button>
@@ -1621,31 +1556,17 @@ const Dashboard = () => {
                                 {!psychCardCollapse.leads && (
                                     <div className="psych-card__body">
                                         <div className="psych-leads-list">
-                                            {psychLeads.length > 0 ? (
-                                                psychLeads.map(lead => (
-                                                    <div key={lead.id} className="psych-lead-card">
-                                                        <div>
-                                                            <h4>{lead.display_name}</h4>
-                                                            <p>{lead.summary}</p>
-                                                            <span className={`lead-badge lead-${lead.risk_level}`}>{lead.risk_level} risk</span>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-secondary btn-small"
-                                                            onClick={() => handleLeadMessage(lead.id)}
-                                                        >
-                                                            Send message
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-outline btn-small"
-                                                            onClick={() => handleLeadArchive(lead.id)}
-                                                        >
-                                                            Remove
-                                                        </button>
+                                            {psychLeads.length > 0 ? psychLeads.map(lead => (
+                                                <div key={lead.id} className="psych-lead-card">
+                                                    <div>
+                                                        <h4>{lead.display_name}</h4>
+                                                        <p>{lead.summary}</p>
+                                                        <span className={`lead-badge lead-${lead.risk_level}`}>{lead.risk_level} risk</span>
                                                     </div>
-                                                ))
-                                            ) : (
+                                                    <button type="button" className="btn btn-secondary btn-small" onClick={() => handleLeadMessage(lead.id)}>Send message</button>
+                                                    <button type="button" className="btn btn-outline btn-small" onClick={() => handleLeadArchive(lead.id)}>Remove</button>
+                                                </div>
+                                            )) : (
                                                 <p className="empty-message">No new leads right now.</p>
                                             )}
                                         </div>
@@ -1653,18 +1574,14 @@ const Dashboard = () => {
                                 )}
                             </section>
 
+                            {/* Recent calls card */}
                             <section className="psych-card psych-card--compact">
                                 <header className="psych-card__header">
                                     <div>
                                         <h3><FaVideo /> Recent Calls</h3>
                                         <p>Previous voice/video sessions with employees.</p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline btn-small psych-card__toggle"
-                                        onClick={() => togglePsychCard('calls')}
-                                        aria-label={psychCardCollapse.calls ? 'Maximize recent calls card' : 'Minimize recent calls card'}
-                                    >
+                                    <button type="button" className="btn btn-outline btn-small psych-card__toggle" onClick={() => togglePsychCard('calls')}>
                                         {psychCardCollapse.calls ? <FaChevronDown /> : <FaChevronUp />}
                                         {psychCardCollapse.calls ? 'Maximize' : 'Minimize'}
                                     </button>
@@ -1687,12 +1604,6 @@ const Dashboard = () => {
                                     </div>
                                 )}
                             </section>
-                        </div>
-                    )}
-
-                    {user?.role === 'psychologist' && activeTab === 'profile' && (
-                        <div className="profile-tab">
-                            <ProfileSettings onUpdate={fetchDashboardData} />
                         </div>
                     )}
                 </div>

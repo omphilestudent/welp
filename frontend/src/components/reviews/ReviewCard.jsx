@@ -24,6 +24,11 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
     };
 
     const reviewCreatedAt = review.created_at || review.createdAt;
+    const isAuthorAnonymous = review.author?.isAnonymous || review.author?.is_anonymous;
+    const reviewerRoleRaw = review.author?.role || review.author_role || '';
+    const reviewerRole = !isAuthorAnonymous && reviewerRoleRaw
+        ? reviewerRoleRaw.replace(/_/g, ' ')
+        : null;
     const canEdit = user && user.id === review.author_id &&
         new Date() - new Date(reviewCreatedAt) < 24 * 60 * 60 * 1000;
 
@@ -88,11 +93,16 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
         <div className="review-card">
             <div className="review-header">
                 <div className="review-author">
-          <span className="review-author-name">
-            {review.author?.isAnonymous || review.author?.is_anonymous
-                ? 'Anonymous'
-                : (review.author?.display_name || review.author?.displayName || 'Unknown')}
-          </span>
+                    <span className="review-author-name">
+                        {isAuthorAnonymous
+                            ? 'Anonymous'
+                            : (review.author?.display_name || review.author?.displayName || 'Unknown')}
+                    </span>
+                    {reviewerRole && (
+                        <span className="review-author-role">
+                            {reviewerRole}
+                        </span>
+                    )}
                     <span className="review-date">
             {formatDistanceToNow(new Date(reviewCreatedAt))} ago
           </span>

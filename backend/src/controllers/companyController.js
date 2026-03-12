@@ -64,6 +64,17 @@ const syncCompanyClaimStatus = async () => {
                     AND LOWER(u.role) = 'business'
               )
         `);
+
+        // Ensure owner records exist for claimed companies
+        await query(`
+            INSERT INTO company_owners (company_id, user_id)
+            SELECT c.id, c.claimed_by
+            FROM companies c
+                     LEFT JOIN company_owners co
+                               ON co.company_id = c.id AND co.user_id = c.claimed_by
+            WHERE c.claimed_by IS NOT NULL
+              AND co.user_id IS NULL
+        `);
     } catch (error) {
         console.warn('Company claim status sync skipped:', error.message);
     }
@@ -670,7 +681,8 @@ const getCompanyReviewsForBusiness = async (req, res) => {
                          'id', u.id,
                          'displayName', u.display_name,
                          'isAnonymous', u.is_anonymous,
-                         'avatarUrl', u.avatar_url
+                         'avatarUrl', u.avatar_url,
+                         'role', u.role
                  ) as author,
                  COALESCE(replies_data.replies, '[]'::json) as replies
              FROM reviews r
