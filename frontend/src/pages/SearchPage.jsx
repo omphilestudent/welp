@@ -58,7 +58,7 @@ const SearchPage = () => {
             };
 
 
-            const response = await api.get('/businesses', { params });
+            const response = await api.get('/companies/search', { params });
 
             setCompanies(response.data.companies || []);
             setPagination(response.data.pagination || {

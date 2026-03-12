@@ -130,20 +130,14 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
             )}
 
             <div className="company-card-footer">
-                {isClaimed ? (
-                    <span className="company-claimed-pill" aria-label="Business already claimed">
-                        ✓ Claimed on Welp
-                    </span>
-                ) : (
-                    showClaimAction && (
-                        <button
-                            type="button"
-                            className="company-claim-btn"
-                            onClick={handleClaimClick}
-                        >
-                            Claim this business
-                        </button>
-                    )
+                {!isClaimed && showClaimAction && (
+                    <button
+                        type="button"
+                        className="company-claim-btn"
+                        onClick={handleClaimClick}
+                    >
+                        Claim this business
+                    </button>
                 )}
             </div>
         </div>

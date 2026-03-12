@@ -14,10 +14,6 @@ const ownerRoles = ['business', 'admin', 'super_admin', 'superadmin', 'system_ad
 router.get('/search', apiLimiter, companyController.searchCompanies);
 router.get('/industries', apiLimiter, companyController.getIndustries);
 router.get('/unclaimed', apiLimiter, companyController.getUnclaimedCompanies);
-router.get('/:id', apiLimiter, companyController.getCompany);
-
-
-
 router.post('/scrape',
     authenticate,
     authorize('admin', 'super_admin', 'hr_admin'),
@@ -97,6 +93,9 @@ router.get('/my-claim-requests',
     authorize('business'),
     companyController.getMyClaimRequests
 );
+
+// Generic company lookup MUST stay after more specific routes to avoid conflicts
+router.get('/:id', apiLimiter, companyController.getCompany);
 
 
 router.post('/verify-email',

@@ -38,6 +38,39 @@ const ensureCompanyOwnerMetadata = async () => {
 
 ensureCompanyOwnerMetadata();
 
+const syncCompanyClaimStatus = async () => {
+    try {
+        // Mark companies as claimed when an owner record already exists
+        await query(`
+            UPDATE companies c
+            SET is_claimed = true,
+                claimed_by = COALESCE(c.claimed_by, co.user_id)
+            FROM company_owners co
+            WHERE c.id = co.company_id
+              AND c.is_claimed IS NOT TRUE
+        `);
+
+        // Auto-claim companies created by approved business accounts
+        await query(`
+            UPDATE companies c
+            SET is_claimed = true,
+                claimed_by = COALESCE(c.claimed_by, c.created_by_user_id)
+            WHERE c.is_claimed IS NOT TRUE
+              AND c.created_by_user_id IS NOT NULL
+              AND EXISTS (
+                  SELECT 1
+                  FROM users u
+                  WHERE u.id = c.created_by_user_id
+                    AND LOWER(u.role) = 'business'
+              )
+        `);
+    } catch (error) {
+        console.warn('Company claim status sync skipped:', error.message);
+    }
+};
+
+syncCompanyClaimStatus();
+
 const COMPANY_SELECT_SQL = `
     SELECT
         c.*,
@@ -336,30 +369,69 @@ const createCompany = async (req, res) => {
         const finalStatus = 'pending';
         const needsEnrichment = true;
         const enrichmentJson = enrichmentData ? JSON.stringify(enrichmentData) : null;
+        const isBusinessCreator = String(req.user?.role || '').toLowerCase() === 'business';
+
+        const insertColumns = [
+            'name',
+            'description',
+            'industry',
+            'website',
+            'email',
+            'phone',
+            'address',
+            'city',
+            'country',
+            'logo_url',
+            'status',
+            'needs_enrichment',
+            'enrichment_data',
+            'created_by_user_id'
+        ];
+        const insertValues = [
+            cleanedName,
+            finalDescription,
+            cleanedIndustry,
+            finalWebsite,
+            finalEmail,
+            finalPhone,
+            finalAddress,
+            finalCity,
+            cleanedCountry,
+            scrapedLogoUrl,
+            finalStatus,
+            needsEnrichment,
+            enrichmentJson,
+            req.user.id
+        ];
+
+        if (isBusinessCreator) {
+            insertColumns.push('is_claimed', 'claimed_by');
+            insertValues.push(true, req.user.id);
+        }
+
+        const placeholders = insertColumns.map((_, idx) => `$${idx + 1}`);
 
         const result = await query(
-            `INSERT INTO companies (name, description, industry, website, email, phone, address, city, country, logo_url, status, needs_enrichment, enrichment_data, created_by_user_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                 RETURNING *`,
-            [
-                cleanedName,
-                finalDescription,
-                cleanedIndustry,
-                finalWebsite,
-                finalEmail,
-                finalPhone,
-                finalAddress,
-                finalCity,
-                cleanedCountry,
-                scrapedLogoUrl,
-                finalStatus,
-                needsEnrichment,
-                enrichmentJson,
-                req.user.id
-            ]
+            `INSERT INTO companies (${insertColumns.join(', ')})
+             VALUES (${placeholders.join(', ')})
+             RETURNING *`,
+            insertValues
         );
 
         const company = result.rows[0];
+
+        if (isBusinessCreator) {
+            try {
+                await query(
+                    `INSERT INTO company_owners (company_id, user_id)
+                     VALUES ($1, $2)
+                     ON CONFLICT (company_id, user_id) DO NOTHING`,
+                    [company.id, req.user.id]
+                );
+            } catch (ownerError) {
+                console.warn('Auto-claim owner sync failed:', ownerError.message);
+            }
+        }
 
         try {
             await generateAutoReview({
@@ -380,8 +452,12 @@ const createCompany = async (req, res) => {
             }
         }
 
+        const responseMessage = isBusinessCreator
+            ? 'Company created and linked to your business profile.'
+            : 'Company submitted for review. Admins will verify it shortly.';
+
         res.status(201).json({
-            message: 'Company submitted for review. Admins will verify it shortly.',
+            message: responseMessage,
             company
         });
     } catch (error) {

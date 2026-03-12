@@ -110,7 +110,7 @@ const BusinessRegister = () => {
         setSelectedClaimCompany(null);
         setClaimLoading(true);
         try {
-            const { data } = await api.get('/businesses', {
+            const { data } = await api.get('/companies/search', {
                 params: {
                     search: safeTerm,
                     unclaimed: true,
