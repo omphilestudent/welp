@@ -75,15 +75,16 @@
     align-items: center;
     width: 100%;
     border-radius: var(--border-radius);
-    border: 1.5px solid rgba(148, 163, 184, 0.45);
-    background: rgba(248, 250, 252, 0.95);
-    box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: none;
+    backdrop-filter: blur(6px);
     transition: var(--transition-base);
 }
 
 .input-wrapper:focus-within {
     border-color: var(--primary-color);
-    box-shadow: 0 18px 40px rgba(79, 70, 229, 0.18);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
 
 /* Icon styles */

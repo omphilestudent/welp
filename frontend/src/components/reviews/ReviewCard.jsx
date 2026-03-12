@@ -6,7 +6,7 @@ import api from '../../services/api';
 import StarRating from './StarRating';
 import toast from 'react-hot-toast';
 
-const ReviewCard = ({ review, onReplyAdded }) => {
+const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
     const { user } = useAuth();
     const [showReplyForm, setShowReplyForm] = useState(false);
     const [replyContent, setReplyContent] = useState('');
@@ -34,7 +34,8 @@ const ReviewCard = ({ review, onReplyAdded }) => {
         setSubmitting(true);
         setError('');
         try {
-            await api.post(`/reviews/${review.id}/replies`, {
+            const endpoint = replyEndpoint || `/reviews/${review.id}/replies`;
+            await api.post(endpoint, {
                 content: replyContent
             });
             setReplyContent('');
@@ -95,6 +96,9 @@ const ReviewCard = ({ review, onReplyAdded }) => {
                     <span className="review-date">
             {formatDistanceToNow(new Date(reviewCreatedAt))} ago
           </span>
+                    {review.isNew && (
+                        <span className="review-badge">New</span>
+                    )}
                 </div>
                 <div className="review-rating">
                     <StarRating rating={review.rating} readonly />

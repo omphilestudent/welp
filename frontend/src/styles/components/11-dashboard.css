@@ -850,3 +850,160 @@
   }
 }
 
+.business-dashboard-panel {
+  margin-top: 2rem;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 1.75rem;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.business-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.business-company-selector {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.business-company-selector select {
+  border-radius: 0.8rem;
+  border: 1px solid #cbd5f5;
+  padding: 0.55rem 0.85rem;
+  min-width: 220px;
+}
+
+.business-panel-tabs {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  flex-wrap: wrap;
+}
+
+.business-panel-tab {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  border-radius: 30px;
+  padding: 0.45rem 1.25rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.business-panel-tab.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.business-last-seen {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.business-reviews-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.business-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  gap: 1rem;
+}
+
+.business-pagination button {
+  border: none;
+  background: #e2e8f0;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.business-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.business-analytics-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.analytics-card {
+  background: #f8fafc;
+  border-radius: 18px;
+  padding: 1rem 1.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.analytics-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.analytics-card strong {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.6rem;
+  color: #0f172a;
+}
+
+.business-analytics-panel .analytics-chart {
+  background: #fff;
+  border-radius: 20px;
+  padding: 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  margin-bottom: 1.25rem;
+}
+
+.business-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.business-edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-grid-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.form-grid-two input {
+  border: 1px solid #cbd5f5;
+  border-radius: 0.85rem;
+  padding: 0.6rem 0.85rem;
+}
+
+.business-edit-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.business-edit-actions .btn {
+  border-radius: 30px;
+  padding: 0.55rem 1.5rem;
+}
+

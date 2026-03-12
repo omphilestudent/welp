@@ -14,6 +14,7 @@ const ClaimBusiness = () => {
     const [company, setCompany] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [recentReviews, setRecentReviews] = useState([]);
 
     useEffect(() => {
         console.log('ClaimBusiness mounted with ID:', id);
@@ -25,9 +26,12 @@ const ClaimBusiness = () => {
     const fetchCompany = async () => {
         try {
             console.log('Fetching company with ID:', id);
-            const { data } = await api.get(`/companies/${id}`);
+            const { data } = await api.get(`/business/${id}`, {
+                params: { reviewLimit: 3 }
+            });
             console.log('Company data:', data);
             setCompany(data);
+            setRecentReviews(data.recentReviews || []);
         } catch (error) {
             console.error('Failed to fetch company:', error);
             setError('Failed to load company details');
@@ -80,6 +84,23 @@ const ClaimBusiness = () => {
                             </div>
                         </div>
                     </div>
+
+                    {recentReviews.length > 0 && (
+                        <div className="claim-reviews-preview">
+                            <h3>Recent employee feedback</h3>
+                            <ul>
+                                {recentReviews.map((review) => (
+                                    <li key={review.id}>
+                                        <div className="claim-review-rating">
+                                            <span>Rating: {review.rating}/5</span>
+                                            <span>{new Date(review.created_at || review.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        <p>{review.content}</p>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     <div className="claim-steps">
                         <h2>Verification Process</h2>

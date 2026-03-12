@@ -5,10 +5,151 @@ const { scrapeCompanyFromWebsite } = require('../services/companyScraperService'
 const { enrichCompanyWithOSM } = require('../services/companyEnrichmentService');
 const { generateAutoReview } = require('../services/autoReviewService');
 
+const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
+const OWNER_ACCESS_ROLES = new Set(['business', ...ADMIN_ROLES]);
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const resolveCompanyIdParam = (params = {}) => params.id || params.companyId;
+
+const formatCompanyRow = (company = {}) => ({
+    ...company,
+    avg_rating: parseFloat(company.avg_rating || 0).toFixed(1),
+    review_count: parseInt(company.review_count || 0, 10),
+    owners: company.owners?.filter((owner) => owner && owner.id) || []
+});
+
+const isAdminUser = (user) => {
+    if (!user) return false;
+    const normalizedRole = String(user.role || '').toLowerCase();
+    return ADMIN_ROLES.has(normalizedRole);
+};
+
+const ensureCompanyOwnerMetadata = async () => {
+    try {
+        await query(`
+            ALTER TABLE company_owners
+                ADD COLUMN IF NOT EXISTS last_review_viewed_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS last_dashboard_visit_at TIMESTAMP
+        `);
+    } catch (error) {
+        console.warn('Company owner metadata migration skipped:', error.message);
+    }
+};
+
+ensureCompanyOwnerMetadata();
+
+const COMPANY_SELECT_SQL = `
+    SELECT
+        c.*,
+        COALESCE(AVG(r.rating), 0) as avg_rating,
+        COUNT(r.id) as review_count,
+        json_agg(DISTINCT jsonb_build_object('id', u.id, 'displayName', u.display_name)) FILTER (WHERE u.id IS NOT NULL) as owners
+    FROM companies c
+    LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
+    LEFT JOIN company_owners co ON c.id = co.company_id
+    LEFT JOIN users u ON co.user_id = u.id
+    WHERE c.id = $1
+    GROUP BY c.id
+`;
+
+const fetchCompanyByIdStrict = async (companyId) => {
+    const result = await query(COMPANY_SELECT_SQL, [companyId]);
+    if (result.rows.length === 0) {
+        const error = new Error('Company not found');
+        error.statusCode = 404;
+        throw error;
+    }
+    return formatCompanyRow(result.rows[0]);
+};
+
+const assertCompanyOwnership = async (companyId, user) => {
+    if (!user) {
+        const error = new Error('Authentication required');
+        error.statusCode = 401;
+        throw error;
+    }
+
+    if (isAdminUser(user)) {
+        return null;
+    }
+
+    const ownership = await query(
+        'SELECT * FROM company_owners WHERE company_id = $1 AND user_id = $2',
+        [companyId, user.id]
+    );
+
+    if (ownership.rows.length === 0) {
+        const error = new Error('Not authorized to manage this company');
+        error.statusCode = 403;
+        throw error;
+    }
+
+    return ownership.rows[0];
+};
+
+const fetchRecentPublicReviews = async (companyId, limit = 5) => {
+    const result = await query(
+        `SELECT
+             r.*,
+             json_build_object(
+                 'id', u.id,
+                 'displayName', u.display_name,
+                 'isAnonymous', u.is_anonymous,
+                 'avatarUrl', u.avatar_url
+             ) as author,
+             COALESCE(replies_data.replies, '[]'::json) as replies
+         FROM reviews r
+                  JOIN users u ON r.author_id = u.id
+                  LEFT JOIN LATERAL (
+             SELECT json_agg(json_build_object(
+                 'id', rp.id,
+                 'content', rp.content,
+                 'authorRole', rp.author_role,
+                 'createdAt', rp.created_at,
+                 'author', json_build_object(
+                     'id', ru.id,
+                     'displayName', ru.display_name,
+                     'role', ru.role,
+                     'avatarUrl', ru.avatar_url
+                 )
+             ) ORDER BY rp.created_at ASC) AS replies
+             FROM replies rp
+                      JOIN users ru ON rp.author_id = ru.id
+             WHERE rp.review_id = r.id
+         ) AS replies_data ON true
+         WHERE r.company_id = $1
+           AND r.is_public = true
+         ORDER BY r.created_at DESC
+         LIMIT $2`,
+        [companyId, Math.max(1, limit)]
+    );
+
+    return result.rows.map((row) => ({
+        ...row,
+        replies: row.replies || []
+    }));
+};
+
+const handleControllerError = (res, error, fallbackMessage = 'Unexpected server error') => {
+    const status = error.statusCode || 500;
+    if (status >= 500) {
+        console.error(fallbackMessage, error);
+    }
+    return res.status(status).json({ error: error.message || fallbackMessage });
+};
+
 
 const searchCompanies = async (req, res) => {
     try {
-        const { q, page = 1, limit = 20, industry, unclaimed } = req.query;
+        const {
+            q,
+            search,
+            page = 1,
+            limit = 20,
+            industry,
+            unclaimed,
+            claimed
+        } = req.query;
 
         const validPage = Math.max(1, parseInt(page) || 1);
         const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
@@ -18,9 +159,12 @@ const searchCompanies = async (req, res) => {
         let paramIndex = 1;
         const conditions = ["c.status = 'active'"];
 
-        if (q && q.trim() !== '') {
+        const rawSearch = typeof q === 'string' && q.trim() !== '' ? q : search;
+        const trimmedSearch = typeof rawSearch === 'string' ? rawSearch.trim() : '';
+
+        if (trimmedSearch) {
             conditions.push('(c.name ILIKE $' + paramIndex + ' OR c.description ILIKE $' + paramIndex + ' OR c.industry ILIKE $' + paramIndex + ')');
-            params.push('%' + q.trim() + '%');
+            params.push('%' + trimmedSearch + '%');
             paramIndex++;
         }
 
@@ -32,6 +176,8 @@ const searchCompanies = async (req, res) => {
 
         if (unclaimed === 'true') {
             conditions.push('c.is_claimed = false');
+        } else if (claimed === 'true') {
+            conditions.push('c.is_claimed = true');
         }
 
         const whereClause = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
@@ -76,43 +222,37 @@ const searchCompanies = async (req, res) => {
 };
 const getCompany = async (req, res) => {
     try {
-        const { id } = req.params;
-
-
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(id)) {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
             return res.status(400).json({ error: 'Invalid company ID format' });
         }
 
-        const result = await query(
-            `SELECT
-                 c.*,
-                 COALESCE(AVG(r.rating), 0) as avg_rating,
-                 COUNT(r.id) as review_count,
-                 json_agg(DISTINCT jsonb_build_object('id', u.id, 'displayName', u.display_name)) FILTER (WHERE u.id IS NOT NULL) as owners
-             FROM companies c
-                      LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
-                      LEFT JOIN company_owners co ON c.id = co.company_id
-                      LEFT JOIN users u ON co.user_id = u.id
-             WHERE c.id = $1
-             GROUP BY c.id`,
-            [id]
-        );
+        const company = await fetchCompanyByIdStrict(companyId);
+        return res.json(company);
+    } catch (error) {
+        return handleControllerError(res, error, 'Failed to fetch company');
+    }
+};
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Company not found' });
+const getBusinessProfile = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
         }
 
-        const company = result.rows[0];
-        res.json({
+        const reviewLimit = Math.min(10, Math.max(1, parseInt(req.query.reviewLimit, 10) || 5));
+        const [company, recentReviews] = await Promise.all([
+            fetchCompanyByIdStrict(companyId),
+            fetchRecentPublicReviews(companyId, reviewLimit)
+        ]);
+
+        return res.json({
             ...company,
-            avg_rating: parseFloat(company.avg_rating || 0).toFixed(1),
-            review_count: parseInt(company.review_count || 0),
-            owners: company.owners?.filter(o => o.id !== null) || []
+            recentReviews
         });
     } catch (error) {
-        console.error('Get company error:', error);
-        res.status(500).json({ error: 'Failed to fetch company' });
+        return handleControllerError(res, error, 'Failed to load business profile');
     }
 };
 
@@ -252,12 +392,16 @@ const createCompany = async (req, res) => {
 
 
 const claimCompany = async (req, res) => {
+    let transactionStarted = false;
     try {
-        const { id } = req.params;
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
 
         const company = await query(
             'SELECT * FROM companies WHERE id = $1',
-            [id]
+            [companyId]
         );
 
         if (company.rows.length === 0) {
@@ -269,22 +413,36 @@ const claimCompany = async (req, res) => {
         }
 
         await query('BEGIN');
+        transactionStarted = true;
 
         await query(
-            'UPDATE companies SET is_claimed = true WHERE id = $1',
-            [id]
+            'UPDATE companies SET is_claimed = true, claimed_by = $1 WHERE id = $2',
+            [req.user.id, companyId]
         );
 
         await query(
-            'INSERT INTO company_owners (company_id, user_id) VALUES ($1, $2)',
-            [id, req.user.id]
+            `INSERT INTO company_owners (company_id, user_id)
+             VALUES ($1, $2)
+             ON CONFLICT (company_id, user_id) DO NOTHING`,
+            [companyId, req.user.id]
         );
 
         await query('COMMIT');
+        transactionStarted = false;
+        const updatedCompany = await fetchCompanyByIdStrict(companyId);
 
-        res.json({ message: 'Company claimed successfully' });
+        res.json({
+            message: 'Company claimed successfully',
+            company: updatedCompany
+        });
     } catch (error) {
-        await query('ROLLBACK');
+        if (transactionStarted) {
+            try {
+                await query('ROLLBACK');
+            } catch (rollbackError) {
+                console.error('Claim company rollback failed:', rollbackError.message);
+            }
+        }
         console.error('Claim company error:', error);
         res.status(500).json({ error: 'Failed to claim company' });
     }
@@ -339,60 +497,93 @@ const getMyCompanies = async (req, res) => {
 
 const updateCompany = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { description, website, phone, address, logo_url } = req.body;
-
-        const ownership = await query(
-            'SELECT * FROM company_owners WHERE company_id = $1 AND user_id = $2',
-            [id, req.user.id]
-        );
-
-        if (ownership.rows.length === 0) {
-            return res.status(403).json({ error: 'Not authorized to update this company' });
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
         }
 
-        const result = await query(
+        await assertCompanyOwnership(companyId, req.user);
+
+        const fieldOrder = [
+            ['description', 'description'],
+            ['website', 'website'],
+            ['phone', 'phone'],
+            ['email', 'email'],
+            ['location', 'address'],
+            ['address', 'address'],
+            ['city', 'city'],
+            ['country', 'country'],
+            ['logo_url', 'logo_url'],
+            ['logoUrl', 'logo_url']
+        ];
+
+        const normalize = (value) => {
+            if (value === null || value === undefined) return null;
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                return trimmed === '' ? null : trimmed;
+            }
+            return value;
+        };
+
+        const payload = {};
+        fieldOrder.forEach(([key, column]) => {
+            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+                const normalized = normalize(req.body[key]);
+                if (normalized !== undefined) {
+                    payload[column] = normalized;
+                }
+            }
+        });
+
+        if (Object.keys(payload).length === 0) {
+            return res.status(400).json({ error: 'No updates were provided' });
+        }
+
+        const setClauses = [];
+        const values = [];
+        let paramIndex = 1;
+        for (const [column, value] of Object.entries(payload)) {
+            setClauses.push(`${column} = $${paramIndex}`);
+            values.push(value);
+            paramIndex += 1;
+        }
+        setClauses.push('updated_at = CURRENT_TIMESTAMP');
+        values.push(companyId);
+
+        await query(
             `UPDATE companies
-             SET description = COALESCE($1, description),
-                 website = COALESCE($2, website),
-                 phone = COALESCE($3, phone),
-                 address = COALESCE($4, address),
-                 logo_url = COALESCE($5, logo_url),
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $6
-                 RETURNING *`,
-            [description, website, phone, address, logo_url, id]
+             SET ${setClauses.join(', ')}
+             WHERE id = $${paramIndex}`,
+            values
         );
 
-        res.json(result.rows[0]);
+        const updatedCompany = await fetchCompanyByIdStrict(companyId);
+        return res.json(updatedCompany);
     } catch (error) {
-        console.error('Update company error:', error);
-        res.status(500).json({ error: 'Failed to update company' });
+        return handleControllerError(res, error, 'Failed to update company');
     }
 };
 
 
 const getCompanyReviewsForBusiness = async (req, res) => {
     try {
-        const { id } = req.params;
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
         const { page = 1, limit = 20 } = req.query;
 
         const validPage = Math.max(1, parseInt(page) || 1);
         const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
         const offset = (validPage - 1) * validLimit;
 
-        const ownership = await query(
-            'SELECT * FROM company_owners WHERE company_id = $1 AND user_id = $2',
-            [id, req.user.id]
-        );
-
-        if (ownership.rows.length === 0) {
-            return res.status(403).json({ error: 'Not authorized to view these reviews' });
-        }
+        const ownership = await assertCompanyOwnership(companyId, req.user);
+        const lastViewedAt = ownership?.last_review_viewed_at ? new Date(ownership.last_review_viewed_at) : null;
 
         const countResult = await query(
             'SELECT COUNT(*) FROM reviews WHERE company_id = $1',
-            [id]
+            [companyId]
         );
         const total = parseInt(countResult.rows[0]?.count || 0);
 
@@ -402,28 +593,153 @@ const getCompanyReviewsForBusiness = async (req, res) => {
                  json_build_object(
                          'id', u.id,
                          'displayName', u.display_name,
-                         'isAnonymous', u.is_anonymous
-                 ) as author
+                         'isAnonymous', u.is_anonymous,
+                         'avatarUrl', u.avatar_url
+                 ) as author,
+                 COALESCE(replies_data.replies, '[]'::json) as replies
              FROM reviews r
                       JOIN users u ON r.author_id = u.id
+                      LEFT JOIN LATERAL (
+                 SELECT json_agg(json_build_object(
+                     'id', rp.id,
+                     'content', rp.content,
+                     'authorRole', rp.author_role,
+                     'createdAt', rp.created_at,
+                     'author', json_build_object(
+                         'id', ru.id,
+                         'displayName', ru.display_name,
+                         'role', ru.role,
+                         'avatarUrl', ru.avatar_url
+                     )
+                 ) ORDER BY rp.created_at ASC) AS replies
+                 FROM replies rp
+                          JOIN users ru ON rp.author_id = ru.id
+                 WHERE rp.review_id = r.id
+             ) AS replies_data ON true
              WHERE r.company_id = $1
              ORDER BY r.created_at DESC
                  LIMIT $2 OFFSET $3`,
-            [id, validLimit, offset]
+            [companyId, validLimit, offset]
         );
 
+        const reviews = result.rows.map((review) => ({
+            ...review,
+            replies: review.replies || [],
+            author: review.author,
+            isNew: !lastViewedAt || new Date(review.created_at) > lastViewedAt
+        }));
+
+        if (ownership) {
+            await query(
+                'UPDATE company_owners SET last_review_viewed_at = CURRENT_TIMESTAMP WHERE company_id = $1 AND user_id = $2',
+                [companyId, req.user.id]
+            );
+        }
+
         res.json({
-            reviews: result.rows,
+            reviews,
             pagination: {
                 page: validPage,
                 limit: validLimit,
                 total,
                 pages: Math.ceil(total / validLimit)
-            }
+            },
+            lastViewedAt
         });
     } catch (error) {
-        console.error('Get business reviews error:', error);
-        res.status(500).json({ error: 'Failed to fetch company reviews' });
+        return handleControllerError(res, error, 'Failed to fetch company reviews');
+    }
+};
+
+const getCompanyAnalytics = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        await assertCompanyOwnership(companyId, req.user);
+
+        const metricsResult = await query(
+            `SELECT
+                 ROUND(COALESCE(AVG(r.rating), 0)::numeric, 2) as avg_rating,
+                 COUNT(r.id) as total_reviews,
+                 COUNT(CASE WHEN u.is_anonymous THEN 1 END) as anonymous_reviews,
+                 COUNT(CASE WHEN NOT COALESCE(u.is_anonymous, false) THEN 1 END) as employee_reviews
+             FROM reviews r
+                      LEFT JOIN users u ON r.author_id = u.id
+             WHERE r.company_id = $1`,
+            [companyId]
+        );
+
+        const distributionResult = await query(
+            `SELECT rating, COUNT(*) as count
+             FROM reviews
+             WHERE company_id = $1
+             GROUP BY rating`,
+            [companyId]
+        );
+
+        const trendResult = await query(
+            `SELECT
+                 DATE_TRUNC('month', created_at) as bucket,
+                 COUNT(*) as count
+             FROM reviews
+             WHERE company_id = $1
+               AND created_at >= NOW() - INTERVAL '12 months'
+             GROUP BY bucket
+             ORDER BY bucket`,
+            [companyId]
+        );
+
+        const responseResult = await query(
+            `SELECT COUNT(DISTINCT r.id) as responded
+             FROM reviews r
+                      JOIN replies rp ON rp.review_id = r.id
+             WHERE r.company_id = $1
+               AND rp.author_role = 'business'`,
+            [companyId]
+        );
+
+        const metrics = metricsResult.rows[0] || {};
+        const totalReviews = Number(metrics.total_reviews || 0);
+
+        const ratingDistribution = {
+            5: 0,
+            4: 0,
+            3: 0,
+            2: 0,
+            1: 0
+        };
+        distributionResult.rows.forEach((row) => {
+            const rating = Number(row.rating);
+            if (ratingDistribution[rating] !== undefined) {
+                ratingDistribution[rating] = Number(row.count || 0);
+            }
+        });
+
+        const trend = trendResult.rows.map((row) => ({
+            bucket: row.bucket,
+            count: Number(row.count || 0)
+        }));
+
+        const responded = Number(responseResult.rows[0]?.responded || 0);
+
+        return res.json({
+            averageRating: Number(metrics.avg_rating || 0).toFixed(2),
+            totalReviews,
+            ratingDistribution,
+            employeeVsAnonymous: {
+                employee: Number(metrics.employee_reviews || 0),
+                anonymous: Number(metrics.anonymous_reviews || 0)
+            },
+            responseRate: totalReviews === 0 ? 0 : Number((responded / totalReviews).toFixed(2)),
+            trendGranularity: 'month',
+            trend,
+            lastUpdated: new Date().toISOString()
+        });
+    } catch (error) {
+        return handleControllerError(res, error, 'Failed to fetch company analytics');
     }
 };
 
@@ -927,12 +1243,14 @@ const scrapeMissingCompanyInfo = async (req, res) => {
 module.exports = {
     searchCompanies,
     getCompany,
+    getBusinessProfile,
     createCompany,
     claimCompany,
     getIndustries,
     getMyCompanies,
     updateCompany,
     getCompanyReviewsForBusiness,
+    getCompanyAnalytics,
     getUnclaimedCompanies,
     requestClaimCompany,
     getMyClaimRequests,

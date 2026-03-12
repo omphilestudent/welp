@@ -3,10 +3,12 @@ const express = require('express');
 const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
-const { validate, companyValidation } = require('../middleware/validation');
+const { validate, companyValidation, companyUpdateValidation } = require('../middleware/validation');
 const companyController = require('../controllers/companyController');
 
 const router = express.Router();
+
+const ownerRoles = ['business', 'admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'];
 
 
 router.get('/search', apiLimiter, companyController.searchCompanies);
@@ -53,15 +55,28 @@ router.post('/:id/claim',
 
 router.patch('/:id',
     authenticate,
-    authorize('business'),
-    validate(companyValidation),
+    authorize(...ownerRoles),
+    validate(companyUpdateValidation),
+    companyController.updateCompany
+);
+
+router.put('/:id',
+    authenticate,
+    authorize(...ownerRoles),
+    validate(companyUpdateValidation),
     companyController.updateCompany
 );
 
 router.get('/:id/business-reviews',
     authenticate,
-    authorize('business'),
+    authorize(...ownerRoles),
     companyController.getCompanyReviewsForBusiness
+);
+
+router.get('/:id/analytics',
+    authenticate,
+    authorize(...ownerRoles),
+    companyController.getCompanyAnalytics
 );
 
 

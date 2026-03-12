@@ -302,6 +302,11 @@ const updateReview = async (req, res) => {
             return res.status(404).json({ error: 'Review not found' });
         }
 
+        const routeCompanyId = req.params.companyId || req.params.id;
+        if (routeCompanyId && String(review.rows[0].company_id) !== String(routeCompanyId)) {
+            return res.status(400).json({ error: 'Review does not belong to this business' });
+        }
+
         if (review.rows[0].author_id !== req.user.id) {
             return res.status(403).json({ error: 'Not authorized' });
         }

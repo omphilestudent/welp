@@ -13,7 +13,7 @@ const PLACEHOLDER_COLORS = [
 const getPlaceholderColor = (initial) =>
     PLACEHOLDER_COLORS[initial.charCodeAt(0) % PLACEHOLDER_COLORS.length];
 
-const CompanyCard = ({ company }) => {
+const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
     const navigate  = useNavigate();
     const [urlIndex, setUrlIndex] = useState(0);
 
@@ -25,6 +25,7 @@ const CompanyCard = ({ company }) => {
     const rating      = parseFloat(company.avg_rating  || company.rating      || 0);
     const reviewCount = parseInt(company.review_count  || company.reviewCount || 0, 10);
     const description = company.description || '';
+    const isClaimed = Boolean(company.is_claimed);
     const nameLower   = name.toLowerCase().trim();
     const initial     = name.charAt(0).toUpperCase();
 
@@ -52,6 +53,14 @@ const CompanyCard = ({ company }) => {
     const handleKeyPress = useCallback((e) => {
         if (e.key === 'Enter' || e.key === ' ') handleClick();
     }, [handleClick]);
+
+    const handleClaimClick = useCallback((event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof onClaim === 'function') {
+            onClaim(company);
+        }
+    }, [company, onClaim]);
 
     return (
         <div
@@ -120,6 +129,23 @@ const CompanyCard = ({ company }) => {
                 </p>
             )}
 
+            <div className="company-card-footer">
+                {isClaimed ? (
+                    <span className="company-claimed-pill" aria-label="Business already claimed">
+                        ✓ Claimed on Welp
+                    </span>
+                ) : (
+                    showClaimAction && (
+                        <button
+                            type="button"
+                            className="company-claim-btn"
+                            onClick={handleClaimClick}
+                        >
+                            Claim this business
+                        </button>
+                    )
+                )}
+            </div>
         </div>
     );
 };

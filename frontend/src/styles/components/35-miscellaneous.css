@@ -1324,3 +1324,27 @@
   background: var(--hover-bg);
   color: var(--text-primary);
 }
+
+.claim-reviews-preview {
+  margin-top: 1.5rem;
+  background: #fff;
+  border-radius: 20px;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.claim-reviews-preview ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.claim-review-rating {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #475569;
+}

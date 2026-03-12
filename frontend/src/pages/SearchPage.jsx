@@ -51,18 +51,14 @@ const SearchPage = () => {
         setLoading(true);
         setError('');
         try {
-            console.log('Searching companies with query:', query);
-
             const params = {
-                q: query || undefined,
+                search: query || undefined,
                 page,
                 limit: 12
             };
 
 
-            const response = await api.get('/companies/search', { params });
-
-            console.log('API Response:', response.data);
+            const response = await api.get('/businesses', { params });
 
             setCompanies(response.data.companies || []);
             setPagination(response.data.pagination || {
@@ -77,6 +73,11 @@ const SearchPage = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleClaimRedirect = (company) => {
+        if (!company?.id) return;
+        navigate(`/claim/${company.id}`);
     };
 
     const handleCreateCompany = async (e) => {
@@ -157,7 +158,11 @@ const SearchPage = () => {
                     <div className="companies-grid">
                         {companies.map(company => (
                             <div key={company.id} className="company-card-wrapper">
-                                <CompanyCard company={company} />
+                                <CompanyCard
+                                    company={company}
+                                    showClaimAction
+                                    onClaim={handleClaimRedirect}
+                                />
                             </div>
                         ))}
                     </div>

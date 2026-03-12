@@ -40,6 +40,7 @@ const BusinessRegister = () => {
     const [claimLoading, setClaimLoading] = useState(false);
     const [claimError, setClaimError] = useState('');
     const [emailConflict, setEmailConflict] = useState('');
+    const [selectedClaimCompany, setSelectedClaimCompany] = useState(null);
     const claimSectionRef = useRef(null);
     const claimSearchInputRef = useRef(null);
 
@@ -52,6 +53,7 @@ const BusinessRegister = () => {
                 setClaimResults([]);
                 setClaimSearchTerm('');
                 setClaimError('');
+                setSelectedClaimCompany(null);
             }
             return updated;
         });
@@ -91,22 +93,26 @@ const BusinessRegister = () => {
 
     const back = () => setStep(s => s - 1);
 
-    const searchUnclaimedCompanies = async (overrideTerm) => {
-        const resolvedTerm = typeof overrideTerm === 'string' ? overrideTerm : claimSearchTerm;
-        const safeTerm = (resolvedTerm || '').trim();
+    const searchUnclaimedCompanies = async (termOrEvent) => {
+        if (termOrEvent?.preventDefault) {
+            termOrEvent.preventDefault();
+        }
+        const resolvedTerm = typeof termOrEvent === 'string' ? termOrEvent : claimSearchTerm;
+        const safeTerm = (resolvedTerm ?? '').trim();
         if (!safeTerm) {
             setClaimError('Enter a company name or keyword');
             return;
         }
-        if (typeof overrideTerm === 'string') {
+        if (typeof termOrEvent === 'string') {
             setClaimSearchTerm(safeTerm);
         }
         setClaimError('');
+        setSelectedClaimCompany(null);
         setClaimLoading(true);
         try {
-            const { data } = await api.get('/companies/search', {
+            const { data } = await api.get('/businesses', {
                 params: {
-                    q: safeTerm,
+                    search: safeTerm,
                     unclaimed: true,
                     limit: 8
                 }
@@ -125,6 +131,7 @@ const BusinessRegister = () => {
         setClaimResults([]);
         setClaimSearchTerm('');
         setClaimError('');
+        setSelectedClaimCompany(null);
     };
 
     const jumpToClaimSection = (opts = {}) => {
@@ -403,14 +410,28 @@ const BusinessRegister = () => {
                                                                         companyName: company.name,
                                                                         companyWebsite: company.website || f.companyWebsite,
                                                                         country: company.country || f.country,
+                                                                        companyDescription: company.description || f.companyDescription,
                                                                         claimCompanyId: company.id
                                                                     }));
-                                                                    setClaimResults([]);
                                                                     setClaimSearchTerm(company.name);
+                                                                    setSelectedClaimCompany(company);
                                                                 }}
                                                             >
                                                                 <strong>{company.name}</strong>
-                                                                <span style={{ fontSize: '0.75rem', color: '#475569' }}>{company.industry || 'General'} · {company.country || 'Unknown region'}</span>
+                                                                <span style={{ fontSize: '0.75rem', color: '#475569' }}>
+                                                                    {company.industry || 'General'} · {company.country || 'Unknown region'}
+                                                                </span>
+                                                                <div className="reg-claim-item__meta">
+                                                                    {company.address && (
+                                                                        <span>📍 {company.address}</span>
+                                                                    )}
+                                                                    {company.phone && (
+                                                                        <span>☎ {company.phone}</span>
+                                                                    )}
+                                                                    {company.email && (
+                                                                        <span>✉ {company.email}</span>
+                                                                    )}
+                                                                </div>
                                                             </button>
                                                         ))}
                                                     </div>
@@ -426,6 +447,20 @@ const BusinessRegister = () => {
                                                         >
                                                             Change
                                                         </button>
+                                                    </div>
+                                                )}
+                                                {selectedClaimCompany && (
+                                                    <div className="reg-claim-selected">
+                                                        <p style={{ marginBottom: '0.25rem' }}>We'll use the details below to match your ownership:</p>
+                                                        <ul>
+                                                            {selectedClaimCompany.email && <li>Email: {selectedClaimCompany.email}</li>}
+                                                            {selectedClaimCompany.phone && <li>Phone: {selectedClaimCompany.phone}</li>}
+                                                            {(selectedClaimCompany.address || selectedClaimCompany.city) && (
+                                                                <li>
+                                                                    Location: {selectedClaimCompany.address || `${selectedClaimCompany.city || ''} ${selectedClaimCompany.country || ''}`}
+                                                                </li>
+                                                            )}
+                                                        </ul>
                                                     </div>
                                                 )}
                                             </div>

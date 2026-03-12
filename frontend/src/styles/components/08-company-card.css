@@ -122,4 +122,36 @@
   overflow: hidden;
 }
 
+.company-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.company-claimed-pill {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.company-claim-btn {
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.company-claim-btn:hover {
+  background: #1d4ed8;
+}
+
 

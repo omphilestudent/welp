@@ -61,6 +61,19 @@ const companyValidation = [
     body('address').optional().trim()
 ];
 
+const companyUpdateValidation = [
+    body('description').optional().trim().isLength({ max: 1000 }),
+    body('website').optional().isURL(),
+    body('phone').optional().trim(),
+    body('email').optional().isEmail().normalizeEmail(),
+    body('location').optional().trim().isLength({ max: 255 }),
+    body('address').optional().trim().isLength({ max: 255 }),
+    body('city').optional().trim().isLength({ max: 100 }),
+    body('country').optional().trim().isLength({ max: 100 }),
+    body('logo_url').optional().isURL(),
+    body('logoUrl').optional().isURL()
+];
+
 const reviewValidation = [
     body('rating').isInt({ min: 1, max: 5 }),
     body('content').trim().isLength({ min: 10, max: 2000 }),
@@ -314,6 +327,7 @@ module.exports = {
     registerValidation,
     loginValidation,
     companyValidation,
+    companyUpdateValidation,
     reviewValidation,
     replyValidation,
     messageValidation,

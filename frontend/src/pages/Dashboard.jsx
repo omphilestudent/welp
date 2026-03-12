@@ -8,6 +8,21 @@ import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit, FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import {
+    ResponsiveContainer,
+    BarChart,
+    Bar,
+    LineChart,
+    Line,
+    PieChart,
+    Pie,
+    Cell,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip
+} from 'recharts';
+const BUSINESS_PIE_COLORS = ['#4f46e5', '#f59e0b', '#0ea5e9', '#10b981', '#9333ea'];
+import {
     addDays,
     addMonths,
     addWeeks,
@@ -83,7 +98,12 @@ const ProfileSection = ({ user, onUpdate }) => {
 
         setSearching(true);
         try {
-            const { data } = await api.get(`/companies/search?q=${encodeURIComponent(query)}&limit=5`);
+            const { data } = await api.get('/businesses', {
+                params: {
+                    search: query,
+                    limit: 5
+                }
+            });
             setSearchResults(data.companies || []);
         } catch (error) {
             console.error('Workplace search error:', error);
@@ -267,12 +287,191 @@ const Dashboard = () => {
         leads: false,
         calls: false
     });
+    const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+    const [selectedCompany, setSelectedCompany] = useState(null);
+    const [companyPanelTab, setCompanyPanelTab] = useState('reviews');
+    const [companyReviews, setCompanyReviews] = useState([]);
+    const [companyReviewPagination, setCompanyReviewPagination] = useState({
+        page: 1,
+        pages: 0,
+        total: 0,
+        limit: 5
+    });
+    const [companyAnalytics, setCompanyAnalytics] = useState(null);
+    const [reviewsLoading, setReviewsLoading] = useState(false);
+    const [analyticsLoading, setAnalyticsLoading] = useState(false);
+    const [businessSectionError, setBusinessSectionError] = useState('');
+    const [companyInfoSaving, setCompanyInfoSaving] = useState(false);
+    const [companyInfoMessage, setCompanyInfoMessage] = useState('');
+    const [editCompanyForm, setEditCompanyForm] = useState({
+        phone: '',
+        email: '',
+        address: '',
+        city: '',
+        country: '',
+        logo_url: ''
+    });
     const formatDuration = (seconds = 0) => {
         const total = Number(seconds) || 0;
         const mins = Math.floor(total / 60);
         const secs = total % 60;
         return `${mins}m ${secs}s`;
     };
+
+    const fetchSelectedCompanyProfile = async (companyId, options = {}) => {
+        if (!companyId) return;
+        try {
+            const { data } = await api.get(`/business/${companyId}`, { params: { reviewLimit: 3 } });
+            setSelectedCompany(data);
+            setCompanyInfoMessage('');
+            if (!options.skipFormUpdate) {
+                setEditCompanyForm({
+                    phone: data.phone || '',
+                    email: data.email || '',
+                    address: data.address || '',
+                    city: data.city || '',
+                    country: data.country || '',
+                    logo_url: data.logo_url || ''
+                });
+            }
+            setBusinessSectionError('');
+        } catch (err) {
+            setBusinessSectionError(err.response?.data?.error || 'Failed to load business profile');
+        }
+    };
+
+    const fetchBusinessReviews = async (companyId, page = 1) => {
+        if (!companyId) return;
+        setReviewsLoading(true);
+        try {
+            const { data } = await api.get(`/business/${companyId}/reviews`, {
+                params: { page, limit: companyReviewPagination.limit || 5 }
+            });
+            setCompanyReviews(data.reviews || []);
+            setCompanyReviewPagination({
+                page: data.pagination?.page || 1,
+                pages: data.pagination?.pages || 1,
+                total: data.pagination?.total || 0,
+                limit: data.pagination?.limit || companyReviewPagination.limit || 5,
+                lastViewedAt: data.lastViewedAt
+            });
+            setBusinessSectionError('');
+        } catch (err) {
+            setBusinessSectionError(err.response?.data?.error || 'Failed to load reviews');
+            setCompanyReviews([]);
+        } finally {
+            setReviewsLoading(false);
+        }
+    };
+
+    const fetchBusinessAnalytics = async (companyId) => {
+        if (!companyId) return;
+        setAnalyticsLoading(true);
+        try {
+            const { data } = await api.get(`/business/${companyId}/analytics`);
+            setCompanyAnalytics(data);
+            setBusinessSectionError('');
+        } catch (err) {
+            setBusinessSectionError(err.response?.data?.error || 'Failed to load analytics');
+            setCompanyAnalytics(null);
+        } finally {
+            setAnalyticsLoading(false);
+        }
+    };
+
+    const handleBusinessReviewPageChange = (direction) => {
+        const nextPage = (companyReviewPagination.page || 1) + direction;
+        if (nextPage < 1 || nextPage > (companyReviewPagination.pages || 1)) {
+            return;
+        }
+        fetchBusinessReviews(selectedCompanyId, nextPage);
+    };
+
+    const handleCompanyInfoChange = (field, value) => {
+        setEditCompanyForm((prev) => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
+    const handleCompanyInfoSubmit = async (event) => {
+        event.preventDefault();
+        if (!selectedCompanyId) return;
+        setCompanyInfoSaving(true);
+        setCompanyInfoMessage('');
+        try {
+            const { data } = await api.put(`/business/${selectedCompanyId}`, editCompanyForm);
+            setSelectedCompany(data);
+            setMyCompanies((prev) =>
+                Array.isArray(prev)
+                    ? prev.map((company) => (company.id === data.id ? data : company))
+                    : prev
+            );
+            setCompanyInfoMessage('Business profile updated.');
+            toast.success('Business info updated');
+        } catch (err) {
+            const message = err.response?.data?.error || 'Failed to update business info';
+            setCompanyInfoMessage(message);
+            toast.error(message);
+        } finally {
+            setCompanyInfoSaving(false);
+        }
+    };
+
+    const handleScrapeMissingInfo = async () => {
+        if (!selectedCompanyId) return;
+        setCompanyInfoSaving(true);
+        setCompanyInfoMessage('');
+        try {
+            const { data } = await api.post(`/companies/${selectedCompanyId}/scrape-missing`);
+            const updated = data.company || data;
+            setSelectedCompany(updated);
+            setEditCompanyForm({
+                phone: updated.phone || '',
+                email: updated.email || '',
+                address: updated.address || '',
+                city: updated.city || '',
+                country: updated.country || '',
+                logo_url: updated.logo_url || ''
+            });
+            setCompanyInfoMessage('Latest website data applied.');
+            toast.success('Company info refreshed from website');
+        } catch (err) {
+            const message = err.response?.data?.error || 'Unable to refresh company info';
+            setCompanyInfoMessage(message);
+            toast.error(message);
+        } finally {
+            setCompanyInfoSaving(false);
+        }
+    };
+
+    const refreshBusinessSections = () => {
+        if (!selectedCompanyId) return;
+        fetchSelectedCompanyProfile(selectedCompanyId, { skipFormUpdate: true });
+        fetchBusinessReviews(selectedCompanyId, companyReviewPagination.page || 1);
+        fetchBusinessAnalytics(selectedCompanyId);
+    };
+
+    const ratingChartData = companyAnalytics
+        ? Object.entries(companyAnalytics.ratingDistribution || {}).map(([rating, count]) => ({
+            rating,
+            count: Number(count || 0)
+        }))
+        : [];
+
+    const trendChartData = companyAnalytics
+        ? (companyAnalytics.trend || []).map((point) => ({
+            label: point.bucket ? format(new Date(point.bucket), 'MMM yy') : 'N/A',
+            count: Number(point.count || 0)
+        }))
+        : [];
+
+    const reviewerBreakdown = companyAnalytics
+        ? [
+            { name: 'Employee', value: Number(companyAnalytics.employeeVsAnonymous?.employee || 0) },
+            { name: 'Anonymous', value: Number(companyAnalytics.employeeVsAnonymous?.anonymous || 0) }
+        ]
+        : [];
 
     useEffect(() => {
         if (user?.role === 'psychologist') {
@@ -284,6 +483,15 @@ const Dashboard = () => {
         }
         fetchDashboardData();
     }, [user]);
+
+    useEffect(() => {
+        if (user?.role === 'business' && selectedCompanyId) {
+            fetchSelectedCompanyProfile(selectedCompanyId);
+            fetchBusinessReviews(selectedCompanyId, 1);
+            fetchBusinessAnalytics(selectedCompanyId);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedCompanyId, user?.role]);
 
     const fetchDashboardData = async () => {
         setLoading(true);
@@ -299,6 +507,9 @@ const Dashboard = () => {
             } else if (user?.role === 'business') {
                 const companiesRes = await api.get('/companies/my-companies');
                 setMyCompanies(companiesRes.data || []);
+                if (companiesRes.data?.length) {
+                    setSelectedCompanyId((prev) => prev || companiesRes.data[0].id);
+                }
             } else if (user?.role === 'psychologist') {
                 const [pendingRes, leadsRes, scheduleRes, permissionsRes] = await Promise.all([
                     api.get('/messages/conversations/pending').catch(() => ({ data: [] })),
@@ -756,7 +967,11 @@ const Dashboard = () => {
                                                     View Page
                                                 </button>
                                                 <button
-                                                    onClick={() => window.location.href = `/business/reviews/${company.id}`}
+                                                    onClick={() => {
+                                                        setSelectedCompanyId(company.id);
+                                                        setCompanyPanelTab('reviews');
+                                                        setActiveTab('reviews');
+                                                    }}
                                                     className="btn btn-primary btn-small"
                                                 >
                                                     Manage Reviews
@@ -775,25 +990,300 @@ const Dashboard = () => {
                     )}
 
                     {user?.role === 'business' && activeTab === 'reviews' && (
-                        <div className="company-reviews-section">
-                            <h3>Reviews for Your Companies</h3>
-                            {myCompanies.length > 0 ? (
-                                <div className="company-selector">
-                                    <p>Select a company to view its reviews:</p>
-                                    <div className="company-buttons">
-                                        {myCompanies.map(company => (
-                                            <button
-                                                key={company.id}
-                                                onClick={() => window.location.href = `/business/reviews/${company.id}`}
-                                                className="btn btn-outline"
-                                            >
-                                                {company.name}
-                                            </button>
-                                        ))}
-                                    </div>
+                        <div className="business-dashboard-panel">
+                            <div className="business-panel-header">
+                                <div>
+                                    <h3>Business Control Center</h3>
+                                    <p>Monitor reviews, insights, and keep your public profile accurate.</p>
                                 </div>
+                                {myCompanies.length > 0 && (
+                                    <div className="business-company-selector">
+                                        <label htmlFor="business-company-select">Company</label>
+                                        <select
+                                            id="business-company-select"
+                                            value={selectedCompanyId || ''}
+                                            onChange={(e) => setSelectedCompanyId(e.target.value || null)}
+                                        >
+                                            <option value="" disabled>
+                                                Choose a company
+                                            </option>
+                                            {myCompanies.map((company) => (
+                                                <option key={company.id} value={company.id}>
+                                                    {company.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-small"
+                                            onClick={refreshBusinessSections}
+                                            disabled={!selectedCompanyId || reviewsLoading || analyticsLoading}
+                                        >
+                                            Refresh
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {businessSectionError && (
+                                <div className="alert alert-error">{businessSectionError}</div>
+                            )}
+
+                            {(!myCompanies || myCompanies.length === 0) ? (
+                                <p className="empty-message">
+                                    You don't have any companies yet.{' '}
+                                    <a href="/search">Search for your profile</a> to claim it.
+                                </p>
                             ) : (
-                                <p className="empty-message">You don't have any companies yet.</p>
+                                <>
+                                    <div className="business-panel-tabs">
+                                        <button
+                                            className={`business-panel-tab ${companyPanelTab === 'reviews' ? 'active' : ''}`}
+                                            onClick={() => setCompanyPanelTab('reviews')}
+                                        >
+                                            Reviews
+                                        </button>
+                                        <button
+                                            className={`business-panel-tab ${companyPanelTab === 'analytics' ? 'active' : ''}`}
+                                            onClick={() => setCompanyPanelTab('analytics')}
+                                        >
+                                            Analytics
+                                        </button>
+                                        <button
+                                            className={`business-panel-tab ${companyPanelTab === 'edit' ? 'active' : ''}`}
+                                            onClick={() => setCompanyPanelTab('edit')}
+                                        >
+                                            Edit Info
+                                        </button>
+                                    </div>
+
+                                    <div className="business-panel-body">
+                                        {companyPanelTab === 'reviews' && (
+                                            <div className="business-reviews-panel">
+                                                {reviewsLoading ? (
+                                                    <Loading />
+                                                ) : companyReviews.length > 0 ? (
+                                                    <>
+                                                        {companyReviewPagination.lastViewedAt && (
+                                                            <p className="business-last-seen">
+                                                                Last checked{' '}
+                                                                {new Date(companyReviewPagination.lastViewedAt).toLocaleString()}
+                                                            </p>
+                                                        )}
+                                                        {companyReviews.map((review) => (
+                                                            <ReviewCard
+                                                                key={review.id}
+                                                                review={review}
+                                                                onReplyAdded={() =>
+                                                                    fetchBusinessReviews(
+                                                                        selectedCompanyId,
+                                                                        companyReviewPagination.page || 1
+                                                                    )
+                                                                }
+                                                                replyEndpoint={
+                                                                    selectedCompanyId
+                                                                        ? `/business/${selectedCompanyId}/review/${review.id}/reply`
+                                                                        : undefined
+                                                                }
+                                                            />
+                                                        ))}
+                                                        <div className="business-pagination">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleBusinessReviewPageChange(-1)}
+                                                                disabled={
+                                                                    (companyReviewPagination.page || 1) <= 1 || reviewsLoading
+                                                                }
+                                                            >
+                                                                Previous
+                                                            </button>
+                                                            <span>
+                                                                Page {companyReviewPagination.page || 1} of{' '}
+                                                                {companyReviewPagination.pages || 1}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleBusinessReviewPageChange(1)}
+                                                                disabled={
+                                                                    (companyReviewPagination.page || 1) >=
+                                                                        (companyReviewPagination.pages || 1) || reviewsLoading
+                                                                }
+                                                            >
+                                                                Next
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <p className="empty-message">No reviews yet.</p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {companyPanelTab === 'analytics' && (
+                                            <div className="business-analytics-panel">
+                                                {analyticsLoading ? (
+                                                    <Loading />
+                                                ) : companyAnalytics ? (
+                                                    <>
+                                                        <div className="business-analytics-cards">
+                                                            <div className="analytics-card">
+                                                                <p>Average rating</p>
+                                                                <strong>{companyAnalytics.averageRating}</strong>
+                                                            </div>
+                                                            <div className="analytics-card">
+                                                                <p>Total reviews</p>
+                                                                <strong>{companyAnalytics.totalReviews}</strong>
+                                                            </div>
+                                                            <div className="analytics-card">
+                                                                <p>Response rate</p>
+                                                                <strong>{(companyAnalytics.responseRate * 100).toFixed(0)}%</strong>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="business-analytics-grid">
+                                                            <div className="analytics-chart">
+                                                                <h4>Rating distribution</h4>
+                                                                <ResponsiveContainer width="100%" height={220}>
+                                                                    <BarChart data={ratingChartData}>
+                                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                                        <XAxis dataKey="rating" />
+                                                                        <YAxis allowDecimals={false} />
+                                                                        <Tooltip />
+                                                                        <Bar dataKey="count" fill="#4f46e5" radius={[6, 6, 0, 0]} />
+                                                                    </BarChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                            <div className="analytics-chart">
+                                                                <h4>Anonymous vs employee</h4>
+                                                                <ResponsiveContainer width="100%" height={220}>
+                                                                    <PieChart>
+                                                                        <Pie
+                                                                            data={reviewerBreakdown}
+                                                                            dataKey="value"
+                                                                            nameKey="name"
+                                                                            innerRadius={50}
+                                                                            outerRadius={80}
+                                                                            paddingAngle={2}
+                                                                        >
+                                                                            {reviewerBreakdown.map((entry, index) => (
+                                                                                <Cell
+                                                                                    key={`cell-${entry.name}`}
+                                                                                    fill={BUSINESS_PIE_COLORS[index % BUSINESS_PIE_COLORS.length]}
+                                                                                />
+                                                                            ))}
+                                                                        </Pie>
+                                                                        <Tooltip />
+                                                                    </PieChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="analytics-chart">
+                                                            <h4>Review volume</h4>
+                                                            <ResponsiveContainer width="100%" height={260}>
+                                                                <LineChart data={trendChartData}>
+                                                                    <CartesianGrid strokeDasharray="3 3" />
+                                                                    <XAxis dataKey="label" />
+                                                                    <YAxis allowDecimals={false} />
+                                                                    <Tooltip />
+                                                                    <Line
+                                                                        type="monotone"
+                                                                        dataKey="count"
+                                                                        stroke="#0ea5e9"
+                                                                        strokeWidth={2}
+                                                                    />
+                                                                </LineChart>
+                                                            </ResponsiveContainer>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <p className="empty-message">Analytics will appear once reviews start rolling in.</p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {companyPanelTab === 'edit' && selectedCompany && (
+                                            <form className="business-edit-panel" onSubmit={handleCompanyInfoSubmit}>
+                                                <div className="form-grid-two">
+                                                    <label>
+                                                        Public phone
+                                                        <input
+                                                            type="text"
+                                                            value={editCompanyForm.phone}
+                                                            onChange={(e) => handleCompanyInfoChange('phone', e.target.value)}
+                                                            placeholder="+1 555 123 4567"
+                                                        />
+                                                    </label>
+                                                    <label>
+                                                        Public email
+                                                        <input
+                                                            type="email"
+                                                            value={editCompanyForm.email}
+                                                            onChange={(e) => handleCompanyInfoChange('email', e.target.value)}
+                                                            placeholder="press@company.com"
+                                                        />
+                                                    </label>
+                                                    <label>
+                                                        Street address
+                                                        <input
+                                                            type="text"
+                                                            value={editCompanyForm.address}
+                                                            onChange={(e) => handleCompanyInfoChange('address', e.target.value)}
+                                                            placeholder="123 Main Road"
+                                                        />
+                                                    </label>
+                                                    <label>
+                                                        City
+                                                        <input
+                                                            type="text"
+                                                            value={editCompanyForm.city}
+                                                            onChange={(e) => handleCompanyInfoChange('city', e.target.value)}
+                                                            placeholder="Johannesburg"
+                                                        />
+                                                    </label>
+                                                    <label>
+                                                        Country
+                                                        <input
+                                                            type="text"
+                                                            value={editCompanyForm.country}
+                                                            onChange={(e) => handleCompanyInfoChange('country', e.target.value)}
+                                                            placeholder="South Africa"
+                                                        />
+                                                    </label>
+                                                    <label>
+                                                        Logo URL
+                                                        <input
+                                                            type="url"
+                                                            value={editCompanyForm.logo_url}
+                                                            onChange={(e) => handleCompanyInfoChange('logo_url', e.target.value)}
+                                                            placeholder="https://example.com/logo.png"
+                                                        />
+                                                    </label>
+                                                </div>
+                                                {companyInfoMessage && (
+                                                    <p className="form-hint">{companyInfoMessage}</p>
+                                                )}
+                                                <div className="business-edit-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary"
+                                                        onClick={handleScrapeMissingInfo}
+                                                        disabled={companyInfoSaving || !selectedCompany?.website}
+                                                    >
+                                                        {selectedCompany?.website ? 'Auto-fill from website' : 'Add a website to enable auto-fill'}
+                                                    </button>
+                                                    <button
+                                                        type="submit"
+                                                        className="btn btn-primary"
+                                                        disabled={companyInfoSaving}
+                                                    >
+                                                        {companyInfoSaving ? 'Saving...' : 'Save changes'}
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        )}
+                                    </div>
+                                </>
                             )}
                         </div>
                     )}
