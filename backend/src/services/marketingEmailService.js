@@ -98,6 +98,7 @@ const renderTemplate = (template, user) => {
 };
 
 const initMarketingTables = async () => {
+    await query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
     await query(`
         CREATE TABLE IF NOT EXISTS user_settings (
             user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

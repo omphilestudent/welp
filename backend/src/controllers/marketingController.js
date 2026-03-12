@@ -4,12 +4,14 @@ const {
     renderTemplate,
     wrapMarketingHtml,
     buildUnsubscribeToken,
-    buildUnsubscribeUrl
+    buildUnsubscribeUrl,
+    initMarketingTables
 } = require('../services/marketingEmailService');
 const { sendMarketingEmail } = require('../utils/emailService');
 
 const listTemplates = async (req, res) => {
     try {
+        await initMarketingTables();
         const result = await query(
             'SELECT * FROM marketing_email_templates ORDER BY updated_at DESC'
         );
