@@ -38,17 +38,27 @@ const Navbar = () => {
     const checkAdminStatus = async () => {
         if (!user) return;
 
-        try {
-            await api.get('/admin/profile', { skipAuthRedirect: true });
-            setIsAdmin(true);
-        } catch (error) {
+        const normalizedRole = String(user.role || '').toLowerCase();
+        const adminRoles = new Set(['admin', 'super_admin', 'superadmin', 'system_admin']);
+        if (adminRoles.has(normalizedRole)) {
+            try {
+                await api.get('/admin/profile', { skipAuthRedirect: true });
+                setIsAdmin(true);
+            } catch (error) {
+                setIsAdmin(false);
+            }
+        } else {
             setIsAdmin(false);
         }
 
-        try {
-            await api.get('/hr/profile', { skipAuthRedirect: true });
-            setIsHR(true);
-        } catch (error) {
+        if (normalizedRole === 'hr_admin') {
+            try {
+                await api.get('/hr/profile', { skipAuthRedirect: true });
+                setIsHR(true);
+            } catch (error) {
+                setIsHR(false);
+            }
+        } else {
             setIsHR(false);
         }
     };

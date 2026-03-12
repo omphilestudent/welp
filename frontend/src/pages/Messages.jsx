@@ -27,6 +27,7 @@ const Messages = () => {
     const [availablePsychologists, setAvailablePsychologists] = useState([]);
     const [subscription, setSubscription] = useState(null);
     const [isRequestingSupport, setIsRequestingSupport] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const formatList = (value) => {
         if (!value) return '';
         if (Array.isArray(value)) {
@@ -194,6 +195,12 @@ const Messages = () => {
     }, [activeConversation, fetchMessages]);
 
     useEffect(() => {
+        if (!activeConversation) {
+            setIsSidebarOpen(true);
+        }
+    }, [activeConversation]);
+
+    useEffect(() => {
         if (user) {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             if (token) {
@@ -237,6 +244,20 @@ const Messages = () => {
         toast('Video call setup is in progress — a link will be emailed shortly.');
     };
 
+    const handleVoiceCall = () => {
+        if (!activeConversation || !currentPsychologist) {
+            toast.error('No active psychologist yet.');
+            return;
+        }
+
+        if (isConversationExpired) {
+            toast('This session has ended. Upgrade to premium to keep chatting longer.');
+            return;
+        }
+
+        toast('Voice call setup is in progress — a link will be emailed shortly.');
+    };
+
     const handleViewHistory = () => {
         if (!activeConversation) return;
         fetchMessages(activeConversation.id);
@@ -258,6 +279,7 @@ const Messages = () => {
 
     const handleSelectConversation = (conversation) => {
         setActiveConversation(conversation);
+        setIsSidebarOpen(false);
     };
 
     const handleSendMessage = async (content) => {
@@ -329,6 +351,16 @@ const Messages = () => {
         }
     };
 
+    const handleLeadArchive = async (leadId) => {
+        try {
+            await api.patch(`/psychologists/dashboard/leads/${leadId}/archive`);
+            setPsychLeads((prev) => prev.filter((lead) => lead.id !== leadId));
+            toast.success('Lead removed');
+        } catch (err) {
+            toast.error('Failed to remove lead');
+        }
+    };
+
     const handleFavoriteAdd = async (employee) => {
         try {
             const { data } = await api.post('/psychologists/dashboard/favorites', {
@@ -358,9 +390,16 @@ const Messages = () => {
         <div className="messages-page">
             {error && <div className="alert alert-error">{error}</div>}
             <div className="messages-container">
-                <div className="messages-sidebar">
+                <div className={`messages-sidebar ${isSidebarOpen ? 'open' : ''}`}>
                     <div className="sidebar-header">
                         <h2>Messages</h2>
+                        <button
+                            type="button"
+                            className="btn btn-outline btn-small messages-sidebar-toggle"
+                            onClick={() => setIsSidebarOpen(false)}
+                        >
+                            Close
+                        </button>
                     </div>
                     {user?.role === 'psychologist' && (
                         <div className="psych-sidebar">
@@ -417,6 +456,12 @@ const Messages = () => {
                                                 onClick={() => handleLeadMessage(lead.id)}
                                             >
                                                 Message
+                                            </button>
+                                            <button
+                                                className="btn btn-secondary btn-small"
+                                                onClick={() => handleLeadArchive(lead.id)}
+                                            >
+                                                Remove
                                             </button>
                                         </div>
                                     ))
@@ -580,9 +625,18 @@ const Messages = () => {
                         isExpired={isConversationExpired}
                         timeRemainingLabel={timeLabel}
                         onSendMessage={handleSendMessage}
+                        onStartVoiceCall={handleVoiceCall}
+                        onStartVideoCall={handleVideoCall}
+                        onOpenSidebar={() => setIsSidebarOpen(true)}
                     />
                 </div>
             </div>
+            {isSidebarOpen && (
+                <div
+                    className="messages-sidebar-overlay"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
         </div>
     );
 };

@@ -718,6 +718,27 @@ const runMigrations = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`
+            ,
+            `CREATE TABLE IF NOT EXISTS psychologist_calendar_integrations (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                provider VARCHAR(50) NOT NULL,
+                name VARCHAR(100),
+                ical_url TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS psychologist_external_events (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                integration_id UUID NOT NULL REFERENCES psychologist_calendar_integrations(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                starts_at TIMESTAMP NOT NULL,
+                ends_at TIMESTAMP,
+                location TEXT,
+                source_uid TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`
         ];
 
         for (const migration of migrations) {

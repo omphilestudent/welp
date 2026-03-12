@@ -245,6 +245,13 @@ const Dashboard = () => {
     const [psychLeads, setPsychLeads] = useState([]);
     const [psychSchedule, setPsychSchedule] = useState([]);
     const [psychPermissions, setPsychPermissions] = useState(null);
+    const [calendarIntegrations, setCalendarIntegrations] = useState([]);
+    const [externalEvents, setExternalEvents] = useState([]);
+    const [calendarIntegrationDraft, setCalendarIntegrationDraft] = useState({
+        provider: 'google',
+        name: '',
+        icalUrl: ''
+    });
     const [scheduleDraft, setScheduleDraft] = useState({
         title: '',
         date: '',
@@ -296,6 +303,8 @@ const Dashboard = () => {
                 setPsychLeads(leadsRes.data || []);
                 setPsychSchedule(scheduleRes.data || []);
                 setPsychPermissions(permissionsRes.data || null);
+                const integrationsRes = await api.get('/psychologists/dashboard/calendar-integrations').catch(() => ({ data: [] }));
+                setCalendarIntegrations(integrationsRes.data || []);
             }
         } catch (error) {
             setError('Failed to load dashboard data');
@@ -362,6 +371,16 @@ const Dashboard = () => {
         }
     };
 
+    const handleScheduleRemove = async (itemId) => {
+        try {
+            await api.delete(`/psychologists/dashboard/schedule/${itemId}`);
+            setPsychSchedule((prev) => prev.filter((item) => item.id !== itemId));
+            toast.success('Schedule item removed');
+        } catch (error) {
+            toast.error('Failed to remove schedule item');
+        }
+    };
+
     const handleLeadMessage = async (leadId) => {
         try {
             await api.post(`/psychologists/dashboard/leads/${leadId}/message`, {
@@ -371,6 +390,79 @@ const Dashboard = () => {
         } catch (error) {
             toast.error('Failed to send lead message');
         }
+    };
+
+    const handleLeadArchive = async (leadId) => {
+        try {
+            await api.patch(`/psychologists/dashboard/leads/${leadId}/archive`);
+            setPsychLeads((prev) => prev.filter((lead) => lead.id !== leadId));
+            toast.success('Lead removed');
+        } catch (error) {
+            toast.error('Failed to remove lead');
+        }
+    };
+
+    const handleAddCalendarIntegration = async (e) => {
+        e.preventDefault();
+        if (!calendarIntegrationDraft.icalUrl) {
+            toast.error('Please add an iCal URL');
+            return;
+        }
+        try {
+            const { data } = await api.post('/psychologists/dashboard/calendar-integrations', {
+                provider: calendarIntegrationDraft.provider,
+                name: calendarIntegrationDraft.name || calendarIntegrationDraft.provider,
+                icalUrl: calendarIntegrationDraft.icalUrl
+            });
+            setCalendarIntegrations((prev) => [data, ...prev]);
+            setCalendarIntegrationDraft({ provider: 'google', name: '', icalUrl: '' });
+            toast.success('Calendar connected');
+            await handleSyncCalendarIntegration(data.id);
+        } catch (error) {
+            toast.error('Failed to connect calendar');
+        }
+    };
+
+    const handleRemoveCalendarIntegration = async (integrationId) => {
+        try {
+            await api.delete(`/psychologists/dashboard/calendar-integrations/${integrationId}`);
+            setCalendarIntegrations((prev) => prev.filter((item) => item.id !== integrationId));
+            setExternalEvents((prev) => prev.filter((item) => item.integration_id !== integrationId));
+            toast.success('Calendar removed');
+        } catch (error) {
+            toast.error('Failed to remove calendar');
+        }
+    };
+
+    const handleSyncCalendarIntegration = async (integrationId) => {
+        try {
+            const { data } = await api.post(`/psychologists/dashboard/calendar-integrations/${integrationId}/sync`);
+            const events = (data.events || []).map((event) => ({
+                ...event,
+                integration_id: integrationId
+            }));
+            setExternalEvents((prev) => [
+                ...prev.filter((item) => item.integration_id !== integrationId),
+                ...events
+            ]);
+            toast.success(`Synced ${data.count || events.length} events`);
+        } catch (error) {
+            toast.error('Failed to sync calendar');
+        }
+    };
+
+    const handleDownloadIcs = () => {
+        const base = api.defaults.baseURL || '';
+        const url = `${base}/psychologists/dashboard/schedule.ics`;
+        window.open(url, '_blank');
+    };
+
+    const handleCallAction = (type) => {
+        if (!(psychPermissions?.roleFlags?.voice_video_calls)) {
+            toast.error('Call features are not enabled for your plan.');
+            return;
+        }
+        toast(`${type === 'voice' ? 'Voice' : 'Video'} call setup is in progress — a link will be emailed shortly.`);
     };
 
     const scheduleItems = psychSchedule
@@ -389,6 +481,18 @@ const Dashboard = () => {
         acc[key].push(item);
         return acc;
     }, {});
+    const selectedDateKey = format(calendarDate, 'yyyy-MM-dd');
+    const selectedDateItems = itemsByDate[selectedDateKey] || [];
+    const externalItemsByDate = externalEvents.reduce((acc, item) => {
+        const raw = item.starts_at || item.startsAt;
+        const date = raw ? new Date(raw) : null;
+        if (!date || Number.isNaN(date.getTime())) return acc;
+        const key = format(date, 'yyyy-MM-dd');
+        acc[key] = acc[key] || [];
+        acc[key].push({ ...item, scheduledDate: date });
+        return acc;
+    }, {});
+    const selectedExternalItems = externalItemsByDate[selectedDateKey] || [];
 
     const weekStartsOn = 1;
     const calendarStart = calendarView === 'month'
@@ -880,6 +984,121 @@ const Dashboard = () => {
                                                 <p className="empty-message">No scheduled items yet.</p>
                                             )}
                                         </div>
+                                        <div className="psych-schedule-list">
+                                            <div className="psych-schedule-list__header">
+                                                <h4>{format(calendarDate, 'MMMM d, yyyy')}</h4>
+                                                <span>{selectedDateItems.length} item{selectedDateItems.length === 1 ? '' : 's'}</span>
+                                            </div>
+                                            {selectedDateItems.length > 0 ? (
+                                                <div className="psych-schedule-list__items">
+                                                    {selectedDateItems.map((item) => (
+                                                        <div key={item.id} className="psych-schedule-list__item">
+                                                            <div>
+                                                                <strong>{item.title}</strong>
+                                                                <span>{format(item.scheduledDate, 'p')}</span>
+                                                                {item.location && <span>{item.location}</span>}
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary btn-small"
+                                                                onClick={() => handleScheduleRemove(item.id)}
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="empty-message">No items for this day.</p>
+                                            )}
+                                        </div>
+                                        <div className="psych-schedule-list">
+                                            <div className="psych-schedule-list__header">
+                                                <h4>External calendar</h4>
+                                                <span>{selectedExternalItems.length} item{selectedExternalItems.length === 1 ? '' : 's'}</span>
+                                            </div>
+                                            {selectedExternalItems.length > 0 ? (
+                                                <div className="psych-schedule-list__items">
+                                                    {selectedExternalItems.map((item, index) => (
+                                                        <div key={`${item.title}-${index}`} className="psych-schedule-list__item">
+                                                            <div>
+                                                                <strong>{item.title}</strong>
+                                                                <span>{item.location || 'External event'}</span>
+                                                            </div>
+                                                            <span>{format(item.scheduledDate, 'p')}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="empty-message">No external items for this day.</p>
+                                            )}
+                                        </div>
+                                        <div className="psych-schedule-list">
+                                            <div className="psych-schedule-list__header">
+                                                <h4>Calendar integrations</h4>
+                                                <span>{calendarIntegrations.length} connected</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline btn-small"
+                                                onClick={handleDownloadIcs}
+                                            >
+                                                Download iCal
+                                            </button>
+                                            <form className="psych-schedule-form" onSubmit={handleAddCalendarIntegration}>
+                                                <select
+                                                    value={calendarIntegrationDraft.provider}
+                                                    onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, provider: e.target.value })}
+                                                >
+                                                    <option value="google">Google Calendar</option>
+                                                    <option value="outlook">Outlook</option>
+                                                    <option value="ical">iCal</option>
+                                                </select>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Calendar name"
+                                                    value={calendarIntegrationDraft.name}
+                                                    onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, name: e.target.value })}
+                                                />
+                                                <input
+                                                    type="url"
+                                                    placeholder="Public iCal URL"
+                                                    value={calendarIntegrationDraft.icalUrl}
+                                                    onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, icalUrl: e.target.value })}
+                                                />
+                                                <button type="submit" className="btn btn-primary btn-small">Connect</button>
+                                            </form>
+                                            {calendarIntegrations.length > 0 ? (
+                                                <div className="psych-schedule-list__items">
+                                                    {calendarIntegrations.map((integration) => (
+                                                        <div key={integration.id} className="psych-schedule-list__item">
+                                                            <div>
+                                                                <strong>{integration.name || integration.provider}</strong>
+                                                                <span>{integration.provider}</span>
+                                                            </div>
+                                                            <div className="psych-calendar-actions">
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-outline btn-small"
+                                                                    onClick={() => handleSyncCalendarIntegration(integration.id)}
+                                                                >
+                                                                    Sync
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-secondary btn-small"
+                                                                    onClick={() => handleRemoveCalendarIntegration(integration.id)}
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="empty-message">No external calendars connected.</p>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </section>
@@ -917,6 +1136,13 @@ const Dashboard = () => {
                                                             onClick={() => handleLeadMessage(lead.id)}
                                                         >
                                                             Send message
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-outline btn-small"
+                                                            onClick={() => handleLeadArchive(lead.id)}
+                                                        >
+                                                            Remove
                                                         </button>
                                                     </div>
                                                 ))
@@ -959,10 +1185,20 @@ const Dashboard = () => {
                                                 </p>
                                             </div>
                                             <div className="psych-call-actions">
-                                                <button type="button" className="btn btn-outline btn-small" disabled>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline btn-small"
+                                                    onClick={() => handleCallAction('voice')}
+                                                    disabled={!psychPermissions?.roleFlags?.voice_video_calls}
+                                                >
                                                     <FaPhoneAlt /> Voice
                                                 </button>
-                                                <button type="button" className="btn btn-outline btn-small" disabled>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline btn-small"
+                                                    onClick={() => handleCallAction('video')}
+                                                    disabled={!psychPermissions?.roleFlags?.voice_video_calls}
+                                                >
                                                     <FaVideo /> Video
                                                 </button>
                                             </div>

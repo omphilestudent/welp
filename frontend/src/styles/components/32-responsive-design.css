@@ -125,6 +125,10 @@
     transform: translateX(0);
   }
 
+  .thread-back-button {
+    display: inline-flex;
+  }
+
   .auth-card {
     padding: 2rem;
   }

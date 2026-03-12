@@ -72,6 +72,20 @@ router.post('/dashboard/schedule',
     psychologistDashboardController.addScheduleItem
 );
 
+router.get('/dashboard/schedule.ics',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.exportScheduleIcs
+);
+
+router.delete('/dashboard/schedule/:itemId',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.removeScheduleItem
+);
+
 router.get('/dashboard/leads',
     authenticate,
     authorize('psychologist'),
@@ -84,6 +98,13 @@ router.post('/dashboard/leads/:leadId/message',
     authorize('psychologist'),
     checkRoleFlag('leads'),
     psychologistDashboardController.sendLeadMessage
+);
+
+router.patch('/dashboard/leads/:leadId/archive',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('leads'),
+    psychologistDashboardController.archiveLead
 );
 
 router.get('/dashboard/favorites',
@@ -112,6 +133,34 @@ router.get('/dashboard/employees/search',
     authorize('psychologist'),
     checkRoleFlag('employee_search'),
     psychologistDashboardController.searchEmployees
+);
+
+router.get('/dashboard/calendar-integrations',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.getCalendarIntegrations
+);
+
+router.post('/dashboard/calendar-integrations',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.addCalendarIntegration
+);
+
+router.delete('/dashboard/calendar-integrations/:integrationId',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.removeCalendarIntegration
+);
+
+router.post('/dashboard/calendar-integrations/:integrationId/sync',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.syncCalendarIntegration
 );
 
 module.exports = router;

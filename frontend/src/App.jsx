@@ -24,6 +24,7 @@ import Benefits from './pages/Benefits';
 import Internships from './pages/Internships';
 import GeneralApplication from './pages/GeneralApplication';
 import MentalHealthResources from './pages/MentalHealthResources';
+import UserProfile from './pages/UserProfile';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
@@ -87,6 +88,14 @@ function App() {
                                 <Route path="/careers/benefits" element={<Benefits />} />
                                 <Route path="/careers/internships" element={<Internships />} />
                                 <Route path="/resources" element={<MentalHealthResources />} />
+                                <Route
+                                    path="/users/:id"
+                                    element={
+                                        <PrivateRoute>
+                                            <UserProfile />
+                                        </PrivateRoute>
+                                    }
+                                />
 
                                 {/* Protected Routes */}
                                 <Route

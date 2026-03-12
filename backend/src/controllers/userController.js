@@ -383,6 +383,98 @@ const deleteAccount = async (req, res) => {
     }
 };
 
+const getPublicProfile = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userResult = await query(
+            `SELECT
+                 u.id,
+                 u.role,
+                 u.display_name,
+                 u.avatar_url,
+                 u.bio,
+                 u.location,
+                 u.website,
+                 u.occupation,
+                 u.is_anonymous,
+                 json_build_object(
+                         'id', c.id,
+                         'name', c.name,
+                         'industry', c.industry,
+                         'logo_url', c.logo_url
+                 ) as workplace
+             FROM users u
+                      LEFT JOIN companies c ON u.workplace_id = c.id
+             WHERE u.id = $1`,
+            [id]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const user = userResult.rows[0];
+        const response = { user };
+
+        if (user.role === 'psychologist') {
+            try {
+                const profileResult = await query(
+                    `SELECT
+                         specialization,
+                         qualifications,
+                         biography,
+                         consultation_modes,
+                         languages,
+                         accepted_age_groups,
+                         hourly_rate,
+                         availability,
+                         is_verified
+                     FROM psychologist_profiles
+                     WHERE user_id = $1`,
+                    [id]
+                );
+                response.psychologistProfile = profileResult.rows[0] || null;
+            } catch (error) {
+                response.psychologistProfile = null;
+            }
+
+            try {
+                const scheduleResult = await query(
+                    `SELECT id, title, scheduled_for, type, status, location
+                     FROM psychologist_schedule_items
+                     WHERE psychologist_id = $1
+                       AND scheduled_for >= CURRENT_TIMESTAMP - INTERVAL '1 day'
+                     ORDER BY scheduled_for ASC`,
+                    [id]
+                );
+                response.schedule = scheduleResult.rows;
+            } catch (error) {
+                response.schedule = [];
+            }
+
+            try {
+                const externalEvents = await query(
+                    `SELECT e.title, e.starts_at, e.ends_at, e.location
+                     FROM psychologist_external_events e
+                     JOIN psychologist_calendar_integrations i ON e.integration_id = i.id
+                     WHERE i.psychologist_id = $1
+                     ORDER BY e.starts_at ASC
+                     LIMIT 50`,
+                    [id]
+                );
+                response.externalEvents = externalEvents.rows;
+            } catch (error) {
+                response.externalEvents = [];
+            }
+        }
+
+        return res.json(response);
+    } catch (error) {
+        console.error('Get public profile error:', error);
+        return res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+};
+
 module.exports = {
     getProfile,
     updateProfile,
@@ -390,5 +482,6 @@ module.exports = {
     getSettings,
     updateSettings,
     addPsychologistProfile,
-    deleteAccount
+    deleteAccount,
+    getPublicProfile
 };

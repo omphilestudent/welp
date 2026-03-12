@@ -2,11 +2,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import socketService from '../../services/socket';
 import api from '../../services/api';
 
-const MessageThread = ({ conversation, messages: initialMessages, onSendMessage, callConfig, isExpired, timeRemainingLabel }) => {
+const MessageThread = ({
+    conversation,
+    messages: initialMessages,
+    onSendMessage,
+    callConfig,
+    isExpired,
+    timeRemainingLabel,
+    onStartVoiceCall,
+    onStartVideoCall,
+    onOpenSidebar
+}) => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [messages, setMessages] = useState(initialMessages || []);
     const [newMessage, setNewMessage] = useState('');
     const [sending, setSending] = useState(false);
@@ -103,24 +115,52 @@ const MessageThread = ({ conversation, messages: initialMessages, onSendMessage,
     }
 
     const other = getOtherParticipant();
+    const canCall = !isExpired && conversation?.status === 'accepted';
+    const allowPsychCalls = callConfig?.roleFlags?.voice_video_calls;
+    const showCallActions = user?.role === 'psychologist'
+        ? Boolean(allowPsychCalls)
+        : user?.role === 'employee';
+    const disableCallButtons = !canCall || (user?.role === 'psychologist' && !allowPsychCalls);
 
     return (
         <div className={`message-thread ${isExpired ? 'is-expired' : ''}`} ref={threadRef}>
             <div className="thread-header">
+                <button
+                    type="button"
+                    className="thread-back-button"
+                    onClick={() => onOpenSidebar?.()}
+                    aria-label="Open conversations"
+                >
+                    Conversations
+                </button>
                 <div className="thread-participant">
-                    <h3>{other?.display_name || 'Unknown'}</h3>
+                    <button
+                        type="button"
+                        className="thread-participant-name"
+                        onClick={() => other?.id && navigate(`/users/${other.id}`)}
+                    >
+                        {other?.display_name || 'Unknown'}
+                    </button>
                     {other?.role === 'psychologist' && (
                         <span className="role-badge">
               {other.is_verified ? 'Verified Psychologist' : 'Psychologist'}
             </span>
                     )}
                 </div>
-                {user?.role === 'psychologist' && callConfig?.roleFlags?.voice_video_calls && (
+                {showCallActions && (
                     <div className="thread-actions">
-                        <button className="btn btn-outline btn-small" disabled>
+                        <button
+                            className="btn btn-outline btn-small"
+                            disabled={disableCallButtons}
+                            onClick={() => onStartVoiceCall?.()}
+                        >
                             Voice
                         </button>
-                        <button className="btn btn-outline btn-small" disabled>
+                        <button
+                            className="btn btn-outline btn-small"
+                            disabled={disableCallButtons}
+                            onClick={() => onStartVideoCall?.()}
+                        >
                             Video
                         </button>
                         <span className="thread-call-limit">

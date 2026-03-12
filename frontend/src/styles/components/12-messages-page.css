@@ -15,6 +15,14 @@
   margin: 1rem;
 }
 
+.messages-sidebar-toggle {
+  display: none;
+}
+
+.messages-sidebar-overlay {
+  display: none;
+}
+
 .messages-sidebar {
   width: 380px;
   border-right: 1px solid var(--border-color);
@@ -170,6 +178,17 @@
   gap: 1rem;
 }
 
+.thread-back-button {
+  display: none;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 .thread-participant {
   display: flex;
   align-items: center;
@@ -180,6 +199,20 @@
   font-size: 1.25rem;
   color: var(--text-primary);
   font-weight: 700;
+}
+
+.thread-participant-name {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  font-weight: 700;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.thread-participant-name:hover {
+  text-decoration: underline;
 }
 
 .role-badge {
@@ -608,6 +641,20 @@
 @media (max-width: 900px) {
   .employee-support-panel {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .messages-sidebar-toggle {
+    display: inline-flex;
+  }
+
+  .messages-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 5;
   }
 }
 

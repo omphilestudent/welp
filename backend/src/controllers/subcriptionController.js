@@ -115,17 +115,23 @@ const getMySubscription = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-
-            const pricing = await query(
-                'SELECT * FROM pricing WHERE country_code = $1',
-                ['US']
-            );
+            let pricing;
+            try {
+                pricing = await query(
+                    'SELECT * FROM pricing WHERE country_code = $1',
+                    ['US']
+                );
+            } catch (error) {
+                pricing = { rows: [] };
+            }
 
             return res.json({
                 plan_type: 'free',
                 chat_hours_per_day: 2,
-                video_calls_per_week: 1,
-                leads_per_month: req.user.role === 'psychologist' ? 0 : null,
+                video_calls_per_week: pricing.rows[0]?.employee_free_video_calls ?? 1,
+                leads_per_month: req.user.role === 'psychologist'
+                    ? (pricing.rows[0]?.psychologist_free_leads ?? 0)
+                    : null,
                 accepts_assignments: false
             });
         }

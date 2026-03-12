@@ -49,6 +49,8 @@ const upload = multer({
 router.get('/profile', authenticate, apiLimiter, userController.getProfile);
 router.patch('/profile', authenticate, apiLimiter, userController.updateProfile);
 
+router.get('/public/:id', authenticate, apiLimiter, userController.getPublicProfile);
+
 
 router.post('/upload-avatar',
     authenticate,
