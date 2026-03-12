@@ -81,9 +81,13 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem("token");
                 sessionStorage.removeItem("token");
                 setRequestToken(null);
+                setUser(null);
+            } else if (!error.response || error.response?.status >= 500) {
+                setIsBackendAvailable(false);
+                // Keep existing user on transient backend/network errors.
+            } else {
+                setUser(null);
             }
-
-            setUser(null);
         } finally {
             setLoading(false);
         }

@@ -3,9 +3,10 @@ const { query } = require('../utils/database');
 
 
 const initSubscriptions = async () => {
-    await query(`
+    try {
+        await query(`
         CREATE TABLE IF NOT EXISTS subscriptions (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
             user_id UUID REFERENCES users(id) ON DELETE CASCADE,
             plan_type VARCHAR(50) NOT NULL CHECK (plan_type IN ('free', 'premium')),
             role VARCHAR(50) NOT NULL,
@@ -32,7 +33,10 @@ const initSubscriptions = async () => {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `);
-    console.log('✅ Subscriptions table initialized');
+        console.log('✅ Subscriptions table initialized');
+    } catch (error) {
+        console.error('? Error initializing subscriptions table:', error.message);
+    }
 };
 
 initSubscriptions();

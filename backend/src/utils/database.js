@@ -599,6 +599,7 @@ const runMigrations = async () => {
             "CREATE INDEX IF NOT EXISTS idx_conversations_started_at ON conversations(started_at);",
             "CREATE INDEX IF NOT EXISTS idx_conversations_expires_at ON conversations(expires_at);",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;",
+            "ALTER TABLE admin_roles ADD COLUMN IF NOT EXISTS is_system_role BOOLEAN DEFAULT false;",
 
             // Job Applications — extra columns for public apply form
             "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS linkedin_url TEXT;",
@@ -741,14 +742,11 @@ const runMigrations = async () => {
 // ── Run setup then migrations ──────────────────────────────────────────────────
 const setupDatabase = async () => {
     await createTables();
+    await runMigrations();
     await insertDefaultData();
 };
 
 setupDatabase();
-
-setTimeout(() => {
-    runMigrations();
-}, 2000);
 
 // ── Exports ────────────────────────────────────────────────────────────────────
 module.exports = {
