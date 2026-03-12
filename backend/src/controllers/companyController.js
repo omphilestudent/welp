@@ -3,6 +3,7 @@ const { query } = require('../utils/database');
 const { sendClaimInvitation } = require('../utils/emailService');
 const { scrapeCompanyFromWebsite } = require('../services/companyScraperService');
 const { enrichCompanyWithOSM } = require('../services/companyEnrichmentService');
+const { generateAutoReview } = require('../services/autoReviewService');
 
 
 const searchCompanies = async (req, res) => {
@@ -208,6 +209,17 @@ const createCompany = async (req, res) => {
         );
 
         const company = result.rows[0];
+
+        try {
+            await generateAutoReview({
+                companyId: company.id,
+                userId: req.user.id,
+                companyName: cleanedName,
+                description: finalDescription
+            });
+        } catch (autoReviewError) {
+            console.warn('Auto review generation failed:', autoReviewError.message);
+        }
 
         if (finalEmail) {
             try {
