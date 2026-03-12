@@ -313,7 +313,7 @@ io.on('connection', (socket) => {
             };
 
             // Emit to all in conversation
-            io.to(`conversation-${conversationId}`).emit('new-message', message);
+            io.to(`conversation-${conversationId}`).emit('ml-services-message', message);
 
             const { createUserNotification } = require('./utils/userNotifications');
             const convo = conversationAccess.rows[0];

@@ -165,7 +165,7 @@ const MLInteractions = () => {
         }
     };
 
-    // Train new model
+    // Train ml-services model
     const trainModel = async () => {
         try {
             setLoading(true);

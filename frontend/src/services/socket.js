@@ -61,13 +61,13 @@ class SocketService {
 
     onNewMessage(callback) {
         if (this.socket) {
-            this.socket.on('new-message', callback);
+            this.socket.on('ml-services-message', callback);
         }
     }
 
     offNewMessage() {
         if (this.socket) {
-            this.socket.off('new-message');
+            this.socket.off('ml-services-message');
         }
     }
 

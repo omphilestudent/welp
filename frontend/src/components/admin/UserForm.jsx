@@ -27,7 +27,7 @@ const UserForm = ({ user, roles, onSubmit, onCancel }) => {
         if (!formData.email) newErrors.email = 'Email is required';
         else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
 
-        if (!user && !formData.password) newErrors.password = 'Password is required for new users';
+        if (!user && !formData.password) newErrors.password = 'Password is required for ml-services users';
         else if (formData.password && formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
 
         if (!formData.firstName) newErrors.firstName = 'First name is required';

@@ -6,6 +6,7 @@ const { authorizeAdmin } = require('../middleware/adminAuth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
 const adminController = require('../controllers/adminController');
+const companyController = require('../controllers/companyController');
 
 const router = express.Router();
 
@@ -99,6 +100,16 @@ router.patch('/subscriptions/pricing/:countryCode', adminController.updateCountr
 
 
 router.get('/settings', adminController.getSystemSettings);
+
+// Claim requests (business profile ownership)
+router.get('/claim-requests', companyController.getPendingClaimRequests);
+router.patch('/claim-requests/:requestId/approve', companyController.approveClaimRequest);
+router.patch('/claim-requests/:requestId/reject',
+    validate([
+        body('reason').optional().trim().isLength({ max: 500 })
+    ]),
+    companyController.rejectClaimRequest
+);
 
 
 router.get('/ml-interactions', adminController.getMlInteractions);

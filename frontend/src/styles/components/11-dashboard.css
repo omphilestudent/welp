@@ -859,6 +859,62 @@
   border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
+.claim-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  margin: 1rem 0;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.claim-banner__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+}
+
+.claim-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: #334155;
+  flex: 1;
+}
+
+.claim-banner__text strong {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.claim-banner--claimed {
+  background: #ecfeff;
+  border-color: #bae6fd;
+}
+
+.claim-banner--claimed .claim-banner__icon {
+  background: #0ea5e9;
+  color: #fff;
+}
+
+.claim-banner--unclaimed {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.claim-banner--unclaimed .claim-banner__icon {
+  background: #f97316;
+  color: #fff;
+}
+
 .business-panel-header {
   display: flex;
   flex-wrap: wrap;
@@ -982,6 +1038,12 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+.business-edit-intro {
+  color: #64748b;
+  font-size: 0.95rem;
+  margin: 0;
 }
 
 .form-grid-two {

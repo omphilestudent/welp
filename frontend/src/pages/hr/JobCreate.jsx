@@ -120,7 +120,7 @@ const JobCreate = () => {
 
     // ── KEY FIX: fetch departments and normalise to { id, name } using the
     //    real PK (d.id). We accept both old (department_id alias only) and
-    //    new (both id + department_id) server responses.
+    //    ml-services (both id + department_id) server responses.
     const fetchDepartments = useCallback(async () => {
         setLoadingDepts(true);
         setDeptFetchError(null);

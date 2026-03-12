@@ -695,7 +695,7 @@ const runMigrations = async () => {
                 summary TEXT,
                 company VARCHAR(255),
                 source_review_id UUID REFERENCES reviews(id),
-                status VARCHAR(20) DEFAULT 'new' CHECK (status IN ('new', 'review', 'contacted', 'archived')),
+                status VARCHAR(20) DEFAULT 'ml-services' CHECK (status IN ('ml-services', 'review', 'contacted', 'archived')),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`,

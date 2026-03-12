@@ -66,7 +66,7 @@ const generateMlLeads = async (psychologistId) => {
         await query(
             `INSERT INTO psychologist_leads
              (psychologist_id, employee_id, display_name, risk_level, summary, company, status, source_review_id)
-             VALUES ($1, $2, $3, $4, $5, $6, 'new', $7)`,
+             VALUES ($1, $2, $3, $4, $5, $6, 'ml-services', $7)`,
             [
                 psychologistId,
                 review.author?.id || null,

@@ -40,6 +40,7 @@ import SystemSettings from './pages/admin/SystemSettings';
 import MLInteractions from './pages/admin/MLInteractions';
 import RegistrationApplications from './pages/admin/RegistrationApplications';
 import CalendarTroubleshoot from './pages/admin/CalendarTroubleshoot';
+import ClaimRequests from './pages/admin/ClaimRequests';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
@@ -158,6 +159,7 @@ function App() {
                                     <Route path="companies" element={<CompanyManagement />} />
                                     <Route path="reviews" element={<ReviewModeration />} />
                                     <Route path="applications" element={<RegistrationApplications />} />
+                                    <Route path="claims" element={<ClaimRequests />} />
                                     <Route path="calendar" element={<CalendarTroubleshoot />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />

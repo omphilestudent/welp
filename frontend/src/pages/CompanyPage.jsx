@@ -203,9 +203,14 @@ const CompanyPage = () => {
                                 </button>
                             )}
 
-                            {company.is_claimed && (
+                            {company.is_verified && (
                                 <span className="verified-badge-large">
-                                    ✓ Verified Business
+                                    Verified Business
+                                </span>
+                            )}
+                            {!company.is_verified && company.is_claimed && (
+                                <span className="verified-badge-large">
+                                    Claimed Business
                                 </span>
                             )}
                         </div>

@@ -1198,8 +1198,8 @@ const confirmEmailVerification = async (req, res) => {
 
 const getPendingClaimRequests = async (req, res) => {
     try {
-
-        if (req.user.role !== 'admin') {
+        const normalizedRole = String(req.user?.role || '').toLowerCase().trim();
+        if (!ADMIN_ROLES.has(normalizedRole)) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -1236,8 +1236,8 @@ const approveClaimRequest = async (req, res) => {
     try {
         const { requestId } = req.params;
 
-
-        if (req.user.role !== 'admin') {
+        const normalizedRole = String(req.user?.role || '').toLowerCase().trim();
+        if (!ADMIN_ROLES.has(normalizedRole)) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -1262,8 +1262,14 @@ const approveClaimRequest = async (req, res) => {
 
 
         await query(
-            'UPDATE companies SET is_claimed = true, claimed_by = $1 WHERE id = $2',
-            [claimRequest.rows[0].user_id, claimRequest.rows[0].company_id]
+            `UPDATE companies
+             SET is_claimed = true,
+                 claimed_by = $1,
+                 is_verified = true,
+                 verified_by = $2,
+                 verified_at = CURRENT_TIMESTAMP
+             WHERE id = $3`,
+            [claimRequest.rows[0].user_id, req.user.id, claimRequest.rows[0].company_id]
         );
 
 
@@ -1290,8 +1296,8 @@ const rejectClaimRequest = async (req, res) => {
         const { requestId } = req.params;
         const { reason } = req.body;
 
-
-        if (req.user.role !== 'admin') {
+        const normalizedRole = String(req.user?.role || '').toLowerCase().trim();
+        if (!ADMIN_ROLES.has(normalizedRole)) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 

@@ -519,6 +519,17 @@ const Dashboard = () => {
             setMyCompanies((prev) =>
                 Array.isArray(prev) ? prev.map((c) => (c.id === data.id ? data : c)) : prev
             );
+            setEditCompanyForm({
+                phone: data.phone || '',
+                email: data.email || '',
+                address: data.address || '',
+                city: data.city || '',
+                country: data.country || '',
+                logo_url: data.logo_url || '',
+                website: data.website || '',
+                registration_number: data.registration_number || ''
+            });
+            fetchSelectedCompanyProfile(data.id, { skipFormUpdate: false });
             setCompanyInfoMessage('Business profile updated.');
             toast.success('Business info updated');
         } catch (err) {

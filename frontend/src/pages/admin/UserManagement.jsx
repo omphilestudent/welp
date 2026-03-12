@@ -107,7 +107,7 @@ const UserModal = ({ user, onClose, onSaved }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.email) return toast.error('Email is required');
-        if (!isEdit && !form.password) return toast.error('Password is required for new users');
+        if (!isEdit && !form.password) return toast.error('Password is required for ml-services users');
         if (!isEdit && form.password.length < 8) return toast.error('Password must be at least 8 characters');
 
         setSaving(true);

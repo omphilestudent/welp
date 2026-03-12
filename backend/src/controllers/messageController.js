@@ -553,7 +553,7 @@ const sendMessage = async (req, res) => {
 
         const io = req.app?.get('io');
         if (io) {
-            io.to(`conversation-${conversationId}`).emit('new-message', {
+            io.to(`conversation-${conversationId}`).emit('ml-services-message', {
                 ...result.rows[0],
                 sender: sender.rows[0]
             });

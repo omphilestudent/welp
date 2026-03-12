@@ -85,7 +85,7 @@ const EmployeeRelations = () => {
         setTimeout(() => setToast({ show: false, message: '', type: '' }), 5000);
     };
 
-    // Add new case
+    // Add ml-services case
     const addCase = async (caseData) => {
         try {
             const response = await fetch('/api/employee-relations/cases', {

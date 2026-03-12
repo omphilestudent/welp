@@ -56,7 +56,7 @@ const generateAutoReview = async ({ companyId, userId, companyName, description 
             sentiment.sentiment,
             sentiment.score,
             'pending_auto_review',
-            'ML generated auto-review for new company',
+            'ML generated auto-review for ml-services company',
             false,
             null
         ]
@@ -66,7 +66,7 @@ const generateAutoReview = async ({ companyId, userId, companyName, description 
     if (reviewId) {
         await createAdminNotification({
             type: 'auto_review',
-            message: `ML auto review created for ${companyName || 'a new company'}`,
+            message: `ML auto review created for ${companyName || 'a ml-services company'}`,
             entityType: 'review',
             entityId: reviewId
         });

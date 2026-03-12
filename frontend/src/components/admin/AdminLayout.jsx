@@ -22,7 +22,8 @@ import {
     FaBell,
     FaSearch,
     FaUserCircle,
-    FaRobot
+    FaRobot,
+    FaUserCheck
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
@@ -130,6 +131,12 @@ const AdminLayout = () => {
             icon: <FaClipboardList />,
             label: 'Registration Applications',
             color: '#63b3ed'
+        },
+        {
+            path: '/admin/claims',
+            icon: <FaUserCheck />,
+            label: 'Claim Requests',
+            color: '#0ea5e9'
         },
         {
             path: '/admin/subscriptions',
