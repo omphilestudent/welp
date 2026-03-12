@@ -152,7 +152,7 @@ const scrapeCompanyFromWebsite = async (websiteUrl) => {
 
     const html = await response.text();
 
-    const titleMatch = html.match(/<title[^>]*>([^<]+)<\\/title>/i);
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const ogTitle = getMetaContent(html, 'og:title');
     const description = getMetaContent(html, 'description') || getMetaContent(html, 'og:description');
 
