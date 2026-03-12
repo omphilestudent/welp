@@ -288,10 +288,42 @@ const sendKYCRejectionEmail = async (email, companyName, reason) => {
     }
 };
 
+const sendEmail = async ({ to, subject, html, text }) => {
+    if (!transporter) {
+        console.log('\n=== EMAIL NOTIFICATION (DEV MODE) ===');
+        console.log(`To: ${to}`);
+        console.log(`Subject: ${subject}`);
+        if (text) console.log(`Text: ${text}`);
+        if (html) console.log(`HTML length: ${html.length}`);
+        console.log('=====================================\n');
+        return { success: true, devMode: true };
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to,
+            subject,
+            html,
+            text
+        });
+        return { success: true, info };
+    } catch (error) {
+        console.error('❌ Failed to send email:', error.message);
+        return { success: false, error: error.message };
+    }
+};
+
+const sendMarketingEmail = async ({ to, subject, html, text }) => {
+    return sendEmail({ to, subject, html, text });
+};
+
 module.exports = {
     sendClaimInvitation,
     sendVerificationEmail,
     sendApplicationConfirmation,
     sendKYCApprovalEmail,
-    sendKYCRejectionEmail
+    sendKYCRejectionEmail,
+    sendEmail,
+    sendMarketingEmail
 };

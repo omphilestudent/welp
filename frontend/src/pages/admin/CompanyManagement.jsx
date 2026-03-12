@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../../services/api';
 import Loading from '../../components/common/Loading';
 import toast from 'react-hot-toast';
+import { buildLogoUrls } from '../../utils/companyLogos';
 import {
     FaBuilding,
     FaSearch,
@@ -32,6 +33,41 @@ import {
     FaUsers
 } from 'react-icons/fa';
 
+const resolveMediaUrl = (url) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+const CompanyLogoThumb = ({ company }) => {
+    const [idx, setIdx] = useState(0);
+    const nameLower = (company?.name || '').toLowerCase().trim();
+    const logoUrls = useMemo(() => buildLogoUrls(company, nameLower), [company, nameLower]);
+    const current = idx < logoUrls.length ? logoUrls[idx] : null;
+    const src = current ? resolveMediaUrl(current) : '';
+    const handleError = useCallback(() => setIdx((i) => i + 1), []);
+
+    if (src) {
+        return (
+            <img
+                src={src}
+                alt={company?.name || 'Company logo'}
+                className="company-logo-small"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                onError={handleError}
+            />
+        );
+    }
+
+    return (
+        <div className="company-logo-placeholder-small">
+            {(company?.name || 'C').charAt(0)}
+        </div>
+    );
+};
+
 const CompanyManagement = () => {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -55,6 +91,29 @@ const CompanyManagement = () => {
         claimed: 0,
         unclaimed: 0
     });
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createForm, setCreateForm] = useState({
+        name: '',
+        industry: '',
+        website: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        country: '',
+        description: ''
+    });
+    const [createSaving, setCreateSaving] = useState(false);
+
+    const toNumber = (value, fallback = 0) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+    };
+
+    const toLocale = (value, fallback = '0') => {
+        const n = toNumber(value, NaN);
+        return Number.isFinite(n) ? n.toLocaleString() : fallback;
+    };
 
     const industries = [
         'Technology', 'Finance', 'Healthcare', 'Education', 'Retail',
@@ -189,6 +248,20 @@ const CompanyManagement = () => {
         }
     };
 
+    const handleUnclaim = async (id) => {
+        if (!window.confirm('Unclaim this business? This will remove ownership and verification.')) return;
+        try {
+            const { data } = await api.patch(`/admin/companies/${id}/unclaim`);
+            toast.success('Company unclaimed');
+            if (selectedCompany?.id === id) {
+                setSelectedCompany(data.company || null);
+            }
+            fetchCompanies();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to unclaim company');
+        }
+    };
+
     const handleExport = () => {
 
         const data = companies.map(c => ({
@@ -205,6 +278,46 @@ const CompanyManagement = () => {
         const csv = convertToCSV(data);
         downloadCSV(csv, 'companies_export.csv');
         toast.success('Companies exported successfully');
+    };
+
+    const handleCreateCompany = async () => {
+        if (!createForm.name || !createForm.country) {
+            toast.error('Company name and country are required');
+            return;
+        }
+        setCreateSaving(true);
+        try {
+            const payload = {
+                name: createForm.name.trim(),
+                industry: createForm.industry.trim() || undefined,
+                website: createForm.website.trim() || undefined,
+                email: createForm.email.trim() || undefined,
+                phone: createForm.phone.trim() || undefined,
+                address: createForm.address.trim() || undefined,
+                city: createForm.city.trim() || undefined,
+                country: createForm.country.trim(),
+                description: createForm.description.trim() || undefined
+            };
+            await api.post('/admin/companies', payload);
+            toast.success('Company created');
+            setShowCreateModal(false);
+            setCreateForm({
+                name: '',
+                industry: '',
+                website: '',
+                email: '',
+                phone: '',
+                address: '',
+                city: '',
+                country: '',
+                description: ''
+            });
+            fetchCompanies();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to create company');
+        } finally {
+            setCreateSaving(false);
+        }
     };
 
     const convertToCSV = (data) => {
@@ -278,7 +391,7 @@ const CompanyManagement = () => {
                     </p>
                 </div>
                 <div className="header-actions">
-                    <button className="btn btn-primary" onClick={() => {}}>
+                    <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
                         <FaPlus /> Add Company
                     </button>
                     <button className="btn btn-secondary" onClick={handleExport}>
@@ -409,13 +522,7 @@ const CompanyManagement = () => {
                         <tr key={company.id}>
                             <td>
                                 <div className="company-cell">
-                                    {company.logo_url ? (
-                                        <img src={company.logo_url} alt={company.name} className="company-logo-small" />
-                                    ) : (
-                                        <div className="company-logo-placeholder-small">
-                                            {company.name.charAt(0)}
-                                        </div>
-                                    )}
+                                    <CompanyLogoThumb company={company} />
                                     <div>
                                         <div className="company-name">{company.name}</div>
                                         <small className="company-email">{company.email}</small>
@@ -469,7 +576,10 @@ const CompanyManagement = () => {
                                     </button>
                                     <button
                                         className="btn-icon"
-                                        onClick={() => {}}
+                                        onClick={() => {
+                                            handleViewDetails(company);
+                                            setEditMode(true);
+                                        }}
                                         title="Edit"
                                     >
                                         <FaEdit />
@@ -554,7 +664,7 @@ const CompanyManagement = () => {
                         <div className="company-details">
                             <div className="detail-header">
                                 {selectedCompany.logo_url ? (
-                                    <img src={selectedCompany.logo_url} alt={selectedCompany.name} className="detail-logo" />
+                                    <img src={resolveMediaUrl(selectedCompany.logo_url)} alt={selectedCompany.name} className="detail-logo" />
                                 ) : (
                                     <div className="detail-logo-placeholder">
                                         {selectedCompany.name.charAt(0)}
@@ -590,6 +700,15 @@ const CompanyManagement = () => {
                                     </div>
                                     <div className="detail-item">
                                         <FaMapMarkerAlt /> <strong>Address:</strong> {selectedCompany.address}
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaMapMarkerAlt /> <strong>City:</strong> {selectedCompany.city || '-'}
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaMapMarkerAlt /> <strong>Country:</strong> {selectedCompany.country || '-'}
+                                    </div>
+                                    <div className="detail-item">
+                                        <FaBuilding /> <strong>Registration:</strong> {selectedCompany.registration_number || '-'}
                                     </div>
                                     <div className="detail-item">
                                         <FaCalendarAlt /> <strong>Founded:</strong> {selectedCompany.founded}
@@ -634,13 +753,13 @@ const CompanyManagement = () => {
                                         </span>
                                     </div>
                                     <div className="detail-item">
-                                        <FaBuilding /> <strong>Total Reviews:</strong> {selectedCompany.reviews_count.toLocaleString()}
+                                        <FaBuilding /> <strong>Total Reviews:</strong> {toLocale(selectedCompany.reviews_count)}
                                     </div>
                                     <div className="detail-item">
-                                        <FaUsers /> <strong>Employees:</strong> {selectedCompany.employee_count.toLocaleString()}
+                                        <FaUsers /> <strong>Employees:</strong> {toLocale(selectedCompany.employee_count)}
                                     </div>
                                     <div className="detail-item">
-                                        <FaChartLine /> <strong>Monthly Revenue:</strong> ${selectedCompany.monthly_revenue.toLocaleString()}
+                                        <FaChartLine /> <strong>Monthly Revenue:</strong> ${toLocale(selectedCompany.monthly_revenue)}
                                     </div>
                                 </div>
 
@@ -754,8 +873,74 @@ const CompanyManagement = () => {
                                         <FaCheckCircle /> Verify Company
                                     </button>
                                 )}
+                                {selectedCompany.is_claimed && (
+                                    <button className="btn btn-warning" onClick={() => handleUnclaim(selectedCompany.id)}>
+                                        <FaTimesCircle /> Unclaim Company
+                                    </button>
+                                )}
                                 <button className="btn btn-danger" onClick={() => handleDelete(selectedCompany.id)}>
                                     <FaTrash /> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showCreateModal && (
+                <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+                    <div className="modal-content large" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Add Company</h2>
+                            <button className="close-btn" onClick={() => setShowCreateModal(false)}>×</button>
+                        </div>
+                        <div className="company-details">
+                            <div className="detail-section full-width">
+                                <div className="admin-edit-grid">
+                                    <label>
+                                        Name *
+                                        <input type="text" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
+                                    </label>
+                                    <label>
+                                        Industry
+                                        <input type="text" value={createForm.industry} onChange={(e) => setCreateForm({ ...createForm, industry: e.target.value })} />
+                                    </label>
+                                    <label>
+                                        Website
+                                        <input type="text" value={createForm.website} onChange={(e) => setCreateForm({ ...createForm, website: e.target.value })} />
+                                    </label>
+                                    <label>
+                                        Email
+                                        <input type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
+                                    </label>
+                                    <label>
+                                        Phone
+                                        <input type="text" value={createForm.phone} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} />
+                                    </label>
+                                    <label>
+                                        Address
+                                        <input type="text" value={createForm.address} onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })} />
+                                    </label>
+                                    <label>
+                                        City
+                                        <input type="text" value={createForm.city} onChange={(e) => setCreateForm({ ...createForm, city: e.target.value })} />
+                                    </label>
+                                    <label>
+                                        Country *
+                                        <input type="text" value={createForm.country} onChange={(e) => setCreateForm({ ...createForm, country: e.target.value })} />
+                                    </label>
+                                    <label className="admin-edit-grid__full">
+                                        Description
+                                        <textarea rows={4} value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} />
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
+                                    Cancel
+                                </button>
+                                <button className="btn btn-primary" onClick={handleCreateCompany} disabled={createSaving}>
+                                    {createSaving ? 'Saving...' : 'Create Company'}
                                 </button>
                             </div>
                         </div>
@@ -1056,6 +1241,11 @@ const CompanyManagement = () => {
 
                 .btn-icon.danger:hover {
                     background: #f56565;
+                }
+
+                .btn.btn-warning {
+                    background: #f59e0b;
+                    color: #fff;
                 }
 
                 .empty-state {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import CompanyCard from '../components/companies/CompanyCard';
 import CompanySearch from '../components/companies/CompanySearch';
@@ -11,6 +11,7 @@ import { useAuth } from '../hooks/useAuth';
 const SearchPage = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const query = searchParams.get('q') || '';
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -37,7 +38,11 @@ const SearchPage = () => {
         industry: '',
         description: ''
     });
-    const canSuggestCompany = user && ['employee', 'business'].includes(user.role);
+    const normalizedRole = String(user?.role || '').toLowerCase();
+    const adminRoles = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
+    const canSuggestCompany = user && ['employee', 'business', ...adminRoles].includes(normalizedRole);
+    const isAdminRole = adminRoles.has(normalizedRole);
+    const canShowAddCompany = true;
 
     useEffect(() => {
         searchCompanies(1);
@@ -96,7 +101,16 @@ const SearchPage = () => {
                 industry: createForm.industry?.trim() || undefined,
                 description: createForm.description?.trim() || undefined
             };
-            await api.post('/companies', payload);
+            const endpoint = isAdminRole ? '/admin/companies' : '/companies';
+            const { data } = await api.post(endpoint, payload);
+            const created = data?.company;
+            if (created?.id && payload.website) {
+                try {
+                    await api.post(`/companies/${created.id}/scrape-missing`);
+                } catch {
+                    // best-effort scrape
+                }
+            }
             setSubmissionMessage('Thanks! The company is pending review and will appear once an admin approves it.');
             setShowAddCompanyForm(false);
             setCreateForm({
@@ -116,6 +130,20 @@ const SearchPage = () => {
         } finally {
             setCreating(false);
         }
+    };
+
+    const handleAddCompanyClick = () => {
+        setCreateError('');
+        if (!user) {
+            navigate('/login', { state: { from: location.pathname + location.search } });
+            return;
+        }
+        if (!canSuggestCompany) {
+            setCreateError('Only employees, business users, or admins can add companies.');
+            return;
+        }
+        setShowAddCompanyForm(true);
+        setSubmissionMessage('');
     };
 
     return (
@@ -175,30 +203,34 @@ const SearchPage = () => {
                         <p>
                             {'Try adjusting your search or browse all companies.'}
                         </p>
-                        {query && (
+                        {(query || canShowAddCompany) && (
                             <>
                                 {submissionMessage && (
                                     <div className="alert alert-success" style={{ textAlign: 'center' }}>
                                         {submissionMessage}
                                     </div>
                                 )}
-                                {canSuggestCompany ? (
+                                {createError && !showAddCompanyForm && (
+                                    <div className="alert alert-error" style={{ textAlign: 'center' }}>
+                                        {createError}
+                                    </div>
+                                )}
+                                {canShowAddCompany ? (
                                     <>
                                         {!showAddCompanyForm ? (
                                             <button
                                                 type="button"
                                                 className="btn btn-primary"
                                                 style={{ marginTop: '1rem' }}
-                                                onClick={() => {
-                                                    setShowAddCompanyForm(true);
-                                                    setSubmissionMessage('');
-                                                }}
+                                                onClick={handleAddCompanyClick}
                                             >
-                                                Add "{query}" to the directory
+                                                {user
+                                                    ? (query ? `Add "${query}" to the directory` : 'Add a company to the directory')
+                                                    : 'Log in to add this company'}
                                             </button>
                                         ) : (
                                             <form onSubmit={handleCreateCompany} className="company-create-form" style={{ marginTop: '1rem', maxWidth: 520 }}>
-                                                <h4 style={{ marginBottom: '0.5rem' }}>Add this company for review</h4>
+                                                <h4 style={{ marginBottom: '0.5rem' }}>Add a company for review</h4>
                                                 {createError && <div className="alert alert-error">{createError}</div>}
                                                 <div className="form-group">
                                                     <label>Company name *</label>

@@ -184,6 +184,86 @@ const handleControllerError = (res, error, fallbackMessage = 'Unexpected server 
 };
 
 
+const pickValue = (current, ...fallbacks) => {
+    const hasCurrent = typeof current === 'string' ? current.trim() !== '' : current !== null && current !== undefined;
+    if (hasCurrent) return current;
+    for (const value of fallbacks) {
+        if (value === undefined || value === null) continue;
+        if (typeof value === 'string' && value.trim() === '') continue;
+        return value;
+    }
+    return null;
+};
+
+const scrapeAndUpdateCompany = async (company) => {
+    const website = company?.website;
+    if (!website) return null;
+
+    const scraped = await scrapeCompanyFromWebsite(website);
+    let enrichmentData = null;
+    try {
+        enrichmentData = await enrichCompanyWithOSM({
+            name: company.name,
+            city: company.city || scraped?.city,
+            country: company.country || scraped?.country
+        });
+    } catch (error) {
+        console.warn('Scrape missing info enrichment failed:', error?.message);
+    }
+
+    const enrichmentJson = enrichmentData ? JSON.stringify(enrichmentData) : null;
+    const description = pickValue(company.description, scraped?.description);
+    const logoUrl = pickValue(company.logo_url, scraped?.logo_url);
+    const websiteFinal = pickValue(company.website, scraped?.website);
+    const emailFinal = pickValue(company.email, scraped?.email, enrichmentData?.email);
+    const phoneFinal = pickValue(company.phone, scraped?.phone, enrichmentData?.phone);
+    const addressFinal = pickValue(company.address, scraped?.address, enrichmentData?.address);
+    const cityFinal = pickValue(
+        company.city,
+        scraped?.city,
+        enrichmentData?.raw?.address?.city,
+        enrichmentData?.raw?.address?.town,
+        enrichmentData?.raw?.address?.village
+    );
+    const countryFinal = pickValue(
+        company.country,
+        scraped?.country,
+        enrichmentData?.raw?.address?.country
+    );
+
+    const result = await query(
+        `UPDATE companies
+         SET description = $1,
+             logo_url = $2,
+             website = $3,
+             email = $4,
+             phone = $5,
+             address = $6,
+             city = $7,
+             country = $8,
+             enrichment_data = COALESCE($9, enrichment_data),
+             needs_enrichment = $10,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $11
+         RETURNING *`,
+        [
+            description,
+            logoUrl,
+            websiteFinal,
+            emailFinal,
+            phoneFinal,
+            addressFinal,
+            cityFinal,
+            countryFinal,
+            enrichmentJson,
+            false,
+            company.id
+        ]
+    );
+
+    return { company: result.rows[0], scraped };
+};
+
 const searchCompanies = async (req, res) => {
     try {
         const {
@@ -244,6 +324,18 @@ const searchCompanies = async (req, res) => {
             + 'LIMIT $' + paramIndex + ' OFFSET $' + (paramIndex + 1);
 
         const result = await query(resultSql, [...params, validLimit, offset]);
+
+        const shouldAutoScrape = true;
+        if (shouldAutoScrape) {
+            const candidates = result.rows
+                .filter(company => company.website && company.needs_enrichment)
+                .slice(0, 6);
+            candidates.forEach(company => {
+                scrapeAndUpdateCompany(company).catch(error => {
+                    console.warn('Auto scrape failed for search:', company.id, error?.message);
+                });
+            });
+        }
 
         const companies = result.rows.map(company => ({
             ...company,
@@ -638,6 +730,8 @@ const updateCompany = async (req, res) => {
         await assertCompanyOwnership(companyId, req.user);
 
         const fieldOrder = [
+            ['name', 'name'],
+            ['industry', 'industry'],
             ['description', 'description'],
             ['website', 'website'],
             ['phone', 'phone'],
@@ -1347,6 +1441,43 @@ const rejectClaimRequest = async (req, res) => {
     }
 };
 
+const unclaimCompany = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        const normalizedRole = String(req.user?.role || '').toLowerCase().trim();
+        if (!ADMIN_ROLES.has(normalizedRole)) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        await query('BEGIN');
+
+        await query(
+            `UPDATE companies
+             SET is_claimed = false,
+                 is_verified = false,
+                 claimed_by = NULL,
+                 verified_by = NULL,
+                 verified_at = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [companyId]
+        );
+
+        await query('DELETE FROM company_owners WHERE company_id = $1', [companyId]);
+
+        await query('COMMIT');
+
+        const updated = await fetchCompanyByIdStrict(companyId);
+        return res.json({ message: 'Company unclaimed', company: updated });
+    } catch (error) {
+        try { await query('ROLLBACK'); } catch {}
+        return handleControllerError(res, error, 'Failed to unclaim company');
+    }
+};
 const scrapeCompany = async (req, res) => {
     try {
         const { website } = req.body;
@@ -1449,83 +1580,12 @@ const scrapeMissingCompanyInfo = async (req, res) => {
             }
         }
 
-        const scraped = await scrapeCompanyFromWebsite(website);
-        let enrichmentData = null;
-        try {
-            enrichmentData = await enrichCompanyWithOSM({
-                name: company.name,
-                city: company.city || scraped?.city,
-                country: company.country || scraped?.country
-            });
-        } catch (error) {
-            console.warn('Scrape missing info enrichment failed:', error?.message);
-        }
-
-        const enrichmentJson = enrichmentData ? JSON.stringify(enrichmentData) : null;
-        const pickValue = (current, ...fallbacks) => {
-            const hasCurrent = typeof current === 'string' ? current.trim() !== '' : current !== null && current !== undefined;
-            if (hasCurrent) return current;
-            for (const value of fallbacks) {
-                if (value === undefined || value === null) continue;
-                if (typeof value === 'string' && value.trim() === '') continue;
-                return value;
-            }
-            return null;
-        };
-
-        const description = pickValue(company.description, scraped.description);
-        const logoUrl = pickValue(company.logo_url, scraped.logo_url);
-        const websiteFinal = pickValue(company.website, scraped.website);
-        const emailFinal = pickValue(company.email, scraped.email, enrichmentData?.email);
-        const phoneFinal = pickValue(company.phone, scraped.phone, enrichmentData?.phone);
-        const addressFinal = pickValue(company.address, scraped.address, enrichmentData?.address);
-        const cityFinal = pickValue(
-            company.city,
-            scraped.city,
-            enrichmentData?.raw?.address?.city,
-            enrichmentData?.raw?.address?.town,
-            enrichmentData?.raw?.address?.village
-        );
-        const countryFinal = pickValue(
-            company.country,
-            scraped.country,
-            enrichmentData?.raw?.address?.country
-        );
-
-        const result = await query(
-            `UPDATE companies
-             SET description = $1,
-                 logo_url = $2,
-                 website = $3,
-                 email = $4,
-                 phone = $5,
-                 address = $6,
-                 city = $7,
-                 country = $8,
-                 enrichment_data = COALESCE($9, enrichment_data),
-                 needs_enrichment = $10,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $11
-             RETURNING *`,
-            [
-                description,
-                logoUrl,
-                websiteFinal,
-                emailFinal,
-                phoneFinal,
-                addressFinal,
-                cityFinal,
-                countryFinal,
-                enrichmentJson,
-                false,
-                id
-            ]
-        );
+        const updated = await scrapeAndUpdateCompany(company);
 
         return res.json({
             message: 'Company information updated successfully',
-            company: result.rows[0],
-            scraped
+            company: updated?.company,
+            scraped: updated?.scraped
         });
     } catch (error) {
         console.error('Scrape missing company info error:', error);
@@ -1560,4 +1620,6 @@ module.exports = {
     getPendingClaimRequests,
     approveClaimRequest,
     rejectClaimRequest
+    ,
+    unclaimCompany
 };

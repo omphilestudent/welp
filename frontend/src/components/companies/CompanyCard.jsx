@@ -130,17 +130,7 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
                 </p>
             )}
 
-            <div className="company-card-footer">
-                {showClaimAction && (
-                    <button
-                        type="button"
-                        className="company-claim-btn"
-                        onClick={handleClaimClick}
-                    >
-                        Claim this business
-                    </button>
-                )}
-            </div>
+            <div className="company-card-footer" />
         </div>
     );
 };

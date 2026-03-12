@@ -21,6 +21,8 @@ const hrRoutes = require('./routes/hrRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const resourcesRoutes = require('./routes/resourcesRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const marketingRoutes = require('./routes/marketingRoutes');
+const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
 
 // Database connection with better error handling
 const { sequelize, testConnection } = require('./models');
@@ -152,6 +154,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/marketing', marketingRoutes);
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {
@@ -517,6 +520,15 @@ const startServer = async () => {
 
         if (!dbConnected) {
             console.log('⚠️ Server will start but database features may not work');
+        }
+
+        if (dbConnected) {
+            try {
+                await initMarketingTables();
+                startMarketingScheduler();
+            } catch (error) {
+                console.warn('⚠️ Marketing scheduler failed to start:', error.message);
+            }
         }
 
         // Start server

@@ -220,7 +220,7 @@ const ClaimStatusBanner = ({ company, onRefresh }) => {
 /* ─────────────────────────────────────────────
    Profile Section
 ───────────────────────────────────────────── */
-const ProfileSection = ({ user, onUpdate }) => {
+const ProfileSection = ({ user, company, onUpdate }) => {
     const [uploading, setUploading] = useState(false);
     const [editing, setEditing] = useState(false);
     const [occupation, setOccupation] = useState(user?.occupation || '');
@@ -296,6 +296,14 @@ const ProfileSection = ({ user, onUpdate }) => {
                         <>
                             {user?.occupation && <p className="user-occupation"><FaBriefcase /> {user.occupation}</p>}
                             {user?.workplace && <p className="user-workplace"><FaBuilding /> {user.workplace.name}</p>}
+                            {user?.role === 'business' && company && (
+                                <>
+                                    <p className="user-workplace"><FaBuilding /> {company.name}</p>
+                                    {company.email && <p className="user-email"><FaEnvelope /> {company.email}</p>}
+                                    {company.phone && <p className="user-email"><FaPhone /> {company.phone}</p>}
+                                    {company.website && <p className="user-email"><FaGlobe /> {company.website}</p>}
+                                </>
+                            )}
                             {(user?.role === 'employee' || user?.role === 'psychologist') && (
                                 <button className="edit-profile-btn" onClick={() => setEditing(true)}>
                                     <FaEdit /> Add Work Info
@@ -992,7 +1000,16 @@ const Dashboard = () => {
 
                 {error && <div className="alert alert-error">{error}</div>}
 
-                <ProfileSection user={user} onUpdate={fetchDashboardData} />
+                <ProfileSection
+                    user={user}
+                    company={selectedCompany}
+                    onUpdate={async () => {
+                        if (typeof refreshUser === 'function') {
+                            await refreshUser();
+                        }
+                        await fetchDashboardData();
+                    }}
+                />
 
                 {/* Tabs */}
                 <div className="dashboard-tabs">

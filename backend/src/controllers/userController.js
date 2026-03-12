@@ -139,7 +139,7 @@ const getSettings = async (req, res) => {
                 email_notifications BOOLEAN DEFAULT true,
                 message_notifications BOOLEAN DEFAULT true,
                 review_notifications BOOLEAN DEFAULT true,
-                marketing_notifications BOOLEAN DEFAULT false,
+                marketing_notifications BOOLEAN DEFAULT true,
                 product_updates BOOLEAN DEFAULT true,
                 security_alerts BOOLEAN DEFAULT true,
                 profile_visibility VARCHAR(20) DEFAULT 'public',
@@ -154,7 +154,7 @@ const getSettings = async (req, res) => {
         `);
         await query(`
             ALTER TABLE user_settings
-                ADD COLUMN IF NOT EXISTS marketing_notifications BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS marketing_notifications BOOLEAN DEFAULT true,
                 ADD COLUMN IF NOT EXISTS product_updates BOOLEAN DEFAULT true,
                 ADD COLUMN IF NOT EXISTS security_alerts BOOLEAN DEFAULT true,
                 ADD COLUMN IF NOT EXISTS profile_visibility VARCHAR(20) DEFAULT 'public',
@@ -177,7 +177,7 @@ const getSettings = async (req, res) => {
                 email_notifications: true,
                 message_notifications: true,
                 review_notifications: true,
-                marketing_notifications: false,
+                marketing_notifications: true,
                 product_updates: true,
                 security_alerts: true,
                 profile_visibility: 'public',
@@ -252,7 +252,7 @@ const updateSettings = async (req, res) => {
                 resolve(emailNotifications, existing.email_notifications ?? true),
                 resolve(messageNotifications, existing.message_notifications ?? true),
                 resolve(reviewNotifications, existing.review_notifications ?? true),
-                resolve(marketingNotifications, existing.marketing_notifications ?? false),
+                resolve(marketingNotifications, existing.marketing_notifications ?? true),
                 resolve(productUpdates, existing.product_updates ?? true),
                 resolve(securityAlerts, existing.security_alerts ?? true),
                 resolve(profileVisibility, existing.profile_visibility || 'public'),

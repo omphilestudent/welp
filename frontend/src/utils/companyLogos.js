@@ -31,6 +31,36 @@ const KNOWN_COMPANY_LOGOS = {
     'absa': [
         'https://img.logo.dev/absa.co.za?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
     ],
+    'transnet': [
+        'https://img.logo.dev/transnet.net?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
+        'https://logo.clearbit.com/transnet.net',
+        'https://transnet.net/favicon.ico',
+    ],
+    'spoornet': [
+        'https://img.logo.dev/transnet.net?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
+        'https://logo.clearbit.com/transnet.net',
+        'https://transnet.net/favicon.ico',
+    ],
+    'mr price': [
+        'https://img.logo.dev/mrpricegroup.com?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
+        'https://logo.clearbit.com/mrpricegroup.com',
+        'https://mrpricegroup.com/favicon.ico',
+    ],
+    'mrprice': [
+        'https://img.logo.dev/mrpricegroup.com?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
+        'https://logo.clearbit.com/mrpricegroup.com',
+        'https://mrpricegroup.com/favicon.ico',
+    ],
+    'mr price group': [
+        'https://img.logo.dev/mrpricegroup.com?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
+        'https://logo.clearbit.com/mrpricegroup.com',
+        'https://mrpricegroup.com/favicon.ico',
+    ],
+    'mrp': [
+        'https://img.logo.dev/mrp.com?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
+        'https://logo.clearbit.com/mrp.com',
+        'https://mrp.com/favicon.ico',
+    ],
     'apple inc.': [
         'https://cdn.simpleicons.org/apple',
         'https://www.apple.com/favicon.ico',

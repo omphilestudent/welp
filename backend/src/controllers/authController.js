@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
 const { createAdminNotification } = require('../utils/adminNotifications');
+const { enqueueMarketingForUser } = require('../services/marketingEmailService');
 
 const tableExists = async (tableName) => {
     try {
@@ -166,6 +167,10 @@ const registerEmployee = async (req, res) => {
         const user = result.rows[0];
         const token = generateToken(user);
 
+        enqueueMarketingForUser(user.id).catch((error) => {
+            console.warn('Marketing enqueue failed:', error.message);
+        });
+
         return res.status(201).json({
             success: true,
             message: 'Account created successfully',
@@ -325,6 +330,10 @@ const registerPsychologist = async (req, res) => {
             message: `New psychologist application from ${email}`,
             entityType: 'psychologist_application',
             entityId: user.id
+        });
+
+        enqueueMarketingForUser(user.id).catch((error) => {
+            console.warn('Marketing enqueue failed:', error.message);
         });
 
         return res.status(201).json({
@@ -534,6 +543,10 @@ const registerBusiness = async (req, res) => {
             message: `New business application from ${email}`,
             entityType: 'business_application',
             entityId: user.id
+        });
+
+        enqueueMarketingForUser(user.id).catch((error) => {
+            console.warn('Marketing enqueue failed:', error.message);
         });
 
         return res.status(201).json({

@@ -27,7 +27,7 @@ router.post('/scrape',
 // Scrape missing info for an existing company
 router.post(`/:id(${UUID_PARAM})/scrape-missing`,
     authenticate,
-    authorize('business', 'admin', 'super_admin', 'hr_admin'),
+    authorize('employee', 'business', 'admin', 'super_admin', 'hr_admin'),
     companyController.scrapeMissingCompanyInfo
 );
 router.post('/',

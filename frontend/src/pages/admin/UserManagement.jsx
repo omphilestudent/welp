@@ -43,12 +43,6 @@ const PERMISSION_SETS = {
         color: '#4f46e5',
         permissions: ['reviews:read', 'reviews:write'],
         description: 'Submit and view reviews'
-    },
-    user: {
-        label: 'User',
-        color: '#6b7280',
-        permissions: ['reviews:read'],
-        description: 'Basic read access'
     }
 };
 
@@ -72,10 +66,10 @@ const UserModal = ({ user, onClose, onSaved }) => {
     const [form, setForm] = useState({
         email:       user?.email       ?? '',
         displayName: user?.display_name ?? '',
-        role:        user?.role        ?? 'user',
+        role:        user?.role        ?? 'employee',
         password:    '',
         isActive:    user?.is_active   ?? true,
-        permissions: user?.permissions ?? PERMISSION_SETS['user'].permissions,
+        permissions: user?.permissions ?? PERMISSION_SETS['employee'].permissions,
     });
     const [saving, setSaving] = useState(false);
     const [customPerms, setCustomPerms] = useState(false);
@@ -107,7 +101,7 @@ const UserModal = ({ user, onClose, onSaved }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.email) return toast.error('Email is required');
-        if (!isEdit && !form.password) return toast.error('Password is required for ml-services users');
+        if (!isEdit && !form.password) return toast.error('Password is required for new users');
         if (!isEdit && form.password.length < 8) return toast.error('Password must be at least 8 characters');
 
         setSaving(true);

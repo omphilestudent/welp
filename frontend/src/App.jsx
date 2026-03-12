@@ -17,6 +17,7 @@ import BusinessRegister from './pages/BusinessRegister';
 import PsychologistRegister from './pages/PsychologistRegister';
 import ApplicationSuccess from './pages/ApplicationSuccess';
 import Pricing from './pages/Pricing';
+import FAQ from './pages/FAQ';
 import Careers from './pages/Careers';
 import JobDetails from './pages/JobDetails';
 import ApplyJob from './pages/ApplyJob';
@@ -41,6 +42,7 @@ import MLInteractions from './pages/admin/MLInteractions';
 import RegistrationApplications from './pages/admin/RegistrationApplications';
 import CalendarTroubleshoot from './pages/admin/CalendarTroubleshoot';
 import ClaimRequests from './pages/admin/ClaimRequests';
+import MarketingEmails from './pages/admin/MarketingEmails';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
@@ -78,6 +80,7 @@ function App() {
                                 <Route path="/search" element={<SearchPage />} />
                                 <Route path="/companies/:id" element={<CompanyPage />} />
                                 <Route path="/pricing" element={<Pricing />} />
+                                <Route path="/faq" element={<FAQ />} />
                                 <Route path="/register/psychologist" element={<PsychologistRegister />} />
                                 <Route path="/register/business" element={<BusinessRegister />} />
                                 <Route path="/application-success" element={<ApplicationSuccess />} />
@@ -160,6 +163,7 @@ function App() {
                                     <Route path="reviews" element={<ReviewModeration />} />
                                     <Route path="applications" element={<RegistrationApplications />} />
                                     <Route path="claims" element={<ClaimRequests />} />
+                                    <Route path="marketing" element={<MarketingEmails />} />
                                     <Route path="calendar" element={<CalendarTroubleshoot />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />

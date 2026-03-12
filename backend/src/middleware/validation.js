@@ -64,21 +64,23 @@ const companyValidation = [
 ];
 
 const companyUpdateValidation = [
-    body('description').optional().trim().isLength({ max: 1000 }),
-    body('website').optional().isURL({ require_protocol: false }),
-    body('phone').optional().trim(),
-    body('email').optional().isEmail().normalizeEmail(),
-    body('location').optional().trim().isLength({ max: 255 }),
-    body('address').optional().trim().isLength({ max: 255 }),
-    body('city').optional().trim().isLength({ max: 100 }),
-    body('country').optional().trim().isLength({ max: 100 }),
-    body('registrationNumber').optional().trim().isLength({ max: 100 }),
-    body('registration_number').optional().trim().isLength({ max: 100 }),
-    body('logo_url').optional().custom((value) => {
+    body('name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 100 }),
+    body('industry').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('description').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }),
+    body('website').optional({ checkFalsy: true }).isURL({ require_protocol: false }),
+    body('phone').optional({ checkFalsy: true }).trim(),
+    body('email').optional({ checkFalsy: true }).isEmail().normalizeEmail(),
+    body('location').optional({ checkFalsy: true }).trim().isLength({ max: 255 }),
+    body('address').optional({ checkFalsy: true }).trim().isLength({ max: 255 }),
+    body('city').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('country').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('registrationNumber').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('registration_number').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('logo_url').optional({ checkFalsy: true }).custom((value) => {
         if (!value) return true;
         return /^https?:\/\//i.test(value) || value.startsWith('/uploads/');
     }).withMessage('logo_url must be a valid URL or upload path'),
-    body('logoUrl').optional().custom((value) => {
+    body('logoUrl').optional({ checkFalsy: true }).custom((value) => {
         if (!value) return true;
         return /^https?:\/\//i.test(value) || value.startsWith('/uploads/');
     }).withMessage('logoUrl must be a valid URL or upload path')

@@ -12,7 +12,7 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
     useEffect(() => {
         let isMounted = true;
 
-        const checkAuthorization = async () => {
+    const checkAuthorization = async () => {
             console.log('=== AdminRoute Check ===');
             console.log('User:', user);
             console.log('User role:', user?.role);
@@ -31,12 +31,16 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
                 return;
             }
 
-            // Check if user has admin role
-            const adminRoles = ['admin', 'super_admin', 'administrator', 'superadmin'];
             const userRole = String(user.role || '').toLowerCase().trim();
+            const adminRoles = ['admin', 'super_admin', 'administrator', 'superadmin', 'system_admin'];
+            const hrRoles = ['hr_admin'];
 
-            if (adminRoles.includes(userRole)) {
-                console.log('User has admin role - authorized');
+            const roleAllowed = requiredRole === 'hr'
+                ? hrRoles.includes(userRole)
+                : adminRoles.includes(userRole);
+
+            if (roleAllowed) {
+                console.log('User has required role - authorized');
                 if (isMounted) {
                     setIsAuthorized(true);
                     setChecking(false);
@@ -48,7 +52,8 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
             try {
                 console.log('Checking admin access via API...');
                 // Use skipAuthRedirect to prevent automatic redirect
-                await api.get('/admin/profile', {
+                const profileEndpoint = requiredRole === 'hr' ? '/hr/profile' : '/admin/profile';
+                await api.get(profileEndpoint, {
                     skipAuthRedirect: true  // This is key!
                 });
                 console.log('API check passed - authorized');

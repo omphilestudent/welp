@@ -5,8 +5,10 @@ const { authenticate } = require('../middleware/auth');
 const { authorizeAdmin } = require('../middleware/adminAuth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
+const { companyValidation } = require('../middleware/validation');
 const adminController = require('../controllers/adminController');
 const companyController = require('../controllers/companyController');
+const marketingController = require('../controllers/marketingController');
 
 const router = express.Router();
 
@@ -31,7 +33,7 @@ router.post('/users',
     validate([
         body('email').isEmail(),
         body('password').isLength({ min: 6 }),
-        body('role').isIn(['employee', 'psychologist', 'business'])
+        body('role').isIn(['employee', 'psychologist', 'business', 'admin', 'super_admin', 'hr_admin'])
     ]),
     adminController.createUser
 );
@@ -43,7 +45,12 @@ router.get('/companies', adminController.getCompanies);
 router.get('/companies/:id', adminController.getCompanyDetails);
 router.patch('/companies/:id/verify', adminController.verifyCompany);
 router.patch('/companies/:id/status', adminController.updateCompanyStatus);
+router.post('/companies',
+    validate(companyValidation),
+    companyController.createCompany
+);
 router.delete('/companies/:id', adminController.deleteCompany);
+router.patch('/companies/:id/unclaim', companyController.unclaimCompany);
 
 
 router.get('/reviews', adminController.getReviews);
@@ -100,6 +107,37 @@ router.patch('/subscriptions/pricing/:countryCode', adminController.updateCountr
 
 
 router.get('/settings', adminController.getSystemSettings);
+
+// Marketing email templates
+router.get('/marketing/templates', marketingController.listTemplates);
+router.post('/marketing/templates',
+    validate([
+        body('name').isString().trim().notEmpty(),
+        body('subject').isString().trim().notEmpty(),
+        body('body_html').isString().notEmpty(),
+        body('body_text').optional().isString(),
+        body('is_active').optional().isBoolean()
+    ]),
+    marketingController.createTemplate
+);
+router.put('/marketing/templates/:id',
+    validate([
+        body('name').isString().trim().notEmpty(),
+        body('subject').isString().trim().notEmpty(),
+        body('body_html').isString().notEmpty(),
+        body('body_text').optional().isString(),
+        body('is_active').optional().isBoolean()
+    ]),
+    marketingController.updateTemplate
+);
+router.delete('/marketing/templates/:id', marketingController.deleteTemplate);
+router.post('/marketing/templates/:id/test',
+    validate([
+        body('email').optional().isEmail(),
+        body('userId').optional().isUUID()
+    ]),
+    marketingController.sendTemplateTest
+);
 
 // Claim requests (business profile ownership)
 router.get('/claim-requests', companyController.getPendingClaimRequests);

@@ -324,6 +324,12 @@ const createUser = async (req, res) => {
         if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
         if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
+        const normalizedRole = String(role || '').toLowerCase().trim();
+        const allowedRoles = ['employee', 'psychologist', 'business', 'admin', 'super_admin', 'hr_admin'];
+        if (normalizedRole && !allowedRoles.includes(normalizedRole)) {
+            return res.status(400).json({ error: 'Invalid role' });
+        }
+
         const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
         if (existing.rows.length > 0) return res.status(400).json({ error: 'Email already exists' });
 
@@ -334,7 +340,7 @@ const createUser = async (req, res) => {
 
         const cols    = ['email', 'password_hash', 'role', 'display_name'];
         const holders = ['$1',   '$2',             '$3',   '$4'];
-        const params  = [email, hashedPassword, role || 'user', displayName || email.split('@')[0]];
+        const params  = [email, hashedPassword, normalizedRole || 'employee', displayName || email.split('@')[0]];
         let   idx     = 5;
 
         if (hasIsActiveCol)   { cols.push('is_active');   holders.push(`$${idx}`); params.push(isActive); idx++; }

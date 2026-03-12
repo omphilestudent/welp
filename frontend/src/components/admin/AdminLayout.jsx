@@ -23,7 +23,8 @@ import {
     FaSearch,
     FaUserCircle,
     FaRobot,
-    FaUserCheck
+    FaUserCheck,
+    FaEnvelope
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
@@ -40,6 +41,7 @@ const AdminLayout = () => {
 
     const userRole = String(user?.role || adminInfo?.role_name || '').toLowerCase().trim();
     const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(userRole);
+    const isHrAdmin = userRole === 'hr_admin';
 
     useEffect(() => {
         fetchAdminInfo();
@@ -137,6 +139,12 @@ const AdminLayout = () => {
             icon: <FaUserCheck />,
             label: 'Claim Requests',
             color: '#0ea5e9'
+        },
+        {
+            path: '/admin/marketing',
+            icon: <FaEnvelope />,
+            label: 'Marketing Emails',
+            color: '#f59e0b'
         },
         {
             path: '/admin/subscriptions',
@@ -245,24 +253,26 @@ const AdminLayout = () => {
                 </div>
 
                 <nav className="sidebar-nav">
-                    <div className="nav-section">
-                        <h3>Administration</h3>
-                        {navItems.map(item => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                className={({ isActive }) =>
-                                    `nav-link ${isActive ? 'active' : ''}`
-                                }
-                                style={{ '--item-color': item.color }}
-                            >
-                                <span className="nav-icon">{item.icon}</span>
-                                {sidebarOpen && <span className="nav-label">{item.label}</span>}
-                            </NavLink>
-                        ))}
-                    </div>
+                    {!isHrAdmin && (
+                        <div className="nav-section">
+                            <h3>Administration</h3>
+                            {navItems.map(item => (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    className={({ isActive }) =>
+                                        `nav-link ${isActive ? 'active' : ''}`
+                                    }
+                                    style={{ '--item-color': item.color }}
+                                >
+                                    <span className="nav-icon">{item.icon}</span>
+                                    {sidebarOpen && <span className="nav-label">{item.label}</span>}
+                                </NavLink>
+                            ))}
+                        </div>
+                    )}
 
-                    {isSuperAdmin && (
+                    {isSuperAdmin && !isHrAdmin && (
                         <div className="nav-section">
                             <h3>Super Admin</h3>
                             {superAdminNavItems.map(item => (
@@ -281,22 +291,24 @@ const AdminLayout = () => {
                         </div>
                     )}
 
-                    <div className="nav-section">
-                        <h3>Human Resources</h3>
-                        {hrNavItems.map(item => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                className={({ isActive }) =>
-                                    `nav-link ${isActive ? 'active' : ''}`
-                                }
-                                style={{ '--item-color': item.color }}
-                            >
-                                <span className="nav-icon">{item.icon}</span>
-                                {sidebarOpen && <span className="nav-label">{item.label}</span>}
-                            </NavLink>
-                        ))}
-                    </div>
+                    {isHrAdmin && (
+                        <div className="nav-section">
+                            <h3>Human Resources</h3>
+                            {hrNavItems.map(item => (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    className={({ isActive }) =>
+                                        `nav-link ${isActive ? 'active' : ''}`
+                                    }
+                                    style={{ '--item-color': item.color }}
+                                >
+                                    <span className="nav-icon">{item.icon}</span>
+                                    {sidebarOpen && <span className="nav-label">{item.label}</span>}
+                                </NavLink>
+                            ))}
+                        </div>
+                    )}
                 </nav>
 
                 <div className="sidebar-footer">
