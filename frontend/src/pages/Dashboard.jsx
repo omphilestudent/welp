@@ -411,7 +411,8 @@ const Dashboard = () => {
         country: '',
         logo_url: '',
         website: '',
-        registration_number: ''
+        registration_number: '',
+        description: ''
     });
     const [reviewFilter, setReviewFilter] = useState({ rating: '', type: '', sort: 'newest' });
     const [apiKeys, setApiKeys] = useState([]);
@@ -445,7 +446,8 @@ const Dashboard = () => {
                     country: data.country || '',
                     logo_url: data.logo_url || '',
                     website: data.website || '',
-                    registration_number: data.registration_number || ''
+                    registration_number: data.registration_number || '',
+                    description: data.description || ''
                 });
             }
             setBusinessSectionError('');
@@ -521,6 +523,7 @@ const Dashboard = () => {
         setCompanyInfoSaving(true);
         setCompanyInfoMessage('');
         try {
+            console.log('[BusinessHub] Save attempt', { companyId: selectedCompanyId, payload: editCompanyForm });
             const { data } = await api.put(`/business/${selectedCompanyId}`, editCompanyForm);
             setSelectedCompany(data);
             setMyCompanies((prev) =>
@@ -534,7 +537,8 @@ const Dashboard = () => {
                 country: data.country || '',
                 logo_url: data.logo_url || '',
                 website: data.website || '',
-                registration_number: data.registration_number || ''
+                registration_number: data.registration_number || '',
+                description: data.description || ''
             });
             fetchSelectedCompanyProfile(data.id, { skipFormUpdate: false });
             setCompanyInfoMessage('Business profile updated.');
@@ -542,6 +546,7 @@ const Dashboard = () => {
         } catch (err) {
             const message = err.response?.data?.error || 'Failed to update business info';
             setCompanyInfoMessage(message);
+            console.error('[BusinessHub] Save failed', err);
             toast.error(message);
         } finally {
             setCompanyInfoSaving(false);
@@ -639,7 +644,8 @@ const Dashboard = () => {
                 country: updated.country || '',
                 logo_url: updated.logo_url || '',
                 website: updated.website || '',
-                registration_number: updated.registration_number || ''
+                registration_number: updated.registration_number || '',
+                description: updated.description || ''
             });
             setCompanyInfoMessage('Latest website data applied.');
             toast.success('Company info refreshed from website');
@@ -1116,13 +1122,6 @@ const Dashboard = () => {
                                             <div className="company-info">
                                                 <h4>
                                                     {company.name}
-                                                    {(company.is_claimed || company.claimed) && (
-                                                        <span className="claim-badge">
-                                                            {(company.is_verified || company.verified)
-                                                                ? <><FaShieldAlt size={11} /> Verified</>
-                                                                : <><FaCheckCircle size={11} /> Claimed</>}
-                                                        </span>
-                                                    )}
                                                 </h4>
                                                 <p>Industry: {company.industry || 'Not specified'}</p>
                                                 <p>Total Reviews: {company.review_count || 0}</p>
@@ -1190,6 +1189,12 @@ const Dashboard = () => {
                                 <p className="empty-message">You don't have any companies yet. <a href="/search">Search for your profile</a> to claim it.</p>
                             ) : (
                                 <>
+                                    {selectedCompany && (
+                                        <div className="business-about-card">
+                                            <h4>About {selectedCompany.name}</h4>
+                                            <p>{selectedCompany.description || 'Add a short company description to appear here.'}</p>
+                                        </div>
+                                    )}
                                     <div className="business-panel-tabs">
                                         {[
                                             { id: 'reviews', label: 'Reviews' },
@@ -1431,6 +1436,15 @@ const Dashboard = () => {
                                                     <label className="form-grid-two__full">
                                                         <span className="form-label-text"><FaGlobe size={11} /> Country</span>
                                                         <input type="text" value={editCompanyForm.country} onChange={(e) => handleCompanyInfoChange('country', e.target.value)} placeholder="South Africa" />
+                                                    </label>
+                                                    <label className="form-grid-two__full">
+                                                        <span className="form-label-text"><FaBuilding size={11} /> Company description</span>
+                                                        <textarea
+                                                            value={editCompanyForm.description}
+                                                            onChange={(e) => handleCompanyInfoChange('description', e.target.value)}
+                                                            placeholder="Short description shown on your public profile"
+                                                            rows={4}
+                                                        />
                                                     </label>
                                                 </div>
 

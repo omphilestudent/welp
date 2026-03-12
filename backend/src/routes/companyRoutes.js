@@ -50,6 +50,12 @@ router.post(`/:id(${UUID_PARAM})/claim`,
     companyController.claimCompany
 );
 
+router.get(`/:id(${UUID_PARAM})/claim-status`,
+    authenticate,
+    authorize('business', 'admin', 'super_admin', 'hr_admin', 'system_admin'),
+    companyController.getCompanyClaimStatus
+);
+
 router.patch(`/:id(${UUID_PARAM})`,
     authenticate,
     authorize(...ownerRoles),

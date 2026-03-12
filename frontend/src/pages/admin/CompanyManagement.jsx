@@ -40,6 +40,9 @@ const CompanyManagement = () => {
     const [filterIndustry, setFilterIndustry] = useState('all');
     const [selectedCompany, setSelectedCompany] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [editForm, setEditForm] = useState(null);
+    const [saving, setSaving] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
     const [sortBy, setSortBy] = useState('name');
@@ -130,6 +133,20 @@ const CompanyManagement = () => {
     const handleViewDetails = (company) => {
         setSelectedCompany(company);
         setShowDetails(true);
+        setEditMode(false);
+        setEditForm({
+            name: company.name || '',
+            description: company.description || '',
+            industry: company.industry || '',
+            website: company.website || '',
+            email: company.email || '',
+            phone: company.phone || '',
+            address: company.address || '',
+            city: company.city || '',
+            country: company.country || '',
+            registration_number: company.registration_number || '',
+            logo_url: company.logo_url || ''
+        });
     };
 
     const handleVerify = async (id) => {
@@ -139,6 +156,24 @@ const CompanyManagement = () => {
             fetchCompanies();
         } catch (error) {
             toast.error('Failed to verify company');
+        }
+    };
+
+    const handleEditSave = async () => {
+        if (!selectedCompany || !editForm) return;
+        setSaving(true);
+        try {
+            const { data } = await api.put(`/companies/${selectedCompany.id}`, editForm);
+            setSelectedCompany(data);
+            setCompanies((prev) =>
+                prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
+            );
+            toast.success('Company updated');
+            setEditMode(false);
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to update company');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -614,6 +649,58 @@ const CompanyManagement = () => {
                                     <p>{selectedCompany.description}</p>
                                 </div>
 
+                                {editMode && editForm && (
+                                    <div className="detail-section full-width">
+                                        <h4>Edit Company</h4>
+                                        <div className="admin-edit-grid">
+                                            <label>
+                                                Name
+                                                <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                Industry
+                                                <input type="text" value={editForm.industry} onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                Website
+                                                <input type="text" value={editForm.website} onChange={(e) => setEditForm({ ...editForm, website: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                Email
+                                                <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                Phone
+                                                <input type="text" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                Address
+                                                <input type="text" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                City
+                                                <input type="text" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                Country
+                                                <input type="text" value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                Registration Number
+                                                <input type="text" value={editForm.registration_number} onChange={(e) => setEditForm({ ...editForm, registration_number: e.target.value })} />
+                                            </label>
+                                            <label>
+                                                Logo URL
+                                                <input type="text" value={editForm.logo_url} onChange={(e) => setEditForm({ ...editForm, logo_url: e.target.value })} />
+                                            </label>
+                                            <label className="admin-edit-grid__full">
+                                                Description
+                                                <textarea rows={4} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="detail-section full-width">
                                     <h4>Timeline</h4>
                                     <div className="timeline">
@@ -653,9 +740,15 @@ const CompanyManagement = () => {
                                 <button className="btn btn-secondary" onClick={() => setShowDetails(false)}>
                                     Close
                                 </button>
-                                <button className="btn btn-primary" onClick={() => {}}>
-                                    <FaEdit /> Edit Company
-                                </button>
+                                {!editMode ? (
+                                    <button className="btn btn-primary" onClick={() => setEditMode(true)}>
+                                        <FaEdit /> Edit Company
+                                    </button>
+                                ) : (
+                                    <button className="btn btn-primary" onClick={handleEditSave} disabled={saving}>
+                                        <FaEdit /> {saving ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                )}
                                 {!selectedCompany.is_verified && (
                                     <button className="btn btn-success" onClick={() => handleVerify(selectedCompany.id)}>
                                         <FaCheckCircle /> Verify Company
@@ -1062,6 +1155,31 @@ const CompanyManagement = () => {
 
                 .company-details {
                     padding: 1rem 0;
+                }
+
+                .admin-edit-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                    gap: 1rem;
+                }
+
+                .admin-edit-grid label {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.4rem;
+                    font-size: 0.9rem;
+                    color: #334155;
+                }
+
+                .admin-edit-grid input,
+                .admin-edit-grid textarea {
+                    border: 1px solid #e2e8f0;
+                    border-radius: 10px;
+                    padding: 0.55rem 0.75rem;
+                }
+
+                .admin-edit-grid__full {
+                    grid-column: 1 / -1;
                 }
 
                 .detail-header {

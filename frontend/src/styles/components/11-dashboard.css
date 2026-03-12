@@ -1067,6 +1067,14 @@
   padding: 0.6rem 0.85rem;
 }
 
+.form-grid-two textarea {
+  border: 1px solid #cbd5f5;
+  border-radius: 0.85rem;
+  padding: 0.6rem 0.85rem;
+  resize: vertical;
+  min-height: 120px;
+}
+
 .form-grid-two input[type="file"] {
   padding: 0.45rem 0.6rem;
   background: #f8fafc;
@@ -1087,6 +1095,206 @@
 .business-edit-actions .btn {
   border-radius: 30px;
   padding: 0.55rem 1.5rem;
+}
+
+.business-about-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.business-about-card h4 {
+  margin: 0 0 0.35rem;
+  color: #0f172a;
+}
+
+.business-about-card p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.biz-review-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+}
+
+.biz-review-filters select {
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+}
+
+.biz-review-total {
+  margin-left: auto;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.biz-review-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.biz-review-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.biz-review-author {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.biz-review-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #e2e8f0;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.biz-review-avatar--anon {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.biz-review-author-name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.biz-review-author-meta {
+  display: flex;
+  gap: 0.6rem;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.biz-review-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.biz-review-badge--anon {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.biz-review-badge--verified {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.biz-review-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.biz-review-title {
+  margin: 0.6rem 0 0.35rem;
+  color: #0f172a;
+}
+
+.biz-review-body {
+  margin: 0 0 0.6rem;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.biz-review-pros-cons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.biz-review-pros,
+.biz-review-cons {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.biz-review-pros {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.biz-review-cons {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.biz-review-reply {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #f1f5f9;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.biz-review-reply__label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.35rem;
+}
+
+.biz-review-reply-action {
+  margin-top: 0.75rem;
+}
+
+.btn-reply {
+  border: none;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.biz-review-reply-form textarea {
+  width: 100%;
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.biz-review-reply-form__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .business-api-panel {

@@ -25,7 +25,6 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
     const rating      = parseFloat(company.avg_rating  || company.rating      || 0);
     const reviewCount = parseInt(company.review_count  || company.reviewCount || 0, 10);
     const description = company.description || '';
-    const isClaimed = Boolean(company.is_claimed);
     const nameLower   = name.toLowerCase().trim();
     const initial     = name.charAt(0).toUpperCase();
 
@@ -95,11 +94,6 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
                 <div className="company-card-info">
                     <div className="company-card-name-row">
                         <h3 className="company-card-name">{name}</h3>
-                        {isClaimed && (
-                            <span className="company-claimed-pill" aria-label="Business already claimed">
-                                Claimed
-                            </span>
-                        )}
                     </div>
                     <span className="company-card-industry">{industry}</span>
                 </div>
@@ -137,20 +131,14 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
             )}
 
             <div className="company-card-footer">
-                {isClaimed ? (
-                    <span className="company-claimed-note" aria-live="polite">
-                        Verified owner profile active
-                    </span>
-                ) : (
-                    showClaimAction && (
-                        <button
-                            type="button"
-                            className="company-claim-btn"
-                            onClick={handleClaimClick}
-                        >
-                            Claim this business
-                        </button>
-                    )
+                {showClaimAction && (
+                    <button
+                        type="button"
+                        className="company-claim-btn"
+                        onClick={handleClaimClick}
+                    >
+                        Claim this business
+                    </button>
                 )}
             </div>
         </div>
