@@ -505,6 +505,13 @@ const Dashboard = () => {
     };
 
     const handleCompanyInfoChange = (field, value) => {
+        if (field === 'website') {
+            const trimmed = value.trim();
+            if (trimmed && !/^https?:\/\//i.test(trimmed) && !trimmed.startsWith('http')) {
+                setEditCompanyForm((prev) => ({ ...prev, [field]: trimmed }));
+                return;
+            }
+        }
         setEditCompanyForm((prev) => ({ ...prev, [field]: value }));
     };
 

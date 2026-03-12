@@ -279,6 +279,36 @@ const getCompany = async (req, res) => {
     }
 };
 
+const getCompanyClaimStatus = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        const result = await query(
+            `SELECT id, is_claimed, is_verified, claimed_by, verified_by, verified_at
+             FROM companies WHERE id = $1`,
+            [companyId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        const row = result.rows[0];
+        return res.json({
+            id: row.id,
+            is_claimed: row.is_claimed,
+            is_verified: row.is_verified,
+            claimed_by: row.claimed_by,
+            verified_by: row.verified_by,
+            verified_at: row.verified_at
+        });
+    } catch (error) {
+        return handleControllerError(res, error, 'Failed to fetch claim status');
+    }
+};
 const getBusinessProfile = async (req, res) => {
     try {
         const companyId = resolveCompanyIdParam(req.params);
@@ -622,11 +652,15 @@ const updateCompany = async (req, res) => {
             ['logoUrl', 'logo_url']
         ];
 
-        const normalize = (value) => {
+        const normalize = (value, field) => {
             if (value === null || value === undefined) return null;
             if (typeof value === 'string') {
                 const trimmed = value.trim();
-                return trimmed === '' ? null : trimmed;
+                if (trimmed === '') return null;
+                if (field === 'website' && !/^https?:\/\//i.test(trimmed)) {
+                    return `https://${trimmed}`;
+                }
+                return trimmed;
             }
             return value;
         };
@@ -634,7 +668,7 @@ const updateCompany = async (req, res) => {
         const payload = {};
         fieldOrder.forEach(([key, column]) => {
             if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-                const normalized = normalize(req.body[key]);
+                const normalized = normalize(req.body[key], column);
                 if (normalized !== undefined) {
                     payload[column] = normalized;
                 }
@@ -1503,6 +1537,7 @@ const scrapeMissingCompanyInfo = async (req, res) => {
 module.exports = {
     searchCompanies,
     getCompany,
+    getCompanyClaimStatus,
     getBusinessProfile,
     createCompany,
     claimCompany,

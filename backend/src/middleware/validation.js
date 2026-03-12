@@ -55,7 +55,7 @@ const companyValidation = [
     body('name').trim().isLength({ min: 2, max: 100 }),
     body('description').optional().trim().isLength({ max: 1000 }),
     body('industry').optional().trim().isLength({ max: 100 }),
-    body('website').optional().isURL(),
+    body('website').optional().isURL({ require_protocol: false }),
     body('email').optional().isEmail().normalizeEmail(),
     body('phone').optional().trim(),
     body('address').optional().trim(),
@@ -65,7 +65,7 @@ const companyValidation = [
 
 const companyUpdateValidation = [
     body('description').optional().trim().isLength({ max: 1000 }),
-    body('website').optional().isURL(),
+    body('website').optional().isURL({ require_protocol: false }),
     body('phone').optional().trim(),
     body('email').optional().isEmail().normalizeEmail(),
     body('location').optional().trim().isLength({ max: 255 }),
