@@ -33,6 +33,24 @@ const columnExists = async (tableName, columnName) => {
     }
 };
 
+const ensureClaimRequestsTable = async () => {
+    await query(`
+        CREATE TABLE IF NOT EXISTS claim_requests (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+            user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+            business_email VARCHAR(255) NOT NULL,
+            business_phone VARCHAR(50),
+            position VARCHAR(100),
+            message TEXT,
+            status VARCHAR(50) DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(company_id, user_id)
+        )
+    `);
+};
+
 const generateToken = (user, options = {}) => {
     const role = String(user?.role || '').toLowerCase().trim();
     const isAdminRole = ['super_admin', 'superadmin', 'system_admin', 'admin', 'hr_admin'].includes(role);
@@ -339,6 +357,7 @@ const registerBusiness = async (req, res) => {
             linkedinUrl,
             registrationNumber,
             claimExistingProfile,
+            claimCompanyId,
             howDidYouHear
         } = req.body;
 
@@ -352,9 +371,30 @@ const registerBusiness = async (req, res) => {
             return res.status(400).json({ error: 'Company name is required' });
         }
 
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (claimExistingProfile) {
+            if (!claimCompanyId || !uuidRegex.test(claimCompanyId)) {
+                return res.status(400).json({ error: 'Select a valid company to claim' });
+            }
+        }
+
         const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
         if (existing.rows.length > 0) {
             return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+
+        if (claimExistingProfile && claimCompanyId) {
+            const companyResult = await query(
+                'SELECT id, is_claimed FROM companies WHERE id = $1',
+                [claimCompanyId]
+            );
+
+            if (companyResult.rows.length === 0) {
+                return res.status(404).json({ error: 'Selected company could not be found' });
+            }
+            if (companyResult.rows[0].is_claimed) {
+                return res.status(400).json({ error: 'This company has already been claimed' });
+            }
         }
 
         const passwordHash = await bcrypt.hash(password, 12);
@@ -417,6 +457,7 @@ const registerBusiness = async (req, res) => {
                 linkedin_url: linkedinUrl || null,
                 registration_number: registrationNumber || null,
                 claim_existing_profile: claimExistingProfile ?? false,
+                claim_company_id: claimCompanyId || null,
                 how_did_you_hear: howDidYouHear || null
             };
 
@@ -454,6 +495,7 @@ const registerBusiness = async (req, res) => {
                             linkedinUrl,
                             registrationNumber,
                             claimExistingProfile,
+                            claimCompanyId,
                             howDidYouHear
                         },
                         appliedAt: new Date()
@@ -461,6 +503,30 @@ const registerBusiness = async (req, res) => {
                 );
             }
             console.warn('business_applications table not found, application data stored in user metadata.');
+        }
+
+        if (claimExistingProfile && claimCompanyId) {
+            await ensureClaimRequestsTable();
+            await query(
+                `INSERT INTO claim_requests (company_id, user_id, business_email, business_phone, position, message)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (company_id, user_id)
+                     DO UPDATE SET
+                         business_email = EXCLUDED.business_email,
+                         business_phone = EXCLUDED.business_phone,
+                         position = EXCLUDED.position,
+                         message = EXCLUDED.message,
+                         status = 'pending',
+                         updated_at = CURRENT_TIMESTAMP`,
+                [
+                    claimCompanyId,
+                    user.id,
+                    email.toLowerCase(),
+                    null,
+                    jobTitle || null,
+                    'Claim initiated during business registration'
+                ]
+            );
         }
 
         await createAdminNotification({

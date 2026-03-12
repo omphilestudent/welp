@@ -453,6 +453,7 @@ const createTables = async () => {
                 linkedin_url TEXT,
                 registration_number VARCHAR(100),
                 claim_existing_profile BOOLEAN DEFAULT false,
+                claim_company_id UUID REFERENCES companies(id),
                 how_did_you_hear TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -465,6 +466,7 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS languages TEXT[];
             ALTER TABLE users ADD COLUMN IF NOT EXISTS biography TEXT;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10,2);
+            ALTER TABLE business_applications ADD COLUMN IF NOT EXISTS claim_company_id UUID REFERENCES companies(id);
 
             -- Indexes
             CREATE INDEX IF NOT EXISTS idx_users_role                       ON users(role);

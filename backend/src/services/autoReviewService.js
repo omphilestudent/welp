@@ -74,5 +74,7 @@ const generateAutoReview = async ({ companyId, userId, companyName, description 
 };
 
 module.exports = {
-    generateAutoReview
+    generateAutoReview,
+    deriveRatingFromScore,
+    formatReviewContent
 };

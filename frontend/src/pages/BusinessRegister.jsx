@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -24,7 +24,7 @@ const empty = {
     // Step 2 — company basics
     companyName: '', companyWebsite: '', industry: '', companySize: '', country: '',
     // Step 3 — additional details
-    companyDescription: '', linkedinUrl: '', registrationNumber: '', claimExistingProfile: false,
+    companyDescription: '', linkedinUrl: '', registrationNumber: '', claimExistingProfile: false, claimCompanyId: '',
     howDidYouHear: '', agreeTerms: false,
 };
 
@@ -35,31 +35,53 @@ const BusinessRegister = () => {
     const [loading, setLoading]   = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [showPw, setShowPw]       = useState(false);
+    const [claimSearchTerm, setClaimSearchTerm] = useState('');
+    const [claimResults, setClaimResults] = useState([]);
+    const [claimLoading, setClaimLoading] = useState(false);
+    const [claimError, setClaimError] = useState('');
+    const [emailConflict, setEmailConflict] = useState('');
+    const claimSectionRef = useRef(null);
+    const claimSearchInputRef = useRef(null);
 
     const set = (field) => (e) => {
         const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-        setForm(f => ({ ...f, [field]: val }));
+        setForm(f => {
+            const updated = { ...f, [field]: val };
+            if (field === 'claimExistingProfile' && !val) {
+                updated.claimCompanyId = '';
+                setClaimResults([]);
+                setClaimSearchTerm('');
+                setClaimError('');
+            }
+            return updated;
+        });
+        if (field === 'email') {
+            setEmailConflict('');
+        }
     };
 
-    const validateStep = () => {
-        if (step === 0) {
+    const getStepError = (currentStep) => {
+        if (currentStep === 0) {
             if (!form.displayName) return 'Full name is required';
             if (!form.email)       return 'Email is required';
             if (!form.jobTitle)    return 'Job title is required';
             if (!form.password || form.password.length < 8) return 'Password must be at least 8 characters';
             if (form.password !== form.confirmPassword) return 'Passwords do not match';
         }
-        if (step === 1) {
+        if (currentStep === 1) {
             if (!form.companyName) return 'Company name is required';
             if (!form.industry)    return 'Industry is required';
             if (!form.companySize) return 'Company size is required';
             if (!form.country)     return 'Country is required';
+            if (form.claimExistingProfile && !form.claimCompanyId) return 'Select the company you want to claim';
         }
-        if (step === 2) {
+        if (currentStep === 2) {
             if (!form.agreeTerms) return 'Please accept the terms';
         }
         return null;
     };
+
+    const validateStep = () => getStepError(step);
 
     const next = () => {
         const err = validateStep();
@@ -68,6 +90,55 @@ const BusinessRegister = () => {
     };
 
     const back = () => setStep(s => s - 1);
+
+    const searchUnclaimedCompanies = async () => {
+        if (!claimSearchTerm.trim()) {
+            setClaimError('Enter a company name or keyword');
+            return;
+        }
+        setClaimError('');
+        setClaimLoading(true);
+        try {
+            const { data } = await api.get('/companies/search', {
+                params: {
+                    q: claimSearchTerm.trim(),
+                    unclaimed: true,
+                    limit: 8
+                }
+            });
+            setClaimResults(data.companies || []);
+        } catch (err) {
+            setClaimError(err?.response?.data?.error || 'Search failed');
+            setClaimResults([]);
+        } finally {
+            setClaimLoading(false);
+        }
+    };
+
+    const clearClaimSelection = () => {
+        setForm(f => ({ ...f, claimCompanyId: '' }));
+        setClaimResults([]);
+        setClaimSearchTerm('');
+        setClaimError('');
+    };
+
+    const jumpToClaimSection = () => {
+        if (step === 0) {
+            const err = getStepError(0);
+            if (err) {
+                toast.error(err);
+                return;
+            }
+            setStep(1);
+        } else if (step > 1) {
+            setStep(1);
+        }
+        setForm(f => ({ ...f, claimExistingProfile: true }));
+        setTimeout(() => {
+            claimSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            claimSearchInputRef.current?.focus();
+        }, 350);
+    };
 
     const handleSubmit = async () => {
         const err = validateStep();
@@ -90,14 +161,20 @@ const BusinessRegister = () => {
                 linkedinUrl:         form.linkedinUrl,
                 registrationNumber:  form.registrationNumber,
                 claimExistingProfile: form.claimExistingProfile,
+                claimCompanyId: form.claimExistingProfile ? form.claimCompanyId || undefined : undefined,
                 howDidYouHear:       form.howDidYouHear,
             });
 
             setSubmitted(true);
             window.scrollTo(0, 0);
         } catch (err) {
+            const status = err?.response?.status;
             const msg = err?.response?.data?.error || err?.response?.data?.message || 'Submission failed';
             toast.error(msg);
+            if (status === 409) {
+                setEmailConflict('This work email is already linked to a Welp account. Please sign in or claim your existing profile to continue.');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         } finally {
             setLoading(false);
         }
@@ -146,6 +223,32 @@ const BusinessRegister = () => {
                     </span>
                     <h1>Register your company</h1>
                     <p>Gain insights · Respond to reviews · Build trust</p>
+                </div>
+
+                {emailConflict && (
+                    <div className="reg-inline-alert" role="alert">
+                        <div className="reg-inline-alert__text">
+                            <strong>Account already exists</strong>
+                            <p>{emailConflict}</p>
+                        </div>
+                        <div className="reg-inline-alert__actions">
+                            <Link to="/login">Sign in</Link>
+                            <button type="button" onClick={jumpToClaimSection}>
+                                Claim with this email
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="reg-claim-callout">
+                    <div>
+                        <p className="reg-callout-eyebrow">Already listed on Welp?</p>
+                        <strong>Claim your existing business profile.</strong>
+                        <p className="reg-callout-copy">We'll help you search for an unclaimed company page before you apply.</p>
+                    </div>
+                    <button type="button" className="reg-claim-callout__btn" onClick={jumpToClaimSection}>
+                        Find my company
+                    </button>
                 </div>
 
                 {/* Step indicator */}
@@ -243,12 +346,81 @@ const BusinessRegister = () => {
                                         <label>Country / Region *</label>
                                         <input type="text" value={form.country} onChange={set('country')} placeholder="South Africa" />
                                     </div>
-                                    <label className="reg-checkbox">
-                                        <input type="checkbox" checked={form.claimExistingProfile} onChange={set('claimExistingProfile')} />
-                                        <span>
-                                            <strong>Claim an existing Welp profile</strong> — our team will match your application to an existing company page
-                                        </span>
-                                    </label>
+                                    <div ref={claimSectionRef}>
+                                        <label className="reg-checkbox">
+                                            <input type="checkbox" checked={form.claimExistingProfile} onChange={set('claimExistingProfile')} />
+                                            <span>
+                                                <strong>Claim an existing Welp profile</strong> — our team will match your application to an existing company page
+                                            </span>
+                                        </label>
+                                        {form.claimExistingProfile && (
+                                            <div className="reg-claim-section">
+                                                <p style={{ marginBottom: '0.75rem', color: '#475569' }}>
+                                                    We’ll match your account with an unclaimed company. Search by name or keyword and select the correct result before you submit.
+                                                </p>
+                                                <div className="reg-row-2" style={{ gap: '0.5rem', alignItems: 'flex-end' }}>
+                                                    <div className="reg-field" style={{ flex: 1, marginBottom: 0 }}>
+                                                        <label>Company search</label>
+                                                        <input
+                                                            type="text"
+                                                            value={claimSearchTerm}
+                                                            onChange={(e) => setClaimSearchTerm(e.target.value)}
+                                                            placeholder="Search for Acme Corp"
+                                                            ref={claimSearchInputRef}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="reg-btn-ghost"
+                                                        style={{ flexShrink: 0 }}
+                                                        onClick={searchUnclaimedCompanies}
+                                                        disabled={claimLoading}
+                                                    >
+                                                        {claimLoading ? 'Searching…' : 'Search'}
+                                                    </button>
+                                                </div>
+                                                {claimError && <p className="reg-field-hint" style={{ color: '#ef4444' }}>{claimError}</p>}
+                                                {claimResults.length > 0 && (
+                                                    <div className="reg-claim-results" style={{ marginTop: '0.5rem' }}>
+                                                        {claimResults.map(company => (
+                                                            <button
+                                                                type="button"
+                                                                key={company.id}
+                                                                className={`reg-claim-item ${form.claimCompanyId === company.id ? 'selected' : ''}`}
+                                                                onClick={() => {
+                                                                    setForm(f => ({
+                                                                        ...f,
+                                                                        companyName: company.name,
+                                                                        companyWebsite: company.website || f.companyWebsite,
+                                                                        country: company.country || f.country,
+                                                                        claimCompanyId: company.id
+                                                                    }));
+                                                                    setClaimResults([]);
+                                                                    setClaimSearchTerm(company.name);
+                                                                }}
+                                                            >
+                                                                <strong>{company.name}</strong>
+                                                                <span style={{ fontSize: '0.75rem', color: '#475569' }}>{company.industry || 'General'} · {company.country || 'Unknown region'}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {form.claimCompanyId && (
+                                                    <div className="reg-field-hint" style={{ marginTop: '0.75rem' }}>
+                                                        Selected profile: <strong>{form.companyName}</strong>
+                                                        <button
+                                                            type="button"
+                                                            className="reg-claim-clear"
+                                                            onClick={clearClaimSelection}
+                                                            style={{ marginLeft: '0.5rem', background: 'none', border: 'none', color: '#d97706', cursor: 'pointer' }}
+                                                        >
+                                                            Change
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 

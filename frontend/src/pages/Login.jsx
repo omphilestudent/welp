@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import LoginForm from '../components/auth/LoginForm';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import './Login.css';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -364,139 +365,56 @@ const Login = () => {
         onSubmit: handleSubmit
     };
 
-    // Inline styles as fallback
-    const styles = {
-        authPage: {
-            minHeight: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            padding: '20px'
-        },
-        container: {
-            width: '100%',
-            maxWidth: '450px',
-            margin: '0 auto'
-        },
-        authCard: {
-            background: 'white',
-            borderRadius: '20px',
-            padding: '40px',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
-        },
-        authTitle: {
-            fontSize: '2rem',
-            fontWeight: 'bold',
-            color: '#333',
-            marginBottom: '10px',
-            textAlign: 'center'
-        },
-        authSubtitle: {
-            fontSize: '1rem',
-            color: '#666',
-            marginBottom: '30px',
-            textAlign: 'center'
-        },
-        alert: {
-            padding: '12px 16px',
-            borderRadius: '10px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-        },
-        alertError: {
-            background: '#fee',
-            color: '#c00',
-            border: '1px solid #fcc'
-        },
-        alertInfo: {
-            background: '#e6f3ff',
-            color: '#0066cc',
-            border: '1px solid #b8daff'
-        },
-        socialLogin: {
-            marginTop: '30px'
-        },
-        divider: {
-            textAlign: 'center',
-            position: 'relative',
-            margin: '20px 0'
-        },
-        dividerText: {
-            background: 'white',
-            padding: '0 10px',
-            color: '#999',
-            fontSize: '0.9rem',
-            position: 'relative',
-            zIndex: 1
-        },
-        dividerLine: {
-            position: 'absolute',
-            top: '50%',
-            left: 0,
-            right: 0,
-            height: '1px',
-            background: '#ddd',
-            zIndex: 0
-        },
-        socialButtons: {
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '15px'
-        },
-        socialBtn: {
-            padding: '12px',
-            border: 'none',
-            borderRadius: '10px',
-            fontSize: '0.95rem',
-            fontWeight: '500',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            transition: 'all 0.3s ease'
-        },
-        googleBtn: {
-            background: '#fff',
-            color: '#333',
-            border: '1px solid #ddd'
-        },
-        githubBtn: {
-            background: '#333',
-            color: '#fff',
-            border: '1px solid #333'
-        },
-        authFooter: {
-            marginTop: '30px',
-            textAlign: 'center'
-        },
-        authLink: {
-            color: '#667eea',
-            textDecoration: 'none',
-            fontWeight: '500'
-        }
-    };
+    const heroHighlights = [
+        { value: '2k+', caption: 'HR teams use Welp insights weekly' },
+        { value: '24/7', caption: 'Moderation & wellbeing monitoring' },
+        { value: '4.8 / 5', caption: 'Average platform satisfaction' }
+    ];
 
     return (
-        <div style={styles.authPage}>
-            <div style={styles.container}>
+        <div className="login-page">
+            <div className="login-grid">
+                <section className="login-hero">
+                    <p className="login-hero__eyebrow">Welp for organisations</p>
+                    <h1 className="login-hero__title">Clarity for every employee conversation</h1>
+                    <p className="login-hero__copy">
+                        Track sentiment in real time, respond to reviews faster, and keep your workforce supported with
+                        in-product guidance.
+                    </p>
+
+                    <ul className="login-hero__stats">
+                        {heroHighlights.map((item) => (
+                            <li key={item.caption}>
+                                <span>{item.value}</span>
+                                <small>{item.caption}</small>
+                            </li>
+                        ))}
+                    </ul>
+
+                    <div className="login-hero__cta">
+                        <Link to="/register" className="login-hero__link" state={{ from }}>
+                            Create an account
+                        </Link>
+                        <p>Looking to claim a business profile? Start from the registration page.</p>
+                    </div>
+                </section>
+
                 <motion.div
-                    style={styles.authCard}
+                    className="login-card"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
+                    transition={{ duration: 0.45 }}
                 >
-                    <h1 style={styles.authTitle}>Welcome Back</h1>
-                    <p style={styles.authSubtitle}>Log in to your Welp account</p>
+                    <header className="login-card__header">
+                        <span className="login-badge">Secure access</span>
+                        <h2>Welcome back</h2>
+                        <p>Sign in with your work email to continue.</p>
+                    </header>
 
-                    {/* General Error Display */}
                     <AnimatePresence mode="wait">
                         {errors.general && (
                             <motion.div
-                                style={{...styles.alert, ...styles.alertError}}
+                                className="login-alert login-alert--error"
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: 20 }}
@@ -520,10 +438,9 @@ const Login = () => {
                         )}
                     </AnimatePresence>
 
-                    {/* Login Method Suggestion */}
                     {loginMethod === 'email' && errors.general?.toLowerCase().includes('different login method') && (
                         <motion.div
-                            style={{...styles.alert, ...styles.alertInfo}}
+                            className="login-alert login-alert--info"
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0 }}
@@ -543,115 +460,96 @@ const Login = () => {
                             </svg>
                             <div>
                                 <strong>Different login method required</strong>
-                                <p style={{ marginTop: '4px', fontSize: '0.9rem' }}>
-                                    This account was created using social login.
-                                    Please try signing in with Google or GitHub below.
+                                <p>
+                                    This account was created with a social provider. Use Google or GitHub below to
+                                    access it.
                                 </p>
                             </div>
                         </motion.div>
                     )}
 
-                    {/* Login Form */}
                     <LoginForm {...loginFormProps} />
 
-                    {/* Social Login */}
-                    <div style={styles.socialLogin}>
-                        <div style={styles.divider}>
-                            <div style={styles.dividerLine}></div>
-                            <span style={styles.dividerText}>Or continue with</span>
-                        </div>
-
-                        <div style={styles.socialButtons}>
-                            <button
-                                onClick={() => handleSocialLogin('google')}
-                                style={{...styles.socialBtn, ...styles.googleBtn}}
-                                disabled={loading.email || loading.google || isLocked}
-                                aria-label="Login with Google"
-                                aria-busy={loading.google}
-                            >
-                                {loading.google ? (
-                                    <span>Loading...</span>
-                                ) : (
-                                    <>
-                                        <svg
-                                            width="20"
-                                            height="20"
-                                            viewBox="0 0 24 24"
-                                            aria-hidden="true"
-                                        >
-                                            <path
-                                                fill="currentColor"
-                                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                                            />
-                                            <path
-                                                fill="currentColor"
-                                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                                            />
-                                            <path
-                                                fill="currentColor"
-                                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                                            />
-                                            <path
-                                                fill="currentColor"
-                                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                                            />
-                                        </svg>
-                                        Google
-                                    </>
-                                )}
-                            </button>
-
-                            <button
-                                onClick={() => handleSocialLogin('github')}
-                                style={{...styles.socialBtn, ...styles.githubBtn}}
-                                disabled={loading.email || loading.github || isLocked}
-                                aria-label="Login with GitHub"
-                                aria-busy={loading.github}
-                            >
-                                {loading.github ? (
-                                    <span>Loading...</span>
-                                ) : (
-                                    <>
-                                        <svg
-                                            width="20"
-                                            height="20"
-                                            viewBox="0 0 24 24"
-                                            aria-hidden="true"
-                                        >
-                                            <path
-                                                fill="currentColor"
-                                                d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12c0-5.52-4.48-10-10-10z"
-                                            />
-                                        </svg>
-                                        GitHub
-                                    </>
-                                )}
-                            </button>
-                        </div>
+                    <div className="login-divider">
+                        <span>Or continue with</span>
                     </div>
 
-                    {/* Footer Links */}
-                    <div style={styles.authFooter}>
+                    <div className="login-social">
+                        <button
+                            onClick={() => handleSocialLogin('google')}
+                            className="login-social__btn login-social__btn--google"
+                            disabled={loading.email || loading.google || isLocked}
+                            aria-label="Login with Google"
+                            aria-busy={loading.google}
+                        >
+                            {loading.google ? (
+                                <span>Loading?</span>
+                            ) : (
+                                <>
+                                    <svg
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                    >
+                                        <path
+                                            fill="currentColor"
+                                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                                        />
+                                        <path
+                                            fill="currentColor"
+                                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                        />
+                                        <path
+                                            fill="currentColor"
+                                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                                        />
+                                        <path
+                                            fill="currentColor"
+                                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                                        />
+                                    </svg>
+                                    Google
+                                </>
+                            )}
+                        </button>
+
+                        <button
+                            onClick={() => handleSocialLogin('github')}
+                            className="login-social__btn login-social__btn--github"
+                            disabled={loading.email || loading.github || isLocked}
+                            aria-label="Login with GitHub"
+                            aria-busy={loading.github}
+                        >
+                            {loading.github ? (
+                                <span>Loading?</span>
+                            ) : (
+                                <>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path
+                                            fill="currentColor"
+                                            d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12c0-5.52-4.48-10-10-10z"
+                                        />
+                                    </svg>
+                                    GitHub
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    <footer className="login-card__footer">
                         <p>
                             Don't have an account?{' '}
-                            <Link
-                                to="/register"
-                                style={styles.authLink}
-                                state={{ from }}
-                            >
+                            <Link to="/register" state={{ from }}>
                                 Sign up
                             </Link>
                         </p>
-                        <p style={{ marginTop: '10px' }}>
-                            <Link
-                                to="/forgot-password"
-                                style={styles.authLink}
-                                state={{ email: formData.email }}
-                            >
+                        <p>
+                            <Link to="/forgot-password" state={{ email: formData.email }}>
                                 Forgot password?
                             </Link>
                         </p>
-                    </div>
+                    </footer>
                 </motion.div>
             </div>
         </div>
