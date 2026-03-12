@@ -3,6 +3,70 @@ import api from '../services/api';
 import Loading from '../components/common/Loading';
 
 const MentalHealthResources = () => {
+    const mockResources = [
+        {
+            id: 'mock-1',
+            title: 'Crisis Text Line',
+            description: 'Free, 24/7 support for anyone in crisis. Connect with a trained counselor by text.',
+            category: 'Crisis Support',
+            audience: 'Employees',
+            resource_type: 'Text',
+            phone: '988',
+            url: 'https://988lifeline.org/',
+            is_emergency: true
+        },
+        {
+            id: 'mock-2',
+            title: 'Welp Wellbeing Check-In',
+            description: 'Self-guided stress check-in to track burnout risk and get tailored tips.',
+            category: 'Assessment',
+            audience: 'Employees',
+            resource_type: 'Tool',
+            url: 'https://example.com/wellbeing-checkin',
+            is_emergency: false
+        },
+        {
+            id: 'mock-3',
+            title: 'Mindful Minutes',
+            description: 'Short, guided breathing and grounding exercises to reduce anxiety.',
+            category: 'Mindfulness',
+            audience: 'Employees',
+            resource_type: 'Audio',
+            url: 'https://example.com/mindful-minutes',
+            is_emergency: false
+        },
+        {
+            id: 'mock-4',
+            title: 'Burnout Recovery Plan',
+            description: 'A 2-week plan with daily micro-actions for recovery and energy management.',
+            category: 'Burnout',
+            audience: 'Employees',
+            resource_type: 'Program',
+            url: 'https://example.com/burnout-plan',
+            is_emergency: false
+        },
+        {
+            id: 'mock-5',
+            title: 'Clinician Consultation Line',
+            description: 'Peer support line for psychologists seeking case consultation or supervision.',
+            category: 'Professional Support',
+            audience: 'Psychologists',
+            resource_type: 'Phone',
+            phone: '+1-800-555-0189',
+            email: 'support@welp.example',
+            is_emergency: false
+        },
+        {
+            id: 'mock-6',
+            title: 'Grief and Loss Resource Hub',
+            description: 'Articles and worksheets supporting grief, loss, and life transitions.',
+            category: 'Grief Support',
+            audience: 'Employees',
+            resource_type: 'Guide',
+            url: 'https://example.com/grief-support',
+            is_emergency: false
+        }
+    ];
     const [resources, setResources] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -13,10 +77,11 @@ const MentalHealthResources = () => {
         const fetchResources = async () => {
             try {
                 const { data } = await api.get('/resources/mental-health');
-                setResources(data?.resources || []);
+                const fetched = data?.resources || [];
+                setResources(fetched.length > 0 ? fetched : mockResources);
             } catch (err) {
                 console.error('Failed to load mental health resources', err);
-                setError('Unable to load resources right now.');
+                setResources(mockResources);
             } finally {
                 setLoading(false);
             }

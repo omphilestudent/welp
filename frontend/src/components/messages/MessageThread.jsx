@@ -25,14 +25,20 @@ const MessageThread = ({
     const [error, setError] = useState('');
     const messagesEndRef = useRef(null);
     const threadRef = useRef(null);
+    const messagesContainerRef = useRef(null);
+    const isNearBottomRef = useRef(true);
 
     useEffect(() => {
         setMessages(initialMessages || []);
     }, [initialMessages]);
 
     useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+        const lastMessage = messages[messages.length - 1];
+        const isOwnMessage = lastMessage?.sender_id === user?.id;
+        if (isNearBottomRef.current || isOwnMessage) {
+            scrollToBottom();
+        }
+    }, [messages, user]);
 
     useEffect(() => {
         if (conversation) {
@@ -57,7 +63,17 @@ const MessageThread = ({
     }, [conversation]);
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const container = messagesContainerRef.current;
+        if (!container) return;
+        container.scrollTop = container.scrollHeight;
+    };
+
+    const handleScroll = () => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+        const threshold = 80;
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+        isNearBottomRef.current = distanceFromBottom < threshold;
     };
 
     const handleSend = async (e) => {
@@ -118,9 +134,11 @@ const MessageThread = ({
     const canCall = !isExpired && conversation?.status === 'accepted';
     const allowPsychCalls = callConfig?.roleFlags?.voice_video_calls;
     const showCallActions = user?.role === 'psychologist'
-        ? Boolean(allowPsychCalls)
+        ? Boolean(allowPsychCalls || callConfig)
         : user?.role === 'employee';
-    const disableCallButtons = !canCall || (user?.role === 'psychologist' && !allowPsychCalls);
+    const callLimitText = timeRemainingLabel && timeRemainingLabel !== 'No timer'
+        ? `Time left: ${timeRemainingLabel}`
+        : `Free limit: ${callConfig?.callLimits?.minutesPerClient || 120} min / client`;
 
     return (
         <div className={`message-thread ${isExpired ? 'is-expired' : ''}`} ref={threadRef}>
@@ -131,7 +149,7 @@ const MessageThread = ({
                     onClick={() => onOpenSidebar?.()}
                     aria-label="Open conversations"
                 >
-                    Conversations
+                    Back
                 </button>
                 <div className="thread-participant">
                     <button
@@ -151,26 +169,38 @@ const MessageThread = ({
                     <div className="thread-actions">
                         <button
                             className="btn btn-outline btn-small"
-                            disabled={disableCallButtons}
-                            onClick={() => onStartVoiceCall?.()}
+                            onClick={() => {
+                                if (!canCall) {
+                                    return onStartVoiceCall?.({ reason: 'pending' });
+                                }
+                                return onStartVoiceCall?.();
+                            }}
                         >
                             Voice
                         </button>
                         <button
                             className="btn btn-outline btn-small"
-                            disabled={disableCallButtons}
-                            onClick={() => onStartVideoCall?.()}
+                            onClick={() => {
+                                if (!canCall) {
+                                    return onStartVideoCall?.({ reason: 'pending' });
+                                }
+                                return onStartVideoCall?.();
+                            }}
                         >
                             Video
                         </button>
                         <span className="thread-call-limit">
-                            Free limit: {callConfig?.callLimits?.minutesPerClient || 120} min / client
+                            {callLimitText}
                         </span>
                     </div>
                 )}
             </div>
 
-            <div className={`messages-thread-container ${isExpired ? 'is-expired' : ''}`}>
+            <div
+                className={`messages-thread-container ${isExpired ? 'is-expired' : ''}`}
+                ref={messagesContainerRef}
+                onScroll={handleScroll}
+            >
                 {isExpired && (
                     <div className="messages-time-flag">
                         {timeRemainingLabel} • Messages are archived when time expires.

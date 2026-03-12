@@ -334,6 +334,85 @@ io.on('connection', (socket) => {
         }
     });
 
+    const ensureConversationAccess = async (conversationId) => {
+        const { query } = require('./utils/database');
+        const conversationAccess = await query(
+            `SELECT id, employee_id, psychologist_id FROM conversations
+             WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
+            [conversationId, socket.userId]
+        );
+        return conversationAccess.rows.length > 0;
+    };
+
+    socket.on('call:offer', async ({ conversationId, sdp, mediaType }) => {
+        try {
+            if (!conversationId || !sdp) return;
+            const allowed = await ensureConversationAccess(conversationId);
+            if (!allowed) {
+                return socket.emit('error', { message: 'Unauthorized conversation access' });
+            }
+            io.to(`conversation-${conversationId}`).emit('call:offer', {
+                conversationId,
+                sdp,
+                mediaType,
+                fromUserId: socket.userId
+            });
+        } catch (error) {
+            console.error('Call offer error:', error);
+        }
+    });
+
+    socket.on('call:answer', async ({ conversationId, sdp }) => {
+        try {
+            if (!conversationId || !sdp) return;
+            const allowed = await ensureConversationAccess(conversationId);
+            if (!allowed) {
+                return socket.emit('error', { message: 'Unauthorized conversation access' });
+            }
+            io.to(`conversation-${conversationId}`).emit('call:answer', {
+                conversationId,
+                sdp,
+                fromUserId: socket.userId
+            });
+        } catch (error) {
+            console.error('Call answer error:', error);
+        }
+    });
+
+    socket.on('call:ice', async ({ conversationId, candidate }) => {
+        try {
+            if (!conversationId || !candidate) return;
+            const allowed = await ensureConversationAccess(conversationId);
+            if (!allowed) {
+                return socket.emit('error', { message: 'Unauthorized conversation access' });
+            }
+            io.to(`conversation-${conversationId}`).emit('call:ice', {
+                conversationId,
+                candidate,
+                fromUserId: socket.userId
+            });
+        } catch (error) {
+            console.error('Call ICE error:', error);
+        }
+    });
+
+    socket.on('call:end', async ({ conversationId, reason }) => {
+        try {
+            if (!conversationId) return;
+            const allowed = await ensureConversationAccess(conversationId);
+            if (!allowed) {
+                return socket.emit('error', { message: 'Unauthorized conversation access' });
+            }
+            io.to(`conversation-${conversationId}`).emit('call:end', {
+                conversationId,
+                reason: reason || 'ended',
+                fromUserId: socket.userId
+            });
+        } catch (error) {
+            console.error('Call end error:', error);
+        }
+    });
+
     socket.on('typing', (data) => {
         const { conversationId, isTyping } = data;
         socket.to(`conversation-${conversationId}`).emit('user-typing', {

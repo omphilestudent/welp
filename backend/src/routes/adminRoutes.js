@@ -22,6 +22,10 @@ router.get('/dashboard/stats', adminController.getDashboardStats);
 
 router.get('/users', adminController.getUsers);
 router.get('/users/:id', adminController.getUserDetails);
+router.get('/psychologists/search', adminController.searchPsychologists);
+router.get('/psychologists/:id/schedule', adminController.getPsychologistSchedule);
+router.get('/psychologists/:id/calendar-integrations', adminController.getPsychologistCalendarIntegrations);
+router.get('/psychologists/:id/external-events', adminController.getPsychologistExternalEvents);
 router.post('/users',
     validate([
         body('email').isEmail(),

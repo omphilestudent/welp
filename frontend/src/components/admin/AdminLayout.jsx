@@ -138,6 +138,12 @@ const AdminLayout = () => {
             color: '#fc8181'
         },
         {
+            path: '/admin/calendar',
+            icon: <FaCalendarAlt />,
+            label: 'Calendar Troubleshoot',
+            color: '#38b2ac'
+        },
+        {
             path: '/admin/settings',
             icon: <FaCog />,
             label: 'Settings',

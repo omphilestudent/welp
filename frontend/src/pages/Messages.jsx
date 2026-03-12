@@ -28,6 +28,19 @@ const Messages = () => {
     const [subscription, setSubscription] = useState(null);
     const [isRequestingSupport, setIsRequestingSupport] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [now, setNow] = useState(Date.now());
+    const [callState, setCallState] = useState({ status: 'idle', mediaType: 'video', conversationId: null, fromUserId: null });
+    const [incomingOffer, setIncomingOffer] = useState(null);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isCameraOff, setIsCameraOff] = useState(false);
+    const [callStartedAt, setCallStartedAt] = useState(null);
+    const [callDurationSec, setCallDurationSec] = useState(0);
+    const localVideoRef = React.useRef(null);
+    const remoteVideoRef = React.useRef(null);
+    const peerRef = React.useRef(null);
+    const localStreamRef = React.useRef(null);
+    const ringIntervalRef = React.useRef(null);
+    const audioCtxRef = React.useRef(null);
     const formatList = (value) => {
         if (!value) return '';
         if (Array.isArray(value)) {
@@ -73,11 +86,17 @@ const Messages = () => {
     );
     const lastMessageAuthorId = activeConversation?.last_message?.senderId;
     const hasResponse = currentPsychologist && lastMessageAuthorId === currentPsychologist.id;
-    const expiresAt = activeConversation?.expires_at ? new Date(activeConversation.expires_at) : null;
-    const timeRemainingMs = expiresAt ? expiresAt.getTime() - Date.now() : null;
+    const sessionLimitMinutes = Math.max(1, Number(activeConversation?.time_limit_minutes ?? 120));
+    const fallbackStart = activeConversation?.started_at ? new Date(activeConversation.started_at) : null;
+    const derivedExpiry = fallbackStart
+        ? new Date(fallbackStart.getTime() + sessionLimitMinutes * 60 * 1000)
+        : null;
+    const expiresAt = activeConversation?.expires_at
+        ? new Date(activeConversation.expires_at)
+        : derivedExpiry;
+    const timeRemainingMs = expiresAt ? expiresAt.getTime() - now : null;
     const isConversationExpired = activeConversation?.status === 'ended' || (timeRemainingMs != null && timeRemainingMs <= 0);
     const timeLabel = formatTimeRemaining(timeRemainingMs);
-    const sessionLimitMinutes = Math.max(1, Number(activeConversation?.time_limit_minutes ?? 120));
     const sessionLimitMs = sessionLimitMinutes * 60 * 1000;
     const sessionProgress = timeRemainingMs != null
         ? Math.max(0, Math.min(100, 100 - (timeRemainingMs / sessionLimitMs) * 100))
@@ -145,6 +164,16 @@ const Messages = () => {
         }
     }, []);
 
+    const ensureConversationActive = useCallback((conversationId) => {
+        if (!conversationId) return;
+        if (activeConversation?.id === conversationId) return;
+        const found = visibleConversations.find(c => c.id === conversationId);
+        if (found) {
+            setActiveConversation(found);
+            fetchMessages(found.id);
+        }
+    }, [activeConversation, visibleConversations, fetchMessages]);
+
     useEffect(() => {
         fetchConversations();
     }, []);
@@ -195,6 +224,28 @@ const Messages = () => {
     }, [activeConversation, fetchMessages]);
 
     useEffect(() => {
+        return () => {
+            endCall(false);
+        };
+    }, [activeConversation?.id]);
+
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        if (!callStartedAt) {
+            setCallDurationSec(0);
+            return;
+        }
+        const timer = setInterval(() => {
+            setCallDurationSec(Math.floor((Date.now() - callStartedAt) / 1000));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [callStartedAt]);
+
+    useEffect(() => {
         if (!activeConversation) {
             setIsSidebarOpen(true);
         }
@@ -212,6 +263,114 @@ const Messages = () => {
             };
         }
     }, [user]);
+
+    useEffect(() => {
+        const handleOffer = (payload) => {
+            if (!payload?.conversationId || payload?.fromUserId === user?.id) return;
+            if (callState.status !== 'idle') {
+                socketService.emitCallEnd({ conversationId: payload.conversationId, reason: 'busy' });
+                return;
+            }
+            ensureConversationActive(payload.conversationId);
+            setIncomingOffer(payload);
+            setCallState({
+                status: 'incoming',
+                mediaType: payload.mediaType || 'video',
+                conversationId: payload.conversationId,
+                fromUserId: payload.fromUserId
+            });
+            startRingtone();
+            showIncomingNotification(payload);
+        };
+
+        const handleAnswer = async (payload) => {
+            if (!payload?.conversationId || payload?.fromUserId === user?.id) return;
+            if (peerRef.current && payload.sdp) {
+                await peerRef.current.setRemoteDescription(payload.sdp);
+                setCallState((prev) => ({
+                    ...prev,
+                    status: 'in-call',
+                    conversationId: payload.conversationId
+                }));
+                setCallStartedAt(Date.now());
+            }
+        };
+
+        const handleIce = async (payload) => {
+            if (!payload?.conversationId || payload?.fromUserId === user?.id) return;
+            if (peerRef.current && payload.candidate) {
+                try {
+                    await peerRef.current.addIceCandidate(payload.candidate);
+                } catch (err) {
+                    console.error('ICE add error', err);
+                }
+            }
+        };
+
+        const handleEnd = (payload) => {
+            if (!payload?.conversationId || payload?.fromUserId === user?.id) return;
+            if (payload.reason === 'busy') {
+                toast('User is busy on another call.');
+            }
+            endCall(false);
+        };
+
+        socketService.onCallOffer(handleOffer);
+        socketService.onCallAnswer(handleAnswer);
+        socketService.onCallIce(handleIce);
+        socketService.onCallEnd(handleEnd);
+
+        return () => {
+            socketService.offCallOffer();
+            socketService.offCallAnswer();
+            socketService.offCallIce();
+            socketService.offCallEnd();
+        };
+    }, [user, ensureConversationActive, callState.status]);
+
+    const startRingtone = () => {
+        stopRingtone();
+        try {
+            if (!audioCtxRef.current) {
+                audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const ctx = audioCtxRef.current;
+            const ring = () => {
+                if (!ctx) return;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                gain.gain.setValueAtTime(0.001, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.5);
+            };
+            ring();
+            ringIntervalRef.current = setInterval(ring, 1200);
+        } catch (err) {
+            // ignore
+        }
+    };
+
+    const stopRingtone = () => {
+        if (ringIntervalRef.current) {
+            clearInterval(ringIntervalRef.current);
+            ringIntervalRef.current = null;
+        }
+    };
+
+    const showIncomingNotification = (payload) => {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'default') {
+            Notification.requestPermission().catch(() => null);
+        }
+        if (Notification.permission !== 'granted') return;
+        const title = payload.mediaType === 'voice' ? 'Incoming voice call' : 'Incoming video call';
+        new Notification(title, { body: 'Open Welp to respond.' });
+    };
 
     const handleRequestPsychologist = async (psychologist) => {
         if (!psychologist) return;
@@ -236,12 +395,22 @@ const Messages = () => {
             return;
         }
 
+        if (callState.status !== 'idle') {
+            toast('You are already in a call.');
+            return;
+        }
+
         if (isConversationExpired) {
             toast('This session has ended. Upgrade to premium to keep chatting longer.');
             return;
         }
 
-        toast('Video call setup is in progress — a link will be emailed shortly.');
+        if (activeConversation?.status !== 'accepted') {
+            toast('This request is still pending. Calls unlock after acceptance.');
+            return;
+        }
+
+        startCall('video');
     };
 
     const handleVoiceCall = () => {
@@ -250,12 +419,218 @@ const Messages = () => {
             return;
         }
 
+        if (callState.status !== 'idle') {
+            toast('You are already in a call.');
+            return;
+        }
+
         if (isConversationExpired) {
             toast('This session has ended. Upgrade to premium to keep chatting longer.');
             return;
         }
 
-        toast('Voice call setup is in progress — a link will be emailed shortly.');
+        if (activeConversation?.status !== 'accepted') {
+            toast('This request is still pending. Calls unlock after acceptance.');
+            return;
+        }
+
+        startCall('voice');
+    };
+
+    const createPeerConnection = (conversationId) => {
+        const pc = new RTCPeerConnection({
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        });
+
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                socketService.emitCallIce({
+                    conversationId,
+                    candidate: event.candidate
+                });
+            }
+        };
+
+        pc.ontrack = (event) => {
+            const [stream] = event.streams;
+            if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = stream;
+            }
+        };
+
+        return pc;
+    };
+
+    const startCall = async (mediaType) => {
+        if (!activeConversation) return;
+        try {
+            let constraints = mediaType === 'voice'
+                ? { audio: true, video: false }
+                : { audio: true, video: true };
+
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (err) {
+                if (mediaType === 'video') {
+                    constraints = { audio: true, video: false };
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    mediaType = 'voice';
+                    toast('Camera unavailable. Falling back to audio call.');
+                } else {
+                    throw err;
+                }
+            }
+
+            localStreamRef.current = stream;
+            setIsMuted(false);
+            setIsCameraOff(mediaType === 'voice');
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+            }
+
+            const pc = createPeerConnection(activeConversation.id);
+            peerRef.current = pc;
+            stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            socketService.emitCallOffer({
+                conversationId: activeConversation.id,
+                sdp: offer,
+                mediaType
+            });
+
+            setCallState({
+                status: 'calling',
+                mediaType,
+                conversationId: activeConversation.id,
+                fromUserId: user?.id
+            });
+        } catch (error) {
+            console.error('Start call error', error);
+            toast.error('Unable to start call. Please check microphone/camera permissions.');
+            endCall(false);
+        }
+    };
+
+    const acceptCall = async () => {
+        if (!incomingOffer?.conversationId || !incomingOffer?.sdp) return;
+        try {
+            let mediaType = incomingOffer.mediaType || 'video';
+            let constraints = mediaType === 'voice'
+                ? { audio: true, video: false }
+                : { audio: true, video: true };
+
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (err) {
+                if (mediaType === 'video') {
+                    constraints = { audio: true, video: false };
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    mediaType = 'voice';
+                    toast('Camera unavailable. Falling back to audio call.');
+                } else {
+                    throw err;
+                }
+            }
+
+            localStreamRef.current = stream;
+            setIsMuted(false);
+            setIsCameraOff(mediaType === 'voice');
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+            }
+
+            const pc = createPeerConnection(incomingOffer.conversationId);
+            peerRef.current = pc;
+            stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+            await pc.setRemoteDescription(incomingOffer.sdp);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            socketService.emitCallAnswer({
+                conversationId: incomingOffer.conversationId,
+                sdp: answer
+            });
+
+            setCallState({
+                status: 'in-call',
+                mediaType,
+                conversationId: incomingOffer.conversationId,
+                fromUserId: incomingOffer.fromUserId
+            });
+            setIncomingOffer(null);
+            stopRingtone();
+            setCallStartedAt(Date.now());
+        } catch (error) {
+            console.error('Accept call error', error);
+            toast.error('Unable to join call.');
+            endCall(false);
+        }
+    };
+
+    const declineCall = () => {
+        if (incomingOffer?.conversationId) {
+            socketService.emitCallEnd({
+                conversationId: incomingOffer.conversationId,
+                reason: 'declined'
+            });
+        }
+        setIncomingOffer(null);
+        setCallState({ status: 'idle', mediaType: 'video', conversationId: null, fromUserId: null });
+        stopRingtone();
+        setCallStartedAt(null);
+    };
+
+    const endCall = (notify = true) => {
+        if (notify && callState.conversationId) {
+            socketService.emitCallEnd({ conversationId: callState.conversationId, reason: 'ended' });
+        }
+        if (peerRef.current) {
+            peerRef.current.ontrack = null;
+            peerRef.current.onicecandidate = null;
+            peerRef.current.close();
+            peerRef.current = null;
+        }
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach((track) => track.stop());
+            localStreamRef.current = null;
+        }
+        if (localVideoRef.current) localVideoRef.current.srcObject = null;
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+        setCallState({ status: 'idle', mediaType: 'video', conversationId: null, fromUserId: null });
+        setIncomingOffer(null);
+        stopRingtone();
+        setCallStartedAt(null);
+    };
+
+    const toggleMute = () => {
+        const stream = localStreamRef.current;
+        if (!stream) return;
+        const next = !isMuted;
+        stream.getAudioTracks().forEach((track) => {
+            track.enabled = !next;
+        });
+        setIsMuted(next);
+    };
+
+    const toggleCamera = () => {
+        const stream = localStreamRef.current;
+        if (!stream) return;
+        const tracks = stream.getVideoTracks();
+        if (tracks.length === 0) return;
+        const next = !isCameraOff;
+        tracks.forEach((track) => {
+            track.enabled = !next;
+        });
+        setIsCameraOff(next);
     };
 
     const handleViewHistory = () => {
@@ -631,6 +1006,45 @@ const Messages = () => {
                     />
                 </div>
             </div>
+            {(callState.status === 'calling' || callState.status === 'incoming' || callState.status === 'in-call') && (
+                <div className="call-overlay">
+                    <div className="call-modal">
+                        <div className="call-header">
+                            <h3>{callState.mediaType === 'voice' ? 'Voice Call' : 'Video Call'}</h3>
+                            {callState.status === 'incoming' && <span>Incoming call...</span>}
+                            {callState.status === 'calling' && <span>Calling...</span>}
+                            {callState.status === 'in-call' && <span>Connected • {new Date(callDurationSec * 1000).toISOString().substr(11, 8)}</span>}
+                        </div>
+                        {callState.status === 'in-call' && (
+                            <div className="call-status-badge">On call</div>
+                        )}
+                        <div className="call-videos">
+                            <video ref={remoteVideoRef} autoPlay playsInline className="call-video remote" />
+                            <video ref={localVideoRef} autoPlay playsInline muted className="call-video local" />
+                        </div>
+                        <div className="call-actions">
+                            {callState.status === 'incoming' ? (
+                                <>
+                                    <button className="btn btn-primary" onClick={acceptCall}>Accept</button>
+                                    <button className="btn btn-secondary" onClick={declineCall}>Decline</button>
+                                </>
+                            ) : (
+                                <>
+                                    <button className="btn btn-outline btn-small" onClick={toggleMute}>
+                                        {isMuted ? 'Unmute' : 'Mute'}
+                                    </button>
+                                    {callState.mediaType === 'video' && (
+                                        <button className="btn btn-outline btn-small" onClick={toggleCamera}>
+                                            {isCameraOff ? 'Camera On' : 'Camera Off'}
+                                        </button>
+                                    )}
+                                    <button className="btn btn-secondary" onClick={() => endCall(true)}>End Call</button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
             {isSidebarOpen && (
                 <div
                     className="messages-sidebar-overlay"

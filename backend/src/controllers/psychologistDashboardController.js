@@ -266,6 +266,40 @@ const removeScheduleItem = async (req, res) => {
     }
 };
 
+const updateScheduleItem = async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const { title, scheduledFor, type, location, status } = req.body || {};
+        const result = await query(
+            `UPDATE psychologist_schedule_items
+             SET title = COALESCE($1, title),
+                 scheduled_for = COALESCE($2, scheduled_for),
+                 type = COALESCE($3, type),
+                 location = COALESCE($4, location),
+                 status = COALESCE($5, status),
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $6 AND psychologist_id = $7
+             RETURNING *`,
+            [
+                title,
+                scheduledFor ? new Date(scheduledFor).toISOString() : null,
+                type,
+                location,
+                status,
+                itemId,
+                req.user.id
+            ]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Schedule item not found' });
+        }
+        return res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Update schedule item error:', error);
+        return res.status(500).json({ error: 'Failed to update schedule item' });
+    }
+};
+
 const getLeads = async (req, res) => {
     try {
         try {
@@ -278,6 +312,7 @@ const getLeads = async (req, res) => {
             `SELECT *
              FROM psychologist_leads
              WHERE psychologist_id = $1
+               AND status <> 'archived'
              ORDER BY created_at DESC`,
             [req.user.id]
         );
@@ -561,6 +596,7 @@ module.exports = {
     addScheduleItem,
     removeScheduleItem,
     exportScheduleIcs,
+    updateScheduleItem,
     getLeads,
     sendLeadMessage,
     archiveLead,

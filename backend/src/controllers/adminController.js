@@ -1415,6 +1415,78 @@ const getSubscriptionAnalytics = async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to fetch subscription analytics' }); }
 };
 
+const searchPsychologists = async (req, res) => {
+    try {
+        const q = String(req.query.q || '').trim();
+        if (!q) return res.json([]);
+        const result = await query(
+            `SELECT id, display_name, email, role
+             FROM users
+             WHERE role = 'psychologist'
+               AND (display_name ILIKE $1 OR email ILIKE $1 OR id::text = $2)
+             ORDER BY display_name
+             LIMIT 20`,
+            [`%${q}%`, q]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Search psychologists error:', error);
+        res.status(500).json({ error: 'Failed to search psychologists' });
+    }
+};
+
+const getPsychologistSchedule = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await query(
+            `SELECT id, title, scheduled_for, type, status, location
+             FROM psychologist_schedule_items
+             WHERE psychologist_id = $1
+             ORDER BY scheduled_for ASC`,
+            [id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get psychologist schedule error:', error);
+        res.status(500).json({ error: 'Failed to fetch schedule' });
+    }
+};
+
+const getPsychologistCalendarIntegrations = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await query(
+            `SELECT id, provider, name, ical_url, is_active, created_at, updated_at
+             FROM psychologist_calendar_integrations
+             WHERE psychologist_id = $1
+             ORDER BY created_at DESC`,
+            [id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get psychologist integrations error:', error);
+        res.status(500).json({ error: 'Failed to fetch integrations' });
+    }
+};
+
+const getPsychologistExternalEvents = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await query(
+            `SELECT e.title, e.starts_at, e.ends_at, e.location, e.source_uid
+             FROM psychologist_external_events e
+             JOIN psychologist_calendar_integrations i ON e.integration_id = i.id
+             WHERE i.psychologist_id = $1
+             ORDER BY e.starts_at ASC`,
+            [id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get psychologist external events error:', error);
+        res.status(500).json({ error: 'Failed to fetch external events' });
+    }
+};
+
 module.exports = {
     getAdminProfile,
     getDashboardStats,
@@ -1462,5 +1534,9 @@ module.exports = {
     getAuditLogs,
     getRevenueAnalytics,
     getUserAnalytics,
-    getSubscriptionAnalytics
+    getSubscriptionAnalytics,
+    searchPsychologists,
+    getPsychologistSchedule,
+    getPsychologistCalendarIntegrations,
+    getPsychologistExternalEvents
 };

@@ -609,7 +609,7 @@ const SummaryCard = ({ title, value, icon, color }) => (
         ...styles.summaryCard,
         borderLeft: `4px solid ${color}`
     }}>
-        <div style={styles.summaryCardIcon} style={{ color }}>
+        <div style={{ ...styles.summaryCardIcon, color }}>
             {icon}
         </div>
         <div style={styles.summaryCardContent}>

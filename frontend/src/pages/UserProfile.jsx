@@ -1,0 +1,150 @@
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import api from '../services/api';
+import Loading from '../components/common/Loading';
+
+const resolveMediaUrl = (url) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+const formatDateTime = (value) => {
+    if (!value) return '';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return '';
+    return dt.toLocaleString();
+};
+
+const UserProfile = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const loadProfile = async () => {
+            setLoading(true);
+            setError('');
+            try {
+                const { data } = await api.get(`/users/public/${id}`);
+                setProfile(data);
+            } catch (err) {
+                setError(err?.response?.data?.error || 'Failed to load profile');
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadProfile();
+    }, [id]);
+
+    if (loading) return <Loading />;
+    if (error) return <div className="alert alert-error">{error}</div>;
+    if (!profile?.user) return null;
+
+    const { user, psychologistProfile, schedule = [], externalEvents = [] } = profile;
+    const availability = psychologistProfile?.availability || {};
+    const handleBack = () => {
+        if (location.key !== 'default') {
+            navigate(-1);
+        } else {
+            navigate('/messages');
+        }
+    };
+
+    return (
+        <div className="user-profile-page">
+            <button type="button" className="profile-back-btn" onClick={handleBack}>
+                Back to chat
+            </button>
+            <div className="user-profile-header">
+                <div className="user-profile-avatar">
+                    {user.avatar_url ? (
+                        <img src={resolveMediaUrl(user.avatar_url)} alt={user.display_name} />
+                    ) : (
+                        <div className="avatar-placeholder">
+                            {user.display_name?.charAt(0) || 'U'}
+                        </div>
+                    )}
+                </div>
+                <div className="user-profile-meta">
+                    <h2>{user.display_name || 'User'}</h2>
+                    <p>{user.role}</p>
+                    {user.occupation && <p>{user.occupation}</p>}
+                    {user.workplace?.name && <p>{user.workplace.name}</p>}
+                    {user.location && <p>{user.location}</p>}
+                </div>
+            </div>
+
+            {user.bio && (
+                <section className="profile-section-card">
+                    <h3>About</h3>
+                    <p>{user.bio}</p>
+                </section>
+            )}
+
+            {user.role === 'psychologist' && (
+                <>
+                    <section className="profile-section-card">
+                        <h3>Availability</h3>
+                        {Object.keys(availability).length > 0 ? (
+                            <div className="availability-grid">
+                                {Object.entries(availability).map(([day, slots]) => (
+                                    <div key={day} className="availability-card">
+                                        <strong>{day}</strong>
+                                        <div>{Array.isArray(slots) ? slots.join(', ') : String(slots)}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p>No availability shared yet.</p>
+                        )}
+                    </section>
+
+                    <section className="profile-section-card">
+                        <h3>Calendar</h3>
+                        {schedule.length > 0 ? (
+                            <div className="schedule-list">
+                                {schedule.map((item) => (
+                                    <div key={item.id} className="schedule-item">
+                                        <div>
+                                            <strong>{item.title}</strong>
+                                            <span>{item.location || item.type}</span>
+                                        </div>
+                                        <span>{formatDateTime(item.scheduled_for)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p>No upcoming schedule items.</p>
+                        )}
+                    </section>
+
+                    <section className="profile-section-card">
+                        <h3>External Calendar Events</h3>
+                        {externalEvents.length > 0 ? (
+                            <div className="schedule-list">
+                                {externalEvents.map((item, index) => (
+                                    <div key={`${item.title}-${index}`} className="schedule-item">
+                                        <div>
+                                            <strong>{item.title}</strong>
+                                            <span>{item.location || 'External calendar'}</span>
+                                        </div>
+                                        <span>{formatDateTime(item.starts_at)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p>No external events synced.</p>
+                        )}
+                    </section>
+                </>
+            )}
+        </div>
+    );
+};
+
+export default UserProfile;

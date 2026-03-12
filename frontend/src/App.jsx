@@ -39,6 +39,7 @@ import SubscriptionManagement from './pages/admin/SubscriptionManagement';
 import SystemSettings from './pages/admin/SystemSettings';
 import MLInteractions from './pages/admin/MLInteractions';
 import RegistrationApplications from './pages/admin/RegistrationApplications';
+import CalendarTroubleshoot from './pages/admin/CalendarTroubleshoot';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
@@ -157,6 +158,7 @@ function App() {
                                     <Route path="companies" element={<CompanyManagement />} />
                                     <Route path="reviews" element={<ReviewModeration />} />
                                     <Route path="applications" element={<RegistrationApplications />} />
+                                    <Route path="calendar" element={<CalendarTroubleshoot />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />
                                     <Route path="ml-interactions" element={<MLInteractions />} />

@@ -83,6 +83,78 @@ class SocketService {
         }
     }
 
+    emitCallOffer(payload) {
+        if (this.socket) {
+            this.socket.emit('call:offer', payload);
+        }
+    }
+
+    emitCallAnswer(payload) {
+        if (this.socket) {
+            this.socket.emit('call:answer', payload);
+        }
+    }
+
+    emitCallIce(payload) {
+        if (this.socket) {
+            this.socket.emit('call:ice', payload);
+        }
+    }
+
+    emitCallEnd(payload) {
+        if (this.socket) {
+            this.socket.emit('call:end', payload);
+        }
+    }
+
+    onCallOffer(callback) {
+        if (this.socket) {
+            this.socket.on('call:offer', callback);
+        }
+    }
+
+    onCallAnswer(callback) {
+        if (this.socket) {
+            this.socket.on('call:answer', callback);
+        }
+    }
+
+    onCallIce(callback) {
+        if (this.socket) {
+            this.socket.on('call:ice', callback);
+        }
+    }
+
+    onCallEnd(callback) {
+        if (this.socket) {
+            this.socket.on('call:end', callback);
+        }
+    }
+
+    offCallOffer() {
+        if (this.socket) {
+            this.socket.off('call:offer');
+        }
+    }
+
+    offCallAnswer() {
+        if (this.socket) {
+            this.socket.off('call:answer');
+        }
+    }
+
+    offCallIce() {
+        if (this.socket) {
+            this.socket.off('call:ice');
+        }
+    }
+
+    offCallEnd() {
+        if (this.socket) {
+            this.socket.off('call:end');
+        }
+    }
+
     onError(callback) {
         if (this.socket) {
             this.socket.on('error', callback);

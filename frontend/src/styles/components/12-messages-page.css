@@ -23,6 +23,65 @@
   display: none;
 }
 
+.call-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.call-modal {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 1.5rem;
+  width: min(900px, 92vw);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.call-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.call-status-badge {
+  align-self: flex-start;
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.call-videos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.call-video {
+  width: 100%;
+  background: #0f172a;
+  border-radius: 12px;
+  min-height: 200px;
+  object-fit: cover;
+}
+
+.call-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
 .messages-sidebar {
   width: 380px;
   border-right: 1px solid var(--border-color);
@@ -179,7 +238,6 @@
 }
 
 .thread-back-button {
-  display: none;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);

@@ -86,6 +86,13 @@ router.delete('/dashboard/schedule/:itemId',
     psychologistDashboardController.removeScheduleItem
 );
 
+router.patch('/dashboard/schedule/:itemId',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('schedule'),
+    psychologistDashboardController.updateScheduleItem
+);
+
 router.get('/dashboard/leads',
     authenticate,
     authorize('psychologist'),
