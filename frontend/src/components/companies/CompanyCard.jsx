@@ -25,7 +25,6 @@ const CompanyCard = ({ company }) => {
     const rating      = parseFloat(company.avg_rating  || company.rating      || 0);
     const reviewCount = parseInt(company.review_count  || company.reviewCount || 0, 10);
     const description = company.description || '';
-    const isClaimed   = company.is_claimed  || false;
     const nameLower   = name.toLowerCase().trim();
     const initial     = name.charAt(0).toUpperCase();
 
@@ -121,9 +120,6 @@ const CompanyCard = ({ company }) => {
                 </p>
             )}
 
-            {!isClaimed && (
-                <span className="company-card-unclaimed">Unclaimed</span>
-            )}
         </div>
     );
 };

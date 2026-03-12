@@ -247,6 +247,7 @@ const Dashboard = () => {
     const [psychPermissions, setPsychPermissions] = useState(null);
     const [calendarIntegrations, setCalendarIntegrations] = useState([]);
     const [externalEvents, setExternalEvents] = useState([]);
+    const [recentCalls, setRecentCalls] = useState([]);
     const [calendarIntegrationDraft, setCalendarIntegrationDraft] = useState({
         provider: 'google',
         name: '',
@@ -266,6 +267,12 @@ const Dashboard = () => {
         leads: false,
         calls: false
     });
+    const formatDuration = (seconds = 0) => {
+        const total = Number(seconds) || 0;
+        const mins = Math.floor(total / 60);
+        const secs = total % 60;
+        return `${mins}m ${secs}s`;
+    };
 
     useEffect(() => {
         if (user?.role === 'psychologist') {
@@ -305,6 +312,8 @@ const Dashboard = () => {
                 setPsychPermissions(permissionsRes.data || null);
                 const integrationsRes = await api.get('/psychologists/dashboard/calendar-integrations').catch(() => ({ data: [] }));
                 setCalendarIntegrations(integrationsRes.data || []);
+                const callsRes = await api.get('/psychologists/dashboard/calls').catch(() => ({ data: [] }));
+                setRecentCalls(callsRes.data || []);
             }
         } catch (error) {
             setError('Failed to load dashboard data');
@@ -853,7 +862,7 @@ const Dashboard = () => {
 
                     {user?.role === 'psychologist' && activeTab === 'overview' && (
                         <div className="psych-dashboard-grid">
-                            <section className="psych-card">
+                            <section className="psych-card psych-card--schedule">
                                 <header className="psych-card__header">
                                     <div>
                                         <h3><FaCalendarAlt /> Schedule</h3>
@@ -1103,7 +1112,7 @@ const Dashboard = () => {
                                 )}
                             </section>
 
-                            <section className="psych-card">
+                            <section className="psych-card psych-card--compact">
                                 <header className="psych-card__header">
                                     <div>
                                         <h3><FaEnvelopeOpenText /> Leads</h3>
@@ -1154,17 +1163,17 @@ const Dashboard = () => {
                                 )}
                             </section>
 
-                            <section className="psych-card">
+                            <section className="psych-card psych-card--compact">
                                 <header className="psych-card__header">
                                     <div>
-                                        <h3><FaVideo /> Call Options</h3>
-                                        <p>Voice and video calls are enabled with plan-based limits.</p>
+                                        <h3><FaVideo /> Recent Calls</h3>
+                                        <p>Previous voice/video sessions with employees.</p>
                                     </div>
                                     <button
                                         type="button"
                                         className="btn btn-outline btn-small psych-card__toggle"
                                         onClick={() => togglePsychCard('calls')}
-                                        aria-label={psychCardCollapse.calls ? 'Maximize call options card' : 'Minimize call options card'}
+                                        aria-label={psychCardCollapse.calls ? 'Maximize recent calls card' : 'Minimize recent calls card'}
                                     >
                                         {psychCardCollapse.calls ? <FaChevronDown /> : <FaChevronUp />}
                                         {psychCardCollapse.calls ? 'Maximize' : 'Minimize'}
@@ -1172,37 +1181,19 @@ const Dashboard = () => {
                                 </header>
                                 {!psychCardCollapse.calls && (
                                     <div className="psych-card__body">
-                                        <div className="psych-call-summary">
-                                            <div>
-                                                <p className="psych-call-plan">
-                                                    Plan: {psychPermissions?.plan || 'Free'}
-                                                </p>
-                                                <p className="psych-call-limit">
-                                                    Free profiles: {psychPermissions?.callLimits?.minutesPerClient || 120} minutes per client.
-                                                </p>
-                                                <p className="psych-call-note">
-                                                    Premium profiles unlock more features as outlined on the pricing page.
-                                                </p>
+                                        {recentCalls.length === 0 ? (
+                                            <p className="empty-message">No previous calls yet.</p>
+                                        ) : (
+                                            <div className="psych-call-summary">
+                                                {recentCalls.map((call) => (
+                                                    <div key={call.id} className="psych-call-row">
+                                                        <strong>{call.employee_name || 'Employee'}</strong>
+                                                        <span>{call.media_type || 'call'}</span>
+                                                        <span>{formatDuration(call.duration_seconds)}</span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                            <div className="psych-call-actions">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline btn-small"
-                                                    onClick={() => handleCallAction('voice')}
-                                                    disabled={!psychPermissions?.roleFlags?.voice_video_calls}
-                                                >
-                                                    <FaPhoneAlt /> Voice
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline btn-small"
-                                                    onClick={() => handleCallAction('video')}
-                                                    disabled={!psychPermissions?.roleFlags?.voice_video_calls}
-                                                >
-                                                    <FaVideo /> Video
-                                                </button>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 )}
                             </section>

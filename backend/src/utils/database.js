@@ -50,6 +50,8 @@ const createTables = async () => {
                 email VARCHAR(255),
                 phone VARCHAR(50),
                 address TEXT,
+                city VARCHAR(100),
+                country VARCHAR(100),
                 logo_url TEXT,
                 is_claimed BOOLEAN DEFAULT false,
                 is_verified BOOLEAN DEFAULT false,
@@ -57,6 +59,8 @@ const createTables = async () => {
                 verified_at TIMESTAMP,
                 claimed_by UUID,
                 status VARCHAR(50) DEFAULT 'active',
+                needs_enrichment BOOLEAN DEFAULT false,
+                enrichment_data JSONB,
                 created_by_user_id UUID,
                 token_version INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -66,6 +70,7 @@ const createTables = async () => {
             -- Users table
             CREATE TABLE IF NOT EXISTS users (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                public_id VARCHAR(20) UNIQUE DEFAULT ('USR-' || substring(replace(uuid_generate_v4()::text, '-', ''), 1, 12)),
                 email VARCHAR(255) UNIQUE,
                 password_hash VARCHAR(255),
                 role VARCHAR(50) NOT NULL CHECK (role IN ('employee', 'psychologist', 'business', 'admin', 'super_admin', 'hr_admin')),
@@ -541,6 +546,13 @@ const insertDefaultData = async () => {
 const runMigrations = async () => {
     try {
         const migrations = [
+            // Companies
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS country VARCHAR(100);",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS city VARCHAR(100);",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS needs_enrichment BOOLEAN DEFAULT false;",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS enrichment_data JSONB;",
+            "UPDATE companies SET needs_enrichment = false WHERE needs_enrichment IS NULL;",
+
             // Users
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation VARCHAR(255);",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS workplace_id UUID REFERENCES companies(id);",
@@ -551,6 +563,10 @@ const runMigrations = async () => {
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS public_id VARCHAR(20);",
+            "ALTER TABLE users ALTER COLUMN public_id SET DEFAULT ('USR-' || substring(replace(uuid_generate_v4()::text, '-', ''), 1, 12));",
+            "UPDATE users SET public_id = ('USR-' || substring(replace(uuid_generate_v4()::text, '-', ''), 1, 12)) WHERE public_id IS NULL;",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_public_id ON users(public_id);",
             `CREATE TABLE IF NOT EXISTS user_settings (
                 user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                 theme VARCHAR(10) DEFAULT 'light',
@@ -737,6 +753,18 @@ const runMigrations = async () => {
                 ends_at TIMESTAMP,
                 location TEXT,
                 source_uid TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`
+            ,
+            `CREATE TABLE IF NOT EXISTS call_logs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+                psychologist_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                employee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                media_type VARCHAR(20) DEFAULT 'video',
+                started_at TIMESTAMP NOT NULL,
+                ended_at TIMESTAMP NOT NULL,
+                duration_seconds INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`
         ];

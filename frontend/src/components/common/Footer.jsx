@@ -31,7 +31,7 @@ const Footer = () => {
                     <div className="footer-section">
                         <h4>For Businesses</h4>
                         <ul className="footer-links">
-                            <li><Link to="/search?unclaimed=true">Claim Your Company</Link></li>
+                            <li><Link to="/search">Find Companies</Link></li>
                             <li><Link to="/business-guide">Business Guide</Link></li>
                             <li><Link to="/pricing?role=business">Business Pricing</Link></li>
                         </ul>

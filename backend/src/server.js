@@ -239,6 +239,8 @@ io.use((socket, next) => {
 });
 
 // Socket.IO connection handling
+const activeCalls = new Map();
+
 io.on('connection', (socket) => {
     console.log('🔌 User connected:', socket.userId, 'Role:', socket.userRole);
     socket.join(`user-${socket.userId}`);
@@ -351,6 +353,13 @@ io.on('connection', (socket) => {
             if (!allowed) {
                 return socket.emit('error', { message: 'Unauthorized conversation access' });
             }
+            if (!activeCalls.has(conversationId)) {
+                activeCalls.set(conversationId, {
+                    mediaType: mediaType || 'video',
+                    startedAt: Date.now(),
+                    initiatorId: socket.userId
+                });
+            }
             io.to(`conversation-${conversationId}`).emit('call:offer', {
                 conversationId,
                 sdp,
@@ -368,6 +377,10 @@ io.on('connection', (socket) => {
             const allowed = await ensureConversationAccess(conversationId);
             if (!allowed) {
                 return socket.emit('error', { message: 'Unauthorized conversation access' });
+            }
+            const active = activeCalls.get(conversationId);
+            if (active && !active.startedAt) {
+                active.startedAt = Date.now();
             }
             io.to(`conversation-${conversationId}`).emit('call:answer', {
                 conversationId,
@@ -408,6 +421,34 @@ io.on('connection', (socket) => {
                 reason: reason || 'ended',
                 fromUserId: socket.userId
             });
+            const active = activeCalls.get(conversationId);
+            if (active && active.startedAt) {
+                const { query } = require('./utils/database');
+                const convo = await query(
+                    `SELECT employee_id, psychologist_id FROM conversations WHERE id = $1`,
+                    [conversationId]
+                );
+                const row = convo.rows[0];
+                if (row) {
+                    const endedAt = new Date();
+                    const durationSeconds = Math.max(0, Math.round((Date.now() - active.startedAt) / 1000));
+                    await query(
+                        `INSERT INTO call_logs
+                         (conversation_id, psychologist_id, employee_id, media_type, started_at, ended_at, duration_seconds)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                        [
+                            conversationId,
+                            row.psychologist_id,
+                            row.employee_id,
+                            active.mediaType || 'video',
+                            new Date(active.startedAt),
+                            endedAt,
+                            durationSeconds
+                        ]
+                    );
+                }
+            }
+            activeCalls.delete(conversationId);
         } catch (error) {
             console.error('Call end error:', error);
         }

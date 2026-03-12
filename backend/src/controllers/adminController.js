@@ -219,12 +219,15 @@ const getUsers = async (req, res) => {
 
         const hasIsActive    = await columnExists('users', 'is_active');
         const hasPermissions = await columnExists('users', 'permissions');
+        const hasPublicId    = await columnExists('users', 'public_id');
         const reviewsExist   = await tableExists('reviews');
+        const normalized     = String(search || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
         // Build SELECT
         let selectCols = `u.id, u.email, u.display_name, u.role, u.created_at, u.updated_at`;
         if (hasIsActive)    selectCols += `, u.is_active`;
         if (hasPermissions) selectCols += `, u.permissions`;
+        if (hasPublicId)    selectCols += `, u.public_id`;
 
         let fromClause = `FROM users u`;
         if (reviewsExist) {
@@ -237,8 +240,16 @@ const getUsers = async (req, res) => {
         let   idx  = 1;
 
         if (search) {
-            where += ` AND (u.email ILIKE $${idx} OR u.display_name ILIKE $${idx})`;
+            let searchClause = `u.email ILIKE $${idx} OR u.display_name ILIKE $${idx} OR u.id::text ILIKE $${idx}`;
+            if (hasPublicId) searchClause += ` OR u.public_id ILIKE $${idx}`;
             vals.push(`%${search}%`); idx++;
+
+            if (normalized) {
+                searchClause += ` OR regexp_replace(lower(COALESCE(u.display_name, '')), '[^a-z0-9]', '', 'g') LIKE $${idx}`;
+                vals.push(`%${normalized}%`); idx++;
+            }
+
+            where += ` AND (${searchClause})`;
         }
         if (role) {
             where += ` AND u.role = $${idx}`;
@@ -1419,14 +1430,22 @@ const searchPsychologists = async (req, res) => {
     try {
         const q = String(req.query.q || '').trim();
         if (!q) return res.json([]);
+        const normalized = q.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const hasPublicId = await columnExists('users', 'public_id');
         const result = await query(
-            `SELECT id, display_name, email, role
-             FROM users
-             WHERE role = 'psychologist'
-               AND (display_name ILIKE $1 OR email ILIKE $1 OR id::text = $2)
-             ORDER BY display_name
+            `SELECT u.id, u.display_name, u.email, u.role
+             FROM users u
+             WHERE (u.display_name ILIKE $1 OR u.email ILIKE $1 OR u.id::text = $2)
+                ${hasPublicId ? 'OR u.public_id ILIKE $1' : ''}
+                OR (
+                    $3 <> '' AND (
+                        regexp_replace(lower(COALESCE(u.display_name, '')), '[^a-z0-9]', '', 'g') LIKE $3
+                        OR regexp_replace(lower(COALESCE(u.email, '')), '[^a-z0-9]', '', 'g') LIKE $3
+                    )
+                )
+             ORDER BY u.display_name
              LIMIT 20`,
-            [`%${q}%`, q]
+            [`%${q}%`, q, `%${normalized}%`]
         );
         res.json(result.rows);
     } catch (error) {
@@ -1540,3 +1559,4 @@ module.exports = {
     getPsychologistCalendarIntegrations,
     getPsychologistExternalEvents
 };
+

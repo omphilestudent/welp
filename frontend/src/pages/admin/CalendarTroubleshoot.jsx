@@ -9,6 +9,7 @@ const CalendarTroubleshoot = () => {
     const [integrations, setIntegrations] = useState([]);
     const [externalEvents, setExternalEvents] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         if (!selected?.id) return;
@@ -38,12 +39,14 @@ const CalendarTroubleshoot = () => {
         e.preventDefault();
         if (!query.trim()) return;
         try {
+            setError('');
             const { data } = await api.get('/admin/psychologists/search', {
                 params: { q: query.trim() }
             });
             setResults(data || []);
         } catch (err) {
             setResults([]);
+            setError(err?.response?.data?.error || 'Search failed.');
         }
     };
 
@@ -65,6 +68,7 @@ const CalendarTroubleshoot = () => {
                 />
                 <button className="btn btn-primary">Search</button>
             </form>
+            {error && <div className="alert alert-error">{error}</div>}
 
             <div className="admin-grid">
                 <div className="admin-panel">

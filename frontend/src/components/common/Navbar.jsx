@@ -156,8 +156,8 @@ const Navbar = () => {
 
                                 {user.role === 'business' && (
                                     <>
-                                        <Link to="/search?unclaimed=true" className="navbar-link">
-                                            Claim Business
+                                        <Link to="/search" className="navbar-link">
+                                            Search Companies
                                         </Link>
                                         <Link to="/dashboard" className="navbar-link">
                                             Business Dashboard

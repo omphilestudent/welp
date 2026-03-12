@@ -110,6 +110,29 @@ const getSchedule = async (req, res) => {
     }
 };
 
+const getRecentCalls = async (req, res) => {
+    try {
+        const result = await query(
+            `SELECT
+                 cl.id,
+                 cl.media_type,
+                 cl.started_at,
+                 cl.ended_at,
+                 cl.duration_seconds,
+                 u.display_name as employee_name
+             FROM call_logs cl
+             LEFT JOIN users u ON cl.employee_id = u.id
+             WHERE cl.psychologist_id = $1
+             ORDER BY cl.started_at DESC
+             LIMIT 10`,
+            [req.user.id]
+        );
+        return res.json(result.rows);
+    } catch (error) {
+        console.error('Get recent calls error:', error);
+        return res.status(500).json({ error: 'Failed to load recent calls' });
+    }
+};
 const addScheduleItem = async (req, res) => {
     try {
         const { title, scheduledFor, type = 'meeting', location = '' } = req.body || {};
@@ -597,6 +620,7 @@ module.exports = {
     removeScheduleItem,
     exportScheduleIcs,
     updateScheduleItem,
+    getRecentCalls,
     getLeads,
     sendLeadMessage,
     archiveLead,

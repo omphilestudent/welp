@@ -122,15 +122,4 @@
   overflow: hidden;
 }
 
-.company-card-unclaimed {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: var(--gradient-warning);
-  color: white;
-  padding: 0.35rem 1rem;
-  border-radius: 30px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
 

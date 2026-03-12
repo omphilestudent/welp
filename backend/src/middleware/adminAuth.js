@@ -1,6 +1,21 @@
 
 const { query } = require('../utils/database');
 
+const tableExists = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = $1
+            )`,
+            [tableName]
+        );
+        return result.rows[0].exists;
+    } catch (error) {
+        return false;
+    }
+};
+
 const authorizeAdmin = (requiredPermissions = []) => {
     return async (req, res, next) => {
         try {
@@ -10,13 +25,16 @@ const authorizeAdmin = (requiredPermissions = []) => {
             }
 
 
-            const adminResult = await query(
-                `SELECT au.*, ar.name as role_name, ar.permissions as role_permissions
-                 FROM admin_users au
-                 JOIN admin_roles ar ON au.role_id = ar.id
-                 WHERE au.user_id = $1 AND au.is_active = true`,
-                [req.user.id]
-            );
+            const hasAdminTables = await tableExists('admin_users') && await tableExists('admin_roles');
+            const adminResult = hasAdminTables
+                ? await query(
+                    `SELECT au.*, ar.name as role_name, ar.permissions as role_permissions
+                     FROM admin_users au
+                     JOIN admin_roles ar ON au.role_id = ar.id
+                     WHERE au.user_id = $1 AND au.is_active = true`,
+                    [req.user.id]
+                )
+                : { rows: [] };
 
             if (adminResult.rows.length === 0) {
                 const normalizedUserRole = req.user.role?.toLowerCase();
@@ -74,14 +92,17 @@ const authorizeHR = () => {
             }
 
 
-            const adminResult = await query(
-                `SELECT au.*, ar.name as role_name
-                 FROM admin_users au
-                 JOIN admin_roles ar ON au.role_id = ar.id
-                 WHERE au.user_id = $1 AND au.is_active = true
-                 AND (ar.name = 'hr_admin' OR ar.name = 'super_admin' OR ar.name = 'system_admin' OR ar.name = 'admin')`,
-                [req.user.id]
-            );
+            const hasAdminTables = await tableExists('admin_users') && await tableExists('admin_roles');
+            const adminResult = hasAdminTables
+                ? await query(
+                    `SELECT au.*, ar.name as role_name
+                     FROM admin_users au
+                     JOIN admin_roles ar ON au.role_id = ar.id
+                     WHERE au.user_id = $1 AND au.is_active = true
+                     AND (ar.name = 'hr_admin' OR ar.name = 'super_admin' OR ar.name = 'system_admin' OR ar.name = 'admin')`,
+                    [req.user.id]
+                )
+                : { rows: [] };
 
             if (adminResult.rows.length === 0) {
                 const normalizedUserRole = req.user.role?.toLowerCase();

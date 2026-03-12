@@ -65,6 +65,13 @@ router.get('/dashboard/schedule',
     psychologistDashboardController.getSchedule
 );
 
+router.get('/dashboard/calls',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('dashboard'),
+    psychologistDashboardController.getRecentCalls
+);
+
 router.post('/dashboard/schedule',
     authenticate,
     authorize('psychologist'),

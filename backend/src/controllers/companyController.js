@@ -2,64 +2,56 @@
 const { query } = require('../utils/database');
 const { sendClaimInvitation } = require('../utils/emailService');
 const { scrapeCompanyFromWebsite } = require('../services/companyScraperService');
+const { enrichCompanyWithOSM } = require('../services/companyEnrichmentService');
 
 
 const searchCompanies = async (req, res) => {
     try {
         const { q, page = 1, limit = 20, industry, unclaimed } = req.query;
 
-
         const validPage = Math.max(1, parseInt(page) || 1);
         const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
         const offset = (validPage - 1) * validLimit;
 
-        let whereClause = '';
         const params = [];
         let paramIndex = 1;
-
+        const conditions = ['c.status = \\'active\\''];
 
         if (q && q.trim() !== '') {
-            whereClause += ` WHERE (name ILIKE $${paramIndex} OR description ILIKE $${paramIndex} OR industry ILIKE $${paramIndex})`;
-            params.push(`%${q.trim()}%`);
+            conditions.push('(c.name ILIKE $' + paramIndex + ' OR c.description ILIKE $' + paramIndex + ' OR c.industry ILIKE $' + paramIndex + ')');
+            params.push('%' + q.trim() + '%');
             paramIndex++;
         }
 
         if (industry && industry.trim() !== '') {
-            whereClause += whereClause ? ` AND industry = $${paramIndex}` : ` WHERE industry = $${paramIndex}`;
+            conditions.push('c.industry = $' + paramIndex);
             params.push(industry.trim());
             paramIndex++;
         }
 
-
         if (unclaimed === 'true') {
-            if (whereClause) {
-                whereClause += ` AND is_claimed = false`;
-            } else {
-                whereClause = ` WHERE is_claimed = false`;
-            }
+            conditions.push('c.is_claimed = false');
         }
 
+        const whereClause = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
 
         const countResult = await query(
-            `SELECT COUNT(*) FROM companies${whereClause}`,
+            'SELECT COUNT(*) FROM companies c' + whereClause,
             params
         );
         const total = parseInt(countResult.rows[0]?.count || 0);
 
+        const resultSql = 'SELECT c.*, '
+            + 'COALESCE(AVG(r.rating), 0) as avg_rating, '
+            + 'COUNT(r.id) as review_count '
+            + 'FROM companies c '
+            + 'LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true '
+            + whereClause
+            + ' GROUP BY c.id '
+            + 'ORDER BY c.name '
+            + 'LIMIT $' + paramIndex + ' OFFSET $' + (paramIndex + 1);
 
-        const result = await query(
-            `SELECT
-                 c.*,
-                 COALESCE(AVG(r.rating), 0) as avg_rating,
-                 COUNT(r.id) as review_count
-             FROM companies c
-                      LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
-                 ${whereClause}
-             GROUP BY c.id
-             ORDER BY c.name
-                 LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-            [...params, validLimit, offset]
-        );
+        const result = await query(resultSql, [...params, validLimit, offset]);
 
         const companies = result.rows.map(company => ({
             ...company,
@@ -81,8 +73,6 @@ const searchCompanies = async (req, res) => {
         res.status(500).json({ error: 'Failed to search companies' });
     }
 };
-
-
 const getCompany = async (req, res) => {
     try {
         const { id } = req.params;
@@ -128,26 +118,52 @@ const getCompany = async (req, res) => {
 
 const createCompany = async (req, res) => {
     try {
-        const { name, description, industry, website, email, phone, address } = req.body;
+        const { name, description, industry, website, email, phone, address, city, country } = req.body;
 
-        if (!name || name.trim() === '') {
+        const cleanedName = name?.trim();
+        const cleanedCountry = country?.trim();
+
+        if (!cleanedName) {
             return res.status(400).json({ error: 'Company name is required' });
         }
 
+        if (!cleanedCountry) {
+            return res.status(400).json({ error: 'Country is required' });
+        }
+
+        const cleanedDescription = description?.trim();
+        const cleanedIndustry = industry?.trim() || null;
+        const cleanedWebsite = website?.trim() || null;
+        const cleanedEmail = email?.trim() || null;
+        const cleanedPhone = phone?.trim() || null;
+        const cleanedAddress = address?.trim() || null;
+        const cleanedCity = city?.trim() || null;
+
         const existing = await query(
             'SELECT id FROM companies WHERE name = $1',
-            [name.trim()]
+            [cleanedName]
         );
 
         if (existing.rows.length > 0) {
             return res.status(400).json({ error: 'Company already exists' });
         }
 
+        let enrichmentData = null;
+        try {
+            enrichmentData = await enrichCompanyWithOSM({
+                name: cleanedName,
+                country: cleanedCountry,
+                city: cleanedCity
+            });
+        } catch (enrichError) {
+            console.warn('Company enrichment failed:', enrichError?.message);
+        }
+
         let scrapedLogoUrl = null;
         let scrapedDescription = null;
-        if (website) {
+        if (cleanedWebsite) {
             try {
-                const scraped = await scrapeCompanyFromWebsite(website);
+                const scraped = await scrapeCompanyFromWebsite(cleanedWebsite);
                 scrapedLogoUrl = scraped?.logo_url || null;
                 scrapedDescription = scraped?.description || null;
             } catch (scrapeError) {
@@ -155,34 +171,56 @@ const createCompany = async (req, res) => {
             }
         }
 
+        const finalWebsite = cleanedWebsite || enrichmentData?.website || null;
+        const finalAddress = cleanedAddress || enrichmentData?.address || null;
+        const finalPhone = cleanedPhone || enrichmentData?.phone || null;
+        const finalEmail = cleanedEmail || enrichmentData?.email || null;
+        const derivedCity = enrichmentData?.raw?.address?.city
+            || enrichmentData?.raw?.address?.town
+            || enrichmentData?.raw?.address?.village
+            || null;
+        const finalCity = cleanedCity || derivedCity;
+        const finalDescription = cleanedDescription || scrapedDescription || null;
+        const finalStatus = 'pending';
+        const needsEnrichment = true;
+        const enrichmentJson = enrichmentData ? JSON.stringify(enrichmentData) : null;
+
         const result = await query(
-            `INSERT INTO companies (name, description, industry, website, email, phone, address, logo_url, created_by_user_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `INSERT INTO companies (name, description, industry, website, email, phone, address, city, country, logo_url, status, needs_enrichment, enrichment_data, created_by_user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                  RETURNING *`,
             [
-                name.trim(),
-                description || scrapedDescription,
-                industry,
-                website,
-                email,
-                phone,
-                address,
+                cleanedName,
+                finalDescription,
+                cleanedIndustry,
+                finalWebsite,
+                finalEmail,
+                finalPhone,
+                finalAddress,
+                finalCity,
+                cleanedCountry,
                 scrapedLogoUrl,
+                finalStatus,
+                needsEnrichment,
+                enrichmentJson,
                 req.user.id
             ]
         );
 
         const company = result.rows[0];
 
-        if (email) {
+        if (finalEmail) {
             try {
-                await sendClaimInvitation(email, name, company.id);
+                await sendClaimInvitation(finalEmail, cleanedName, company.id);
             } catch (emailError) {
                 console.error('Failed to send claim invitation email:', emailError);
             }
         }
 
-        res.status(201).json(company);
+        res.status(201).json({
+            message: 'Company submitted for review. Admins will verify it shortly.',
+            company
+        });
     } catch (error) {
         console.error('Create company error:', error);
         res.status(500).json({ error: 'Failed to create company' });
