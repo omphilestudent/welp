@@ -1,4 +1,7 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const { authenticate, authorize } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const {
@@ -14,6 +17,24 @@ const router = express.Router();
 const ownerRoles = ['business', 'admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'];
 const UUID_PARAM = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 
+const logoUploadDir = path.join(__dirname, '../../uploads/company-logos');
+if (!fs.existsSync(logoUploadDir)) {
+    fs.mkdirSync(logoUploadDir, { recursive: true });
+}
+
+const logoStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, logoUploadDir),
+    filename: (req, file, cb) => {
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, `${Date.now()}-${safeName}`);
+    }
+});
+
+const uploadLogo = multer({
+    storage: logoStorage,
+    limits: { fileSize: 2 * 1024 * 1024 }
+});
+
 router.get('/', apiLimiter, companyController.searchCompanies);
 router.get(`/:companyId(${UUID_PARAM})`, apiLimiter, companyController.getBusinessProfile);
 
@@ -21,6 +42,31 @@ router.get(`/:companyId(${UUID_PARAM})/analytics`,
     authenticate,
     authorize(...ownerRoles),
     companyController.getCompanyAnalytics
+);
+
+router.get(`/:companyId(${UUID_PARAM})/api-keys`,
+    authenticate,
+    authorize(...ownerRoles),
+    companyController.getCompanyApiKeys
+);
+
+router.post(`/:companyId(${UUID_PARAM})/api-keys`,
+    authenticate,
+    authorize(...ownerRoles),
+    companyController.createCompanyApiKey
+);
+
+router.delete(`/:companyId(${UUID_PARAM})/api-keys/:keyId(${UUID_PARAM})`,
+    authenticate,
+    authorize(...ownerRoles),
+    companyController.revokeCompanyApiKey
+);
+
+router.post(`/:companyId(${UUID_PARAM})/logo`,
+    authenticate,
+    authorize(...ownerRoles),
+    uploadLogo.single('logo'),
+    companyController.uploadCompanyLogo
 );
 
 router.put(`/:companyId(${UUID_PARAM})`,

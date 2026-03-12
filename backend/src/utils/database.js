@@ -52,6 +52,7 @@ const createTables = async () => {
                 address TEXT,
                 city VARCHAR(100),
                 country VARCHAR(100),
+                registration_number VARCHAR(100),
                 logo_url TEXT,
                 is_claimed BOOLEAN DEFAULT false,
                 is_verified BOOLEAN DEFAULT false,
@@ -307,6 +308,19 @@ const createTables = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            -- Business API keys for CRM integrations
+            CREATE TABLE IF NOT EXISTS business_api_keys (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+                created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                name VARCHAR(100),
+                key_prefix VARCHAR(12) NOT NULL,
+                key_hash TEXT NOT NULL,
+                last_used_at TIMESTAMP,
+                revoked_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             -- Psychologist leads
             CREATE TABLE IF NOT EXISTS psychologist_leads (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -551,6 +565,7 @@ const runMigrations = async () => {
             // Companies
             "ALTER TABLE companies ADD COLUMN IF NOT EXISTS country VARCHAR(100);",
             "ALTER TABLE companies ADD COLUMN IF NOT EXISTS city VARCHAR(100);",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS registration_number VARCHAR(100);",
             "ALTER TABLE companies ADD COLUMN IF NOT EXISTS needs_enrichment BOOLEAN DEFAULT false;",
             "ALTER TABLE companies ADD COLUMN IF NOT EXISTS enrichment_data JSONB;",
             "UPDATE companies SET needs_enrichment = false WHERE needs_enrichment IS NULL;",

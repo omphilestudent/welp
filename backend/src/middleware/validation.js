@@ -58,7 +58,9 @@ const companyValidation = [
     body('website').optional().isURL(),
     body('email').optional().isEmail().normalizeEmail(),
     body('phone').optional().trim(),
-    body('address').optional().trim()
+    body('address').optional().trim(),
+    body('registrationNumber').optional().trim().isLength({ max: 100 }),
+    body('registration_number').optional().trim().isLength({ max: 100 })
 ];
 
 const companyUpdateValidation = [
@@ -70,8 +72,16 @@ const companyUpdateValidation = [
     body('address').optional().trim().isLength({ max: 255 }),
     body('city').optional().trim().isLength({ max: 100 }),
     body('country').optional().trim().isLength({ max: 100 }),
-    body('logo_url').optional().isURL(),
-    body('logoUrl').optional().isURL()
+    body('registrationNumber').optional().trim().isLength({ max: 100 }),
+    body('registration_number').optional().trim().isLength({ max: 100 }),
+    body('logo_url').optional().custom((value) => {
+        if (!value) return true;
+        return /^https?:\/\//i.test(value) || value.startsWith('/uploads/');
+    }).withMessage('logo_url must be a valid URL or upload path'),
+    body('logoUrl').optional().custom((value) => {
+        if (!value) return true;
+        return /^https?:\/\//i.test(value) || value.startsWith('/uploads/');
+    }).withMessage('logoUrl must be a valid URL or upload path')
 ];
 
 const reviewValidation = [

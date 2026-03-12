@@ -402,8 +402,24 @@ const Dashboard = () => {
     const [businessSectionError, setBusinessSectionError] = useState('');
     const [companyInfoSaving, setCompanyInfoSaving] = useState(false);
     const [companyInfoMessage, setCompanyInfoMessage] = useState('');
-    const [editCompanyForm, setEditCompanyForm] = useState({ phone: '', email: '', address: '', city: '', country: '', logo_url: '', website: '' });
+    const [companyLogoUploading, setCompanyLogoUploading] = useState(false);
+    const [editCompanyForm, setEditCompanyForm] = useState({
+        phone: '',
+        email: '',
+        address: '',
+        city: '',
+        country: '',
+        logo_url: '',
+        website: '',
+        registration_number: ''
+    });
     const [reviewFilter, setReviewFilter] = useState({ rating: '', type: '', sort: 'newest' });
+    const [apiKeys, setApiKeys] = useState([]);
+    const [apiKeysLoading, setApiKeysLoading] = useState(false);
+    const [apiKeyName, setApiKeyName] = useState('');
+    const [newApiKey, setNewApiKey] = useState('');
+    const [apiKeyError, setApiKeyError] = useState('');
+    const [apiKeyCreating, setApiKeyCreating] = useState(false);
 
     /* ── Helpers ── */
     const formatDuration = (seconds = 0) => {
@@ -428,7 +444,8 @@ const Dashboard = () => {
                     city: data.city || '',
                     country: data.country || '',
                     logo_url: data.logo_url || '',
-                    website: data.website || ''
+                    website: data.website || '',
+                    registration_number: data.registration_number || ''
                 });
             }
             setBusinessSectionError('');
@@ -513,6 +530,81 @@ const Dashboard = () => {
         }
     };
 
+    const handleCompanyLogoUpload = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file || !selectedCompanyId) return;
+        if (!file.type.match(/image.*/)) { toast.error('Please select an image file'); return; }
+        if (file.size > 2 * 1024 * 1024) { toast.error('File size must be less than 2MB'); return; }
+        setCompanyLogoUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('logo', file);
+            const { data } = await api.post(`/business/${selectedCompanyId}/logo`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            const logoUrl = data.logoUrl || data.company?.logo_url;
+            if (logoUrl) {
+                setEditCompanyForm((prev) => ({ ...prev, logo_url: logoUrl }));
+                setSelectedCompany((prev) => prev ? { ...prev, logo_url: logoUrl } : prev);
+                setMyCompanies((prev) =>
+                    Array.isArray(prev) ? prev.map((c) => (c.id === selectedCompanyId ? { ...c, logo_url: logoUrl } : c)) : prev
+                );
+                toast.success('Logo updated');
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to upload logo');
+        } finally {
+            setCompanyLogoUploading(false);
+            event.target.value = '';
+        }
+    };
+
+    const fetchCompanyApiKeys = async (companyId) => {
+        if (!companyId) return;
+        setApiKeysLoading(true);
+        setApiKeyError('');
+        try {
+            const { data } = await api.get(`/business/${companyId}/api-keys`);
+            setApiKeys(data.keys || []);
+        } catch (err) {
+            setApiKeyError(err.response?.data?.error || 'Failed to load API keys');
+            setApiKeys([]);
+        } finally {
+            setApiKeysLoading(false);
+        }
+    };
+
+    const handleCreateApiKey = async (event) => {
+        event.preventDefault();
+        if (!selectedCompanyId) return;
+        setApiKeyCreating(true);
+        setApiKeyError('');
+        try {
+            const { data } = await api.post(`/business/${selectedCompanyId}/api-keys`, { name: apiKeyName });
+            if (data.apiKey) {
+                setApiKeys((prev) => [data.apiKey, ...prev]);
+            }
+            setNewApiKey(data.key || '');
+            setApiKeyName('');
+            toast.success('API key created');
+        } catch (err) {
+            setApiKeyError(err.response?.data?.error || 'Failed to create API key');
+        } finally {
+            setApiKeyCreating(false);
+        }
+    };
+
+    const handleRevokeApiKey = async (keyId) => {
+        if (!selectedCompanyId) return;
+        try {
+            const { data } = await api.delete(`/business/${selectedCompanyId}/api-keys/${keyId}`);
+            setApiKeys((prev) => prev.map((k) => (k.id === keyId ? data.apiKey : k)));
+            toast.success('API key revoked');
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to revoke API key');
+        }
+    };
+
     const handleScrapeMissingInfo = async () => {
         if (!selectedCompanyId) return;
         setCompanyInfoSaving(true);
@@ -528,7 +620,8 @@ const Dashboard = () => {
                 city: updated.city || '',
                 country: updated.country || '',
                 logo_url: updated.logo_url || '',
-                website: updated.website || ''
+                website: updated.website || '',
+                registration_number: updated.registration_number || ''
             });
             setCompanyInfoMessage('Latest website data applied.');
             toast.success('Company info refreshed from website');
@@ -572,6 +665,7 @@ const Dashboard = () => {
         fetchSelectedCompanyProfile(selectedCompanyId, { skipFormUpdate: true });
         fetchBusinessReviews(selectedCompanyId, companyReviewPagination.page || 1);
         fetchBusinessAnalytics(selectedCompanyId);
+        fetchCompanyApiKeys(selectedCompanyId);
     };
 
     /* ── Chart data ── */
@@ -617,6 +711,9 @@ const Dashboard = () => {
             fetchSelectedCompanyProfile(selectedCompanyId);
             fetchBusinessReviews(selectedCompanyId, 1);
             fetchBusinessAnalytics(selectedCompanyId);
+            fetchCompanyApiKeys(selectedCompanyId);
+            setNewApiKey('');
+            setApiKeyError('');
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedCompanyId, user?.role]);
@@ -1079,7 +1176,8 @@ const Dashboard = () => {
                                         {[
                                             { id: 'reviews', label: 'Reviews' },
                                             { id: 'analytics', label: 'Analytics' },
-                                            { id: 'edit', label: 'Edit Profile' }
+                                            { id: 'edit', label: 'Edit Profile' },
+                                            { id: 'api', label: 'API Keys' }
                                         ].map((tab) => (
                                             <button
                                                 key={tab.id}
@@ -1296,6 +1394,15 @@ const Dashboard = () => {
                                                         <input type="url" value={editCompanyForm.logo_url} onChange={(e) => handleCompanyInfoChange('logo_url', e.target.value)} placeholder="https://example.com/logo.png" />
                                                     </label>
                                                     <label>
+                                                        <span className="form-label-text"><FaImage size={11} /> Upload logo</span>
+                                                        <input type="file" accept="image/*" onChange={handleCompanyLogoUpload} disabled={companyLogoUploading} />
+                                                        {companyLogoUploading && <span className="form-hint">Uploadingâ€¦</span>}
+                                                    </label>
+                                                    <label>
+                                                        <span className="form-label-text"><FaShieldAlt size={11} /> Registration number</span>
+                                                        <input type="text" value={editCompanyForm.registration_number} onChange={(e) => handleCompanyInfoChange('registration_number', e.target.value)} placeholder="e.g., 2012/123456/07" />
+                                                    </label>
+                                                    <label>
                                                         <span className="form-label-text"><FaMapMarkerAlt size={11} /> Street address</span>
                                                         <input type="text" value={editCompanyForm.address} onChange={(e) => handleCompanyInfoChange('address', e.target.value)} placeholder="123 Main Road" />
                                                     </label>
@@ -1338,6 +1445,77 @@ const Dashboard = () => {
                                                     </button>
                                                 </div>
                                             </form>
+                                        )}
+
+                                        {/* â”€â”€â”€ API Keys Tab â”€â”€â”€ */}
+                                        {companyPanelTab === 'api' && (
+                                            <div className="business-api-panel">
+                                                <p className="business-edit-intro">
+                                                    Generate API keys to connect your CRM or BI tools. Keep keys private â€” they grant access to your business data.
+                                                </p>
+
+                                                {newApiKey && (
+                                                    <div className="api-key-reveal">
+                                                        <div>
+                                                            <strong>New API key</strong>
+                                                            <p className="api-key-value">{newApiKey}</p>
+                                                            <p className="form-hint">Copy and store this key now. You wonâ€™t see it again.</p>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary btn-small"
+                                                            onClick={() => navigator.clipboard?.writeText(newApiKey)}
+                                                        >
+                                                            Copy key
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                <form className="api-key-create" onSubmit={handleCreateApiKey}>
+                                                    <input
+                                                        type="text"
+                                                        value={apiKeyName}
+                                                        onChange={(e) => setApiKeyName(e.target.value)}
+                                                        placeholder="Key label (e.g., HubSpot, Salesforce)"
+                                                    />
+                                                    <button type="submit" className="btn btn-primary" disabled={apiKeyCreating}>
+                                                        {apiKeyCreating ? 'Creatingâ€¦' : 'Create key'}
+                                                    </button>
+                                                </form>
+
+                                                {apiKeyError && <p className="form-hint">{apiKeyError}</p>}
+
+                                                {apiKeysLoading ? (
+                                                    <Loading />
+                                                ) : apiKeys.length > 0 ? (
+                                                    <div className="api-key-list">
+                                                        {apiKeys.map((key) => (
+                                                            <div key={key.id} className="api-key-item">
+                                                                <div>
+                                                                    <strong>{key.name || `Key ${key.key_prefix}`}</strong>
+                                                                    <p className="api-key-meta">
+                                                                        Prefix: {key.key_prefix} â€¢ Created {new Date(key.created_at).toLocaleDateString()}
+                                                                    </p>
+                                                                    {key.revoked_at && (
+                                                                        <span className="api-key-revoked">Revoked</span>
+                                                                    )}
+                                                                </div>
+                                                                {!key.revoked_at && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn btn-outline btn-small"
+                                                                        onClick={() => handleRevokeApiKey(key.id)}
+                                                                    >
+                                                                        Revoke
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="empty-message">No API keys yet. Create one to start integrating.</p>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </>

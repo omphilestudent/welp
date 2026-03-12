@@ -116,6 +116,11 @@
   gap: 0.5rem;
 }
 
+.company-registration {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .company-description {
   margin: 2rem 0;
   padding: 2rem;

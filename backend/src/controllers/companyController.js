@@ -1,4 +1,5 @@
 
+const crypto = require('crypto');
 const { query } = require('../utils/database');
 const { sendClaimInvitation } = require('../utils/emailService');
 const { scrapeCompanyFromWebsite } = require('../services/companyScraperService');
@@ -303,7 +304,7 @@ const getBusinessProfile = async (req, res) => {
 
 const createCompany = async (req, res) => {
     try {
-        const { name, description, industry, website, email, phone, address, city, country } = req.body;
+        const { name, description, industry, website, email, phone, address, city, country, registrationNumber, registration_number } = req.body;
 
         const cleanedName = name?.trim();
         const cleanedCountry = country?.trim();
@@ -323,6 +324,7 @@ const createCompany = async (req, res) => {
         const cleanedPhone = phone?.trim() || null;
         const cleanedAddress = address?.trim() || null;
         const cleanedCity = city?.trim() || null;
+        const cleanedRegistration = (registrationNumber || registration_number || '')?.trim() || null;
 
         const existing = await query(
             'SELECT id FROM companies WHERE name = $1',
@@ -392,6 +394,7 @@ const createCompany = async (req, res) => {
             'address',
             'city',
             'country',
+            'registration_number',
             'logo_url',
             'status',
             'needs_enrichment',
@@ -408,6 +411,7 @@ const createCompany = async (req, res) => {
             finalAddress,
             finalCity,
             cleanedCountry,
+            cleanedRegistration,
             scrapedLogoUrl,
             finalStatus,
             needsEnrichment,
@@ -551,6 +555,18 @@ const getIndustries = async (req, res) => {
 
 const getMyCompanies = async (req, res) => {
     try {
+        // Ensure claimed/created companies are linked to the owner
+        await query(
+            `INSERT INTO company_owners (company_id, user_id)
+             SELECT c.id, $1
+             FROM companies c
+                      LEFT JOIN company_owners co
+                                ON co.company_id = c.id AND co.user_id = $1
+             WHERE co.user_id IS NULL
+               AND (c.claimed_by = $1 OR c.created_by_user_id = $1)`,
+            [req.user.id]
+        );
+
         const result = await query(
             `SELECT
                  c.*,
@@ -600,6 +616,8 @@ const updateCompany = async (req, res) => {
             ['address', 'address'],
             ['city', 'city'],
             ['country', 'country'],
+            ['registration_number', 'registration_number'],
+            ['registrationNumber', 'registration_number'],
             ['logo_url', 'logo_url'],
             ['logoUrl', 'logo_url']
         ];
@@ -659,7 +677,7 @@ const getCompanyReviewsForBusiness = async (req, res) => {
         if (!companyId || !UUID_REGEX.test(companyId)) {
             return res.status(400).json({ error: 'Invalid company ID format' });
         }
-        const { page = 1, limit = 20 } = req.query;
+        const { page = 1, limit = 20, rating, type, sort } = req.query;
 
         const validPage = Math.max(1, parseInt(page) || 1);
         const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
@@ -668,9 +686,37 @@ const getCompanyReviewsForBusiness = async (req, res) => {
         const ownership = await assertCompanyOwnership(companyId, req.user);
         const lastViewedAt = ownership?.last_review_viewed_at ? new Date(ownership.last_review_viewed_at) : null;
 
+        const conditions = ['r.company_id = $1'];
+        const params = [companyId];
+        let paramIndex = 2;
+
+        if (rating) {
+            conditions.push(`r.rating = $${paramIndex}`);
+            params.push(parseInt(rating, 10));
+            paramIndex += 1;
+        }
+
+        if (type === 'anonymous') {
+            conditions.push('COALESCE(u.is_anonymous, false) = true');
+        } else if (type === 'employee') {
+            conditions.push('COALESCE(u.is_anonymous, false) = false');
+        }
+
+        const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        const orderMap = {
+            newest: 'r.created_at DESC',
+            oldest: 'r.created_at ASC',
+            highest: 'r.rating DESC, r.created_at DESC',
+            lowest: 'r.rating ASC, r.created_at DESC'
+        };
+        const orderBy = orderMap[sort] || orderMap.newest;
+
         const countResult = await query(
-            'SELECT COUNT(*) FROM reviews WHERE company_id = $1',
-            [companyId]
+            `SELECT COUNT(*)
+             FROM reviews r
+                      JOIN users u ON r.author_id = u.id
+             ${whereClause}`,
+            params
         );
         const total = parseInt(countResult.rows[0]?.count || 0);
 
@@ -704,10 +750,10 @@ const getCompanyReviewsForBusiness = async (req, res) => {
                           JOIN users ru ON rp.author_id = ru.id
                  WHERE rp.review_id = r.id
              ) AS replies_data ON true
-             WHERE r.company_id = $1
-             ORDER BY r.created_at DESC
-                 LIMIT $2 OFFSET $3`,
-            [companyId, validLimit, offset]
+             ${whereClause}
+             ORDER BY ${orderBy}
+                 LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+            [...params, validLimit, offset]
         );
 
         const reviews = result.rows.map((review) => ({
@@ -828,6 +874,124 @@ const getCompanyAnalytics = async (req, res) => {
         });
     } catch (error) {
         return handleControllerError(res, error, 'Failed to fetch company analytics');
+    }
+};
+
+/* â”€â”€ Business API keys â”€â”€ */
+const generateApiKey = () => {
+    const raw = crypto.randomBytes(32).toString('hex');
+    const keyPrefix = raw.slice(0, 8);
+    const keyHash = crypto.createHash('sha256').update(raw).digest('hex');
+    return { raw, keyPrefix, keyHash };
+};
+
+const getCompanyApiKeys = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        await assertCompanyOwnership(companyId, req.user);
+
+        const result = await query(
+            `SELECT id, company_id, name, key_prefix, last_used_at, revoked_at, created_at
+             FROM business_api_keys
+             WHERE company_id = $1
+             ORDER BY created_at DESC`,
+            [companyId]
+        );
+
+        res.json({ keys: result.rows });
+    } catch (error) {
+        return handleControllerError(res, error, 'Failed to fetch API keys');
+    }
+};
+
+const createCompanyApiKey = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        await assertCompanyOwnership(companyId, req.user);
+
+        const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+        if (name.length > 100) {
+            return res.status(400).json({ error: 'API key name is too long' });
+        }
+        const { raw, keyPrefix, keyHash } = generateApiKey();
+
+        const result = await query(
+            `INSERT INTO business_api_keys (company_id, created_by, name, key_prefix, key_hash)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, company_id, name, key_prefix, last_used_at, revoked_at, created_at`,
+            [companyId, req.user.id, name || null, keyPrefix, keyHash]
+        );
+
+        res.status(201).json({
+            apiKey: result.rows[0],
+            key: raw
+        });
+    } catch (error) {
+        return handleControllerError(res, error, 'Failed to create API key');
+    }
+};
+
+const revokeCompanyApiKey = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        const { keyId } = req.params;
+        if (!companyId || !UUID_REGEX.test(companyId) || !UUID_REGEX.test(keyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        await assertCompanyOwnership(companyId, req.user);
+
+        const result = await query(
+            `UPDATE business_api_keys
+             SET revoked_at = CURRENT_TIMESTAMP
+             WHERE id = $1 AND company_id = $2
+             RETURNING id, company_id, name, key_prefix, last_used_at, revoked_at, created_at`,
+            [keyId, companyId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'API key not found' });
+        }
+
+        res.json({ apiKey: result.rows[0] });
+    } catch (error) {
+        return handleControllerError(res, error, 'Failed to revoke API key');
+    }
+};
+
+const uploadCompanyLogo = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        await assertCompanyOwnership(companyId, req.user);
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const logoUrl = `/uploads/company-logos/${req.file.filename}`;
+        await query(
+            `UPDATE companies
+             SET logo_url = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2`,
+            [logoUrl, companyId]
+        );
+
+        const updatedCompany = await fetchCompanyByIdStrict(companyId);
+        res.json({ message: 'Logo updated successfully', logoUrl, company: updatedCompany });
+    } catch (error) {
+        return handleControllerError(res, error, 'Failed to upload logo');
     }
 };
 
@@ -1098,13 +1262,15 @@ const approveClaimRequest = async (req, res) => {
 
 
         await query(
-            'UPDATE companies SET is_claimed = true WHERE id = $1',
-            [claimRequest.rows[0].company_id]
+            'UPDATE companies SET is_claimed = true, claimed_by = $1 WHERE id = $2',
+            [claimRequest.rows[0].user_id, claimRequest.rows[0].company_id]
         );
 
 
         await query(
-            'INSERT INTO company_owners (company_id, user_id) VALUES ($1, $2)',
+            `INSERT INTO company_owners (company_id, user_id)
+             VALUES ($1, $2)
+             ON CONFLICT (company_id, user_id) DO NOTHING`,
             [claimRequest.rows[0].company_id, claimRequest.rows[0].user_id]
         );
 
@@ -1339,6 +1505,10 @@ module.exports = {
     updateCompany,
     getCompanyReviewsForBusiness,
     getCompanyAnalytics,
+    getCompanyApiKeys,
+    createCompanyApiKey,
+    revokeCompanyApiKey,
+    uploadCompanyLogo,
     getUnclaimedCompanies,
     requestClaimCompany,
     getMyClaimRequests,
