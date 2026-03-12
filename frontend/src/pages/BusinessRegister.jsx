@@ -91,17 +91,22 @@ const BusinessRegister = () => {
 
     const back = () => setStep(s => s - 1);
 
-    const searchUnclaimedCompanies = async () => {
-        if (!claimSearchTerm.trim()) {
+    const searchUnclaimedCompanies = async (overrideTerm) => {
+        const resolvedTerm = typeof overrideTerm === 'string' ? overrideTerm : claimSearchTerm;
+        const safeTerm = (resolvedTerm || '').trim();
+        if (!safeTerm) {
             setClaimError('Enter a company name or keyword');
             return;
+        }
+        if (typeof overrideTerm === 'string') {
+            setClaimSearchTerm(safeTerm);
         }
         setClaimError('');
         setClaimLoading(true);
         try {
             const { data } = await api.get('/companies/search', {
                 params: {
-                    q: claimSearchTerm.trim(),
+                    q: safeTerm,
                     unclaimed: true,
                     limit: 8
                 }
@@ -122,7 +127,8 @@ const BusinessRegister = () => {
         setClaimError('');
     };
 
-    const jumpToClaimSection = () => {
+    const jumpToClaimSection = (opts = {}) => {
+        const { autoSearch = true } = opts;
         if (step === 0) {
             const err = getStepError(0);
             if (err) {
@@ -133,10 +139,14 @@ const BusinessRegister = () => {
         } else if (step > 1) {
             setStep(1);
         }
+        const prefill = form.companyName?.trim() || claimSearchTerm.trim();
         setForm(f => ({ ...f, claimExistingProfile: true }));
         setTimeout(() => {
             claimSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             claimSearchInputRef.current?.focus();
+            if (autoSearch && prefill && prefill.length >= 2) {
+                searchUnclaimedCompanies(prefill);
+            }
         }, 350);
     };
 

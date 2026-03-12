@@ -162,21 +162,32 @@ const createCompany = async (req, res) => {
 
         let scrapedLogoUrl = null;
         let scrapedDescription = null;
+        let scrapedEmail = null;
+        let scrapedPhone = null;
+        let scrapedAddress = null;
+        let scrapedCity = null;
+        let scrapedCountry = null;
         if (cleanedWebsite) {
             try {
                 const scraped = await scrapeCompanyFromWebsite(cleanedWebsite);
                 scrapedLogoUrl = scraped?.logo_url || null;
                 scrapedDescription = scraped?.description || null;
+                scrapedEmail = scraped?.email || null;
+                scrapedPhone = scraped?.phone || null;
+                scrapedAddress = scraped?.address || null;
+                scrapedCity = scraped?.city || null;
+                scrapedCountry = scraped?.country || null;
             } catch (scrapeError) {
                 console.warn('Company scrape failed during create:', scrapeError.message);
             }
         }
 
         const finalWebsite = cleanedWebsite || enrichmentData?.website || null;
-        const finalAddress = cleanedAddress || enrichmentData?.address || null;
-        const finalPhone = cleanedPhone || enrichmentData?.phone || null;
-        const finalEmail = cleanedEmail || enrichmentData?.email || null;
-        const derivedCity = enrichmentData?.raw?.address?.city
+        const finalAddress = cleanedAddress || scrapedAddress || enrichmentData?.address || null;
+        const finalPhone = cleanedPhone || scrapedPhone || enrichmentData?.phone || null;
+        const finalEmail = cleanedEmail || scrapedEmail || enrichmentData?.email || null;
+        const derivedCity = scrapedCity
+            || enrichmentData?.raw?.address?.city
             || enrichmentData?.raw?.address?.town
             || enrichmentData?.raw?.address?.village
             || null;
@@ -735,18 +746,61 @@ const scrapeCompany = async (req, res) => {
         }
 
         const scraped = await scrapeCompanyFromWebsite(website);
+        let enrichmentData = null;
+        try {
+            enrichmentData = await enrichCompanyWithOSM({
+                name: scraped?.name,
+                city: scraped?.city,
+                country: scraped?.country
+            });
+        } catch (error) {
+            console.warn('Scrape company enrichment failed:', error?.message);
+        }
+
+        const enrichmentJson = enrichmentData ? JSON.stringify(enrichmentData) : null;
+        const finalAddress = scraped?.address || enrichmentData?.address || null;
+        const finalCity = scraped?.city
+            || enrichmentData?.raw?.address?.city
+            || enrichmentData?.raw?.address?.town
+            || enrichmentData?.raw?.address?.village
+            || null;
+        const finalCountry = scraped?.country
+            || enrichmentData?.raw?.address?.country
+            || null;
+        const finalPhone = scraped?.phone || enrichmentData?.phone || null;
+        const finalEmail = scraped?.email || enrichmentData?.email || null;
 
         const result = await query(
-            `INSERT INTO companies (name, description, website, logo_url, created_by_user_id)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO companies (name, description, website, logo_url, email, phone, address, city, country, enrichment_data, needs_enrichment, created_by_user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              ON CONFLICT (name)
              DO UPDATE SET
                 description = COALESCE(EXCLUDED.description, companies.description),
                 website = COALESCE(EXCLUDED.website, companies.website),
                 logo_url = COALESCE(EXCLUDED.logo_url, companies.logo_url),
+                email = COALESCE(EXCLUDED.email, companies.email),
+                phone = COALESCE(EXCLUDED.phone, companies.phone),
+                address = COALESCE(EXCLUDED.address, companies.address),
+                city = COALESCE(EXCLUDED.city, companies.city),
+                country = COALESCE(EXCLUDED.country, companies.country),
+                enrichment_data = COALESCE(EXCLUDED.enrichment_data, companies.enrichment_data),
+                needs_enrichment = COALESCE(EXCLUDED.needs_enrichment, companies.needs_enrichment),
                 updated_at = CURRENT_TIMESTAMP
              RETURNING *`,
-            [scraped.name, scraped.description, scraped.website, scraped.logo_url, req.user.id]
+            [
+                scraped.name,
+                scraped.description,
+                scraped.website,
+                scraped.logo_url,
+                finalEmail,
+                finalPhone,
+                finalAddress,
+                finalCity,
+                finalCountry,
+                enrichmentJson,
+                false,
+                req.user.id
+            ]
         );
 
         return res.status(201).json({
@@ -786,20 +840,76 @@ const scrapeMissingCompanyInfo = async (req, res) => {
         }
 
         const scraped = await scrapeCompanyFromWebsite(website);
+        let enrichmentData = null;
+        try {
+            enrichmentData = await enrichCompanyWithOSM({
+                name: company.name,
+                city: company.city || scraped?.city,
+                country: company.country || scraped?.country
+            });
+        } catch (error) {
+            console.warn('Scrape missing info enrichment failed:', error?.message);
+        }
 
-        const description = company.description && company.description.trim() !== '' ? company.description : scraped.description;
-        const logoUrl = company.logo_url && company.logo_url.trim() !== '' ? company.logo_url : scraped.logo_url;
-        const websiteFinal = company.website && company.website.trim() !== '' ? company.website : scraped.website;
+        const enrichmentJson = enrichmentData ? JSON.stringify(enrichmentData) : null;
+        const pickValue = (current, ...fallbacks) => {
+            const hasCurrent = typeof current === 'string' ? current.trim() !== '' : current !== null && current !== undefined;
+            if (hasCurrent) return current;
+            for (const value of fallbacks) {
+                if (value === undefined || value === null) continue;
+                if (typeof value === 'string' && value.trim() === '') continue;
+                return value;
+            }
+            return null;
+        };
+
+        const description = pickValue(company.description, scraped.description);
+        const logoUrl = pickValue(company.logo_url, scraped.logo_url);
+        const websiteFinal = pickValue(company.website, scraped.website);
+        const emailFinal = pickValue(company.email, scraped.email, enrichmentData?.email);
+        const phoneFinal = pickValue(company.phone, scraped.phone, enrichmentData?.phone);
+        const addressFinal = pickValue(company.address, scraped.address, enrichmentData?.address);
+        const cityFinal = pickValue(
+            company.city,
+            scraped.city,
+            enrichmentData?.raw?.address?.city,
+            enrichmentData?.raw?.address?.town,
+            enrichmentData?.raw?.address?.village
+        );
+        const countryFinal = pickValue(
+            company.country,
+            scraped.country,
+            enrichmentData?.raw?.address?.country
+        );
 
         const result = await query(
             `UPDATE companies
              SET description = $1,
                  logo_url = $2,
                  website = $3,
+                 email = $4,
+                 phone = $5,
+                 address = $6,
+                 city = $7,
+                 country = $8,
+                 enrichment_data = COALESCE($9, enrichment_data),
+                 needs_enrichment = $10,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = $4
+             WHERE id = $11
              RETURNING *`,
-            [description || company.description, logoUrl || company.logo_url, websiteFinal || company.website, id]
+            [
+                description,
+                logoUrl,
+                websiteFinal,
+                emailFinal,
+                phoneFinal,
+                addressFinal,
+                cityFinal,
+                countryFinal,
+                enrichmentJson,
+                false,
+                id
+            ]
         );
 
         return res.json({
