@@ -5,7 +5,7 @@ import api from '../services/api';
 import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
-import BusinessAdsManager from '../components/ads/BusinessAdsManager';
+import AdvertisingSection from '../components/ads/AdvertisingSection';
 import SubscriptionStatus from '../components/subscription/SubscriptionStatus';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
@@ -25,11 +25,6 @@ import {
 } from 'date-fns';
 
 const BUSINESS_PIE_COLORS = ['#6366f1', '#f59e0b', '#0ea5e9', '#10b981', '#ec4899'];
-const BUSINESS_ANALYTICS_SUMMARY = [
-    { tier: 'Base', impressions: '5k / mo', clicks: '250', ctr: '1.1%', spend: '$500 cap' },
-    { tier: 'Enhanced', impressions: '25k / mo', clicks: '2.1k', ctr: '2.4%', spend: '$2.5k cap' },
-    { tier: 'Premium', impressions: 'Unlimited', clicks: 'Real-time', ctr: '3.0%', spend: 'Usage billed' }
-];
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';
@@ -384,7 +379,14 @@ const ChartTooltip = ({ active, payload, label }) => {
 ───────────────────────────────────────────── */
 const Dashboard = () => {
     const { user, refreshUser } = useAuth();
-    const premiumExceptionActive = (user?.email || '').toLowerCase() === 'omphilemohlala@welp.com';
+    const normalizedEmail = (user?.email || '').toLowerCase();
+    const premiumExceptionActive = normalizedEmail === 'omphilemohlala@welp.com';
+    const subscription = user?.subscription;
+    const planTier = (subscription?.plan_tier || subscription?.planTier || subscription?.tier || '').toLowerCase();
+    const planCode = (subscription?.planCode || subscription?.plan_code || '').toLowerCase();
+    const planTierIsPremium = planTier === 'premium';
+    const isBusinessPremiumCode = planCode === 'business_premium' || planCode.startsWith('business_premium');
+    const advertisingUnlocked = user?.role === 'business' && (planTierIsPremium || isBusinessPremiumCode || premiumExceptionActive);
     const [userReviews, setUserReviews] = useState([]);
     const [pendingRequests, setPendingRequests] = useState([]);
     const [myCompanies, setMyCompanies] = useState([]);
@@ -438,6 +440,12 @@ const Dashboard = () => {
     const [newApiKey, setNewApiKey] = useState('');
     const [apiKeyError, setApiKeyError] = useState('');
     const [apiKeyCreating, setApiKeyCreating] = useState(false);
+
+    useEffect(() => {
+        if (activeTab === 'ads' && !advertisingUnlocked) {
+            setActiveTab('reviews');
+        }
+    }, [activeTab, advertisingUnlocked]);
 
     /* ── Helpers ── */
     const formatDuration = (seconds = 0) => {
@@ -1054,9 +1062,11 @@ const Dashboard = () => {
                             <button className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveTab('reviews')}>
                                 Business Hub
                             </button>
-                            <button className={`tab-btn ${activeTab === 'ads' ? 'active' : ''}`} onClick={() => setActiveTab('ads')}>
-                                Advertising
-                            </button>
+                            {advertisingUnlocked && (
+                                <button className={`tab-btn ${activeTab === 'ads' ? 'active' : ''}`} onClick={() => setActiveTab('ads')}>
+                                    Advertising
+                                </button>
+                            )}
                         </>
                     )}
                     {user?.role === 'psychologist' && (
@@ -1409,31 +1419,6 @@ const Dashboard = () => {
                             </div>
                         </div>
                     )}
-
-                    {user?.role === 'business' && activeTab === 'ads' && (
-                        <div className="business-ads-tab">
-                            <div className="business-ad-analytics">
-                                {BUSINESS_ANALYTICS_SUMMARY.map((item) => (
-                                    <div key={item.tier} className="business-ad-analytics__card">
-                                        <p className="business-ad-analytics__eyebrow">{item.tier}</p>
-                                        <h4>{item.impressions}</h4>
-                                        <div className="business-ad-analytics__metrics">
-                                            <span>Clicks {item.clicks}</span>
-                                            <span>CTR {item.ctr}</span>
-                                            <span>{item.spend}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            {premiumExceptionActive && (
-                                <div className="business-ad-analytics__callout">
-                                    Welp premium exception detected â€“ ad limits lifted and advanced analytics enabled.
-                                </div>
-                            )}
-                            <BusinessAdsManager />
-                        </div>
-                    )}
-
                                                         {/* Full-width trend if no sentiment */}
                                                         {sentimentData.length === 0 && trendChartData.length > 0 && (
                                                             <div className="analytics-chart">
@@ -1617,6 +1602,11 @@ const Dashboard = () => {
                                 </>
                             )}
                         </div>
+                    )}
+
+                    {/* ── Business: Advertising Tab ── */}
+                    {user?.role === 'business' && activeTab === 'ads' && (
+                        <AdvertisingSection premiumExceptionActive={premiumExceptionActive} />
                     )}
 
                     {/* ── Psychologist: Pending Requests ── */}

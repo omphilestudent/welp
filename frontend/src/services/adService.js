@@ -16,6 +16,14 @@ export const createCampaign = (formData) => {
     });
 };
 
+export const updateCampaign = (campaignId, formData) => {
+    return api.put(`/ads/${campaignId}`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+};
+
 export const deleteCampaign = (campaignId) => {
     return api.delete(`/ads/${campaignId}`);
 };

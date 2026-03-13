@@ -144,7 +144,7 @@ const AdminLayout = () => {
         {
             path: '/admin/marketing',
             icon: <FaEnvelope />,
-            label: 'Marketing Emails',
+            label: 'Email Marketing',
             color: '#f59e0b'
         },
         {

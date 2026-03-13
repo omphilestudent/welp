@@ -29,6 +29,16 @@ const EMAIL_CAMPAIGN_RECIPIENT_LIMIT = Number(process.env.EMAIL_CAMPAIGN_MAX_REC
 const EMAIL_CAMPAIGN_CRON = process.env.EMAIL_CAMPAIGN_CRON || '*/5 * * * *';
 const BASE_FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 const BASE_BACKEND_URL = (process.env.BACKEND_URL || process.env.API_URL || 'http://localhost:5000').replace(/\/$/, '');
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+const IMAGE_MIME_TYPES = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    avif: 'image/avif'
+};
 
 let tablesInitialized = false;
 let logosCache = null;
@@ -98,6 +108,49 @@ const toAbsoluteUrl = (value) => {
     if (/^https?:\/\//i.test(value)) return value;
     const base = value.startsWith('/uploads') ? BASE_BACKEND_URL : BASE_FRONTEND_URL;
     return `${base}${value.startsWith('/') ? '' : '/'}${value}`;
+};
+
+const getImageMimeType = (filePath) => {
+    const ext = path.extname(filePath || '').replace(/^\./, '').toLowerCase();
+    return IMAGE_MIME_TYPES[ext] || 'image/png';
+};
+
+const embedUploadAsset = async (assetPath) => {
+    if (!assetPath) return null;
+    const [cleaned] = assetPath.split('?');
+    const relativePath = cleaned.replace(/^\/uploads\/?/, '');
+    if (!relativePath) return null;
+    const candidate = path.normalize(path.join(UPLOADS_DIR, relativePath));
+    const relativeToUploads = path.relative(UPLOADS_DIR, candidate);
+    if (relativeToUploads.startsWith('..') || path.isAbsolute(relativeToUploads)) {
+        return null;
+    }
+
+    try {
+        const data = await fsp.readFile(candidate);
+        const mimeType = getImageMimeType(candidate);
+        return `data:${mimeType};base64,${data.toString('base64')}`;
+    } catch (error) {
+        console.warn('âš ï¸ Email campaign asset embed failed:', error.message);
+        return null;
+    }
+};
+
+const resolveHeroAsset = async (value) => {
+    if (!value) return null;
+    const trimmed = String(value).trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('data:')) {
+        return trimmed;
+    }
+    if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+    }
+    if (trimmed.startsWith('/uploads')) {
+        const embedded = await embedUploadAsset(trimmed);
+        if (embedded) return embedded;
+    }
+    return toAbsoluteUrl(trimmed);
 };
 
 const normalizeCampaignPayload = (input = {}, existing = {}) => {
@@ -404,8 +457,11 @@ const buildTextVersion = (campaign, recipient, pricing) => {
 
 const buildCampaignEmail = async (campaign, recipient, pricingSnapshot) => {
     const logos = await loadDefaultLogos();
-    const assets = (campaign.asset_urls || []).map(toAbsoluteUrl);
-    const heroImages = [...logos, ...assets].slice(0, 4);
+    const promises = Array.isArray(campaign.asset_urls)
+        ? campaign.asset_urls.map(resolveHeroAsset)
+        : [];
+    const resolvedAssets = await Promise.all(promises);
+    const heroImages = [...logos, ...resolvedAssets.filter(Boolean)].slice(0, 4);
     const pricing = pricingSnapshot || await fetchPricingSnapshot(campaign);
     const pricingHtml = renderPricingGrid(pricing?.plans || []);
     const ctaLabel = campaign.payload?.ctaLabel || 'View Pricing';

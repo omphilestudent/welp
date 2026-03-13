@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS users (
     email                CITEXT UNIQUE NOT NULL,
     password_hash        TEXT NOT NULL,
     role                 VARCHAR(32) NOT NULL CHECK (role IN ('user','psychologist','business','admin','super_admin')),
+    is_anonymous         BOOLEAN DEFAULT false,
     subscription_tier    subscription_tier_user DEFAULT 'free',
     subscription_expires TIMESTAMP WITH TIME ZONE,
     daily_chat_quota_mins INT DEFAULT 30,
