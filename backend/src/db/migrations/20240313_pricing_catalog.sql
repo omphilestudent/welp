@@ -1,5 +1,7 @@
--- 20240313_pricing_catalog.sql
 BEGIN;
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "citext";
 
 DO $$
 BEGIN
@@ -88,8 +90,8 @@ CREATE TABLE IF NOT EXISTS pricing_catalog (
     is_default BOOLEAN DEFAULT false,
     is_addon BOOLEAN DEFAULT false,
     features JSONB DEFAULT '[]'::jsonb,
-    limits JSONB DEFAULT '{}'::jsonb,
     metadata JSONB DEFAULT '{}'::jsonb,
+    limits JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     UNIQUE (audience, plan_code, currency_code)
@@ -322,6 +324,13 @@ BEGIN
             ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT now();
     END IF;
 END$$;
+
+ALTER TABLE pricing_catalog
+    ALTER COLUMN features SET DEFAULT '[]'::jsonb;
+ALTER TABLE pricing_catalog
+    ALTER COLUMN limits SET DEFAULT '{}'::jsonb;
+ALTER TABLE pricing_catalog
+    ALTER COLUMN plan_tier SET DEFAULT 'free';
 
 INSERT INTO currencies (code, name, symbol, fx_rate_usd, purchasing_power_index)
 VALUES

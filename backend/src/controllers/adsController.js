@@ -11,6 +11,7 @@ const {
     formatAnalyticsForTier
 } = require('../services/adsService');
 const { recordAuditLog } = require('../utils/auditLogger');
+const { hasPremiumException } = require('../utils/premiumAccess');
 
 const AD_ASSET_FOLDER = path.join(__dirname, '../../uploads/ads');
 fs.mkdirSync(AD_ASSET_FOLDER, { recursive: true });
@@ -136,6 +137,10 @@ const createCampaign = async (req, res) => {
 
         const thumbnailUrl = req.body.thumbnailUrl || buildAssetUrl(req, req.file.filename);
         const assetUrl = buildAssetUrl(req, req.file.filename);
+        const premiumOwner = hasPremiumException({ email: req.user.email });
+        const statusValue = premiumOwner ? 'active' : 'pending_review';
+        const reviewStatusValue = premiumOwner ? 'approved' : 'pending';
+        const submittedAt = new Date();
 
         const { rows } = await query(
             `INSERT INTO advertising_campaigns (
@@ -155,7 +160,7 @@ const createCampaign = async (req, res) => {
                 review_status,
                 submitted_at
             ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending_review','pending',CURRENT_TIMESTAMP
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
             ) RETURNING *`,
             [
                 businessId,
@@ -169,7 +174,10 @@ const createCampaign = async (req, res) => {
                 behaviors.length ? JSON.stringify(behaviors) : null,
                 dailyBudgetMinor,
                 bidType,
-                bidRateMinor
+                bidRateMinor,
+                statusValue,
+                reviewStatusValue,
+                submittedAt
             ]
         );
 
@@ -340,6 +348,7 @@ const updateCampaign = async (req, res) => {
         const targetLocations = parseList(req.body.targetLocations);
         const targetIndustries = parseList(req.body.targetIndustries);
         const behaviors = parseBehaviors(req.body.behaviors);
+        const premiumOwner = hasPremiumException({ email: req.user.email });
         if (targetLocations.length) setField('target_locations', targetLocations, true);
         if (targetIndustries.length) setField('target_industries', targetIndustries, true);
         if (behaviors.length) setField('target_behaviors', JSON.stringify(behaviors), true);
@@ -358,6 +367,10 @@ const updateCampaign = async (req, res) => {
             await upsertPlacements(id, placements);
             requiresReview = true;
             changedFields.add('placements');
+        }
+
+        if (premiumOwner) {
+            requiresReview = false;
         }
 
         if (requiresReview) {

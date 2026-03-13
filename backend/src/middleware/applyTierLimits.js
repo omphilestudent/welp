@@ -17,6 +17,10 @@ const applyTierLimits = (options = {}) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
+            if (hasPremiumException(req.user)) {
+                return next();
+            }
+
             if (feature === 'chat') {
                 await ensureChatQuota(req.user, options.minutes || 1);
             } else if (feature === 'video') {
@@ -34,6 +38,10 @@ const applyTierLimits = (options = {}) => {
 };
 
 const enforceVideoQuota = async (user) => {
+    if (hasPremiumException(user)) {
+        return;
+    }
+
     const role = (user.role || '').toLowerCase();
     if (role !== 'employee') {
         return;

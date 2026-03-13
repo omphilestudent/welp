@@ -207,10 +207,13 @@ const getPlanPayload = async (record, audience) => {
     const apiLimit = limits.api?.callsPerDay ?? plan?.apiLimit ?? planLimits.apiLimit ?? null;
     const adsLimits = limits.ads || plan?.ads || planLimits.ads || {};
     const currencySymbol = plan?.currencySymbol || record.metadata?.currencySymbol || '$';
+    const planTier = plan?.tier || planLimits.tier || 'free';
 
     return {
         planCode: record.plan_code,
-        tier: plan?.tier || planLimits.tier || 'premium',
+        tier: planTier,
+        plan_tier: planTier,
+        planTier,
         chatMinutes,
         callMinutes,
         apiLimit,

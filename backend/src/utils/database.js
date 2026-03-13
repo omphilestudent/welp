@@ -764,6 +764,45 @@ const insertDefaultData = async () => {
 const runMigrations = async () => {
     try {
         const migrations = [
+            // Currency table hardening (backfill legacy columns)
+            "ALTER TABLE currencies ADD COLUMN IF NOT EXISTS symbol VARCHAR(8) NOT NULL DEFAULT '$';",
+            "ALTER TABLE currencies ALTER COLUMN symbol SET DEFAULT '$';",
+            "ALTER TABLE currencies ADD COLUMN IF NOT EXISTS fx_rate_usd NUMERIC(18,6) NOT NULL DEFAULT 1.0;",
+            "ALTER TABLE currencies ADD COLUMN IF NOT EXISTS purchasing_power_index NUMERIC(6,3) NOT NULL DEFAULT 1.0;",
+            "ALTER TABLE currencies ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;",
+
+            // Ensure pricing_catalog includes plan metadata
+            "ALTER TABLE pricing_catalog ADD COLUMN IF NOT EXISTS plan_tier VARCHAR(24) NOT NULL DEFAULT 'free';",
+            "ALTER TABLE pricing_catalog ALTER COLUMN plan_tier SET DEFAULT 'free';",
+            "ALTER TABLE pricing_catalog ADD COLUMN IF NOT EXISTS features JSONB NOT NULL DEFAULT '[]'::jsonb;",
+            "ALTER TABLE pricing_catalog ALTER COLUMN features SET DEFAULT '[]'::jsonb;",
+            "ALTER TABLE pricing_catalog ADD COLUMN IF NOT EXISTS limits JSONB NOT NULL DEFAULT '{}'::jsonb;",
+            "ALTER TABLE pricing_catalog ALTER COLUMN limits SET DEFAULT '{}'::jsonb;",
+            // Subscription record compatibility columns
+            "ALTER TABLE subscription_records ADD COLUMN IF NOT EXISTS trial_days INT DEFAULT 0;",
+            "ALTER TABLE subscription_records ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;",
+            "ALTER TABLE subscription_records ADD COLUMN IF NOT EXISTS feature_snapshot JSONB DEFAULT '[]'::jsonb;",
+            "ALTER TABLE subscription_records ALTER COLUMN feature_snapshot SET DEFAULT '[]'::jsonb;",
+            "ALTER TABLE subscription_records ADD COLUMN IF NOT EXISTS limit_snapshot JSONB DEFAULT '{}'::jsonb;",
+            "ALTER TABLE subscription_records ALTER COLUMN limit_snapshot SET DEFAULT '{}'::jsonb;",
+            "ALTER TABLE subscription_records ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;",
+            "ALTER TABLE subscription_records ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;",
+
+            // Audit log enrichment columns
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL;",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS admin_id UUID REFERENCES users(id) ON DELETE SET NULL;",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_role VARCHAR(32);",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_type VARCHAR(64);",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_id UUID;",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS old_values JSONB;",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS new_values JSONB;",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;",
+            "ALTER TABLE audit_logs ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;",
+            "ALTER TABLE audit_logs ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;",
+
             // Companies
             "ALTER TABLE companies ADD COLUMN IF NOT EXISTS country VARCHAR(100);",
             "ALTER TABLE companies ADD COLUMN IF NOT EXISTS city VARCHAR(100);",

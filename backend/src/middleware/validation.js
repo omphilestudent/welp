@@ -334,6 +334,53 @@ const departmentValidation = [
         })
 ];
 
+const EMAIL_CAMPAIGN_AUDIENCES = ['user', 'psychologist', 'business'];
+const EMAIL_CAMPAIGN_RECURRENCE = ['none', 'daily', 'weekly', 'monthly'];
+
+const emailCampaignValidation = [
+    body('name').isString().trim().isLength({ min: 3, max: 150 }),
+    body('subject').isString().trim().isLength({ min: 3, max: 255 }),
+    body('audience').isIn(EMAIL_CAMPAIGN_AUDIENCES),
+    body('scheduleDate').optional({ checkFalsy: true }).isISO8601().withMessage('scheduleDate must be YYYY-MM-DD'),
+    body('scheduleTime').optional({ checkFalsy: true }).matches(/^([01]\d|2[0-3]):[0-5]\d$/).withMessage('scheduleTime must be HH:mm'),
+    body('recurrence').optional({ checkFalsy: true }).isIn(EMAIL_CAMPAIGN_RECURRENCE),
+    body('requireSubscription').optional().isBoolean(),
+    body('payload').optional().isObject(),
+    body('payload.intro').optional({ checkFalsy: true }).isString().isLength({ max: 800 }),
+    body('payload.previewText').optional({ checkFalsy: true }).isString().isLength({ max: 300 }),
+    body('payload.ctaLabel').optional({ checkFalsy: true }).isString().isLength({ max: 80 }),
+    body('payload.ctaUrl').optional({ checkFalsy: true }).isString().isLength({ max: 400 }),
+    body('assetUrls').optional().isArray({ max: 8 }),
+    body('assetUrls.*').optional({ checkFalsy: true }).isString().isLength({ max: 500 })
+];
+
+const emailCampaignUpdateValidation = [
+    body('name').optional({ checkFalsy: true }).isString().trim().isLength({ min: 3, max: 150 }),
+    body('subject').optional({ checkFalsy: true }).isString().trim().isLength({ min: 3, max: 255 }),
+    body('audience').optional({ checkFalsy: true }).isIn(EMAIL_CAMPAIGN_AUDIENCES),
+    body('scheduleDate').optional({ checkFalsy: true }).isISO8601().withMessage('scheduleDate must be YYYY-MM-DD'),
+    body('scheduleTime').optional({ checkFalsy: true }).matches(/^([01]\d|2[0-3]):[0-5]\d$/).withMessage('scheduleTime must be HH:mm'),
+    body('recurrence').optional({ checkFalsy: true }).isIn(EMAIL_CAMPAIGN_RECURRENCE),
+    body('requireSubscription').optional().isBoolean(),
+    body('payload').optional().isObject(),
+    body('payload.intro').optional({ checkFalsy: true }).isString().isLength({ max: 800 }),
+    body('payload.previewText').optional({ checkFalsy: true }).isString().isLength({ max: 300 }),
+    body('payload.ctaLabel').optional({ checkFalsy: true }).isString().isLength({ max: 80 }),
+    body('payload.ctaUrl').optional({ checkFalsy: true }).isString().isLength({ max: 400 }),
+    body('assetUrls').optional().isArray({ max: 8 }),
+    body('assetUrls.*').optional({ checkFalsy: true }).isString().isLength({ max: 500 })
+];
+
+const emailCampaignPreviewValidation = [
+    body('subject').optional({ checkFalsy: true }).isString().trim().isLength({ min: 3, max: 255 }),
+    body('audience').optional({ checkFalsy: true }).isIn(EMAIL_CAMPAIGN_AUDIENCES),
+    body('scheduleDate').optional({ checkFalsy: true }).isISO8601(),
+    body('scheduleTime').optional({ checkFalsy: true }).matches(/^([01]\d|2[0-3]):[0-5]\d$/),
+    body('recurrence').optional({ checkFalsy: true }).isIn(EMAIL_CAMPAIGN_RECURRENCE),
+    body('payload').optional().isObject(),
+    body('assetUrls').optional().isArray({ max: 8 })
+];
+
 module.exports = {
     validate,
     registerValidation,
@@ -351,5 +398,8 @@ module.exports = {
     jobPostingValidation,
     jobApplicationValidation,
     interviewValidation,
-    departmentValidation
+    departmentValidation,
+    emailCampaignValidation,
+    emailCampaignUpdateValidation,
+    emailCampaignPreviewValidation
 };

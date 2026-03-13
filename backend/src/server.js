@@ -22,8 +22,10 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const resourcesRoutes = require('./routes/resourcesRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const marketingRoutes = require('./routes/marketingRoutes');
+const emailMarketingRoutes = require('./routes/admin/emailMarketingRoutes');
 const adsRoutes = require('./routes/adsRoutes');
 const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
+const { initEmailMarketingTables, startEmailCampaignScheduler } = require('./services/emailMarketingService');
 
 // Database connection with better error handling
 const { sequelize, testConnection } = require('./models');
@@ -157,6 +159,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/marketing', marketingRoutes);
+app.use('/api/admin/emailCampaigns', emailMarketingRoutes);
 app.use('/api/ads', adsRoutes);
 
 // RBAC Routes (if available)
@@ -528,9 +531,11 @@ const startServer = async () => {
         if (dbConnected) {
             try {
                 await initMarketingTables();
+                await initEmailMarketingTables();
                 startMarketingScheduler();
+                startEmailCampaignScheduler();
             } catch (error) {
-                console.warn('⚠️ Marketing scheduler failed to start:', error.message);
+                console.warn('⚠️ Marketing scheduler init failure:', error.message);
             }
         }
 

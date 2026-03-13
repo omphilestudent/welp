@@ -60,6 +60,60 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at           TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'users'
+              AND column_name = 'id'
+        ) THEN
+            ALTER TABLE users
+                ADD COLUMN id UUID DEFAULT uuid_generate_v4();
+        END IF;
+
+        UPDATE users SET id = uuid_generate_v4() WHERE id IS NULL;
+
+        BEGIN
+            ALTER TABLE users ALTER COLUMN id SET DEFAULT uuid_generate_v4();
+        EXCEPTION
+            WHEN undefined_column THEN NULL;
+        END;
+
+        BEGIN
+            ALTER TABLE users ALTER COLUMN id SET NOT NULL;
+        EXCEPTION
+            WHEN undefined_column THEN NULL;
+        END;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.constraint_column_usage ccu
+              ON tc.constraint_name = ccu.constraint_name
+             AND tc.table_name = ccu.table_name
+            WHERE tc.table_schema = 'public'
+              AND tc.table_name = 'users'
+              AND ccu.column_name = 'id'
+              AND tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE')
+        ) THEN
+            BEGIN
+                ALTER TABLE users
+                    ADD CONSTRAINT users_id_unique UNIQUE (id);
+            EXCEPTION
+                WHEN duplicate_object THEN NULL;
+            END;
+        END IF;
+    END IF;
+END$$;
+
 CREATE TABLE IF NOT EXISTS psychologists (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id             UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -1,6 +1,7 @@
 const { query } = require('../utils/database');
 const { recordAuditLog } = require('../utils/auditLogger');
 const { createUserNotification } = require('../utils/userNotifications');
+const { hasPremiumException } = require('../utils/premiumAccess');
 
 const ADMIN_STATUS_WHITELIST = new Set(['active', 'paused', 'completed']);
 
@@ -88,10 +89,15 @@ const listAds = async (req, res) => {
             )
         ]);
 
-        const ads = adsResult.rows.map((ad) => ({
-            ...ad,
-            ctr: ad.impressions > 0 ? Number(((ad.clicks / ad.impressions) * 100).toFixed(2)) : 0
-        }));
+        const ads = adsResult.rows.map((ad) => {
+            const premiumOwner = hasPremiumException({ email: ad.owner_email });
+            return {
+                ...ad,
+                status: premiumOwner ? 'active' : ad.status,
+                review_status: premiumOwner ? 'approved' : ad.review_status,
+                ctr: ad.impressions > 0 ? Number(((ad.clicks / ad.impressions) * 100).toFixed(2)) : 0
+            };
+        });
 
         return res.json({
             ads,

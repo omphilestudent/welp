@@ -10,6 +10,7 @@ const {
     PLAN_LIMITS
 } = require('../services/subscriptionService');
 const { recordAuditLog } = require('../utils/auditLogger');
+const { hasPremiumException } = require('../utils/premiumAccess');
 
 const ROLE_TO_OWNER = {
     employee: 'user',
@@ -22,6 +23,33 @@ const DEFAULT_PLAN_CODES = {
     psychologist: 'psychologist_standard',
     business: 'business_base'
 };
+
+const LARGE_QUOTA = 1_000_000;
+
+const buildPremiumSubscriptionPayload = (ownerType) => ({
+    planCode: 'business_premium',
+    tier: 'premium',
+    plan_tier: 'premium',
+    planTier: 'premium',
+    displayName: 'Premium (Welp)',
+    chatMinutes: LARGE_QUOTA,
+    callMinutes: LARGE_QUOTA,
+    apiLimit: LARGE_QUOTA,
+    ads: { maxActive: null, analytics: 'advanced' },
+    features: {
+        chat: 'unlimited',
+        video: 'enabled',
+        ads: 'unlimited',
+        analytics: 'full'
+    },
+    priceFormatted: '$0.00',
+    metadata: { override: 'welp-premium' },
+    status: 'active',
+    limits: { ads: { maxActive: null, analytics: 'advanced' } },
+    limitSnapshot: { chat: { minutesPerDay: LARGE_QUOTA }, video: { sessionsPerWeek: LARGE_QUOTA } },
+    expiresAt: null,
+    ownerType
+});
 
 const subscribePlan = async (req, res) => {
     try {
@@ -91,6 +119,17 @@ const getMySubscription = async (req, res) => {
     try {
         const role = (req.user?.role || 'employee').toLowerCase();
         const ownerType = ROLE_TO_OWNER[role] || 'user';
+        if (hasPremiumException(req.user)) {
+            const premiumPayload = buildPremiumSubscriptionPayload(ownerType);
+            return res.json({
+                success: true,
+                subscription: {
+                    ...premiumPayload,
+                    ownerType,
+                    expiresAt: null
+                }
+            });
+        }
         const record = await getActiveSubscription(ownerType, req.user.id);
         const payload = await getPlanPayload(record, ownerType);
 
