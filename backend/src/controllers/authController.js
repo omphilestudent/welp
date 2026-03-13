@@ -3,6 +3,28 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
 const { createAdminNotification } = require('../utils/adminNotifications');
 const { enqueueMarketingForUser } = require('../services/marketingEmailService');
+const { getTokenFromRequest } = require('../middleware/auth');
+const {
+    createSubscriptionRecord,
+    updateUserSubscriptionTier,
+    getPlanDetails,
+    DEFAULT_CURRENCY,
+    DEFAULT_PLAN_DURATION_DAYS,
+    getActiveSubscription,
+    getPlanPayload
+} = require('../services/subscriptionService');
+
+const ROLE_TO_OWNER = {
+    employee: 'user',
+    psychologist: 'psychologist',
+    business: 'business'
+};
+
+const STARTER_PLAN_CODES = {
+    employee: 'user_free',
+    psychologist: 'psychologist_standard',
+    business: 'business_base'
+};
 
 const tableExists = async (tableName) => {
     try {
@@ -52,6 +74,33 @@ const ensureClaimRequestsTable = async () => {
     `);
 };
 
+const assignStarterSubscription = async (userId, role = 'employee') => {
+    try {
+        const normalizedRole = (role || 'employee').toLowerCase();
+        const ownerType = ROLE_TO_OWNER[normalizedRole] || 'user';
+        const planCode = STARTER_PLAN_CODES[normalizedRole] || 'user_free';
+        const plan = await getPlanDetails(ownerType, planCode, DEFAULT_CURRENCY);
+        const amountMinor = plan?.amount_minor ?? 0;
+        const metadata = plan?.metadata ?? {};
+
+        const { endsAt } = await createSubscriptionRecord(
+            ownerType,
+            userId,
+            planCode,
+            DEFAULT_CURRENCY,
+            amountMinor,
+            DEFAULT_PLAN_DURATION_DAYS,
+            metadata
+        );
+
+        if (ownerType === 'user') {
+            await updateUserSubscriptionTier(userId, 'free', plan?.chatMinutes ?? 30, endsAt);
+        }
+    } catch (error) {
+        console.warn('Starter subscription assignment failed:', error.message);
+    }
+};
+
 const generateToken = (user, options = {}) => {
     const role = String(user?.role || '').toLowerCase().trim();
     const isAdminRole = ['super_admin', 'superadmin', 'system_admin', 'admin', 'hr_admin'].includes(role);
@@ -89,6 +138,7 @@ const getUserByEmailForLogin = async (email) => {
     selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
     selectPart += hasStatus ? `, status` : `, NULL::text as status`;
     selectPart += hasTokenVersion ? `, token_version` : `, 0 as token_version`;
+    selectPart += `, subscription_tier, subscription_expires, daily_chat_quota_mins, used_chat_minutes, last_chat_reset`;
 
     return query(
         `${selectPart} FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
@@ -100,9 +150,10 @@ const getUserByIdForProfile = async (userId) => {
     const hasIsAnonymous = await columnExists('users', 'is_anonymous');
     const hasIsActive = await columnExists('users', 'is_active');
 
-        let selectPart = `SELECT id, email, role, display_name, created_at, avatar_url`;
+    let selectPart = `SELECT id, email, role, display_name, created_at, avatar_url`;
         selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
         selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
+        selectPart += `, subscription_tier, subscription_expires, daily_chat_quota_mins, used_chat_minutes, last_chat_reset`;
 
     return query(
         `${selectPart} FROM users WHERE id = $1 LIMIT 1`,
@@ -171,6 +222,12 @@ const registerEmployee = async (req, res) => {
             console.warn('Marketing enqueue failed:', error.message);
         });
 
+        await assignStarterSubscription(user.id, user.role);
+
+        const employeeOwnerType = ROLE_TO_OWNER[String(user.role || 'employee').toLowerCase()] || 'user';
+        const employeeSubscriptionRecord = await getActiveSubscription(employeeOwnerType, user.id);
+        const employeeSubscriptionData = await getPlanPayload(employeeSubscriptionRecord, employeeOwnerType);
+
         return res.status(201).json({
             success: true,
             message: 'Account created successfully',
@@ -179,7 +236,8 @@ const registerEmployee = async (req, res) => {
                 id: user.id,
                 email: user.email,
                 displayName: user.display_name,
-                role: user.role
+                role: user.role,
+                subscription: employeeSubscriptionData
             }
         });
     } catch (error) {
@@ -336,10 +394,17 @@ const registerPsychologist = async (req, res) => {
             console.warn('Marketing enqueue failed:', error.message);
         });
 
+        await assignStarterSubscription(user.id, user.role);
+
+        const psychOwnerType = ROLE_TO_OWNER[String(user.role || 'employee').toLowerCase()] || 'user';
+        const psychSubscriptionRecord = await getActiveSubscription(psychOwnerType, user.id);
+        const psychSubscriptionData = await getPlanPayload(psychSubscriptionRecord, psychOwnerType);
+
         return res.status(201).json({
             success: true,
             message: 'Application submitted successfully. You will be notified by email once reviewed.',
-            userId: user.id
+            userId: user.id,
+            subscription: psychSubscriptionData
         });
     } catch (error) {
         console.error('Register psychologist error:', error);
@@ -549,10 +614,17 @@ const registerBusiness = async (req, res) => {
             console.warn('Marketing enqueue failed:', error.message);
         });
 
+        await assignStarterSubscription(user.id, user.role);
+
+        const businessOwnerType = ROLE_TO_OWNER[String(user.role || 'employee').toLowerCase()] || 'user';
+        const businessSubscriptionRecord = await getActiveSubscription(businessOwnerType, user.id);
+        const businessSubscriptionData = await getPlanPayload(businessSubscriptionRecord, businessOwnerType);
+
         return res.status(201).json({
             success: true,
             message: 'Application submitted successfully. Our team will review your information and reach out within 1–2 business days.',
-            userId: user.id
+            userId: user.id,
+            subscription: businessSubscriptionData
         });
     } catch (error) {
         console.error('Register business error:', error);
@@ -612,6 +684,10 @@ const login = async (req, res) => {
             });
         }
 
+        const ownerType = ROLE_TO_OWNER[normalizedRole] || 'user';
+        const subscriptionRecord = await getActiveSubscription(ownerType, user.id);
+        const subscriptionPayload = await getPlanPayload(subscriptionRecord, ownerType);
+
         const token = generateToken(user, { rememberMe: Boolean(rememberMe) });
 
         // Set httpOnly cookie to support cookie-based auth (e.g., HR departments page)
@@ -641,7 +717,8 @@ const login = async (req, res) => {
                 id: user.id,
                 email: user.email,
                 displayName: user.display_name,
-                role: user.role
+                role: user.role,
+                subscription: subscriptionPayload
             }
         });
     } catch (error) {
@@ -659,6 +736,11 @@ const getMe = async (req, res) => {
         }
 
         const user = result.rows[0];
+        const normalizedRole = (user.role || 'employee').toLowerCase();
+        const ownerType = ROLE_TO_OWNER[normalizedRole] || 'user';
+        const planRecord = await getActiveSubscription(ownerType, user.id);
+        const subscriptionPayload = await getPlanPayload(planRecord, ownerType);
+
         return res.json({
             success: true,
             user: {
@@ -670,7 +752,8 @@ const getMe = async (req, res) => {
                 isActive: user.is_active,
                 createdAt: user.created_at,
                 avatarUrl: user.avatar_url,
-                avatar_url: user.avatar_url
+                avatar_url: user.avatar_url,
+                subscription: subscriptionPayload
             }
         });
     } catch (error) {
@@ -688,11 +771,76 @@ const logout = async (req, res) => {
     return res.json({ success: true, message: 'Logged out successfully' });
 };
 
+const refreshToken = async (req, res) => {
+    try {
+        const token = getTokenFromRequest(req);
+        if (!token) {
+            return res.status(401).json({ error: 'Authentication token missing' });
+        }
+
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            if (error.name === 'TokenExpiredError') {
+                decoded = jwt.decode(token);
+                if (!decoded) {
+                    return res.status(401).json({ error: 'Refresh token invalid' });
+                }
+            } else {
+                return res.status(401).json({ error: 'Invalid token' });
+            }
+        }
+
+        const result = await query(
+            'SELECT id, email, display_name, role, token_version FROM users WHERE id = $1',
+            [decoded.userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const user = result.rows[0];
+        if (decoded.tokenVersion !== Number(user.token_version ?? 0)) {
+            return res.status(401).json({ error: 'Session invalidated. Please log in again.' });
+        }
+
+        const newToken = generateToken(user);
+        res.cookie('token', newToken, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production'
+        });
+
+        const normalizedRole = (user.role || 'employee').toLowerCase();
+        const ownerType = ROLE_TO_OWNER[normalizedRole] || 'user';
+        const planRecord = await getActiveSubscription(ownerType, user.id);
+        const subscriptionInfo = await getPlanPayload(planRecord, ownerType);
+
+        return res.json({
+            success: true,
+            token: newToken,
+            user: {
+                id: user.id,
+                email: user.email,
+                displayName: user.display_name,
+                role: user.role,
+                subscription: subscriptionInfo
+            }
+        });
+    } catch (error) {
+        console.error('Refresh token error:', error);
+        return res.status(500).json({ error: 'Unable to refresh session' });
+    }
+};
+
 module.exports = {
     registerEmployee,
     registerPsychologist,
     registerBusiness,
     login,
     getMe,
-    logout
+    logout,
+    refreshToken
 };

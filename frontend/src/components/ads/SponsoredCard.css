@@ -1,0 +1,38 @@
+.sponsored-card {
+    border-radius: 1.5rem;
+    padding: 1rem;
+    background: #1a1b2e;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sponsored-media {
+    width: 100%;
+    border-radius: 1.25rem;
+    max-height: 320px;
+    object-fit: cover;
+}
+
+.sponsored-card__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.sponsored-card__badge {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #facc15;
+}
+
+.sponsored-card__meta {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.85rem;
+}

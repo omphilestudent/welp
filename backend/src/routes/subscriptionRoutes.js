@@ -1,6 +1,6 @@
 const express = require('express');
 const { authenticate } = require('../middleware/auth');
-const subscriptionController = require('../controllers/subcriptionController');
+const subscriptionController = require('../controllers/subscriptionController');
 
 const router = express.Router();
 
@@ -9,9 +9,9 @@ router.get('/me',
     subscriptionController.getMySubscription
 );
 
-router.post('/premium',
+router.post('/plan',
     authenticate,
-    subscriptionController.subscribePremium
+    subscriptionController.subscribePlan
 );
 
 router.post('/cancel',

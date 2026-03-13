@@ -22,6 +22,7 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const resourcesRoutes = require('./routes/resourcesRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const marketingRoutes = require('./routes/marketingRoutes');
+const adsRoutes = require('./routes/adsRoutes');
 const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
 
 // Database connection with better error handling
@@ -155,6 +156,7 @@ app.use('/api/hr', hrRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/marketing', marketingRoutes);
+app.use('/api/ads', adsRoutes);
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {

@@ -7,7 +7,8 @@ const {
     registerBusiness,
     login,
     getMe,
-    logout
+    logout,
+    refreshToken
 } = require('../controllers/authController');
 
 const { authenticate } = require('../middleware/auth');
@@ -20,6 +21,7 @@ router.post('/register/psychologist', authLimiter, registerPsychologist);
 router.post('/register/business', authLimiter, registerBusiness);
 router.post('/login', loginLimiter, validate(loginValidation), login);
 router.post('/logout', logout);
+router.post('/refresh', refreshToken);
 
 // Protected
 router.get('/me', authenticate, getMe);

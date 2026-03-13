@@ -48,6 +48,16 @@
   animation: fadeIn 1s ease-out 0.2s both;
 }
 
+.hero-slogan {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.95);
+  margin-bottom: 2rem;
+  position: relative;
+  z-index: 1;
+  animation: fadeIn 1s ease-out 0.3s both;
+}
+
 .hero-search {
   max-width: 700px;
   margin: 0 auto;

@@ -5,6 +5,8 @@ import api from '../services/api';
 import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
+import BusinessAdsManager from '../components/ads/BusinessAdsManager';
+import SubscriptionStatus from '../components/subscription/SubscriptionStatus';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
     FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo,
@@ -397,6 +399,7 @@ const Dashboard = () => {
     const [calendarView, setCalendarView] = useState('month');
     const [calendarDate, setCalendarDate] = useState(new Date());
     const [psychCardCollapse, setPsychCardCollapse] = useState({ schedule: false, leads: false, calls: false });
+    const userKey = user ? `${user.id}:${user.role}` : null;
 
     // Business state
     const [selectedCompanyId, setSelectedCompanyId] = useState(null);
@@ -732,11 +735,13 @@ const Dashboard = () => {
 
     /* ── Lifecycle ── */
     useEffect(() => {
+        if (!user) return;
         if (user?.role === 'psychologist') setActiveTab('overview');
         else if (user?.role === 'business') setActiveTab('companies');
         else setActiveTab('reviews');
         fetchDashboardData();
-    }, [user]);
+        // only re-run when the authenticated user identity or role changes
+    }, [userKey]);
 
     useEffect(() => {
         if (user?.role === 'business' && selectedCompanyId) {
@@ -802,10 +807,18 @@ const Dashboard = () => {
 
     const handleRefresh = async () => {
         setRefreshing(true);
-        await refreshUser();
-        await fetchDashboardData();
-        setRefreshing(false);
-        toast.success('Dashboard refreshed!');
+        try {
+            if (typeof refreshUser === 'function') {
+                await refreshUser();
+            }
+            await fetchDashboardData();
+            toast.success('Dashboard refreshed!');
+        } catch (err) {
+            console.error('Dashboard refresh failed:', err);
+            toast.error('Unable to refresh dashboard right now');
+        } finally {
+            setRefreshing(false);
+        }
     };
 
     const handleAcceptRequest = async (conversationId) => {
@@ -1010,6 +1023,7 @@ const Dashboard = () => {
                         await fetchDashboardData();
                     }}
                 />
+                <SubscriptionStatus />
 
                 {/* Tabs */}
                 <div className="dashboard-tabs">
@@ -1033,6 +1047,9 @@ const Dashboard = () => {
                             </button>
                             <button className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveTab('reviews')}>
                                 Business Hub
+                            </button>
+                            <button className={`tab-btn ${activeTab === 'ads' ? 'active' : ''}`} onClick={() => setActiveTab('ads')}>
+                                Advertising
                             </button>
                         </>
                     )}
@@ -1383,9 +1400,15 @@ const Dashboard = () => {
                                                                             <Line type="monotone" dataKey="count" name="Reviews" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 4, fill: '#0ea5e9' }} />
                                                                         </LineChart>
                                                                     </ResponsiveContainer>
-                                                                </div>
-                                                            </div>
-                                                        )}
+                            </div>
+                        </div>
+                    )}
+
+                    {user?.role === 'business' && activeTab === 'ads' && (
+                        <div className="business-ads-tab">
+                            <BusinessAdsManager />
+                        </div>
+                    )}
 
                                                         {/* Full-width trend if no sentiment */}
                                                         {sentimentData.length === 0 && trendChartData.length > 0 && (

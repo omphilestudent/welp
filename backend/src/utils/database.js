@@ -37,8 +37,26 @@ const createTables = async () => {
         console.log('✅ Database connection test successful');
 
         const queries = `
-            -- Enable UUID extension
+            -- Enable UUID & CITEXT extensions
             CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+            CREATE EXTENSION IF NOT EXISTS "citext";
+
+            -- Enum helpers for subscriptions
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_tier_user') THEN
+                    CREATE TYPE subscription_tier_user AS ENUM ('free', 'premium');
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_tier_business') THEN
+                    CREATE TYPE subscription_tier_business AS ENUM ('base', 'enhanced', 'premium');
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'psychologist_plan') THEN
+                    CREATE TYPE psychologist_plan AS ENUM ('standard');
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'media_type') THEN
+                    CREATE TYPE media_type AS ENUM ('text', 'voice', 'video');
+                END IF;
+            END$$;
 
             -- Companies table (created before users since users reference it)
             CREATE TABLE IF NOT EXISTS companies (
@@ -88,6 +106,71 @@ const createTables = async () => {
                 last_active TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Pricing & subscription helpers
+            CREATE TABLE IF NOT EXISTS currencies (
+                code VARCHAR(3) PRIMARY KEY,
+                name VARCHAR(64) NOT NULL,
+                symbol VARCHAR(8) NOT NULL DEFAULT '$',
+                fx_rate_usd NUMERIC(18,6) NOT NULL DEFAULT 1.0,
+                purchasing_power_index NUMERIC(6,3) NOT NULL DEFAULT 1.0,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS pricing_catalog (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                audience VARCHAR(32) NOT NULL,
+                plan_code VARCHAR(32) NOT NULL,
+                currency_code VARCHAR(3) NOT NULL REFERENCES currencies(code),
+                amount_minor BIGINT NOT NULL,
+                is_default BOOLEAN DEFAULT false,
+                billing_period VARCHAR(16) DEFAULT 'monthly',
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (audience, plan_code, currency_code)
+            );
+
+            CREATE TABLE IF NOT EXISTS subscription_records (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                owner_type VARCHAR(32) NOT NULL CHECK (owner_type IN ('user', 'psychologist', 'business')),
+                owner_id UUID NOT NULL,
+                plan_code VARCHAR(32) NOT NULL,
+                currency_code VARCHAR(3) NOT NULL REFERENCES currencies(code),
+                amount_minor BIGINT NOT NULL,
+                billing_period VARCHAR(16) DEFAULT 'monthly',
+                starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                status VARCHAR(32) DEFAULT 'active' CHECK (status IN ('active', 'past_due', 'cancelled', 'expired')),
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS payment_records (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                subscription_id UUID REFERENCES subscription_records(id) ON DELETE SET NULL,
+                owner_type VARCHAR(32) NOT NULL,
+                owner_id UUID NOT NULL,
+                gateway VARCHAR(32) DEFAULT 'stripe',
+                gateway_reference VARCHAR(128),
+                currency_code VARCHAR(3) NOT NULL,
+                amount_minor BIGINT NOT NULL,
+                status VARCHAR(32) DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed', 'refunded')),
+                invoice_url TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS chat_quota_usage (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                quota_date DATE NOT NULL,
+                used_minutes INT DEFAULT 0,
+                max_minutes INT DEFAULT 30,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, quota_date)
             );
 
             -- Departments table (for HR module)
@@ -528,14 +611,34 @@ const createTables = async () => {
 
 // ── Default seed data ──────────────────────────────────────────────────────────
 const insertDefaultData = async () => {
-    try {
-        await pool.query(`
+        try {
+            await pool.query(`
             INSERT INTO admin_roles (name, description, is_system_role, permissions)
             VALUES
                 ('super_admin', 'Full system access',     true, '{"all": true}'::jsonb),
                 ('admin',       'Administrative access',  true, '{"users": true, "companies": true, "reviews": true}'::jsonb),
                 ('hr_admin',    'HR access',               true, '{"jobs": true, "applications": true, "employees": true}'::jsonb)
             ON CONFLICT (name) DO NOTHING;
+        `);
+
+        await pool.query(`
+            INSERT INTO currencies (code, name, symbol, fx_rate_usd, purchasing_power_index)
+            VALUES
+                ('USD', 'US Dollar', '$', 1.0, 1.0),
+                ('ZAR', 'South African Rand', 'R', 0.054, 0.78)
+            ON CONFLICT (code) DO NOTHING;
+        `);
+
+        await pool.query(`
+            INSERT INTO pricing_catalog (audience, plan_code, currency_code, amount_minor, is_default, metadata)
+            VALUES
+                ('user', 'user_free', 'USD', 0, true, '{"displayName":"Free","chatMinutes":30,"callMinutes":0,"videoDiscount":0}'),
+                ('user', 'user_premium', 'USD', 15000, false, '{"displayName":"Premium","chatMinutes":120,"callMinutes":90,"videoDiscount":20}'),
+                ('psychologist', 'psychologist_standard', 'USD', 50000, true, '{"displayName":"Psychologist","leadsPerMonth":30,"analytics":true}'),
+                ('business', 'business_base', 'USD', 50000, true, '{"displayName":"Business Base","apiLimitPerDay":1000}'),
+                ('business', 'business_enhanced', 'USD', 150000, false, '{"displayName":"Business Enhanced","apiLimitPerDay":3000}'),
+                ('business', 'business_premium', 'USD', 300000, false, '{"displayName":"Business Premium","apiLimitPerDay":10000}')
+            ON CONFLICT (audience, plan_code, currency_code) DO NOTHING;
         `);
 
         await pool.query(`
@@ -584,6 +687,12 @@ const runMigrations = async () => {
             "ALTER TABLE users ALTER COLUMN public_id SET DEFAULT ('USR-' || substring(replace(uuid_generate_v4()::text, '-', ''), 1, 12));",
             "UPDATE users SET public_id = ('USR-' || substring(replace(uuid_generate_v4()::text, '-', ''), 1, 12)) WHERE public_id IS NULL;",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_public_id ON users(public_id);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier subscription_tier_user DEFAULT 'free';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires TIMESTAMP WITH TIME ZONE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_chat_quota_mins INT DEFAULT 30;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS used_chat_minutes INT DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_chat_reset DATE DEFAULT CURRENT_DATE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_psychologist_id UUID;",
             `CREATE TABLE IF NOT EXISTS user_settings (
                 user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                 theme VARCHAR(10) DEFAULT 'light',
@@ -784,6 +893,45 @@ const runMigrations = async () => {
                 duration_seconds INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`
+            ,
+            `CREATE TABLE IF NOT EXISTS advertising_campaigns (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                business_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                media_type media_type NOT NULL DEFAULT 'image',
+                asset_url TEXT NOT NULL,
+                thumbnail_url TEXT,
+                click_redirect_url TEXT,
+                target_locations TEXT[] DEFAULT '{}',
+                target_industries TEXT[] DEFAULT '{}',
+                target_behaviors JSONB,
+                daily_budget_minor BIGINT,
+                bid_type VARCHAR(16) DEFAULT 'cpc',
+                status VARCHAR(32) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'paused', 'completed')),
+                impressions INT DEFAULT 0,
+                clicks INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`
+            ,
+            `CREATE TABLE IF NOT EXISTS ad_placements (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                campaign_id UUID NOT NULL REFERENCES advertising_campaigns(id) ON DELETE CASCADE,
+                placement VARCHAR(32) NOT NULL CHECK (placement IN ('business_profile', 'search_results', 'category', 'recommended')),
+                weight INT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`
+            ,
+            "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;",
+            "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS click_redirect_url TEXT;",
+            `DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'media_type') THEN
+                    ALTER TABLE advertising_campaigns
+                    ALTER COLUMN media_type TYPE media_type
+                    USING media_type::media_type;
+                END IF;
+            END $$;`,
         ];
 
         for (const migration of migrations) {

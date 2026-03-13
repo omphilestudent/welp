@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
@@ -24,6 +24,28 @@ const Pricing = () => {
     const [pricing, setPricing] = useState(null);
     const [countries, setCountries] = useState([]);
     const [loading, setLoading] = useState(true);
+    const selectedCountryInfo = useMemo(() => countries.find((country) => country.code === selectedCountry), [countries, selectedCountry]);
+
+    const formatLimitLabel = (key = '') => {
+        return key
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/_/g, ' ')
+            .replace(/^\w/, (char) => char.toUpperCase());
+    };
+
+    const renderLimitGrid = (limits) => {
+        if (!limits) return null;
+        return (
+            <div className="limit-grid">
+                {Object.entries(limits).map(([key, value]) => (
+                    <div key={key} className="limit-item">
+                        <strong>{formatLimitLabel(key)}</strong>
+                        <span>{value === -1 ? 'Unlimited' : value}</span>
+                    </div>
+                ))}
+            </div>
+        );
+    };
 
     const hardcodedCountries = [
         { code: 'US', name: 'United States', currency: 'USD', symbol: '$' },
@@ -152,6 +174,9 @@ const Pricing = () => {
                                     }</span>
                                     <span className="period">/month</span>
                                 </div>
+                                <p className="pricing-card-subtitle">
+                                    Local price: {pricing.free?.symbol || 'R'} {pricing.free?.price?.toFixed(2) || '0.00'} {pricing.free?.currency}
+                                </p>
                             </div>
 
                             <div className="pricing-card-features">
@@ -161,6 +186,7 @@ const Pricing = () => {
                                         <span>{feature}</span>
                                     </div>
                                 ))}
+                                {renderLimitGrid(pricing.free?.limits)}
                             </div>
 
                             <div className="pricing-card-footer">
@@ -190,6 +216,21 @@ const Pricing = () => {
                                         </div>
                                     )}
                                 </div>
+                                <div className="pricing-card-meta">
+                                    <p>
+                                        Local price: {pricing.premium.symbol} {pricing.premium.price?.toFixed(2)} {pricing.premium.currency}
+                                    </p>
+                                    {pricing.premium?.conversionRate && (
+                                        <p className="conversion-note">
+                                            1 USD ≈ {pricing.premium.conversionRate.toFixed(2)} {pricing.premium.currency}
+                                        </p>
+                                    )}
+                                    {pricing.premium?.multiplier && (
+                                        <p className="multiplier-note">
+                                            Region multiplier: {pricing.premium.multiplier}×
+                                        </p>
+                                    )}
+                                </div>
 
                                 <div className="pricing-card-features">
                                     {pricing.premium?.features?.map((feature, index) => (
@@ -202,6 +243,7 @@ const Pricing = () => {
                                             <span>{feature}</span>
                                         </div>
                                     ))}
+                                    {renderLimitGrid(pricing.premium?.limits)}
                                 </div>
 
                                 <div className="pricing-card-footer">
@@ -216,6 +258,41 @@ const Pricing = () => {
                         )}
                     </div>
                 )}
+
+                <div className="pricing-summary">
+                    <h2>Localized pricing snapshot</h2>
+                    <div className="pricing-summary__grid">
+                        <div>
+                            <span>Country</span>
+                            <strong>{selectedCountryInfo?.name || selectedCountry}</strong>
+                        </div>
+                        <div>
+                            <span>Currency</span>
+                            <strong>{pricing?.premium?.currency || selectedCountryInfo?.currency}</strong>
+                        </div>
+                        <div>
+                            <span>Local symbol</span>
+                            <strong>{pricing?.premium?.symbol || selectedCountryInfo?.symbol}</strong>
+                        </div>
+                        <div>
+                            <span>Conversion rate</span>
+                            <strong>
+                                1 USD ≈ {pricing?.premium?.conversionRate?.toFixed(2) ?? '—'} {pricing?.premium?.currency || selectedCountryInfo?.currency || 'USD'}
+                            </strong>
+                        </div>
+                        <div>
+                            <span>Regional multiplier</span>
+                            <strong>{pricing?.premium?.multiplier ?? selectedCountryInfo?.multiplier ?? '1.0'}×</strong>
+                        </div>
+                        <div>
+                            <span>Plan view</span>
+                            <strong>{selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)} • {pricing?.premium ? 'Premium focus' : 'Free only'}</strong>
+                        </div>
+                    </div>
+                    <p className="pricing-summary__note">
+                        All prices auto-adjust to your region to reflect both purchasing power and ongoing FX rates. Select a different country to preview how the plan shifts.
+                    </p>
+                </div>
 
                 {}
                 {selectedRole === 'employee' && (
@@ -464,6 +541,12 @@ const Pricing = () => {
                     margin-bottom: 1rem;
                 }
 
+                .pricing-card-subtitle {
+                    font-size: 0.9rem;
+                    color: #4a5568;
+                    margin: 0;
+                }
+
                 .price {
                     margin-bottom: 0.5rem;
                 }
@@ -492,6 +575,25 @@ const Pricing = () => {
                     font-style: italic;
                 }
 
+                .pricing-card-meta {
+                    text-align: center;
+                    margin-bottom: 1.5rem;
+                    color: #4a5568;
+                    font-size: 0.9rem;
+                }
+
+                .pricing-card-meta p {
+                    margin: 0.15rem 0;
+                }
+
+                .conversion-note {
+                    color: #1d4ed8;
+                }
+
+                .multiplier-note {
+                    color: #a855f7;
+                }
+
                 .pricing-card-features {
                     margin-bottom: 2rem;
                     min-height: 250px;
@@ -503,6 +605,24 @@ const Pricing = () => {
                     gap: 0.75rem;
                     margin-bottom: 1rem;
                     color: #4a5568;
+                }
+
+                .limit-grid {
+                    margin-top: 1rem;
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                    gap: 0.75rem;
+                }
+
+                .limit-item {
+                    background: #f8fafc;
+                    border-radius: 12px;
+                    padding: 0.75rem 1rem;
+                    border: 1px solid #e2e8f0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.25rem;
+                    font-size: 0.85rem;
                 }
 
                 .check-icon {
@@ -584,6 +704,51 @@ const Pricing = () => {
                     background: #ebf4ff;
                     border-radius: 12px;
                     color: #2d3748;
+                }
+
+                .pricing-summary {
+                    margin: 3rem auto 2rem;
+                    max-width: 960px;
+                    background: white;
+                    border-radius: 16px;
+                    padding: 2rem;
+                    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+                }
+
+                .pricing-summary h2 {
+                    margin-top: 0;
+                    margin-bottom: 1rem;
+                    font-size: 1.8rem;
+                    color: #111827;
+                }
+
+                .pricing-summary__grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                    gap: 1rem;
+                    margin-bottom: 0.75rem;
+                }
+
+                .pricing-summary__grid div {
+                    padding: 0.75rem;
+                    background: #f8fafc;
+                    border-radius: 12px;
+                    border: 1px solid #e2e8f0;
+                    font-size: 0.9rem;
+                    color: #4a5568;
+                }
+
+                .pricing-summary__grid span {
+                    display: block;
+                    font-size: 0.75rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    color: #94a3b8;
+                }
+
+                .pricing-summary__note {
+                    margin: 0;
+                    color: #475569;
                 }
 
                 @media (max-width: 768px) {

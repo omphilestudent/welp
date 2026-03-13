@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CompanyCard from '../components/companies/CompanyCard';
 import api from '../services/api';
+import SponsoredCard from '../components/ads/SponsoredCard';
 
 const Home = () => {
     const navigate = useNavigate();
@@ -57,6 +58,7 @@ const Home = () => {
                     <p className="hero-description">
                         Join millions of employees sharing honest reviews about the world's leading companies.
                     </p>
+                    <p className="hero-slogan">Because we care.</p>
 
                     {}
                     <form onSubmit={handleSearch} className="hero-search">
@@ -90,6 +92,10 @@ const Home = () => {
                     </div>
                 </div>
             </section>
+
+            <div className="container">
+                <SponsoredCard placement="recommended" />
+            </div>
 
             {}
             <section className="companies-section">

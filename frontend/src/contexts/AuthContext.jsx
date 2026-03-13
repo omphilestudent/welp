@@ -93,6 +93,24 @@ export const AuthProvider = ({ children }) => {
         }
     }, []);
 
+    const refreshUser = useCallback(async () => {
+        try {
+            const { data } = await api.get("/auth/me");
+            setUser(data.user);
+            setRateLimitInfo(null);
+            return data.user;
+        } catch (error) {
+            console.error("Refresh user failed:", error);
+            if (error.response?.status === 401) {
+                localStorage.removeItem("token");
+                sessionStorage.removeItem("token");
+                setRequestToken(null);
+                setUser(null);
+            }
+            throw error;
+        }
+    }, []);
+
     const initializeAuth = useCallback(async () => {
         await checkBackendHealth();
         await checkAuth();
@@ -375,6 +393,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         socialLogin,
         checkAuth,
+        refreshUser,
         updateUser,
         isBackendAvailable,
         rateLimitInfo,
