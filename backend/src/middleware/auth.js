@@ -110,13 +110,17 @@ const authenticate = async (req, res, next) => {
     next();
 };
 
+const normalizeRole = (value) => String(value || '').toLowerCase();
+
 const authorize = (...roles) => {
+    const allowedRoles = roles.map(normalizeRole);
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        if (!roles.includes(req.user.role)) {
+        const userRole = normalizeRole(req.user.role);
+        if (!allowedRoles.includes(userRole)) {
             return res.status(403).json({ error: 'Unauthorized access' });
         }
 

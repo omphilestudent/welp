@@ -92,20 +92,26 @@ const resolveMinorAmount = (majorValue, minorValue) => {
 
 const createCampaign = async (req, res) => {
     try {
+        console.log('User role:', req.user?.role);
         if (!req.file) {
             return res.status(400).json({ error: 'Media file is required' });
         }
 
         const businessId = await getBusinessIdForUser(req.user.id);
+        console.log('Business ID:', businessId);
         if (!businessId) {
-            return res.status(403).json({ error: 'Business profile owner not found' });
+            return res.status(403).json({ error: 'Business profile not found' });
         }
 
         const capabilities = await getBusinessAdCapabilities({ userId: req.user.id, email: req.user.email });
         const existingActive = await countActiveCampaigns(businessId);
         if (Number.isFinite(capabilities.maxActive) && existingActive >= capabilities.maxActive) {
             return res.status(403).json({
-                error: `Ad limit reached for your plan (${capabilities.maxActive} active ads).`
+                error: 'Ad limit reached for your plan',
+                details: {
+                    activeCampaigns: existingActive,
+                    maxActive: capabilities.maxActive
+                }
             });
         }
 
@@ -261,9 +267,11 @@ const listCampaigns = async (req, res) => {
 
 const listMyCampaigns = async (req, res) => {
     try {
+        console.log('User role:', req.user?.role);
         const businessId = await getBusinessIdForUser(req.user.id);
+        console.log('Business ID:', businessId);
         if (!businessId) {
-            return res.status(403).json({ error: 'Business profile owner not found' });
+            return res.status(403).json({ error: 'Business profile not found' });
         }
 
         const capabilities = await getBusinessAdCapabilities({ userId: req.user.id, email: req.user.email });

@@ -42,7 +42,12 @@ const ensureAdSchema = async () => {
 
 const getBusinessIdForUser = async (userId) => {
     const result = await query(
-        'SELECT id FROM businesses WHERE owner_user_id = $1 LIMIT 1',
+        `SELECT id
+         FROM businesses
+         WHERE owner_user_id = $1
+           AND status = 'active'
+         ORDER BY updated_at DESC
+         LIMIT 1`,
         [userId]
     );
     return result.rows[0]?.id || null;

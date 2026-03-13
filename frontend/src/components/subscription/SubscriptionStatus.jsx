@@ -9,6 +9,17 @@ import {
 import { getMyCampaigns } from '../../services/adService';
 import './SubscriptionStatus.css';
 
+const resolveAdsAuthMessage = (error) => {
+    if (error?.response?.status !== 403) {
+        return null;
+    }
+    const payload = error.response.data;
+    const detail =
+        (typeof payload?.error === 'string' && payload.error.trim()) ||
+        (typeof payload?.message === 'string' && payload.message.trim());
+    return detail || 'Unauthorized access';
+};
+
 const SubscriptionStatus = () => {
     const { user, updateUser, isAuthenticated } = useAuth();
     const [subscription, setSubscription] = useState(user?.subscription ?? null);
@@ -34,7 +45,9 @@ const SubscriptionStatus = () => {
             }
         } catch (error) {
             console.error('Failed to load subscription', error);
-            toast.error('Unable to load subscription status');
+            const authError = resolveAdsAuthMessage(error);
+            toast.error(authError ?? 'Unable to load subscription status');
+            setAdsCapability(null);
         } finally {
             setLoading(false);
         }
