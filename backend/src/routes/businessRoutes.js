@@ -12,6 +12,7 @@ const {
 } = require('../middleware/validation');
 const companyController = require('../controllers/companyController');
 const reviewController = require('../controllers/reviewController');
+const { applyTierLimits } = require('../middleware/applyTierLimits');
 
 const router = express.Router();
 const ownerRoles = ['business', 'admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'];
@@ -41,6 +42,7 @@ router.get(`/:companyId(${UUID_PARAM})`, apiLimiter, companyController.getBusine
 router.get(`/:companyId(${UUID_PARAM})/analytics`,
     authenticate,
     authorize(...ownerRoles),
+    applyTierLimits({ feature: 'api' }),
     companyController.getCompanyAnalytics
 );
 

@@ -19,6 +19,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'media_type') THEN
         CREATE TYPE media_type AS ENUM ('text', 'voice', 'video');
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ad_review_status') THEN
+        CREATE TYPE ad_review_status AS ENUM ('pending', 'approved', 'rejected');
+    END IF;
 END$$;
 
 CREATE TABLE IF NOT EXISTS currencies (
@@ -234,7 +237,15 @@ CREATE TABLE IF NOT EXISTS advertising_campaigns (
     target_behaviors JSONB,
     daily_budget_minor BIGINT,
     bid_type VARCHAR(16) DEFAULT 'cpc',
-    status VARCHAR(32) DEFAULT 'draft' CHECK (status IN ('draft','active','paused','completed')),
+    bid_rate_minor BIGINT DEFAULT 0,
+    spend_minor BIGINT DEFAULT 0,
+    status VARCHAR(32) DEFAULT 'draft' CHECK (status IN ('draft','pending_review','active','paused','completed','rejected')),
+    review_status ad_review_status DEFAULT 'pending',
+    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    reviewed_by UUID REFERENCES users(id),
+    review_notes TEXT,
+    override_restrictions BOOLEAN DEFAULT false,
     impressions INT DEFAULT 0,
     clicks INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),

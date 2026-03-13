@@ -80,18 +80,18 @@ const assignStarterSubscription = async (userId, role = 'employee') => {
         const ownerType = ROLE_TO_OWNER[normalizedRole] || 'user';
         const planCode = STARTER_PLAN_CODES[normalizedRole] || 'user_free';
         const plan = await getPlanDetails(ownerType, planCode, DEFAULT_CURRENCY);
-        const amountMinor = plan?.amount_minor ?? 0;
+        const amountMinor = plan?.amountMinor ?? 0;
         const metadata = plan?.metadata ?? {};
 
-        const { endsAt } = await createSubscriptionRecord(
+        const { endsAt } = await createSubscriptionRecord({
             ownerType,
-            userId,
-            planCode,
-            DEFAULT_CURRENCY,
+            ownerId: userId,
+            plan,
+            currencyCode: DEFAULT_CURRENCY,
             amountMinor,
-            DEFAULT_PLAN_DURATION_DAYS,
+            durationDays: DEFAULT_PLAN_DURATION_DAYS,
             metadata
-        );
+        });
 
         if (ownerType === 'user') {
             await updateUserSubscriptionTier(userId, 'free', plan?.chatMinutes ?? 30, endsAt);

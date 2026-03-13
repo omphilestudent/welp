@@ -710,6 +710,26 @@ const deleteConversation = async (req, res) => {
     }
 };
 
+const startVideoSession = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const conversation = await query(
+            `SELECT id FROM conversations
+             WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
+            [conversationId, req.user.id]
+        );
+
+        if (conversation.rows.length === 0) {
+            return res.status(404).json({ error: 'Conversation not found or access denied' });
+        }
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Start video session error:', error);
+        return res.status(500).json({ error: 'Unable to start video session' });
+    }
+};
+
 module.exports = {
 
     requestChatWithPsychologist,
@@ -725,5 +745,6 @@ module.exports = {
     markMessagesAsRead,
     getUnreadCount,
     blockConversation,
-    deleteConversation
+    deleteConversation,
+    startVideoSession
 };

@@ -9,7 +9,17 @@ router.get('/me',
     subscriptionController.getMySubscription
 );
 
+router.get('/status',
+    authenticate,
+    subscriptionController.getMySubscription
+);
+
 router.post('/plan',
+    authenticate,
+    subscriptionController.subscribePlan
+);
+
+router.post('/upgrade',
     authenticate,
     subscriptionController.subscribePlan
 );

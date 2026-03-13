@@ -6,6 +6,7 @@ import {
     upgradeSubscription,
     cancelSubscription
 } from '../../services/subscriptionService';
+import { getMyCampaigns } from '../../services/adService';
 import './SubscriptionStatus.css';
 
 const SubscriptionStatus = () => {
@@ -13,6 +14,7 @@ const SubscriptionStatus = () => {
     const [subscription, setSubscription] = useState(user?.subscription ?? null);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
+    const [adsCapability, setAdsCapability] = useState(null);
 
     const loadSubscription = async () => {
         if (!isAuthenticated) return;
@@ -24,6 +26,12 @@ const SubscriptionStatus = () => {
                 setSubscription(payload);
                 updateUser?.({ subscription: payload });
             }
+            if (user?.role === 'business') {
+                const campaigns = await getMyCampaigns();
+                setAdsCapability(campaigns.data?.capabilities || null);
+            } else {
+                setAdsCapability(null);
+            }
         } catch (error) {
             console.error('Failed to load subscription', error);
             toast.error('Unable to load subscription status');
@@ -34,7 +42,7 @@ const SubscriptionStatus = () => {
 
     useEffect(() => {
         loadSubscription();
-    }, [isAuthenticated]);
+    }, [isAuthenticated, user]);
 
     const handleUpgrade = async () => {
         setActionLoading(true);
@@ -87,6 +95,11 @@ const SubscriptionStatus = () => {
     const statusText = subscription?.status || 'free';
     const isPremium = subscription?.tier === 'premium' || subscription?.planCode === 'user_premium';
 
+    const adsSummary = adsCapability
+        ? (!Number.isFinite(adsCapability.maxActive) ? 'Unlimited active ads' : `${adsCapability.maxActive} active ads`) +
+        ` • ${adsCapability.analyticsMode || 'limited'} analytics`
+        : null;
+
     return (
         <section className="subscription-card">
             <div className="subscription-card__header">
@@ -127,6 +140,13 @@ const SubscriptionStatus = () => {
                     <strong>{priceText}</strong>
                 </div>
             </div>
+
+            {adsSummary && (
+                <div className="subscription-card__ads">
+                    <span>Ad entitlements</span>
+                    <strong>{adsSummary}</strong>
+                </div>
+            )}
 
             <div className="subscription-card__actions">
                 {!isPremium && (

@@ -1,0 +1,223 @@
+.pricing-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 2rem 0;
+}
+
+.pricing-page__hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    background: var(--panel-bg, #0f172a);
+    color: #fff;
+    padding: 1.75rem;
+    border-radius: 1.25rem;
+}
+
+.pricing-page__hero h1 {
+    margin: 0.25rem 0;
+    font-size: 2rem;
+}
+
+.pricing-page__controls {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.role-chip {
+    padding: 0.5rem 1.25rem;
+    border-radius: 999px;
+    border: 1px solid #cbd5f5;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.role-chip--active {
+    background: #4338ca;
+    color: #fff;
+    border-color: #4338ca;
+}
+
+.pricing-page__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+}
+
+.plan-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.plan-card--highlighted {
+    border-color: #7c3aed;
+    box-shadow: 0 10px 30px rgba(124, 58, 237, 0.15);
+}
+
+.plan-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.plan-card__eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.7rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.plan-card__price {
+    font-size: 2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.plan-card__features {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: #334155;
+}
+
+.plan-card__features li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.95rem;
+}
+
+.plan-card__limits {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.plan-card__ads {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    background: #eef2ff;
+    color: #312e81;
+    font-size: 0.9rem;
+}
+
+.plan-card__ads--current {
+    background: #e0f2fe;
+    color: #082f49;
+}
+
+.plan-card__cta {
+    border: none;
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.plan-card__cta--primary {
+    background: #4338ca;
+    color: #fff;
+}
+
+.plan-card__cta--muted {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.currency-toggle {
+    display: flex;
+    gap: 1rem;
+}
+
+.currency-toggle__group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 200px;
+}
+
+.currency-toggle__group select {
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid #cbd5f5;
+}
+
+.upgrade-modal__backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.upgrade-modal {
+    background: #fff;
+    width: min(480px, 90vw);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.upgrade-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.upgrade-modal__body ul {
+    margin: 0;
+    padding-left: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: #1e293b;
+}
+
+.upgrade-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.btn-primary {
+    background: #4338ca;
+    color: #fff;
+    border: none;
+    border-radius: 0.65rem;
+    padding: 0.65rem 1.25rem;
+    cursor: pointer;
+}
+
+.btn-secondary {
+    background: #e2e8f0;
+    color: #1f2937;
+    border: none;
+    border-radius: 0.65rem;
+    padding: 0.65rem 1.25rem;
+    cursor: pointer;
+}

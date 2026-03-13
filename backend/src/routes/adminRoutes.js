@@ -7,6 +7,7 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
 const { companyValidation } = require('../middleware/validation');
 const adminController = require('../controllers/adminController');
+const adminAdsController = require('../controllers/adminAdsController');
 const companyController = require('../controllers/companyController');
 const marketingController = require('../controllers/marketingController');
 
@@ -70,6 +71,24 @@ router.get('/subscriptions', adminController.getSubscriptions);
 router.get('/subscriptions/:id', adminController.getSubscriptionDetails);
 router.patch('/subscriptions/:id/cancel', adminController.cancelSubscription);
 
+router.get('/ads', adminAdsController.listAds);
+router.post('/ads/approve',
+    validate([
+        body('adId').isUUID(),
+        body('forceStatus').optional().isIn(['active', 'paused', 'completed']),
+        body('overrideRestrictions').optional().isBoolean(),
+        body('notes').optional().isString()
+    ]),
+    adminAdsController.approveAd
+);
+router.post('/ads/reject',
+    validate([
+        body('adId').isUUID(),
+        body('reason').isString().isLength({ min: 3 }),
+        body('notes').optional().isString()
+    ]),
+    adminAdsController.rejectAd
+);
 
 router.get('/pricing', adminController.getPricingConfig);
 router.put('/pricing/:role/:plan',

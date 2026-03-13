@@ -1,88 +1,123 @@
 const { query } = require('../utils/database');
+const { getPlanByCode, DEFAULT_CURRENCY: PRICING_DEFAULT_CURRENCY } = require('./pricingService');
 
 const DEFAULT_PLAN_DURATION_DAYS = Number(process.env.DEFAULT_PLAN_DURATION_DAYS || 30);
-const DEFAULT_CURRENCY = process.env.DEFAULT_CURRENCY || 'USD';
+const DEFAULT_CURRENCY = (PRICING_DEFAULT_CURRENCY || process.env.DEFAULT_CURRENCY || 'USD').toUpperCase();
 
 const PLAN_LIMITS = {
-    user_free: { tier: 'free', chatMinutes: 30, callMinutes: 0, displayName: 'Free', videoDiscount: 0 },
-    user_premium: { tier: 'premium', chatMinutes: 120, callMinutes: 90, displayName: 'Premium', videoDiscount: 20 },
+    user_free: { tier: 'free', chatMinutes: 30, callMinutes: 0, displayName: 'Free', videoDiscount: 0, videoSessionsPerWeek: 1 },
+    user_premium: { tier: 'premium', chatMinutes: 120, callMinutes: 90, displayName: 'Premium', videoDiscount: 20, videoSessionsPerWeek: 3 },
     psychologist_standard: { tier: 'premium', chatMinutes: 180, callMinutes: 120, displayName: 'Psychologist Partner' },
-    business_base: { tier: 'base', apiLimit: 1000, displayName: 'Business Base' },
-    business_enhanced: { tier: 'enhanced', apiLimit: 3000, displayName: 'Business Enhanced' },
-    business_premium: { tier: 'premium', apiLimit: 10000, displayName: 'Business Premium' }
+    business_base: { tier: 'base', apiLimit: 1000, displayName: 'Business Base', ads: { maxActive: 1, analytics: 'limited' } },
+    business_enhanced: { tier: 'enhanced', apiLimit: 3000, displayName: 'Business Enhanced', ads: { maxActive: 5, analytics: 'standard' } },
+    business_premium: { tier: 'premium', apiLimit: 10000, displayName: 'Business Premium', ads: { maxActive: null, analytics: 'advanced' } }
 };
 
-const parseMetadata = (raw) => {
-    if (!raw) return {};
+const parseJson = (raw, fallback) => {
+    if (raw === null || raw === undefined) return fallback;
     if (typeof raw === 'string') {
         try {
             return JSON.parse(raw);
         } catch {
-            return {};
+            return fallback;
         }
     }
-    return raw;
+    if (Array.isArray(fallback) && Array.isArray(raw)) return raw;
+    if (!Array.isArray(fallback) && typeof raw === 'object') return raw;
+    return fallback;
 };
 
-const getPlanDetails = async (audience, planCode, currencyCode = DEFAULT_CURRENCY) => {
-    const result = await query(
-        `SELECT pc.*, c.symbol
-         FROM pricing_catalog pc
-         JOIN currencies c ON c.code = pc.currency_code
-         WHERE pc.audience = $1 AND pc.plan_code = $2 AND pc.currency_code = $3
-         LIMIT 1`,
-        [audience, planCode, currencyCode]
-    );
+const formatPrice = (amountMinor, symbol = '$') => {
+    const amount = Number(amountMinor || 0) / 100;
+    return `${symbol}${amount.toFixed(2)}`;
+};
 
-    if (result.rows.length === 0) {
+const getPlanDetails = async (audience, planCode, currencyCode = DEFAULT_CURRENCY, options = {}) => {
+    const plan = await getPlanByCode(audience, planCode, currencyCode, options);
+    if (!plan) {
         return null;
     }
 
-    const plan = result.rows[0];
-    const metadata = parseMetadata(plan.metadata);
+    const metadata = plan.metadata || {};
+    const planLimits = PLAN_LIMITS[planCode] || {};
+    const chatMinutes = plan.limits?.chat?.minutesPerDay ?? planLimits.chatMinutes ?? (audience === 'user' ? 30 : 0);
+    const callMinutes = plan.limits?.video?.minutesPerSession ?? planLimits.callMinutes ?? 0;
+    const apiLimit = plan.limits?.api?.callsPerDay ?? planLimits.apiLimit ?? null;
+
     return {
         ...plan,
-        displayName: metadata.displayName || plan.plan_code,
-        chatMinutes: metadata.chatMinutes ?? (plan.plan_code === 'user_premium' ? 120 : 30),
-        callMinutes: metadata.callMinutes ?? 0,
-        videoDiscount: metadata.videoDiscount ?? 0,
-        currencySymbol: plan.symbol,
-        metadata
+        tier: plan.planTier || planLimits.tier || 'free',
+        displayName: metadata.displayName || planLimits.displayName || plan.planCode,
+        chatMinutes,
+        callMinutes,
+        apiLimit,
+        ads: plan.limits?.ads || planLimits.ads || {}
     };
 };
 
-const createSubscriptionRecord = async (
+const createSubscriptionRecord = async ({
     ownerType,
     ownerId,
-    planCode,
-    currencyCode,
+    plan,
+    currencyCode = DEFAULT_CURRENCY,
     amountMinor,
     durationDays = DEFAULT_PLAN_DURATION_DAYS,
     metadata = {}
-) => {
+}) => {
+    if (!plan) {
+        throw new Error('Plan details are required to create a subscription record');
+    }
+
     const now = new Date();
     const endsAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const amount = amountMinor ?? plan.amountMinor ?? 0;
+    const mergedMetadata = {
+        ...(plan.metadata || {}),
+        ...metadata,
+        displayName: plan.displayName || plan.planCode,
+        currencySymbol: plan.currencySymbol || metadata.currencySymbol || '$'
+    };
 
-    await query(
+    const insertResult = await query(
         `INSERT INTO subscription_records (
-             owner_type, owner_id, plan_code, currency_code, amount_minor,
-             billing_period, starts_at, ends_at, status, metadata
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+             owner_type,
+             owner_id,
+             plan_code,
+             currency_code,
+             amount_minor,
+             billing_period,
+             starts_at,
+             ends_at,
+             status,
+             metadata,
+             feature_snapshot,
+             limit_snapshot,
+             trial_days
+         ) VALUES (
+             $1,$2,$3,$4,$5,$6,$7,$8,'active',$9::jsonb,$10::jsonb,$11::jsonb,$12
+         )
+         RETURNING *`,
         [
             ownerType,
             ownerId,
-            planCode,
+            plan.planCode,
             currencyCode,
-            amountMinor,
-            'monthly',
+            amount,
+            plan.billingPeriod || 'monthly',
             now,
             endsAt,
-            'active',
-            JSON.stringify(metadata)
+            JSON.stringify(mergedMetadata),
+            JSON.stringify(plan.features || []),
+            JSON.stringify(plan.limits || {}),
+            Number(plan.trialDays || 0)
         ]
     );
 
-    return { startsAt: now, endsAt };
+    return {
+        record: insertResult.rows[0],
+        startsAt: now,
+        endsAt
+    };
 };
 
 const updateUserSubscriptionTier = async (userId, tier, chatMinutes, expiresAt) => {
@@ -100,68 +135,92 @@ const updateUserSubscriptionTier = async (userId, tier, chatMinutes, expiresAt) 
     );
 };
 
+const serializeRecord = (row) => {
+    if (!row) return null;
+    return {
+        ...row,
+        metadata: parseJson(row.metadata, {}),
+        feature_snapshot: parseJson(row.feature_snapshot, []),
+        limit_snapshot: parseJson(row.limit_snapshot, {})
+    };
+};
+
 const getActiveSubscription = async (ownerType, ownerId) => {
     const result = await query(
-        `SELECT * FROM subscription_records
-         WHERE owner_type = $1 AND owner_id = $2 AND status = 'active'
-         ORDER BY created_at DESC
+        `SELECT *
+         FROM subscription_records
+         WHERE owner_type = $1
+           AND owner_id = $2
+           AND status = 'active'
+         ORDER BY ends_at DESC
          LIMIT 1`,
         [ownerType, ownerId]
     );
 
-    return result.rows[0] || null;
+    return serializeRecord(result.rows[0]) || null;
 };
 
 const cancelSubscriptions = async (ownerType, ownerId) => {
     await query(
         `UPDATE subscription_records
-         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-         WHERE owner_type = $1 AND owner_id = $2 AND status = 'active'`,
+         SET status = 'cancelled',
+             cancelled_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE owner_type = $1
+           AND owner_id = $2
+           AND status = 'active'`,
         [ownerType, ownerId]
     );
 };
 
+const buildFallbackPayload = (audience) => {
+    const fallbackPlanCode = audience === 'psychologist'
+        ? 'psychologist_standard'
+        : audience === 'business'
+            ? 'business_base'
+            : `${audience}_free`;
+    const limits = PLAN_LIMITS[fallbackPlanCode] || {};
+    return {
+        planCode: fallbackPlanCode,
+        tier: limits.tier || 'free',
+        chatMinutes: limits.chatMinutes ?? (audience === 'user' ? 30 : 0),
+        callMinutes: limits.callMinutes ?? 0,
+        apiLimit: limits.apiLimit ?? null,
+        ads: limits.ads || {},
+        currencySymbol: '$',
+        priceFormatted: '$0.00',
+        nextBillingDate: null,
+        status: 'free'
+    };
+};
+
 const getPlanPayload = async (record, audience) => {
     if (!record) {
-        const fallbackPlanCode = audience === 'psychologist'
-            ? 'psychologist_standard'
-            : audience === 'business'
-                ? 'business_base'
-                : `${audience}_free`;
-        const limits = PLAN_LIMITS[fallbackPlanCode] || {};
-        return {
-            planCode: fallbackPlanCode,
-            tier: limits.tier || 'free',
-            chatMinutes: limits.chatMinutes ?? (audience === 'user' ? 30 : 0),
-            callMinutes: limits.callMinutes ?? 0,
-            currencySymbol: '$',
-            nextBillingDate: null,
-            status: 'free'
-        };
+        return buildFallbackPayload(audience);
     }
 
     const plan = await getPlanDetails(audience, record.plan_code, record.currency_code);
-    if (!plan) {
-        return {
-            planCode: record.plan_code,
-            tier: PLAN_LIMITS[record.plan_code]?.tier || 'premium',
-            chatMinutes: PLAN_LIMITS[record.plan_code]?.chatMinutes ?? 0,
-            callMinutes: PLAN_LIMITS[record.plan_code]?.callMinutes ?? 0,
-            currencySymbol: '$',
-            nextBillingDate: record.ends_at,
-            status: record.status
-        };
-    }
+    const limits = record.limit_snapshot || {};
+    const planLimits = PLAN_LIMITS[record.plan_code] || {};
+    const chatMinutes = limits.chat?.minutesPerDay ?? plan?.chatMinutes ?? planLimits.chatMinutes ?? 0;
+    const callMinutes = limits.video?.minutesPerSession ?? plan?.callMinutes ?? planLimits.callMinutes ?? 0;
+    const apiLimit = limits.api?.callsPerDay ?? plan?.apiLimit ?? planLimits.apiLimit ?? null;
+    const adsLimits = limits.ads || plan?.ads || planLimits.ads || {};
+    const currencySymbol = plan?.currencySymbol || record.metadata?.currencySymbol || '$';
 
     return {
         planCode: record.plan_code,
-        tier: PLAN_LIMITS[record.plan_code]?.tier || 'premium',
-        chatMinutes: plan.chatMinutes,
-        callMinutes: plan.callMinutes,
-        currencySymbol: plan.currencySymbol,
-        priceFormatted: `${plan.currencySymbol}${(plan.amount_minor / 100).toFixed(2)}`,
+        tier: plan?.tier || planLimits.tier || 'premium',
+        chatMinutes,
+        callMinutes,
+        apiLimit,
+        ads: adsLimits,
+        currencySymbol,
+        priceFormatted: plan?.priceFormatted || formatPrice(record.amount_minor, currencySymbol),
         nextBillingDate: record.ends_at,
-        status: record.status
+        status: record.status,
+        metadata: record.metadata,
+        limits
     };
 };
 

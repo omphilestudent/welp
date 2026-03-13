@@ -3,9 +3,14 @@ const fs = require('fs');
 const { query } = require('../utils/database');
 const {
     getBusinessIdForUser,
+    getBusinessOwner,
     upsertPlacements,
-    fetchPlacementCampaigns
+    fetchPlacementCampaigns,
+    getBusinessAdCapabilities,
+    countActiveCampaigns,
+    formatAnalyticsForTier
 } = require('../services/adsService');
+const { recordAuditLog } = require('../utils/auditLogger');
 
 const AD_ASSET_FOLDER = path.join(__dirname, '../../uploads/ads');
 fs.mkdirSync(AD_ASSET_FOLDER, { recursive: true });
@@ -74,6 +79,16 @@ const calculateBudgetMinor = (value) => {
     return Math.round(parsed * 100);
 };
 
+const resolveMinorAmount = (majorValue, minorValue) => {
+    if (minorValue !== undefined && minorValue !== null) {
+        const parsedMinor = Number(minorValue);
+        if (!Number.isNaN(parsedMinor)) {
+            return Math.max(0, Math.round(parsedMinor));
+        }
+    }
+    return calculateBudgetMinor(majorValue);
+};
+
 const createCampaign = async (req, res) => {
     try {
         if (!req.file) {
@@ -83,6 +98,14 @@ const createCampaign = async (req, res) => {
         const businessId = await getBusinessIdForUser(req.user.id);
         if (!businessId) {
             return res.status(403).json({ error: 'Business profile owner not found' });
+        }
+
+        const capabilities = await getBusinessAdCapabilities({ userId: req.user.id, email: req.user.email });
+        const existingActive = await countActiveCampaigns(businessId);
+        if (Number.isFinite(capabilities.maxActive) && existingActive >= capabilities.maxActive) {
+            return res.status(403).json({
+                error: `Ad limit reached for your plan (${capabilities.maxActive} active ads).`
+            });
         }
 
         const ext = path.extname(req.file.originalname).toLowerCase();
@@ -106,9 +129,9 @@ const createCampaign = async (req, res) => {
         const targetIndustries = parseList(req.body.targetIndustries);
         const behaviors = parseBehaviors(req.body.behaviors);
 
-        const dailyBudget = calculateBudgetMinor(req.body.dailyBudget);
+        const dailyBudgetMinor = resolveMinorAmount(req.body.dailyBudget, req.body.dailyBudgetMinor);
+        const bidRateMinor = resolveMinorAmount(req.body.bidRate, req.body.bidRateMinor) || 0;
         const bidType = VALID_BID_TYPES.includes(req.body.bid_type) ? req.body.bid_type : 'cpc';
-        const status = VALID_STATUSES.includes(req.body.status) ? req.body.status : 'draft';
         const name = String(req.body.name || 'Campaign').trim();
 
         const thumbnailUrl = req.body.thumbnailUrl || buildAssetUrl(req, req.file.filename);
@@ -116,11 +139,23 @@ const createCampaign = async (req, res) => {
 
         const { rows } = await query(
             `INSERT INTO advertising_campaigns (
-                business_id, name, media_type, asset_url, thumbnail_url,
-                click_redirect_url, target_locations, target_industries,
-                target_behaviors, daily_budget_minor, bid_type, status
+                business_id,
+                name,
+                media_type,
+                asset_url,
+                thumbnail_url,
+                click_redirect_url,
+                target_locations,
+                target_industries,
+                target_behaviors,
+                daily_budget_minor,
+                bid_type,
+                bid_rate_minor,
+                status,
+                review_status,
+                submitted_at
             ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending_review','pending',CURRENT_TIMESTAMP
             ) RETURNING *`,
             [
                 businessId,
@@ -132,9 +167,9 @@ const createCampaign = async (req, res) => {
                 targetLocations,
                 targetIndustries,
                 behaviors.length ? JSON.stringify(behaviors) : null,
-                dailyBudget,
+                dailyBudgetMinor,
                 bidType,
-                status
+                bidRateMinor
             ]
         );
 
@@ -142,14 +177,30 @@ const createCampaign = async (req, res) => {
         await upsertPlacements(campaign.id, placements);
 
         campaign.placements = placements;
-        return res.status(201).json({ campaign });
+
+        await recordAuditLog({
+            userId: req.user.id,
+            actorRole: 'business',
+            action: 'ad.created',
+            entityType: 'advertising_campaign',
+            entityId: campaign.id,
+            newValues: { name, mediaType, businessId },
+            metadata: { source: 'dashboard' },
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
+
+        return res.status(201).json({ campaign, capabilities });
     } catch (error) {
         console.error('Create campaign error:', error);
         return res.status(500).json({ error: 'Unable to create campaign' });
     }
 };
 
-const buildCampaignsQuery = async (filters = [], params = []) => {
+const buildCampaignsQuery = async (filters = [], params = [], options = {}) => {
+    if (!options.includeAllStatuses) {
+        filters.push(`c.review_status = 'approved'`);
+    }
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
     const result = await query(
         `
@@ -174,6 +225,7 @@ const listCampaigns = async (req, res) => {
     try {
         const filters = [];
         const params = [];
+        let includeAllStatuses = false;
 
         if (req.query.businessId) {
             params.push(req.query.businessId);
@@ -185,8 +237,13 @@ const listCampaigns = async (req, res) => {
         } else if (req.query.active === 'true') {
             filters.push(`c.status = 'active'`);
         }
+        if (req.query.reviewStatus && ['pending', 'approved', 'rejected'].includes(req.query.reviewStatus)) {
+            params.push(req.query.reviewStatus);
+            filters.push(`c.review_status = $${params.length}`);
+            includeAllStatuses = true;
+        }
 
-        const campaigns = await buildCampaignsQuery(filters, params);
+        const campaigns = await buildCampaignsQuery(filters, params, { includeAllStatuses });
         return res.json({ campaigns });
     } catch (error) {
         console.error('List campaigns error:', error);
@@ -201,8 +258,16 @@ const listMyCampaigns = async (req, res) => {
             return res.status(403).json({ error: 'Business profile owner not found' });
         }
 
-        const campaigns = await buildCampaignsQuery([`c.business_id = $1`], [businessId]);
-        return res.json({ campaigns });
+        const capabilities = await getBusinessAdCapabilities({ userId: req.user.id, email: req.user.email });
+        const campaigns = await buildCampaignsQuery(
+            [`c.business_id = $1`],
+            [businessId],
+            { includeAllStatuses: true }
+        );
+        const formatted = campaigns.map((campaign) =>
+            formatAnalyticsForTier(campaign, capabilities.analyticsMode)
+        );
+        return res.json({ campaigns: formatted, capabilities });
     } catch (error) {
         console.error('List my campaigns error:', error);
         return res.status(500).json({ error: 'Unable to list your campaigns' });
@@ -227,11 +292,17 @@ const updateCampaign = async (req, res) => {
 
         const updates = [];
         const params = [];
+        let requiresReview = false;
+        const changedFields = new Set();
 
-        const setField = (column, value) => {
+        const setField = (column, value, trackReview = false) => {
             if (value === undefined) return;
             params.push(value);
             updates.push(`${column} = $${params.length}`);
+            changedFields.add(column);
+            if (trackReview) {
+                requiresReview = true;
+            }
         };
 
         if (req.file) {
@@ -241,36 +312,82 @@ const updateCampaign = async (req, res) => {
             if (!inferred || inferred !== mediaType) {
                 return res.status(400).json({ error: 'Media type mismatch' });
             }
-            setField('media_type', mediaType);
             const assetUrl = buildAssetUrl(req, req.file.filename);
-            setField('asset_url', assetUrl);
-            setField('thumbnail_url', req.body.thumbnailUrl || assetUrl);
+            setField('media_type', mediaType, true);
+            setField('asset_url', assetUrl, true);
+            setField('thumbnail_url', req.body.thumbnailUrl || assetUrl, true);
         }
 
-        if (req.body.name) setField('name', String(req.body.name).trim());
-        if (req.body.clickRedirectUrl) setField('click_redirect_url', req.body.clickRedirectUrl);
-        if (req.body.dailyBudget) setField('daily_budget_minor', calculateBudgetMinor(req.body.dailyBudget));
-        if (req.body.bid_type && VALID_BID_TYPES.includes(req.body.bid_type)) setField('bid_type', req.body.bid_type);
-        if (req.body.status && VALID_STATUSES.includes(req.body.status)) setField('status', req.body.status);
+        if (req.body.name) setField('name', String(req.body.name).trim(), true);
+        if (req.body.clickRedirectUrl) setField('click_redirect_url', req.body.clickRedirectUrl, true);
+
+        if (req.body.dailyBudget || req.body.dailyBudgetMinor) {
+            setField('daily_budget_minor', resolveMinorAmount(req.body.dailyBudget, req.body.dailyBudgetMinor), true);
+        }
+
+        if (req.body.bidRate || req.body.bidRateMinor) {
+            setField('bid_rate_minor', resolveMinorAmount(req.body.bidRate, req.body.bidRateMinor), true);
+        }
+
+        if (req.body.bid_type && VALID_BID_TYPES.includes(req.body.bid_type)) {
+            setField('bid_type', req.body.bid_type, true);
+        }
+
+        if (req.body.status && ['draft', 'paused', 'pending_review'].includes(req.body.status)) {
+            setField('status', req.body.status);
+        }
 
         const targetLocations = parseList(req.body.targetLocations);
         const targetIndustries = parseList(req.body.targetIndustries);
         const behaviors = parseBehaviors(req.body.behaviors);
-        if (targetLocations.length) setField('target_locations', targetLocations);
-        if (targetIndustries.length) setField('target_industries', targetIndustries);
-        if (behaviors.length) setField('target_behaviors', JSON.stringify(behaviors));
+        if (targetLocations.length) setField('target_locations', targetLocations, true);
+        if (targetIndustries.length) setField('target_industries', targetIndustries, true);
+        if (behaviors.length) setField('target_behaviors', JSON.stringify(behaviors), true);
 
         if (updates.length) {
-            await query(`UPDATE advertising_campaigns SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${params.length + 1}`, [...params, id]);
+            await query(
+                `UPDATE advertising_campaigns
+                 SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $${params.length + 1}`,
+                [...params, id]
+            );
         }
 
         const placements = parsePlacements(req.body.placements);
         if (placements.length) {
             await upsertPlacements(id, placements);
+            requiresReview = true;
+            changedFields.add('placements');
         }
 
-        const refreshed = await buildCampaignsQuery(['c.id = $1'], [id]);
-        return res.json({ campaign: refreshed[0] || null });
+        if (requiresReview) {
+            await query(
+                `UPDATE advertising_campaigns
+                 SET review_status = 'pending',
+                     status = 'pending_review',
+                     submitted_at = CURRENT_TIMESTAMP,
+                     reviewed_at = NULL,
+                     reviewed_by = NULL
+                 WHERE id = $1`,
+                [id]
+            );
+        }
+
+        const refreshed = await buildCampaignsQuery(['c.id = $1'], [id], { includeAllStatuses: true });
+
+        await recordAuditLog({
+            userId: req.user.id,
+            actorRole: 'business',
+            action: 'ad.updated',
+            entityType: 'advertising_campaign',
+            entityId: id,
+            newValues: { updatedFields: Array.from(changedFields) },
+            metadata: { requiresReview },
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
+
+        return res.json({ campaign: refreshed[0] || null, requiresReview });
     } catch (error) {
         console.error('Update campaign error:', error);
         return res.status(500).json({ error: 'Unable to update campaign' });
@@ -294,6 +411,16 @@ const deleteCampaign = async (req, res) => {
         }
 
         await query('DELETE FROM advertising_campaigns WHERE id = $1', [id]);
+        await recordAuditLog({
+            userId: req.user.id,
+            actorRole: 'business',
+            action: 'ad.deleted',
+            entityType: 'advertising_campaign',
+            entityId: id,
+            metadata: { businessId },
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
         return res.json({ success: true });
     } catch (error) {
         console.error('Delete campaign error:', error);
@@ -321,15 +448,25 @@ const recordImpression = async (req, res) => {
         const { id } = req.params;
         const result = await query(
             `UPDATE advertising_campaigns
-             SET impressions = impressions + 1
+             SET impressions = impressions + 1,
+                 spend_minor = spend_minor + CASE
+                     WHEN bid_type = 'cpm' AND bid_rate_minor > 0
+                         THEN GREATEST(1, CEIL(bid_rate_minor::numeric / 1000))
+                     ELSE 0
+                 END
              WHERE id = $1
-             RETURNING impressions`,
+               AND review_status = 'approved'
+               AND status = 'active'
+             RETURNING impressions, spend_minor`,
             [id]
         );
         if (!result.rows.length) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
-        return res.json({ impressions: result.rows[0].impressions });
+        return res.json({
+            impressions: result.rows[0].impressions,
+            spendMinor: Number(result.rows[0].spend_minor || 0)
+        });
     } catch (error) {
         console.error('Impression error:', error);
         return res.status(500).json({ error: 'Unable to track impression' });
@@ -341,16 +478,27 @@ const recordClick = async (req, res) => {
         const { id } = req.params;
         const result = await query(
             `UPDATE advertising_campaigns
-             SET clicks = clicks + 1
+             SET clicks = clicks + 1,
+                 spend_minor = spend_minor + CASE
+                     WHEN bid_type = 'cpc' AND bid_rate_minor > 0
+                         THEN GREATEST(1, bid_rate_minor)
+                     ELSE 0
+                 END
              WHERE id = $1
-             RETURNING clicks, click_redirect_url`,
+               AND review_status = 'approved'
+               AND status = 'active'
+             RETURNING clicks, click_redirect_url, spend_minor`,
             [id]
         );
         if (!result.rows.length) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
         const campaign = result.rows[0];
-        return res.json({ clicks: campaign.clicks, redirectUrl: campaign.click_redirect_url });
+        return res.json({
+            clicks: campaign.clicks,
+            redirectUrl: campaign.click_redirect_url,
+            spendMinor: Number(campaign.spend_minor || 0)
+        });
     } catch (error) {
         console.error('Click error:', error);
         return res.status(500).json({ error: 'Unable to track click' });

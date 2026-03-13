@@ -58,6 +58,7 @@ import './styles/global.css';
 import './styles/theme.css';
 import './styles/components.css';
 import './styles/admin.css';
+import './styles/pricing.css';
 
 function App() {
     return (

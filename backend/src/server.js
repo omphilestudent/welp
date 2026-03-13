@@ -154,6 +154,7 @@ app.use('/api/resources', resourcesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/marketing', marketingRoutes);
 app.use('/api/ads', adsRoutes);

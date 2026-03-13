@@ -1,6 +1,34 @@
 // backend/migrate.js
 const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
+const migrationsDir = path.join(__dirname, 'db', 'migrations');
+
+const runSqlMigrations = async (client) => {
+    try {
+        if (!fs.existsSync(migrationsDir)) {
+            return;
+        }
+        const sqlFiles = fs.readdirSync(migrationsDir)
+            .filter((file) => file.endsWith('.sql'))
+            .sort();
+
+        for (const file of sqlFiles) {
+            const filePath = path.join(migrationsDir, file);
+            const sql = fs.readFileSync(filePath, 'utf-8');
+            if (!sql.trim()) continue;
+
+            console.log(`➡️  Running SQL migration ${file}`);
+            await client.query(sql);
+            console.log(`✅ Completed ${file}`);
+        }
+    } catch (err) {
+        console.error('❌ SQL migration failed:', err.message);
+        throw err;
+    }
+};
 
 async function runMigrations() {
     console.log('🔍 Running database migrations...');
@@ -81,6 +109,8 @@ async function runMigrations() {
             `);
             console.log('✅ Default departments inserted');
         }
+
+        await runSqlMigrations(client);
 
         client.release();
         console.log('✅ All migrations completed successfully');

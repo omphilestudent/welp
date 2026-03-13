@@ -9,6 +9,7 @@ const {
     DEFAULT_PLAN_DURATION_DAYS,
     PLAN_LIMITS
 } = require('../services/subscriptionService');
+const { recordAuditLog } = require('../utils/auditLogger');
 
 const ROLE_TO_OWNER = {
     employee: 'user',
@@ -34,18 +35,18 @@ const subscribePlan = async (req, res) => {
             return res.status(404).json({ error: 'Pricing plan not found for selected currency' });
         }
 
+        const previous = await getActiveSubscription(ownerType, req.user.id);
         await cancelSubscriptions(ownerType, req.user.id);
 
         const durationDays = Number(req.body.durationDays) || DEFAULT_PLAN_DURATION_DAYS;
-        const { endsAt } = await createSubscriptionRecord(
+        const { endsAt } = await createSubscriptionRecord({
             ownerType,
-            req.user.id,
-            planCode,
+            ownerId: req.user.id,
+            plan,
             currencyCode,
-            plan.amount_minor,
-            durationDays,
-            plan.metadata
-        );
+            amountMinor: plan.amountMinor,
+            durationDays
+        });
 
         if (ownerType === 'user') {
             await updateUserSubscriptionTier(req.user.id, plan.tier, plan.chatMinutes, endsAt);
@@ -53,6 +54,24 @@ const subscribePlan = async (req, res) => {
 
         const latestRecord = await getActiveSubscription(ownerType, req.user.id);
         const subscriptionPayload = await getPlanPayload(latestRecord, ownerType);
+
+        await recordAuditLog({
+            userId: req.user.id,
+            actorRole: ownerType,
+            action: 'subscription.upgrade',
+            entityType: `${ownerType}_subscription`,
+            entityId: latestRecord?.id || null,
+            oldValues: previous ? { planCode: previous.plan_code, status: previous.status } : null,
+            newValues: {
+                planCode: plan.planCode,
+                status: 'active',
+                currency: currencyCode,
+                amountMinor: plan.amountMinor
+            },
+            metadata: { audience: ownerType, durationDays },
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
 
         return res.json({
             success: true,
@@ -93,6 +112,7 @@ const cancelSubscription = async (req, res) => {
     try {
         const role = (req.user?.role || 'employee').toLowerCase();
         const ownerType = ROLE_TO_OWNER[role] || 'user';
+        const previous = await getActiveSubscription(ownerType, req.user.id);
 
         await cancelSubscriptions(ownerType, req.user.id);
 
@@ -102,6 +122,19 @@ const cancelSubscription = async (req, res) => {
         }
 
         const fallbackPayload = await getPlanPayload(null, ownerType);
+
+        await recordAuditLog({
+            userId: req.user.id,
+            actorRole: ownerType,
+            action: 'subscription.cancel',
+            entityType: `${ownerType}_subscription`,
+            entityId: previous?.id || null,
+            oldValues: previous ? { planCode: previous.plan_code, status: previous.status } : null,
+            newValues: { planCode: fallbackPayload.planCode, status: 'cancelled' },
+            metadata: { audience: ownerType },
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent']
+        });
 
         return res.json({
             success: true,

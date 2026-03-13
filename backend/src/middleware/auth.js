@@ -54,7 +54,20 @@ const authenticate = async (req, res, next) => {
 
     const fetchPromise = (async () => {
         const result = await query(
-            'SELECT id, email, role, is_anonymous, display_name, token_version FROM users WHERE id = $1',
+            `SELECT
+                 id,
+                 email,
+                 role,
+                 is_anonymous,
+                 display_name,
+                 token_version,
+                 subscription_tier,
+                 subscription_expires,
+                 daily_chat_quota_mins,
+                 used_chat_minutes,
+                 last_chat_reset
+             FROM users
+             WHERE id = $1`,
             [decoded.userId]
         );
         if (result.rows.length === 0) {

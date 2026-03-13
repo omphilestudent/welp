@@ -6,6 +6,7 @@ const { checkRoleFlag } = require('../middleware/roleFlags');
 const { messageLimiter, apiLimiter } = require('../middleware/rateLimiter');
 const { validate, messageValidation } = require('../middleware/validation');
 const messageController = require('../controllers/messageController');
+const { applyTierLimits } = require('../middleware/applyTierLimits');
 
 const router = express.Router();
 
@@ -41,6 +42,7 @@ router.patch('/conversations/:conversationId/status',
 router.post('/request-chat',
     authenticate,
     authorize('employee'),
+    applyTierLimits({ feature: 'chat' }),
     validate([
         body('psychologistId').isUUID(),
         body('initialMessage').optional().trim()
@@ -68,9 +70,16 @@ router.get('/conversations/:conversationId/messages',
 
 router.post('/conversations/:conversationId/messages',
     authenticate,
+    applyTierLimits({ feature: 'chat' }),
     messageLimiter,
     validate(messageValidation),
     messageController.sendMessage
+);
+
+router.post('/conversations/:conversationId/video/start',
+    authenticate,
+    applyTierLimits({ feature: 'video' }),
+    messageController.startVideoSession
 );
 
 router.post('/conversations/:conversationId/read',
