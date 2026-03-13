@@ -1,4 +1,4 @@
-﻿-- 20240313_pricing_catalog.sql
+-- 20240313_pricing_catalog.sql
 BEGIN;
 
 DO 

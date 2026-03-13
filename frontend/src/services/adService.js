@@ -37,3 +37,15 @@ export const recordImpression = (campaignId) => {
 export const recordClick = (campaignId) => {
     return api.post(`/ads/${campaignId}/click`);
 };
+
+export const adminListAds = (params = {}) => {
+    return api.get('/admin/ads', { params });
+};
+
+export const adminApproveAd = (payload) => {
+    return api.post('/admin/ads/approve', payload);
+};
+
+export const adminRejectAd = (payload) => {
+    return api.post('/admin/ads/reject', payload);
+};

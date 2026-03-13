@@ -45,6 +45,13 @@ const PricingPage = () => {
         initCountries();
     }, []);
 
+    useEffect(() => {
+        const entry = countries.find((row) => row.code === country);
+        if (entry?.currency && entry.currency !== currency) {
+            setCurrency(entry.currency);
+        }
+    }, [country, countries]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const loadSubscription = useCallback(async () => {
         if (!isAuthenticated) return;
         try {

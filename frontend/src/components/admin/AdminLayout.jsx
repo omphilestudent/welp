@@ -24,7 +24,8 @@ import {
     FaUserCircle,
     FaRobot,
     FaUserCheck,
-    FaEnvelope
+    FaEnvelope,
+    FaBullhorn
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
@@ -151,6 +152,12 @@ const AdminLayout = () => {
             icon: <FaClipboardList />,
             label: 'Subscriptions',
             color: '#fc8181'
+        },
+        {
+            path: '/admin/ads',
+            icon: <FaBullhorn />,
+            label: 'Ad Approvals',
+            color: '#dd6b20'
         },
         {
             path: '/admin/calendar',

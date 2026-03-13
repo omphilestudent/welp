@@ -25,6 +25,11 @@ import {
 } from 'date-fns';
 
 const BUSINESS_PIE_COLORS = ['#6366f1', '#f59e0b', '#0ea5e9', '#10b981', '#ec4899'];
+const BUSINESS_ANALYTICS_SUMMARY = [
+    { tier: 'Base', impressions: '5k / mo', clicks: '250', ctr: '1.1%', spend: '$500 cap' },
+    { tier: 'Enhanced', impressions: '25k / mo', clicks: '2.1k', ctr: '2.4%', spend: '$2.5k cap' },
+    { tier: 'Premium', impressions: 'Unlimited', clicks: 'Real-time', ctr: '3.0%', spend: 'Usage billed' }
+];
 
 const resolveMediaUrl = (url) => {
     if (!url) return '';
@@ -379,6 +384,7 @@ const ChartTooltip = ({ active, payload, label }) => {
 ───────────────────────────────────────────── */
 const Dashboard = () => {
     const { user, refreshUser } = useAuth();
+    const premiumExceptionActive = (user?.email || '').toLowerCase() === 'omphilemohlala@welp.com';
     const [userReviews, setUserReviews] = useState([]);
     const [pendingRequests, setPendingRequests] = useState([]);
     const [myCompanies, setMyCompanies] = useState([]);
@@ -1406,6 +1412,24 @@ const Dashboard = () => {
 
                     {user?.role === 'business' && activeTab === 'ads' && (
                         <div className="business-ads-tab">
+                            <div className="business-ad-analytics">
+                                {BUSINESS_ANALYTICS_SUMMARY.map((item) => (
+                                    <div key={item.tier} className="business-ad-analytics__card">
+                                        <p className="business-ad-analytics__eyebrow">{item.tier}</p>
+                                        <h4>{item.impressions}</h4>
+                                        <div className="business-ad-analytics__metrics">
+                                            <span>Clicks {item.clicks}</span>
+                                            <span>CTR {item.ctr}</span>
+                                            <span>{item.spend}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {premiumExceptionActive && (
+                                <div className="business-ad-analytics__callout">
+                                    Welp premium exception detected â€“ ad limits lifted and advanced analytics enabled.
+                                </div>
+                            )}
                             <BusinessAdsManager />
                         </div>
                     )}

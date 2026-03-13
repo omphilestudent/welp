@@ -4,6 +4,41 @@ const { getActiveSubscription, PLAN_LIMITS } = require('./subscriptionService');
 const { hasPremiumException } = require('../utils/premiumAccess');
 
 const ACCEPTED_MEDIA_TYPES = ['image', 'video', 'gif'];
+const AD_SCHEMA_TTL_MS = 5 * 60 * 1000;
+
+let cachedAdSchema = null;
+
+const ensureAdSchema = async () => {
+    if (cachedAdSchema && cachedAdSchema.expiresAt > Date.now()) {
+        return cachedAdSchema;
+    }
+    try {
+        const { rows } = await query(
+            `SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'advertising_campaigns'`
+        );
+        const columns = rows.map((row) => row.column_name);
+        cachedAdSchema = {
+            hasReviewStatus: columns.includes('review_status'),
+            hasSpendMinor: columns.includes('spend_minor'),
+            hasBidRateMinor: columns.includes('bid_rate_minor'),
+            hasOverride: columns.includes('override_restrictions'),
+            expiresAt: Date.now() + AD_SCHEMA_TTL_MS
+        };
+    } catch (error) {
+        console.warn('Ad schema introspection failed:', error.message);
+        cachedAdSchema = {
+            hasReviewStatus: false,
+            hasSpendMinor: false,
+            hasBidRateMinor: false,
+            hasOverride: false,
+            expiresAt: Date.now() + AD_SCHEMA_TTL_MS
+        };
+    }
+    return cachedAdSchema;
+};
 
 const getBusinessIdForUser = async (userId) => {
     const result = await query(
@@ -67,7 +102,11 @@ const buildBehaviorFilter = (filters, params, behaviors = []) => {
 };
 
 const fetchPlacementCampaigns = async ({ placement, location, industry, behaviors = [] }) => {
-    const filters = ["c.status = 'active'", "c.review_status = 'approved'"];
+    const schema = await ensureAdSchema();
+    const filters = ["c.status = 'active'"];
+    if (schema.hasReviewStatus) {
+        filters.push("c.review_status = 'approved'");
+    }
     const params = [];
 
     buildPlacementFilter(filters, params, placement);
@@ -76,11 +115,15 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
     buildBehaviorFilter(filters, params, behaviors);
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const reviewColumn = schema.hasReviewStatus ? '' : ", 'approved'::text AS review_status";
+    const spendColumn = schema.hasSpendMinor ? '' : ', 0::bigint AS spend_minor';
+    const bidRateColumn = schema.hasBidRateMinor ? '' : ', 0::bigint AS bid_rate_minor';
+    const overrideColumn = schema.hasOverride ? '' : ', false AS override_restrictions';
 
     const result = await query(
         `
         SELECT
-            c.*,
+            c.*${reviewColumn}${spendColumn}${bidRateColumn}${overrideColumn},
             (
                 SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                 FROM ad_placements ap
