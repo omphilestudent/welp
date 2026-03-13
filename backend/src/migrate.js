@@ -5,6 +5,23 @@ const path = require('path');
 require('dotenv').config();
 
 const migrationsDir = path.join(__dirname, 'db', 'migrations');
+const platformSchemaPath = path.join(__dirname, 'db', 'platform_schema.sql');
+
+const runSqlFile = async (client, filePath, label) => {
+    if (!fs.existsSync(filePath)) {
+        return;
+    }
+
+    const sql = fs.readFileSync(filePath, 'utf-8');
+    if (!sql.trim()) {
+        return;
+    }
+
+    const displayLabel = label || path.basename(filePath);
+    console.log(`➡️  Running ${displayLabel}`);
+    await client.query(sql);
+    console.log(`✅ Completed ${displayLabel}`);
+};
 
 const runSqlMigrations = async (client) => {
     try {
@@ -20,9 +37,7 @@ const runSqlMigrations = async (client) => {
             const sql = fs.readFileSync(filePath, 'utf-8');
             if (!sql.trim()) continue;
 
-            console.log(`➡️  Running SQL migration ${file}`);
-            await client.query(sql);
-            console.log(`✅ Completed ${file}`);
+            await runSqlFile(client, filePath, `SQL migration ${file}`);
         }
     } catch (err) {
         console.error('❌ SQL migration failed:', err.message);
@@ -110,6 +125,7 @@ async function runMigrations() {
             console.log('✅ Default departments inserted');
         }
 
+        await runSqlFile(client, platformSchemaPath, 'platform schema');
         await runSqlMigrations(client);
 
         client.release();
@@ -117,6 +133,14 @@ async function runMigrations() {
     } catch (err) {
         console.error('❌ Migration failed:', err.message);
         console.error('Error code:', err.code);
+        if (err.stack) {
+            console.error(err.stack);
+        }
+        if (Array.isArray(err.errors) && err.errors.length) {
+            err.errors.forEach((nestedErr, index) => {
+                console.error(`Nested error ${index + 1}:`, nestedErr.message || nestedErr.code || nestedErr);
+            });
+        }
     } finally {
         await pool.end();
     }

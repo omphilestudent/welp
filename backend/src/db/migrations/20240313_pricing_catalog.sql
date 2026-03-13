@@ -1,7 +1,7 @@
 -- 20240313_pricing_catalog.sql
 BEGIN;
 
-DO 
+DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pricing_audience') THEN
         CREATE TYPE pricing_audience AS ENUM ('user', 'psychologist', 'business');
@@ -15,7 +15,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'billing_period') THEN
         CREATE TYPE billing_period AS ENUM ('monthly', 'quarterly', 'annual');
     END IF;
-END;
+END$$;
 
 CREATE TABLE IF NOT EXISTS currencies (
     code VARCHAR(3) PRIMARY KEY,
@@ -25,6 +25,56 @@ CREATE TABLE IF NOT EXISTS currencies (
     purchasing_power_index NUMERIC(6,3) NOT NULL DEFAULT 1.0,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'currencies'
+          AND column_name = 'symbol'
+    ) THEN
+        ALTER TABLE currencies
+            ADD COLUMN symbol VARCHAR(8) NOT NULL DEFAULT '$';
+    ELSE
+        ALTER TABLE currencies
+            ALTER COLUMN symbol SET DEFAULT '$';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'currencies'
+          AND column_name = 'fx_rate_usd'
+    ) THEN
+        ALTER TABLE currencies
+            ADD COLUMN fx_rate_usd NUMERIC(18,6) NOT NULL DEFAULT 1.0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'currencies'
+          AND column_name = 'purchasing_power_index'
+    ) THEN
+        ALTER TABLE currencies
+            ADD COLUMN purchasing_power_index NUMERIC(6,3) NOT NULL DEFAULT 1.0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'currencies'
+          AND column_name = 'updated_at'
+    ) THEN
+        ALTER TABLE currencies
+            ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT now();
+    END IF;
+END$$;
 
 CREATE TABLE IF NOT EXISTS pricing_catalog (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -65,6 +115,68 @@ CREATE TABLE IF NOT EXISTS subscription_records (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'subscription_records'
+          AND column_name = 'trial_days'
+    ) THEN
+        ALTER TABLE subscription_records
+            ADD COLUMN trial_days INT DEFAULT 0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'subscription_records'
+          AND column_name = 'cancelled_at'
+    ) THEN
+        ALTER TABLE subscription_records
+            ADD COLUMN cancelled_at TIMESTAMP WITH TIME ZONE;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'subscription_records'
+          AND column_name = 'feature_snapshot'
+    ) THEN
+        ALTER TABLE subscription_records
+            ADD COLUMN feature_snapshot JSONB DEFAULT '[]'::jsonb;
+    ELSE
+        ALTER TABLE subscription_records
+            ALTER COLUMN feature_snapshot SET DEFAULT '[]'::jsonb;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'subscription_records'
+          AND column_name = 'limit_snapshot'
+    ) THEN
+        ALTER TABLE subscription_records
+            ADD COLUMN limit_snapshot JSONB DEFAULT '{}'::jsonb;
+    ELSE
+        ALTER TABLE subscription_records
+            ALTER COLUMN limit_snapshot SET DEFAULT '{}'::jsonb;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'subscription_records'
+          AND column_name = 'updated_at'
+    ) THEN
+        ALTER TABLE subscription_records
+            ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT now();
+    ELSE
+        ALTER TABLE subscription_records
+            ALTER COLUMN updated_at SET DEFAULT now();
+    END IF;
+END$$;
+
 CREATE INDEX IF NOT EXISTS idx_subscription_records_owner ON subscription_records(owner_type, owner_id);
 CREATE INDEX IF NOT EXISTS idx_subscription_records_plan ON subscription_records(plan_code, status);
 
@@ -83,6 +195,133 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'user_id'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'admin_id'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN admin_id UUID REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'actor_role'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN actor_role VARCHAR(32);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'entity_type'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN entity_type VARCHAR(64);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'entity_id'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN entity_id UUID;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'old_values'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN old_values JSONB;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'new_values'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN new_values JSONB;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'metadata'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN metadata JSONB DEFAULT '{}'::jsonb;
+    ELSE
+        ALTER TABLE audit_logs
+            ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'ip_address'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN ip_address VARCHAR(64);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'user_agent'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN user_agent TEXT;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'audit_logs'
+          AND column_name = 'created_at'
+    ) THEN
+        ALTER TABLE audit_logs
+            ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT now();
+    END IF;
+END$$;
 
 INSERT INTO currencies (code, name, symbol, fx_rate_usd, purchasing_power_index)
 VALUES
