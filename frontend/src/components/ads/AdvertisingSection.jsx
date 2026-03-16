@@ -38,6 +38,40 @@ const normalizeCapabilities = (raw) => {
     };
 };
 
+const resolveCampaignError = (error) => {
+    if (!error) {
+        return 'We were unable to create your advertisement due to a server issue. Please try again later.';
+    }
+    if (error.response) {
+        const { status, data } = error.response;
+        const backendMessage = data?.error || data?.message;
+        const detailList = Array.isArray(data?.details) && data.details.length ? `: ${data.details.join(', ')}` : '';
+        if (status === 400) {
+            return (
+                backendMessage ||
+                'Please complete all required fields before submitting your advertisement.'
+            ) + detailList;
+        }
+        if (status === 403) {
+            return (
+                backendMessage ||
+                'Advertising features are available in the Premium Plan. Please upgrade your subscription to create campaigns.'
+            );
+        }
+        if (status === 413 || backendMessage?.toLowerCase().includes('file too large')) {
+            return `The selected file is too large. Please upload a file under ${MAX_MEDIA_MB}MB.`;
+        }
+        if (status >= 500) {
+            return backendMessage || 'We were unable to create your advertisement due to a server issue. Please try again later.';
+        }
+        return backendMessage || 'Unable to save campaign.';
+    }
+    if (error.message?.toLowerCase().includes('network')) {
+        return 'Network error while saving the campaign. Please check your connection and try again.';
+    }
+    return 'We were unable to create your advertisement due to a server issue. Please try again later.';
+};
+
 const AdvertisingSection = ({ premiumExceptionActive = false }) => {
     const { user } = useAuth();
     const [campaigns, setCampaigns] = useState([]);
@@ -48,6 +82,8 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
     const [saving, setSaving] = useState(false);
     const [capabilities, setCapabilities] = useState(null);
     const [editingCampaign, setEditingCampaign] = useState(null);
+    const [formMessage, setFormMessage] = useState(null);
+    const [formMessageType, setFormMessageType] = useState('info');
     const userId = user?.id;
     const userRole = user?.role;
     const isBusinessUser = userRole === 'business';
@@ -122,6 +158,8 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
     const displayedActive = capabilities?.active ?? activeCampaigns;
     const limitReached =
         !premiumOverride && typeof maxActive === 'number' && displayedActive >= maxActive;
+    const requiresPremiumTier =
+        !premiumOverride && capabilities?.tier && capabilities.tier !== 'premium';
 
     const placementsSummary = useMemo(() => selectedPlacements.join(', '), [selectedPlacements]);
     const editing = Boolean(editingCampaign);
@@ -138,6 +176,8 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         if (saving) {
             return;
         }
+        setFormMessage(null);
+        setFormMessageType('info');
         if (!selectedPlacements.length) {
             toast.error('Select at least one placement');
             return;
@@ -150,8 +190,18 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
             toast.error(`Media file exceeds ${MAX_MEDIA_MB}MB limit`);
             return;
         }
+        if (requiresPremiumTier) {
+            const message = 'Advertising features are available in the Premium Plan. Please upgrade your subscription.';
+            setFormMessage(message);
+            setFormMessageType('error');
+            toast.error(message);
+            return;
+        }
         if (limitReached) {
-            toast.error('Ad limit reached for your current plan');
+            const message = 'Ad limit reached for your current plan. Pause an existing campaign or upgrade to continue.';
+            setFormMessage(message);
+            setFormMessageType('error');
+            toast.error(message);
             return;
         }
 
@@ -174,18 +224,22 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
             if (editing && editingCampaign) {
                 await updateCampaign(editingCampaign.id, formData);
                 toast.success('Campaign updated');
+                setFormMessage('Campaign updated successfully.');
+                setFormMessageType('success');
             } else {
                 await createCampaign(formData);
                 toast.success('Campaign submitted for approval');
+                setFormMessage('Campaign submitted for review successfully.');
+                setFormMessageType('success');
             }
             resetForm();
             await loadCampaigns();
         } catch (error) {
             console.error('Save campaign failed:', error);
-            const backendMessage = error.response?.data?.error;
-            const details = error.response?.data?.details;
-            const detailText = Array.isArray(details) && details.length ? `: ${details.join(', ')}` : '';
-            toast.error(backendMessage ? `${backendMessage}${detailText}` : 'Failed to save campaign');
+            const friendly = resolveCampaignError(error);
+            setFormMessage(friendly);
+            setFormMessageType('error');
+            toast.error(friendly);
         } finally {
             setSaving(false);
         }
@@ -228,6 +282,8 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
 
     const handleCancelEdit = () => {
         resetForm();
+        setFormMessage(null);
+        setFormMessageType('info');
     };
 
     if (user?.role !== 'business') {
@@ -297,7 +353,18 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
                 </div>
             )}
 
+            {requiresPremiumTier && (
+                <div className="ads-limit-warning">
+                    Advertising features are available in the Premium Plan. Upgrade your subscription to submit campaigns.
+                </div>
+            )}
+
             <form className="ads-form" onSubmit={handleSubmit}>
+                {formMessage && (
+                    <div className={`ads-form-message ads-form-message--${formMessageType}`}>
+                        {formMessage}
+                    </div>
+                )}
                 {editing && (
                     <div className="ads-edit-banner">
                         Editing “{editingCampaign?.name || 'Untitled'}”
@@ -414,8 +481,14 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
                     <button
                         type="submit"
                         className="primary"
-                        disabled={saving || limitReached}
-                        title={limitReached ? 'Upgrade your plan to unlock more ads' : undefined}
+                        disabled={saving || limitReached || requiresPremiumTier}
+                        title={
+                            limitReached
+                                ? 'Upgrade your plan to unlock more ads'
+                                : requiresPremiumTier
+                                    ? 'Premium plan required for advertising'
+                                    : undefined
+                        }
                     >
                         {saving ? 'Saving...' : editing ? 'Update campaign' : 'Submit for approval'}
                     </button>

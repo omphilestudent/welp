@@ -1142,6 +1142,17 @@ const runMigrations = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`
             ,
+            `CREATE TABLE IF NOT EXISTS ad_campaign_failures (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                business_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+                error_message TEXT NOT NULL,
+                details JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );`
+            ,
+            "CREATE INDEX IF NOT EXISTS idx_ad_campaign_failures_business ON ad_campaign_failures(business_id);",
+            "CREATE INDEX IF NOT EXISTS idx_ad_campaign_failures_created_at ON ad_campaign_failures(created_at);",
             "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;",
             "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS click_redirect_url TEXT;",
             "ALTER TYPE media_type ADD VALUE IF NOT EXISTS 'image';",

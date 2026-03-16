@@ -19,7 +19,9 @@ const {
     adminPauseAd,
     adminResumeAd,
     adminGetAdStats,
-    logAdminAction
+    logAdminAction,
+    logAdFailure,
+    listAdFailures
 } = require('../services/adsService');
 const { recordAuditLog } = require('../utils/auditLogger');
 const { hasPremiumException } = require('../utils/premiumAccess');
@@ -87,6 +89,9 @@ const ensureAdCampaignSchema = async () => {
         );
         await query(
             "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS bid_rate_minor BIGINT DEFAULT 0"
+        );
+        await query(
+            "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS override_restrictions BOOLEAN DEFAULT false"
         );
         adCampaignSchemaReady = true;
     } catch (error) {
@@ -185,6 +190,7 @@ const resolveMinorAmount = (majorValue, minorValue) => {
 
 const createCampaign = async (req, res) => {
     let businessId = null;
+    let sanitizedPlacements = [];
     try {
         await ensureAdCampaignSchema();
 
@@ -260,6 +266,16 @@ const createCampaign = async (req, res) => {
 
         const capabilities = await getBusinessAdCapabilities({ userId: req.user.id, email: req.user.email });
         const existingActive = await countActiveCampaigns(businessId);
+        if (!capabilities.premiumException && capabilities.tier && capabilities.tier !== 'premium') {
+            return res.status(403).json({
+                success: false,
+                error: 'Advertising features are available in the Premium Plan. Please upgrade to create campaigns.',
+                details: {
+                    requiredTier: 'premium',
+                    currentTier: capabilities.tier
+                }
+            });
+        }
         if (Number.isFinite(capabilities.maxActive) && existingActive >= capabilities.maxActive) {
             return res.status(403).json({
                 success: false,
@@ -293,7 +309,7 @@ const createCampaign = async (req, res) => {
         const statusValue = premiumOwner ? 'active' : 'pending_review';
         const reviewStatusValue = premiumOwner ? 'approved' : 'pending';
         const submittedAt = new Date();
-        const sanitizedPlacements = placements.map((placement) => ({
+        sanitizedPlacements = placements.map((placement) => ({
             placement: placement.placement,
             weight:
                 Number.isFinite(placement.weight) && placement.weight > 0
@@ -373,16 +389,34 @@ const createCampaign = async (req, res) => {
         const dbErrorHints = {
             '22P02': 'Please double-check your numeric fields (budget/bid).',
             '23503': 'Linked business profile is invalid. Please refresh your business settings.',
-            '42703': 'Database schema is missing required advertising columns. Please run migrations.'
+            '23502': 'Please complete all required fields before submitting your advertisement.',
+            '42703': 'Database schema is missing required advertising columns. Please run migrations.',
+            '42P01': 'Database schema is missing advertising tables. Please run migrations.'
         };
         const friendlyError = dbErrorHints[error?.code] || 'Unable to create campaign';
-        const statusCode = error?.code === '22P02' || error?.code === '23503' ? 400 : 500;
+        const statusCode =
+            error?.code === '22P02' || error?.code === '23503' || error?.code === '23502' ? 400 : 500;
         console.error('Create campaign error:', {
             userId: req.user?.id,
             businessId,
             code: error?.code,
             message: error?.message
         });
+        try {
+            await logAdFailure({
+                userId: req.user?.id,
+                businessId,
+                errorMessage: friendlyError,
+                details: {
+                    code: error?.code || null,
+                    message: error?.message,
+                    placements: sanitizedPlacements.map((placement) => placement.placement),
+                    stage: 'create_campaign'
+                }
+            });
+        } catch (logError) {
+            console.warn('Unable to log ad failure:', logError.message);
+        }
         return res.status(statusCode).json({ success: false, error: friendlyError });
     }
 };
@@ -1194,6 +1228,17 @@ const adminGetAuditLog = async (req, res) => {
     }
 };
 
+const adminListAdFailures = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+        const failures = await listAdFailures({ limit });
+        return res.json({ success: true, data: failures, failures });
+    } catch (error) {
+        console.error('Error in adminListAdFailures:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load failure log' });
+    }
+};
+
 module.exports = {
     createCampaign,
     listCampaigns,
@@ -1218,5 +1263,6 @@ module.exports = {
     adminDeleteCampaign,
     adminExportCampaigns,
     adminGenerateReport,
-    adminGetAuditLog
+    adminGetAuditLog,
+    adminListAdFailures
 };

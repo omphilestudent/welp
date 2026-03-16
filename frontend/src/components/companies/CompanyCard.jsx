@@ -61,6 +61,12 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
         }
     }, [company, onClaim]);
 
+    const handleViewProfile = useCallback((event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleClick();
+    }, [handleClick]);
+
     return (
         <div
             className="company-card"
@@ -130,7 +136,20 @@ const CompanyCard = ({ company, showClaimAction = false, onClaim }) => {
                 </p>
             )}
 
-            <div className="company-card-footer" />
+            <div className="company-card-footer">
+                <button type="button" className="company-card-view" onClick={handleViewProfile}>
+                    View profile
+                </button>
+                {showClaimAction && (
+                    <button
+                        type="button"
+                        className="company-card-claim"
+                        onClick={handleClaimClick}
+                    >
+                        Claim this profile
+                    </button>
+                )}
+            </div>
         </div>
     );
 };

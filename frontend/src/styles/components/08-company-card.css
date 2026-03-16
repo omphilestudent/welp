@@ -1,5 +1,9 @@
 
 .company-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 16px;
@@ -35,8 +39,10 @@
 .company-card-header {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 1.25rem;
   margin-bottom: 1.25rem;
+  flex-wrap: wrap;
 }
 
 .company-card-logo {
@@ -67,6 +73,7 @@
 
 .company-card-info {
   flex: 1;
+  min-width: 180px;
 }
 
 .company-card-name-row {
@@ -101,12 +108,14 @@
 .company-card-rating {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 1rem;
-  padding: 0.5rem;
+  padding: 0.5rem 0.75rem;
   background: var(--bg-secondary);
   border-radius: 30px;
-  width: fit-content;
+  width: 100%;
+  max-width: 320px;
 }
 
 .company-card-address {
@@ -134,6 +143,41 @@
   justify-content: space-between;
   align-items: center;
   margin-top: auto;
+  gap: 0.75rem;
+}
+
+.company-card-view {
+  flex: 1;
+  border: 1px solid var(--accent-color);
+  background: transparent;
+  color: var(--accent-color);
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.company-card-view:hover {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.company-card-claim {
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.company-card-claim:hover {
+  background: #1d4ed8;
 }
 
 .company-claimed-pill {
@@ -165,6 +209,84 @@
   font-size: 0.85rem;
   color: var(--text-muted);
   font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .company-card {
+      padding: 0.9rem;
+      max-height: 65vh;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+      gap: 0.75rem;
+  }
+
+  .company-card-header {
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      align-items: flex-start;
+  }
+
+  .company-card-logo,
+  .company-card-logo-placeholder {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+  }
+
+  .company-card-name {
+      font-size: 1.1rem;
+  }
+
+  .company-card-info {
+      min-width: 0;
+  }
+
+  .company-card-rating {
+      margin-bottom: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.85rem;
+      border-radius: 16px;
+  }
+
+  .company-card-address {
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+      line-height: 1.4;
+  }
+
+  .company-card-description {
+      display: none;
+  }
+
+  .company-card-footer {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+  }
+
+  .company-card-view,
+  .company-card-claim {
+      width: 100%;
+      min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .company-card {
+      padding: 0.8rem;
+      border-radius: 14px;
+  }
+
+  .company-card-header {
+      flex-direction: row;
+  }
+
+  .company-card-name {
+      font-size: 1rem;
+  }
+
+  .company-card-rating {
+      max-width: none;
+  }
 }
 
 

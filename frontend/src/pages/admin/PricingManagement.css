@@ -47,6 +47,8 @@
 .pricing-tabs button.active {
     background: #007bff;
     color: white;
+    box-shadow: 0 8px 20px rgba(0, 123, 255, 0.2);
+    transform: translateY(-2px);
 }
 
 /* Section Header */
@@ -93,6 +95,12 @@
     border-radius: 12px;
     padding: 18px;
     box-shadow: 0 8px 20px rgba(93, 109, 153, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px rgba(93, 109, 153, 0.15);
 }
 
 .stats-label {

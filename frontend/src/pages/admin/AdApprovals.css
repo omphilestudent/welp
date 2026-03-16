@@ -583,6 +583,77 @@
     font-style: italic;
 }
 
+.ad-failure-log {
+    margin-top: 30px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border: 1px solid #eaeaea;
+}
+
+.ad-failure-log__list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ad-failure-log__item {
+    border: 1px solid #edf2f7;
+    border-radius: 10px;
+    padding: 12px 16px;
+    background: #fdfdfd;
+}
+
+.ad-failure-log__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.ad-failure-log__header strong {
+    display: block;
+    font-size: 15px;
+    color: #111;
+}
+
+.failure-meta {
+    display: block;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.failure-timestamp {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.ad-failure-log__error {
+    margin: 8px 0;
+    color: #991b1b;
+    font-weight: 600;
+}
+
+.ad-failure-log__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+    color: #475569;
+}
+
+.failure-empty {
+    margin: 0;
+    color: #6b7280;
+}
+
+.failure-loading {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .stats-grid {

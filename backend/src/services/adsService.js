@@ -867,6 +867,39 @@ const getNotificationMessage = (type, data) => {
     return messages[type] || 'Your ad status has been updated.';
 };
 
+const logAdFailure = async ({ userId, businessId, errorMessage, details = {} }) => {
+    try {
+        await query(
+            `INSERT INTO ad_campaign_failures (
+                user_id,
+                business_id,
+                error_message,
+                details,
+                created_at
+            ) VALUES ($1, $2, $3, $4::jsonb, NOW())`,
+            [userId || null, businessId || null, errorMessage || 'Unknown error', JSON.stringify(details || {})]
+        );
+    } catch (error) {
+        console.error('Failed to log ad failure:', error.message);
+    }
+};
+
+const listAdFailures = async ({ limit = 50 } = {}) => {
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const result = await query(
+        `SELECT f.*,
+                c.name AS business_name,
+                u.email AS user_email
+         FROM ad_campaign_failures f
+         LEFT JOIN companies c ON c.id = f.business_id
+         LEFT JOIN users u ON u.id = f.user_id
+         ORDER BY f.created_at DESC
+         LIMIT $1`,
+        [safeLimit]
+    );
+    return result.rows;
+};
+
 module.exports = {
     // Original exports
     getBusinessIdForUser,
@@ -877,6 +910,8 @@ module.exports = {
     getBusinessAdCapabilities,
     countActiveCampaigns,
     formatAnalyticsForTier,
+    logAdFailure,
+    listAdFailures,
 
     // New admin exports
     adminListAds,

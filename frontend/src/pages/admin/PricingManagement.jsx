@@ -616,141 +616,145 @@ const PricingManagement = () => {
                             </tr>
                             </thead>
                             <tbody>
-                            {filteredCountries.map(country => (
-                                <tr key={country.country_code}>
-                                    <td>{country.country_name}</td>
-                                    <td><code>{country.country_code}</code></td>
-                                    <td>
-                                        {editingCountry?.country_code === country.country_code ? (
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                min="0.1"
-                                                value={editForm.multiplier ?? 1}
-                                                onChange={(e) => setEditForm({
-                                                    ...editForm,
-                                                    multiplier: parseFloat(e.target.value)
-                                                })}
-                                                className="edit-input"
-                                            />
-                                        ) : (
+                            {filteredCountries.map((country) => {
+                                const safeCountry = normalizeCountryEntry(country);
+                                const isEditing = editingCountry?.country_code === safeCountry.country_code;
+                                return (
+                                    <tr key={safeCountry.country_code}>
+                                        <td>{safeCountry.country_name}</td>
+                                        <td><code>{safeCountry.country_code}</code></td>
+                                        <td>
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    min="0.1"
+                                                    value={Number.isFinite(editForm.multiplier) ? editForm.multiplier : 1}
+                                                    onChange={(e) => setEditForm({
+                                                        ...editForm,
+                                                        multiplier: numberOr(parseFloat(e.target.value), 1)
+                                                    })}
+                                                    className="edit-input"
+                                                />
+                                            ) : (
                                                 <span className="multiplier-badge">
-                                                    {formatMultiplier(country.multiplier)}x
+                                                    {formatMultiplier(safeCountry.multiplier)}x
                                                 </span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingCountry?.country_code === country.country_code ? (
-                                            <input
-                                                type="number"
-                                                value={editForm.clientPrice ?? 0}
-                                                onChange={(e) => setEditForm({
-                                                    ...editForm,
-                                                    clientPrice: parseFloat(e.target.value)
-                                                })}
-                                                className="edit-input"
-                                            />
-                                        ) : (
-                                            formatPriceDisplay(country.client_paid_monthly_zar, country.currency_code)
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingCountry?.country_code === country.country_code ? (
-                                            <input
-                                                type="number"
-                                                value={editForm.psychologistPrice ?? 0}
-                                                onChange={(e) => setEditForm({
-                                                    ...editForm,
-                                                    psychologistPrice: parseFloat(e.target.value)
-                                                })}
-                                                className="edit-input"
-                                            />
-                                        ) : (
-                                            formatPriceDisplay(country.psychologist_monthly_zar, country.currency_code)
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingCountry?.country_code === country.country_code ? (
-                                            <input
-                                                type="number"
-                                                value={editForm.businessBasePrice ?? 0}
-                                                onChange={(e) => setEditForm({
-                                                    ...editForm,
-                                                    businessBasePrice: parseFloat(e.target.value)
-                                                })}
-                                                className="edit-input"
-                                            />
-                                        ) : (
-                                            formatPriceDisplay(country.business_base_monthly_zar, country.currency_code)
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingCountry?.country_code === country.country_code ? (
-                                            <input
-                                                type="number"
-                                                value={editForm.businessEnhancedPrice ?? 0}
-                                                onChange={(e) => setEditForm({
-                                                    ...editForm,
-                                                    businessEnhancedPrice: parseFloat(e.target.value)
-                                                })}
-                                                className="edit-input"
-                                            />
-                                        ) : (
-                                            formatPriceDisplay(country.business_enhanced_monthly_zar, country.currency_code)
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingCountry?.country_code === country.country_code ? (
-                                            <input
-                                                type="number"
-                                                value={editForm.businessPremiumPrice ?? 0}
-                                                onChange={(e) => setEditForm({
-                                                    ...editForm,
-                                                    businessPremiumPrice: parseFloat(e.target.value)
-                                                })}
-                                                className="edit-input"
-                                            />
-                                        ) : (
-                                            formatPriceDisplay(country.business_premium_monthly_zar, country.currency_code)
-                                        )}
-                                    </td>
-                                    <td>{country.currency_code || 'ZAR'}</td>
-                                    <td className="actions">
-                                        {editingCountry?.country_code === country.country_code ? (
-                                            <>
-                                                <button
-                                                    className="btn-save"
-                                                    onClick={handleSaveCountry}
-                                                    disabled={loading}
-                                                >
-                                                    Save
-                                                </button>
-                                                <button
-                                                    className="btn-cancel"
-                                                    onClick={() => setEditingCountry(null)}
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <button
-                                                    className="btn-edit"
-                                                    onClick={() => handleEditCountry(country)}
-                                                >
-                                                    Edit
-                                                </button>
-                                                <button
-                                                    className="btn-delete"
-                                                    onClick={() => handleDeleteCountry(country.country_code)}
-                                                >
-                                                    Delete
-                                                </button>
-                                            </>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
+                                            )}
+                                        </td>
+                                        <td>
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    value={editForm.clientPrice ?? 0}
+                                                    onChange={(e) => setEditForm({
+                                                        ...editForm,
+                                                        clientPrice: numberOr(parseFloat(e.target.value))
+                                                    })}
+                                                    className="edit-input"
+                                                />
+                                            ) : (
+                                                formatPriceDisplay(safeCountry.client_paid_monthly_zar, safeCountry.currency_code)
+                                            )}
+                                        </td>
+                                        <td>
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    value={editForm.psychologistPrice ?? 0}
+                                                    onChange={(e) => setEditForm({
+                                                        ...editForm,
+                                                        psychologistPrice: numberOr(parseFloat(e.target.value))
+                                                    })}
+                                                    className="edit-input"
+                                                />
+                                            ) : (
+                                                formatPriceDisplay(safeCountry.psychologist_monthly_zar, safeCountry.currency_code)
+                                            )}
+                                        </td>
+                                        <td>
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    value={editForm.businessBasePrice ?? 0}
+                                                    onChange={(e) => setEditForm({
+                                                        ...editForm,
+                                                        businessBasePrice: numberOr(parseFloat(e.target.value))
+                                                    })}
+                                                    className="edit-input"
+                                                />
+                                            ) : (
+                                                formatPriceDisplay(safeCountry.business_base_monthly_zar, safeCountry.currency_code)
+                                            )}
+                                        </td>
+                                        <td>
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    value={editForm.businessEnhancedPrice ?? 0}
+                                                    onChange={(e) => setEditForm({
+                                                        ...editForm,
+                                                        businessEnhancedPrice: numberOr(parseFloat(e.target.value))
+                                                    })}
+                                                    className="edit-input"
+                                                />
+                                            ) : (
+                                                formatPriceDisplay(safeCountry.business_enhanced_monthly_zar, safeCountry.currency_code)
+                                            )}
+                                        </td>
+                                        <td>
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    value={editForm.businessPremiumPrice ?? 0}
+                                                    onChange={(e) => setEditForm({
+                                                        ...editForm,
+                                                        businessPremiumPrice: numberOr(parseFloat(e.target.value))
+                                                    })}
+                                                    className="edit-input"
+                                                />
+                                            ) : (
+                                                formatPriceDisplay(safeCountry.business_premium_monthly_zar, safeCountry.currency_code)
+                                            )}
+                                        </td>
+                                        <td>{safeCountry.currency_code || 'ZAR'}</td>
+                                        <td className="actions">
+                                            {isEditing ? (
+                                                <>
+                                                    <button
+                                                        className="btn-save"
+                                                        onClick={handleSaveCountry}
+                                                        disabled={loading}
+                                                    >
+                                                        Save
+                                                    </button>
+                                                    <button
+                                                        className="btn-cancel"
+                                                        onClick={() => setEditingCountry(null)}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        className="btn-edit"
+                                                        onClick={() => handleEditCountry(safeCountry)}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        className="btn-delete"
+                                                        onClick={() => handleDeleteCountry(safeCountry.country_code)}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             </tbody>
                         </table>
                     </div>
@@ -804,8 +808,11 @@ const PricingManagement = () => {
                                     type="number"
                                     step="0.1"
                                     min="0.1"
-                                    value={bulkMultiplier}
-                                    onChange={(e) => setBulkMultiplier(parseFloat(e.target.value))}
+                                    value={Number.isFinite(bulkMultiplier) ? bulkMultiplier : 1}
+                                    onChange={(e) => {
+                                        const nextValue = parseFloat(e.target.value);
+                                        setBulkMultiplier(Number.isFinite(nextValue) ? nextValue : 1);
+                                    }}
                                     className="bulk-input"
                                 />
                                 <p className="help-text">
@@ -937,11 +944,14 @@ const PricingManagement = () => {
                                 type="number"
                                 step="0.1"
                                 min="0.1"
-                                value={newCountry.multiplier}
-                                onChange={(e) => setNewCountry({
-                                    ...newCountry,
-                                    multiplier: parseFloat(e.target.value)
-                                })}
+                                value={Number.isFinite(newCountry.multiplier) ? newCountry.multiplier : 1}
+                                onChange={(e) => {
+                                    const nextValue = parseFloat(e.target.value);
+                                    setNewCountry({
+                                        ...newCountry,
+                                        multiplier: Number.isFinite(nextValue) ? nextValue : 1
+                                    });
+                                }}
                                 required
                             />
                         </div>

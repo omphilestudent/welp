@@ -435,8 +435,11 @@ const SubscriptionStatus = () => {
         applySubscriptionSnapshot(user.subscription);
     }, [user?.subscription, applySubscriptionSnapshot]);
 
+    const subscriptionTierNormalized = toLowerSafe(
+        subscription?.planTier || subscription?.plan_tier || subscription?.planTierNormalized
+    );
     const planIdentifier = subscription?.planCode || subscription?.planCodeNormalized;
-    const planTierHint = subscription?.planTier || subscription?.plan_tier || planTierNormalized;
+    const planTierHint = subscription?.planTier || subscription?.plan_tier || subscriptionTierNormalized;
 
     useEffect(() => {
         if (!planIdentifier) {

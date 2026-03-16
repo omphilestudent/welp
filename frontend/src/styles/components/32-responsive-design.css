@@ -94,6 +94,10 @@
   }
 
   .navbar-mobile-overlay {
+    display: none;
+  }
+
+  .navbar-mobile-overlay.navbar-mobile-overlay--visible {
     display: block;
   }
 }

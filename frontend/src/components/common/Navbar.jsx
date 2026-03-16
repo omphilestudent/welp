@@ -127,6 +127,14 @@ const Navbar = () => {
         }
     };
 
+    const overlayClass = `navbar-mobile-overlay${isMobileMenuOpen ? ' navbar-mobile-overlay--visible' : ''}`;
+
+    const renderLink = (to, label, extraClass = '') => (
+        <Link to={to} className={`navbar-link ${extraClass}`.trim()} onClick={closeMobileMenu}>
+            {label}
+        </Link>
+    );
+
     return (
         <>
             <nav className="navbar">
@@ -149,22 +157,29 @@ const Navbar = () => {
                     </button>
 
                     <div className={`navbar-menu ${isMobileMenuOpen ? 'navbar-menu--open' : ''}`}>
-                        <Link to="/search" className="navbar-link" onClick={closeMobileMenu}>
-                            Companies
-                        </Link>
-                        {!user && (
-                            <Link to="/pricing" className="navbar-link" onClick={closeMobileMenu}>
-                                Pricing
-                            </Link>
-                        )}
-
+                        {renderLink('/', 'Home')}
+                        {renderLink('/search', 'Companies')}
                         {!user && (
                             <>
-                                <Link to="/register/psychologist" className="navbar-link" onClick={closeMobileMenu}>
-                                    Join as Psychologist
+                                {renderLink('/pricing', 'Pricing')}
+                                <Link
+                                    to="/login"
+                                    className="btn btn-primary navbar-auth-btn"
+                                    onClick={closeMobileMenu}
+                                >
+                                    Login
+                                </Link>
+                                <Link
+                                    to="/register"
+                                    className="btn btn-secondary navbar-auth-btn"
+                                    onClick={closeMobileMenu}
+                                >
+                                    Sign Up
                                 </Link>
                             </>
                         )}
+
+                        {!user && renderLink('/register/psychologist', 'Join as Psychologist')}
 
                         {user ? (
                             <>
@@ -235,9 +250,7 @@ const Navbar = () => {
                                     </div>
                                 )}
 
-                                <Link to="/settings" className="navbar-link" onClick={closeMobileMenu}>
-                                    Settings
-                                </Link>
+                                {renderLink('/settings', 'Settings')}
 
                                 {user.role === 'employee' && (
                                     <Link to="/messages" className="btn btn-primary" onClick={closeMobileMenu}>
@@ -293,23 +306,17 @@ const Navbar = () => {
                                     Logout
                                 </button>
                             </>
-                        ) : (
-                            <>
-                                <Link to="/login" className="btn btn-primary" onClick={closeMobileMenu}>
-                                    Login
-                                </Link>
-                                <Link to="/register" className="btn btn-secondary" onClick={closeMobileMenu}>
-                                    Sign Up
-                                </Link>
-                            </>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </nav>
 
-            {isMobileMenuOpen && (
-                <div className="navbar-mobile-overlay" onClick={closeMobileMenu} aria-hidden="true" />
-            )}
+            <div
+                className={overlayClass}
+                onClick={closeMobileMenu}
+                aria-hidden="true"
+                role="presentation"
+            />
 
         </>
     );

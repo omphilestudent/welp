@@ -10,7 +10,8 @@ import {
     adminPauseAd,
     adminResumeAd,
     adminGetAdDetails,
-    adminGetAdAnalytics
+    adminGetAdAnalytics,
+    adminListAdFailures
 } from '../../services/adService';
 import './AdApprovals.css'; // Create this CSS file
 
@@ -52,6 +53,19 @@ const AdApprovals = () => {
         start: '',
         end: ''
     });
+    const [failureLog, setFailureLog] = useState([]);
+    const [failureLoading, setFailureLoading] = useState(false);
+    const parseFailureDetails = (details) => {
+        if (!details) return {};
+        if (typeof details === 'string') {
+            try {
+                return JSON.parse(details);
+            } catch {
+                return { raw: details };
+            }
+        }
+        return details;
+    };
 
     const fetchAds = async () => {
         setLoading(true);
@@ -83,8 +97,23 @@ const AdApprovals = () => {
         }
     };
 
+    const fetchFailureLog = async () => {
+        setFailureLoading(true);
+        try {
+            const { data } = await adminListAdFailures({ limit: 50 });
+            const rows = data?.data || data?.failures || [];
+            setFailureLog(rows);
+        } catch (error) {
+            console.error('Failed to fetch ad failure log', error);
+            toast.error('Unable to load ad failure log');
+        } finally {
+            setFailureLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchAds();
+        fetchFailureLog();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Apply local filters
@@ -723,6 +752,56 @@ const AdApprovals = () => {
                     </tbody>
                 </table>
             </div>
+
+            <section className="ad-failure-log">
+                <div className="section-header">
+                    <h2>Recent Submission Failures</h2>
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-small"
+                        onClick={fetchFailureLog}
+                        disabled={failureLoading}
+                    >
+                        {failureLoading ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                </div>
+                {failureLoading ? (
+                    <div className="failure-loading">
+                        <Loading size="small" />
+                    </div>
+                ) : failureLog.length === 0 ? (
+                    <p className="failure-empty">No recent failures recorded.</p>
+                ) : (
+                    <div className="ad-failure-log__list">
+                        {failureLog.map((failure) => {
+                            const details = parseFailureDetails(failure.details);
+                            return (
+                                <article key={failure.id || failure.created_at} className="ad-failure-log__item">
+                                    <header className="ad-failure-log__header">
+                                        <div>
+                                            <strong>{failure.business_name || 'Unlinked business'}</strong>
+                                            {failure.user_email && (
+                                                <span className="failure-meta">Submitted by {failure.user_email}</span>
+                                            )}
+                                        </div>
+                                        <span className="failure-timestamp">
+                                            {new Date(failure.created_at).toLocaleString()}
+                                        </span>
+                                    </header>
+                                    <p className="ad-failure-log__error">{failure.error_message}</p>
+                                    <div className="ad-failure-log__meta">
+                                        {details.code && <span>Code: {details.code}</span>}
+                                        {Array.isArray(details.placements) && details.placements.length > 0 && (
+                                            <span>Placements: {details.placements.join(', ')}</span>
+                                        )}
+                                        {details.stage && <span>Stage: {details.stage}</span>}
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
 
             {/* Ad Details Modal */}
             {showDetailsModal && selectedAdDetails && (

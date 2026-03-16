@@ -52,6 +52,9 @@ export const adminBulkApproveAds = (payload) => api.post(`${ADMIN_BASE}/bulk-app
 
 export const adminBulkRejectAds = (payload) => api.post(`${ADMIN_BASE}/bulk-reject`, payload);
 
+export const adminListAdFailures = (params = {}) =>
+    api.get(`${ADMIN_BASE}/failures`, { params });
+
 export const adminPauseAd = (campaignId) => api.post(`${ADMIN_BASE}/${campaignId}/pause`);
 
 export const adminResumeAd = (campaignId) => api.post(`${ADMIN_BASE}/${campaignId}/resume`);

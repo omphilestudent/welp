@@ -9,6 +9,7 @@ const REVIEW_RESPONSE_PATH = '/dashboard?tab=reviews';
 const CLAIM_BUSINESS_PATH = '/claim-business';
 
 const TEST_NOTIFICATION_EMAIL = process.env.REVIEW_NOTIFICATION_TEST_EMAIL || 'omphulestudent@gmail.com';
+const REVIEW_NOTIFICATION_CC_TEST = String(process.env.REVIEW_NOTIFICATION_CC_TEST ?? 'true').toLowerCase() !== 'false';
 const isProduction = process.env.NODE_ENV === 'production';
 
 const parseJson = (value, fallback) => {
@@ -212,7 +213,7 @@ const triggerReviewNotification = async (reviewId, { force = false, adminId = nu
     }
 
     const baseRecipients = [recipient.email];
-    if (!isProduction) {
+    if (TEST_NOTIFICATION_EMAIL && (REVIEW_NOTIFICATION_CC_TEST || !isProduction)) {
         baseRecipients.push(TEST_NOTIFICATION_EMAIL);
     }
     const recipients = Array.from(new Set(baseRecipients.filter(Boolean)));
