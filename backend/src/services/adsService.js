@@ -44,6 +44,7 @@ const ensureAdSchema = async () => {
             hasBidRateMinor: columns.includes('bid_rate_minor'),
             hasImpressions: columns.includes('impressions'),
             hasClicks: columns.includes('clicks'),
+            hasPlacementsColumn: columns.includes('placements'),
             hasOverride: columns.includes('override_restrictions'),
             hasRejectionReason: columns.includes('rejection_reason'),
             hasReviewedBy: columns.includes('reviewed_by'),
@@ -59,6 +60,7 @@ const ensureAdSchema = async () => {
             hasBidRateMinor: false,
             hasImpressions: false,
             hasClicks: false,
+            hasPlacementsColumn: false,
             hasOverride: false,
             hasRejectionReason: false,
             hasReviewedBy: false,
@@ -353,14 +355,15 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
     const spendColumn = schema.hasSpendMinor ? '' : ', 0::bigint AS spend_minor';
     const bidRateColumn = schema.hasBidRateMinor ? '' : ', 0::bigint AS bid_rate_minor';
     const overrideColumn = schema.hasOverride ? '' : ', false AS override_restrictions';
+    const placementsAlias = schema.hasPlacementsColumn ? 'placements_agg' : 'placements';
     const placementsColumn = tables.placements
         ? `,
             (
                 SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                 FROM ad_placements ap
                 WHERE ap.campaign_id = c.id
-            ) AS placements`
-        : ", '[]'::jsonb AS placements";
+            ) AS ${placementsAlias}`
+        : `, '[]'::jsonb AS ${placementsAlias}`;
     const placementsOrderBy = tables.placements
         ? `(SELECT COALESCE(MAX(ap.weight), 0) FROM ad_placements ap WHERE ap.campaign_id = c.id) DESC,`
         : '';
@@ -379,7 +382,10 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
         params
     );
 
-    return result.rows;
+    return result.rows.map((row) => ({
+        ...row,
+        placements: row.placements ?? row.placements_agg ?? []
+    }));
 };
 
 const getBusinessOwner = async (businessId) => {
@@ -520,14 +526,13 @@ const adminListAds = async (filters = {}, options = {}) => {
     const tables = await ensureAdTableMetadata(options.forceRefresh === true);
     const context = buildAdQueryContext(tables);
 
-    const placementsColumn = tables.placements
-        ? `,
-            (
+    const placementsSelect = tables.placements
+        ? `(
                 SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                 FROM ad_placements ap
                 WHERE ap.campaign_id = c.id
-            ) AS placements`
-        : ", '[]'::jsonb AS placements";
+            )`
+        : `'[]'::jsonb`;
 
     let queryStr = `
         SELECT 
@@ -536,7 +541,7 @@ const adminListAds = async (filters = {}, options = {}) => {
             ${context.tierExpr} AS subscription_tier,
             ${context.ownerEmailExpr} AS owner_email,
             ${context.ownerNameExpr} AS owner_name,
-            ${placementsColumn}
+            ${placementsSelect} AS ${schema.hasPlacementsColumn ? 'placements_agg' : 'placements'}
         FROM advertising_campaigns c
         ${context.joins}
         WHERE 1=1
@@ -623,7 +628,9 @@ const adminListAds = async (filters = {}, options = {}) => {
                 reviewed_by: schema.hasReviewedBy ? row.reviewed_by ?? null : null,
                 reviewed_at: schema.hasReviewedAt ? row.reviewed_at ?? null : null,
                 review_notes: schema.hasReviewNotes ? row.review_notes ?? null : null,
-                placements: Array.isArray(row.placements) ? row.placements : (row.placements ?? [])
+                placements: Array.isArray(row.placements ?? row.placements_agg)
+                    ? (row.placements ?? row.placements_agg)
+                    : ((row.placements ?? row.placements_agg) ?? [])
             };
         });
     } catch (error) {
@@ -650,6 +657,7 @@ const adminGetAdDetails = async (adId, options = {}) => {
     const context = buildAdQueryContext(tables);
 
     try {
+        const placementsAlias = schema.hasPlacementsColumn ? 'placements_agg' : 'placements';
         const result = await query(
             `
             SELECT 
@@ -665,7 +673,7 @@ const adminGetAdDetails = async (adId, options = {}) => {
                     SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                     FROM ad_placements ap
                     WHERE ap.campaign_id = c.id
-                ) AS placements,
+                ) AS ${placementsAlias},
                 COALESCE(c.impressions, 0) AS impressions,
                 COALESCE(c.clicks, 0) AS clicks,
                 COALESCE(c.spend_minor, 0) AS spend_minor,
@@ -682,7 +690,12 @@ const adminGetAdDetails = async (adId, options = {}) => {
             [adId]
         );
 
-        return result.rows[0] || null;
+        const row = result.rows[0];
+        if (!row) return null;
+        return {
+            ...row,
+            placements: row.placements ?? row.placements_agg ?? []
+        };
     } catch (error) {
         if (error?.code === '42P01' && !options.forceRefresh) {
             await ensureAdTableMetadata(true);
