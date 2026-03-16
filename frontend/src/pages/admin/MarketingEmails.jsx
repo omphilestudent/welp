@@ -1,5 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { FaPlus, FaEdit, FaTrash, FaPaperPlane, FaImage, FaEye, FaListUl } from 'react-icons/fa';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    FaPlus,
+    FaEdit,
+    FaTrash,
+    FaPaperPlane,
+    FaImage,
+    FaEye,
+    FaListUl,
+    FaBell,
+    FaSync,
+    FaSearch,
+    FaRedo
+} from 'react-icons/fa';
 import api from '../../services/api';
 import Loading from '../../components/common/Loading';
 
@@ -221,6 +233,30 @@ const STATUS_STYLES = {
     failed:     { background: '#fef2f2', color: '#b91c1c' },
 };
 
+const REVIEW_STATUS_LABELS = {
+    sent: 'Sent',
+    failed: 'Failed',
+    awaiting_contact: 'Awaiting Contact',
+    pending: 'Pending',
+    already_sent: 'Already Sent'
+};
+
+const REVIEW_STATUS_STYLES = {
+    sent: { background: '#dcfce7', color: '#166534' },
+    failed: { background: '#fee2e2', color: '#b91c1c' },
+    awaiting_contact: { background: '#fef9c3', color: '#854d0e' },
+    pending: { background: '#e0e7ff', color: '#4338ca' },
+    already_sent: { background: '#e0f2fe', color: '#0369a1' }
+};
+
+const REVIEW_STATUS_FILTERS = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'sent', label: 'Sent' },
+    { value: 'failed', label: 'Failed' },
+    { value: 'awaiting_contact', label: 'Awaiting contact' },
+    { value: 'pending', label: 'Pending' }
+];
+
 const TOGGLE_CSS = `
 .ec-switch{position:relative;display:inline-block;width:40px;height:22px}
 .ec-switch input{opacity:0;width:0;height:0}
@@ -243,8 +279,41 @@ const MarketingEmails = () => {
     const [logCampaign, setLogCampaign] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [statusFilter, setStatusFilter] = useState('all');
+    const [reviewLogs, setReviewLogs] = useState([]);
+    const [reviewLoading, setReviewLoading] = useState(true);
+    const [reviewStatus, setReviewStatus] = useState('all');
+    const [reviewSearchInput, setReviewSearchInput] = useState('');
+    const [reviewSearch, setReviewSearch] = useState('');
+    const [reviewPage, setReviewPage] = useState(1);
+    const [reviewPagination, setReviewPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
+    const [reviewError, setReviewError] = useState('');
+    const [selectedLog, setSelectedLog] = useState(null);
+    const [resendingLogId, setResendingLogId] = useState(null);
 
     useEffect(() => { fetchCampaigns(); }, []);
+
+    const fetchReviewLogs = useCallback(async () => {
+        setReviewLoading(true);
+        setReviewError('');
+        try {
+            const { data } = await api.get('/admin/review-notifications/logs', {
+                params: {
+                    page: reviewPage,
+                    limit: 20,
+                    status: reviewStatus,
+                    search: reviewSearch
+                }
+            });
+            setReviewLogs(data.logs || []);
+            setReviewPagination(data.pagination || { page: 1, limit: 20, total: 0, pages: 0 });
+        } catch (err) {
+            setReviewError(err.response?.data?.error || 'Failed to load review notification activity');
+        } finally {
+            setReviewLoading(false);
+        }
+    }, [reviewPage, reviewStatus, reviewSearch]);
+
+    useEffect(() => { fetchReviewLogs(); }, [fetchReviewLogs]);
 
     const fetchCampaigns = async () => {
         setLoading(true); setError('');
@@ -324,6 +393,32 @@ const MarketingEmails = () => {
         } catch (err) { setError(err.response?.data?.error || 'Failed to load logs'); }
     };
 
+    const handleReviewSearchSubmit = (e) => {
+        e.preventDefault();
+        setReviewPage(1);
+        setReviewSearch(reviewSearchInput.trim());
+    };
+
+    const resetReviewFilters = () => {
+        setReviewStatus('all');
+        setReviewSearch('');
+        setReviewSearchInput('');
+        setReviewPage(1);
+    };
+
+    const handleReviewResend = async (logId) => {
+        setReviewError('');
+        setResendingLogId(logId);
+        try {
+            await api.post(`/admin/review-notifications/logs/${logId}/resend`);
+            await fetchReviewLogs();
+        } catch (err) {
+            setReviewError(err.response?.data?.error || 'Failed to resend review notification');
+        } finally {
+            setResendingLogId(null);
+        }
+    };
+
     const handleUpload = async (files) => {
         if (!files?.length) return;
         setUploading(true);
@@ -351,6 +446,14 @@ const MarketingEmails = () => {
         { key: 'sent',      label: 'Sent',      count: campaigns.filter(c => c.status === 'sent').length },
         { key: 'failed',    label: 'Failed',    count: campaigns.filter(c => c.status === 'failed').length },
     ], [campaigns]);
+
+    const reviewRangeStart = reviewPagination.total === 0
+        ? 0
+        : (reviewPagination.page - 1) * reviewPagination.limit + 1;
+    const reviewRangeEnd = reviewPagination.total === 0
+        ? 0
+        : Math.min(reviewPagination.total, reviewPagination.page * reviewPagination.limit);
+    const selectedLogMetadata = selectedLog?.metadata || {};
 
     const formatDateTime = (v) => {
         if (!v) return '--';
@@ -641,6 +744,169 @@ const MarketingEmails = () => {
                 </div>
             )}
 
+            {/* Review-triggered notifications */}
+            <div style={{ marginTop: '3rem', borderTop: '1px solid #e5e7eb', paddingTop: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#0f1117', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <FaBell style={{ color: '#f97316' }} />
+                            Review-triggered alerts
+                        </h2>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            Every new review fires an immediate email to the business and a dev copy to <strong>omphulestudent@gmail.com</strong> when SMTP is configured.
+                        </p>
+                    </div>
+                    <button style={s.btnSecondary} onClick={fetchReviewLogs}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                        <FaSync style={{ fontSize: '12px' }} /> Refresh activity
+                    </button>
+                </div>
+
+                <div style={{ marginTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+                    <form onSubmit={handleReviewSearchSubmit} style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '260px' }}>
+                        <input
+                            style={{ ...inputStyle, background: '#fff' }}
+                            placeholder="Filter by company, email, or review text"
+                            value={reviewSearchInput}
+                            onChange={(e) => setReviewSearchInput(e.target.value)}
+                        />
+                        <button type="submit" style={s.btnSecondary}>
+                            <FaSearch style={{ fontSize: '12px' }} /> Search
+                        </button>
+                        <button type="button" style={s.btnSecondary} onClick={resetReviewFilters}>
+                            Clear
+                        </button>
+                    </form>
+                    <div style={{ minWidth: '200px' }}>
+                        <label style={{ ...labelStyle, textTransform: 'none', letterSpacing: 0 }}>Status</label>
+                        <select
+                            style={inputStyle}
+                            value={reviewStatus}
+                            onChange={(e) => { setReviewStatus(e.target.value); setReviewPage(1); }}
+                            onFocus={onFocusStyle}
+                            onBlur={onBlurStyle}
+                        >
+                            {REVIEW_STATUS_FILTERS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {reviewError && <div style={{ ...s.alert, marginTop: '1rem' }}><span>⚠</span> {reviewError}</div>}
+
+                <div style={{
+                    marginTop: '1rem',
+                    background: '#fff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    overflowX: 'auto'
+                }}>
+                    {reviewLoading ? (
+                        <div style={{ padding: '2rem' }}><Loading /></div>
+                    ) : reviewLogs.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.875rem' }}>
+                            No review notifications recorded for this filter yet.
+                        </div>
+                    ) : (
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+                            <thead>
+                                <tr style={{ textAlign: 'left', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280' }}>
+                                    {['Company', 'Rating', 'Reviewer', 'Status', 'Last Attempt', 'Actions'].map((header) => (
+                                        <th key={header} style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb' }}>{header}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {reviewLogs.map((log) => (
+                                    <tr key={log.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                        <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                                            <div style={{ fontWeight: 600 }}>{log.company_name || 'Company record missing'}</div>
+                                            <div style={{ fontSize: '0.76rem', color: '#9ca3af', marginTop: '2px' }}>
+                                                Review ID: {log.review_id?.slice(0, 8)}…
+                                            </div>
+                                            <div style={{ fontSize: '0.76rem', color: '#9ca3af', marginTop: '2px' }}>
+                                                To: {log.email_to}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '12px 16px', fontWeight: 600 }}>
+                                            {log.metadata?.rating ? `${log.metadata.rating} / 5` : '--'}
+                                        </td>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <div style={{ fontWeight: 500 }}>{log.metadata?.reviewerName || 'Anonymous reviewer'}</div>
+                                            <div style={{ fontSize: '0.76rem', color: '#9ca3af' }}>
+                                                {log.metadata?.location || 'Location N/A'}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <span style={{
+                                                ...s.pillBase,
+                                                ...(REVIEW_STATUS_STYLES[log.status] || { background: '#f3f4f6', color: '#374151' })
+                                            }}>
+                                                {REVIEW_STATUS_LABELS[log.status] || log.status}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '12px 16px', fontSize: '0.82rem' }}>
+                                            {formatDateTime(log.created_at)}
+                                        </td>
+                                        <td style={{ padding: '12px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            <button style={{ ...s.btnSecondary, padding: '6px 12px' }} onClick={() => setSelectedLog(log)}
+                                                    onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                                                Details
+                                            </button>
+                                            <button
+                                                style={{ ...s.btnIndigoSm, padding: '6px 12px', background: '#1d4ed8' }}
+                                                onClick={() => handleReviewResend(log.id)}
+                                                disabled={resendingLogId === log.id}
+                                            >
+                                                <FaRedo style={{ fontSize: '11px' }} />
+                                                {resendingLogId === log.id ? 'Resending…' : 'Resend'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
+                {reviewLogs.length > 0 && (
+                    <div style={{
+                        marginTop: '1rem',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '12px',
+                        alignItems: 'center'
+                    }}>
+                        <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                            Showing {reviewRangeStart}-{reviewRangeEnd} of {reviewPagination.total} notifications
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                                style={s.btnSecondary}
+                                onClick={() => setReviewPage((prev) => Math.max(1, prev - 1))}
+                                disabled={reviewPagination.page <= 1}
+                            >
+                                Previous
+                            </button>
+                            <button
+                                style={s.btnSecondary}
+                                onClick={() => setReviewPage((prev) => {
+                                    const maxPage = reviewPagination.pages || prev + 1;
+                                    return Math.min(maxPage, prev + 1);
+                                })}
+                                disabled={reviewPagination.pages > 0 && reviewPagination.page >= reviewPagination.pages}
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* Preview modal */}
             {preview && (
                 <div style={s.overlay} onClick={e => e.target === e.currentTarget && setPreview(null)}>
@@ -698,6 +964,87 @@ const MarketingEmails = () => {
                                     </span>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Review notification detail modal */}
+            {selectedLog && (
+                <div style={s.overlay} onClick={e => e.target === e.currentTarget && setSelectedLog(null)}>
+                    <div style={{ ...s.modal, maxWidth: '640px' }}>
+                        <div style={s.modalHeader}>
+                            <h3 style={s.modalTitle}>Review notification</h3>
+                            <button style={s.modalClose} onClick={() => setSelectedLog(null)}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#e5e7eb'}
+                                    onMouseLeave={e => e.currentTarget.style.background = '#f3f4f6'}>×</button>
+                        </div>
+                        <div style={s.modalBody}>
+                            <div>
+                                <div style={s.sectionDivider}>Company</div>
+                                <p style={{ margin: 0, fontWeight: 600 }}>{selectedLog.company_name}</p>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#6b7280' }}>{selectedLog.email_to}</p>
+                            </div>
+                            <div>
+                                <div style={s.sectionDivider}>Review snapshot</div>
+                                <p style={{ margin: 0 }}>
+                                    <strong>Rating:</strong> {selectedLogMetadata.rating ?? '—'} / 5
+                                </p>
+                                <p style={{ margin: '4px 0 0' }}>
+                                    <strong>Reviewer:</strong> {selectedLogMetadata.reviewerName || 'Anonymous reviewer'}
+                                </p>
+                                <p style={{ margin: '4px 0 0' }}>
+                                    <strong>Location:</strong> {selectedLogMetadata.location || 'Not specified'}
+                                </p>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                                    Submitted {selectedLogMetadata.reviewDate ? formatDateTime(selectedLogMetadata.reviewDate) : '—'}
+                                </p>
+                                <div style={{
+                                    marginTop: '8px',
+                                    padding: '10px 12px',
+                                    background: '#f9fafb',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e5e7eb',
+                                    fontSize: '0.9rem',
+                                    whiteSpace: 'pre-wrap'
+                                }}>
+                                    {selectedLog.content || selectedLogMetadata.reviewExcerpt || 'No review text captured.'}
+                                </div>
+                            </div>
+                            <div>
+                                <div style={s.sectionDivider}>Delivery status</div>
+                                <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{
+                                        ...s.pillBase,
+                                        ...(REVIEW_STATUS_STYLES[selectedLog.status] || { background: '#f3f4f6', color: '#374151' })
+                                    }}>
+                                        {REVIEW_STATUS_LABELS[selectedLog.status] || selectedLog.status}
+                                    </span>
+                                    <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                                        Last attempt: {formatDateTime(selectedLog.created_at)}
+                                    </span>
+                                </p>
+                                {selectedLog.error && (
+                                    <p style={{ marginTop: '6px', fontSize: '0.85rem', color: '#b91c1c' }}>
+                                        {selectedLog.error}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <div style={s.modalFooter}>
+                            <button style={s.btnSecondary} onClick={() => setSelectedLog(null)}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                                Close
+                            </button>
+                            <button
+                                style={{ ...s.btnIndigoSm, background: '#1d4ed8' }}
+                                onClick={() => handleReviewResend(selectedLog.id)}
+                                disabled={resendingLogId === selectedLog.id}
+                            >
+                                <FaRedo style={{ fontSize: '11px' }} />
+                                {resendingLogId === selectedLog.id ? 'Resending…' : 'Resend email'}
+                            </button>
                         </div>
                     </div>
                 </div>

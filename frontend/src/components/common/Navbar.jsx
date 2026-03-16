@@ -7,6 +7,7 @@ import api from '../../services/api';
 import socketService from '../../services/socket';
 import { resolveMediaUrl } from '../../utils/media';
 import { presentNotificationFromPayload } from '../../utils/systemNotifications';
+import AvatarImage from './AvatarImage';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -296,7 +297,7 @@ const Navbar = () => {
 
                                 <Link to="/settings" className="navbar-avatar" aria-label="Profile" onClick={closeMobileMenu}>
                                     {user?.avatar_url ? (
-                                        <img src={resolveMediaUrl(user.avatar_url)} alt={user.display_name || 'Profile'} />
+                                        <AvatarImage src={user.avatar_url} alt={user.display_name || 'Profile'} />
                                     ) : (
                                         <span className="navbar-avatar-placeholder">
                                             {(user?.display_name || user?.email || 'U').charAt(0).toUpperCase()}

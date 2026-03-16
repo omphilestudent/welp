@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { FaTimes, FaUserMd, FaCheckCircle, FaComment } from 'react-icons/fa';
-import { resolveMediaUrl } from '../../utils/media';
+import AvatarImage from '../common/AvatarImage';
 
 const ChatRequestModal = ({ isOpen, onClose, onSuccess }) => {
     const [psychologists, setPsychologists] = useState([]);
@@ -92,7 +92,7 @@ const ChatRequestModal = ({ isOpen, onClose, onSuccess }) => {
                                         >
                                             <div className="psychologist-avatar">
                                                 {psych.avatar_url ? (
-                                                    <img src={resolveMediaUrl(psych.avatar_url)} alt={psych.display_name} />
+                                                    <AvatarImage src={psych.avatar_url} alt={psych.display_name} />
                                                 ) : (
                                                     <div className="avatar-placeholder">
                                                         {psych.display_name?.charAt(0) || 'P'}

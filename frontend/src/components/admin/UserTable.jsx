@@ -1,5 +1,6 @@
 import React from 'react';
 import './UserTable.css';
+import AvatarImage from '../common/AvatarImage';
 
 const UserTable = ({ users, selectedUsers, setSelectedUsers, onEdit, onDelete, onResetPassword }) => {
     const handleSelectAll = (e) => {
@@ -38,7 +39,7 @@ const UserTable = ({ users, selectedUsers, setSelectedUsers, onEdit, onDelete, o
                                 <div className="user-info">
                                     <div className="user-avatar">
                                         {user.profilePicture ? (
-                                            <img src={user.profilePicture} alt={`${user.firstName} ${user.lastName}`} />
+                                            <AvatarImage src={user.profilePicture} alt={`${user.firstName} ${user.lastName}`} />
                                         ) : (
                                             <div className="avatar-placeholder">{user.firstName?.[0] || '?'}{user.lastName?.[0] || '?'}</div>
                                         )}

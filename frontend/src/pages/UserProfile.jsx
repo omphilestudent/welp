@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import Loading from '../components/common/Loading';
-import { resolveMediaUrl } from '../utils/media';
+import AvatarImage from '../components/common/AvatarImage';
 
 const formatDateTime = (value) => {
     if (!value) return '';
@@ -57,7 +57,7 @@ const UserProfile = () => {
             <div className="user-profile-header">
                 <div className="user-profile-avatar">
                     {user.avatar_url ? (
-                        <img src={resolveMediaUrl(user.avatar_url)} alt={user.display_name} />
+                        <AvatarImage src={user.avatar_url} alt={user.display_name} />
                     ) : (
                         <div className="avatar-placeholder">
                             {user.display_name?.charAt(0) || 'U'}

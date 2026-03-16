@@ -33,11 +33,25 @@ const listAds = async (req, res) => {
         let idx = 1;
 
         if (req.query.reviewStatus) {
-            filters.push(`c.review_status = $${idx}`);
+            if (req.query.reviewStatus === 'pending') {
+                filters.push(`(
+                    c.review_status = $${idx}
+                    OR c.review_status IS NULL
+                    OR c.review_status = 'pending_review'
+                    OR c.status = 'pending_review'
+                )`);
+            } else {
+                filters.push(`c.review_status = $${idx}`);
+            }
             params.push(req.query.reviewStatus);
             idx += 1;
         } else {
-            filters.push(`c.review_status = 'pending'`);
+            filters.push(`(
+                c.review_status = 'pending'
+                OR c.review_status IS NULL
+                OR c.review_status = 'pending_review'
+                OR c.status = 'pending_review'
+            )`);
         }
 
         if (req.query.status) {

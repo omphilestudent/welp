@@ -16,7 +16,9 @@ const MessageThread = ({
     sessionLimitMinutes = 30,
     onStartVoiceCall,
     onStartVideoCall,
-    onOpenSidebar
+    onOpenSidebar,
+    callDisabled = false,
+    callDisabledReason = ''
 }) => {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -170,7 +172,10 @@ const MessageThread = ({
                     <div className="thread-actions">
                         <button
                             className="btn btn-outline btn-small"
+                            disabled={callDisabled}
+                            title={callDisabled ? callDisabledReason : undefined}
                             onClick={() => {
+                                if (callDisabled) return;
                                 if (!canCall) {
                                     return onStartVoiceCall?.({ reason: 'pending' });
                                 }
@@ -181,7 +186,10 @@ const MessageThread = ({
                         </button>
                         <button
                             className="btn btn-outline btn-small"
+                            disabled={callDisabled}
+                            title={callDisabled ? callDisabledReason : undefined}
                             onClick={() => {
+                                if (callDisabled) return;
                                 if (!canCall) {
                                     return onStartVideoCall?.({ reason: 'pending' });
                                 }
@@ -193,6 +201,14 @@ const MessageThread = ({
                         <span className="thread-call-limit">
                             {callLimitText}
                         </span>
+                    </div>
+                )}
+                {callDisabled && callDisabledReason && (
+                    <div
+                        className="call-disabled-hint"
+                        style={{ fontSize: '0.8rem', color: '#dc2626', marginTop: '0.35rem' }}
+                    >
+                        {callDisabledReason}
                     </div>
                 )}
             </div>

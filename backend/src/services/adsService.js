@@ -353,7 +353,16 @@ const adminListAds = async (filters = {}) => {
 
     // Apply filters
     if (filters.reviewStatus) {
-        queryStr += ` AND c.review_status = $${paramIndex}`;
+        if (filters.reviewStatus === 'pending') {
+            queryStr += ` AND (
+                c.review_status = $${paramIndex}
+                OR c.review_status IS NULL
+                OR c.review_status = 'pending_review'
+                OR c.status = 'pending_review'
+            )`;
+        } else {
+            queryStr += ` AND c.review_status = $${paramIndex}`;
+        }
         params.push(filters.reviewStatus);
         paramIndex++;
     }

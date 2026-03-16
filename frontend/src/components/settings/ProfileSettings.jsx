@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { FaCamera, FaUpload, FaBriefcase, FaBuilding, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaGlobe } from 'react-icons/fa';
-import { resolveMediaUrl } from '../../utils/media';
+import AvatarImage from '../common/AvatarImage';
 
 const ProfileSettings = ({ onUpdate }) => {
     const { user, updateUser } = useAuth();
@@ -183,7 +183,7 @@ const ProfileSettings = ({ onUpdate }) => {
                 <div className="avatar-upload-container">
                     <div className="current-avatar">
                         {profile.avatarUrl ? (
-                            <img src={resolveMediaUrl(profile.avatarUrl)} alt={profile.displayName} />
+                            <AvatarImage src={profile.avatarUrl} alt={profile.displayName} />
                         ) : (
                             <div className="avatar-placeholder-large">
                                 {profile.displayName?.charAt(0) || user?.display_name?.charAt(0) || 'U'}

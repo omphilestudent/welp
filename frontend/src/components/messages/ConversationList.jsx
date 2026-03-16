@@ -2,7 +2,7 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
-import { resolveMediaUrl } from '../../utils/media';
+import AvatarImage from '../common/AvatarImage';
 
 const ConversationList = ({ conversations, activeId, onSelect }) => {
     const { user } = useAuth();
@@ -36,7 +36,7 @@ const ConversationList = ({ conversations, activeId, onSelect }) => {
                     >
                         <div className="conversation-avatar">
                             {other?.avatar_url ? (
-                                <img src={resolveMediaUrl(other.avatar_url)} alt={other.display_name} />
+                                <AvatarImage src={other.avatar_url} alt={other?.display_name || 'Conversation participant'} />
                             ) : (
                                 <div className="avatar-placeholder">
                                     {other?.display_name?.charAt(0) || '?'}

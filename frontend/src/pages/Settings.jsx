@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import api from '../services/api';
-import { resolveMediaUrl } from '../utils/media';
+import AvatarImage from '../components/common/AvatarImage';
 import toast from 'react-hot-toast';
 import {
     FaUser,
@@ -369,7 +369,7 @@ const Settings = () => {
                                 <div className="profile-avatar-container" style={{ marginBottom: '1.5rem' }}>
                                     <div className="profile-avatar">
                                         {profile.avatarUrl ? (
-                                            <img src={resolveMediaUrl(profile.avatarUrl)} alt={profile.displayName} />
+                                            <AvatarImage src={profile.avatarUrl} alt={profile.displayName} />
                                         ) : (
                                             <div className="avatar-placeholder-large">
                                                 {(profile.displayName || user?.display_name || 'U').charAt(0).toUpperCase()}

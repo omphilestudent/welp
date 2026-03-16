@@ -9,7 +9,7 @@ import MessageThread from '../components/messages/MessageThread';
 import ChatAllocationModal from '../components/messages/ChatAllocationModal';
 import Loading from '../components/common/Loading';
 import toast from 'react-hot-toast';
-import { FaSearch, FaStar, FaUserPlus, FaVideo, FaHistory, FaClock, FaExclamationTriangle } from 'react-icons/fa';
+import { FaSearch, FaStar, FaUserPlus, FaVideo, FaHistory, FaClock, FaExclamationTriangle, FaLock } from 'react-icons/fa';
 import { fetchChatUsage } from '../services/chatUsageService';
 import SponsoredCard from '../components/ads/SponsoredCard';
 
@@ -52,7 +52,16 @@ const Messages = () => {
         }
         return String(value);
     };
-    const subscriptionPlan = subscription?.plan_type || 'free';
+    const resolvedPlan =
+        subscription?.planTier ||
+        subscription?.plan_tier ||
+        subscription?.tier ||
+        subscription?.plan_type ||
+        subscription?.planCode ||
+        subscription?.plan_code ||
+        'free';
+    const subscriptionPlan = String(resolvedPlan).toLowerCase();
+    const callRestrictionCopy = 'Upgrade to a paid plan to initiate calls.';
     const isFreeEmployee = user?.role === 'employee' && subscriptionPlan === 'free';
 
     const sortedConversations = useMemo(() => {
@@ -153,7 +162,7 @@ const Messages = () => {
     const fetchSubscription = async () => {
         try {
             const { data } = await api.get('/subscriptions/me');
-            setSubscription(data);
+            setSubscription(data?.subscription || data);
         } catch (err) {
             console.error('Failed to load subscription', err);
         }
@@ -336,9 +345,14 @@ const Messages = () => {
         };
 
         const handleEnd = (payload) => {
-            if (!payload?.conversationId || payload?.fromUserId === user?.id) return;
+            if (!payload?.conversationId) return;
+            const isSelfTermination = payload?.fromUserId === user?.id && !payload?.system;
+            if (isSelfTermination) return;
             if (payload.reason === 'busy') {
                 toast('User is busy on another call.');
+            }
+            if (payload.reason === 'duration_limit') {
+                toast('Call ended because the psychologist session limit was reached.');
             }
             endCall(false);
         };
@@ -355,6 +369,22 @@ const Messages = () => {
             socketService.offCallEnd();
         };
     }, [userId, ensureConversationActive, callState.status]);
+
+    useEffect(() => {
+        const handleSocketError = (payload) => {
+            if (!payload) return;
+            if (payload.message) {
+                toast.error(payload.message);
+            }
+            if (payload.code === 'CALL_BLOCKED_FREE_TIER') {
+                endCall(false);
+            }
+        };
+        socketService.onError(handleSocketError);
+        return () => {
+            socketService.offError();
+        };
+    }, [endCall]);
 
     const startRingtone = () => {
         stopRingtone();
@@ -434,6 +464,10 @@ const Messages = () => {
             toast.error('No active psychologist yet.');
             return;
         }
+        if (isFreeEmployee) {
+            toast(callRestrictionCopy);
+            return;
+        }
 
         if (callState.status !== 'idle') {
             toast('You are already in a call.');
@@ -456,6 +490,10 @@ const Messages = () => {
     const handleVoiceCall = () => {
         if (!activeConversation || !currentPsychologist) {
             toast.error('No active psychologist yet.');
+            return;
+        }
+        if (isFreeEmployee) {
+            toast(callRestrictionCopy);
             return;
         }
 
@@ -506,6 +544,10 @@ const Messages = () => {
 
     const startCall = async (mediaType) => {
         if (!activeConversation) return;
+        if (isFreeEmployee) {
+            toast(callRestrictionCopy);
+            return;
+        }
         try {
             let constraints = mediaType === 'voice'
                 ? { audio: true, video: false }
@@ -938,7 +980,7 @@ const Messages = () => {
                                 <div className="available-psych-card__header">
                                     <span>Available psychologist</span>
                                     <span className="available-psych-card__tier">
-                                        {subscriptionPlan === 'premium' ? 'Premium access' : 'Free tier'}
+                                        {subscriptionPlan.includes('premium') ? 'Premium access' : 'Free tier'}
                                     </span>
                                 </div>
                                 {featuredPsychologist ? (
@@ -1020,13 +1062,14 @@ const Messages = () => {
                                     {hasResponse ? 'Psychologist has replied' : 'Waiting for a reply'}
                                 </div>
                                 <div className="conversation-status-actions">
-                                    <button
-                                        className="btn btn-outline btn-small"
-                                        onClick={handleVideoCall}
-                                        disabled={!canStartVideoCall}
-                                    >
+                                      <button
+                                          className="btn btn-outline btn-small"
+                                          onClick={handleVideoCall}
+                                          disabled={!canStartVideoCall || isFreeEmployee}
+                                          title={isFreeEmployee ? callRestrictionCopy : undefined}
+                                      >
                                         <FaVideo /> Setup video call
-                                    </button>
+                                      </button>
                                     <button
                                         className="btn btn-secondary btn-small"
                                         onClick={handleViewHistory}
@@ -1035,16 +1078,24 @@ const Messages = () => {
                                         <FaHistory /> View message history
                                     </button>
                                 </div>
-                                {showUpgradeReminder && (
-                                    <div className="upgrade-reminder">
-                                        <FaExclamationTriangle />
-                                        <span>
-                                            {isConversationExpired
-                                                ? 'Upgrade to premium to keep conversations alive longer and preserve history.'
-                                                : 'Time is running out on the free plan. Upgrade to extend the session.'}
-                                        </span>
-                                    </div>
-                                )}
+                                  {showUpgradeReminder && (
+                                      <div className="upgrade-reminder">
+                                          <FaExclamationTriangle />
+                                          <span>
+                                              {isConversationExpired
+                                                  ? 'Upgrade to premium to keep conversations alive longer and preserve history.'
+                                                  : 'Time is running out on the free plan. Upgrade to extend the session.'}
+                                          </span>
+                                      </div>
+                                  )}
+                                  {isFreeEmployee && (
+                                      <div className="upgrade-reminder" style={{ marginTop: '0.75rem' }}>
+                                          <FaLock />
+                                          <span>
+                                              {callRestrictionCopy} Psychologists can still initiate a call with you.
+                                          </span>
+                                      </div>
+                                  )}
                             </section>
 
                             <section className="messages-sponsored-slot">
@@ -1068,6 +1119,8 @@ const Messages = () => {
                         onStartVoiceCall={handleVoiceCall}
                         onStartVideoCall={handleVideoCall}
                         onOpenSidebar={() => setIsSidebarOpen(true)}
+                        callDisabled={isFreeEmployee}
+                        callDisabledReason={callRestrictionCopy}
                     />
                 </div>
             </div>

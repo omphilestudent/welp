@@ -30,6 +30,9 @@ const { initMarketingTables, startMarketingScheduler } = require('./services/mar
 const { initEmailMarketingTables, startEmailCampaignScheduler } = require('./services/emailMarketingService');
 const { query } = require('./utils/database');
 const { createUserNotification } = require('./utils/userNotifications');
+const { getActiveSubscription, getPlanPayload } = require('./services/subscriptionService');
+const { hasPremiumException } = require('./utils/premiumAccess');
+const { ROLE_FLAGS } = require('./middleware/roleFlags');
 
 // Database connection with better error handling
 const { sequelize, testConnection } = require('./models');
@@ -258,6 +261,159 @@ io.use((socket, next) => {
 
 // Socket.IO connection handling
 const activeCalls = new Map();
+const CALL_CAP_CACHE = new Map();
+const CALL_CAP_TTL_MS = Number(process.env.CALL_CAP_CACHE_TTL_MS || 60000);
+
+const getUserCallCapabilities = async (userId) => {
+    if (!userId) {
+        return { role: 'unknown', tier: 'free', callMinutes: 0, canInitiate: false };
+    }
+    const cached = CALL_CAP_CACHE.get(userId);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.value;
+    }
+
+    const userResult = await query(
+        'SELECT id, role, email, subscription_tier FROM users WHERE id = $1',
+        [userId]
+    );
+    if (!userResult.rows.length) {
+        return { role: 'unknown', tier: 'free', callMinutes: 0, canInitiate: false };
+    }
+    const user = userResult.rows[0];
+    const role = String(user.role || 'employee').toLowerCase();
+
+    let planPayload = null;
+    if (role === 'employee') {
+        if (hasPremiumException(user)) {
+            planPayload = { tier: 'premium', callMinutes: 120 };
+        } else {
+            const record = await getActiveSubscription('user', userId);
+            planPayload = await getPlanPayload(record, 'user');
+        }
+    } else if (role === 'psychologist') {
+        const record = await getActiveSubscription('psychologist', userId);
+        planPayload = await getPlanPayload(record, 'psychologist') || {};
+        if (!planPayload.callMinutes) {
+            planPayload.callMinutes = ROLE_FLAGS.psychologist?.call_minutes_per_client || 120;
+        }
+        if (!planPayload.tier) {
+            planPayload.tier = 'premium';
+        }
+    } else {
+        planPayload = { tier: user.subscription_tier || 'free', callMinutes: 0 };
+    }
+
+    const callMinutes = Number(planPayload?.callMinutes ?? 0);
+    const tier = String(
+        planPayload?.tier ||
+        planPayload?.planTier ||
+        planPayload?.plan_tier ||
+        user.subscription_tier ||
+        'free'
+    ).toLowerCase();
+
+    const value = {
+        role,
+        tier,
+        callMinutes,
+        canInitiate: role !== 'employee' || (tier !== 'free' && callMinutes > 0)
+    };
+    CALL_CAP_CACHE.set(userId, { value, expiresAt: Date.now() + CALL_CAP_TTL_MS });
+    return value;
+};
+
+const endCallSession = async (conversationId, reason = 'ended', endedByUserId = null, options = {}) => {
+    if (!options.skipEmit) {
+        io.to(`conversation-${conversationId}`).emit('call:end', {
+            conversationId,
+            reason,
+            fromUserId: endedByUserId,
+            system: Boolean(options.system)
+        });
+    }
+
+    const active = activeCalls.get(conversationId);
+    if (!active) {
+        return;
+    }
+
+    if (active.timer) {
+        clearTimeout(active.timer);
+    }
+
+    let employeeId = active.employeeId;
+    let psychologistId = active.psychologistId;
+    if (!employeeId || !psychologistId) {
+        const fallback = await query(
+            'SELECT employee_id, psychologist_id FROM conversations WHERE id = $1',
+            [conversationId]
+        );
+        if (fallback.rows.length) {
+            employeeId = employeeId || fallback.rows[0].employee_id;
+            psychologistId = psychologistId || fallback.rows[0].psychologist_id;
+        }
+    }
+
+    if (active.startedAt && employeeId && psychologistId) {
+        const endedAt = new Date();
+        const durationSeconds = Math.max(0, Math.round((Date.now() - active.startedAt) / 1000));
+        await query(
+            `INSERT INTO call_logs
+             (conversation_id, psychologist_id, employee_id, media_type, started_at, ended_at, duration_seconds)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+                conversationId,
+                psychologistId,
+                employeeId,
+                active.mediaType || 'video',
+                new Date(active.startedAt),
+                endedAt,
+                durationSeconds
+            ]
+        );
+    } else if (!active.startedAt && active.targetId && endedByUserId && endedByUserId === active.initiatorId) {
+        const callerResult = await query(
+            'SELECT display_name FROM users WHERE id = $1',
+            [active.initiatorId]
+        );
+        const callerName = callerResult.rows[0]?.display_name || 'Someone';
+        const metadata = {
+            conversationId,
+            mediaType: active.mediaType || 'video',
+            callerId: active.initiatorId,
+            callerName,
+            url: `/messages?conversation=${conversationId}`
+        };
+        const missedNotification = await createUserNotification({
+            userId: active.targetId,
+            type: 'call_missed',
+            message: `You missed a call from ${callerName}`,
+            entityType: 'conversation',
+            entityId: conversationId,
+            metadata
+        });
+        if (missedNotification) {
+            io.to(`user-${active.targetId}`).emit('notification', missedNotification);
+        }
+    }
+
+    activeCalls.delete(conversationId);
+};
+
+const scheduleCallDurationLimit = (conversationId, durationMs, psychologistId) => {
+    if (!durationMs || durationMs <= 0) return;
+    const active = activeCalls.get(conversationId);
+    if (!active) return;
+    if (active.timer) {
+        clearTimeout(active.timer);
+    }
+    active.maxDurationMs = durationMs;
+    active.timer = setTimeout(() => {
+        endCallSession(conversationId, 'duration_limit', psychologistId, { system: true });
+    }, durationMs);
+    activeCalls.set(conversationId, active);
+};
 
 io.on('connection', (socket) => {
     console.log('🔌 User connected:', socket.userId, 'Role:', socket.userRole);
@@ -368,39 +524,48 @@ io.on('connection', (socket) => {
         return conversationAccess.rows.length > 0;
     };
 
-    socket.on('call:offer', async ({ conversationId, sdp, mediaType }) => {
-        try {
-            if (!conversationId || !sdp) return;
-            const allowed = await ensureConversationAccess(conversationId);
-            if (!allowed) {
-                return socket.emit('error', { message: 'Unauthorized conversation access' });
-            }
-            const convoParticipants = await query(
-                `SELECT employee_id, psychologist_id FROM conversations WHERE id = $1`,
-                [conversationId]
-            );
-            if (!convoParticipants.rows.length) {
-                return socket.emit('error', { message: 'Conversation not found' });
-            }
-            const row = convoParticipants.rows[0];
-            const targetId = row.employee_id === socket.userId ? row.psychologist_id : row.employee_id;
-            if (!activeCalls.has(conversationId)) {
-                activeCalls.set(conversationId, {
-                    mediaType: mediaType || 'video',
-                    startedAt: null,
-                    initiatorId: socket.userId,
-                    targetId
-                });
-            } else {
-                const existing = activeCalls.get(conversationId);
-                existing.mediaType = mediaType || existing.mediaType || 'video';
-                existing.targetId = targetId;
-                activeCalls.set(conversationId, existing);
-            }
-            const callerResult = await query(
-                'SELECT display_name FROM users WHERE id = $1',
-                [socket.userId]
-            );
+      socket.on('call:offer', async ({ conversationId, sdp, mediaType }) => {
+          try {
+              if (!conversationId || !sdp) return;
+              const allowed = await ensureConversationAccess(conversationId);
+              if (!allowed) {
+                  return socket.emit('error', { message: 'Unauthorized conversation access' });
+              }
+              const callerCapabilities = await getUserCallCapabilities(socket.userId);
+              if (callerCapabilities.role === 'employee' && !callerCapabilities.canInitiate) {
+                  return socket.emit('error', {
+                      message: 'Upgrade to a paid plan to initiate calls.',
+                      code: 'CALL_BLOCKED_FREE_TIER'
+                  });
+              }
+              const convoParticipants = await query(
+                  `SELECT employee_id, psychologist_id FROM conversations WHERE id = $1`,
+                  [conversationId]
+              );
+              if (!convoParticipants.rows.length) {
+                  return socket.emit('error', { message: 'Conversation not found' });
+              }
+              const row = convoParticipants.rows[0];
+              const employeeCapabilities = await getUserCallCapabilities(row.employee_id);
+              const isEmployeeFreeTier = employeeCapabilities.role === 'employee' && employeeCapabilities.tier === 'free';
+              const targetId = row.employee_id === socket.userId ? row.psychologist_id : row.employee_id;
+              const existing = activeCalls.get(conversationId) || {};
+              activeCalls.set(conversationId, {
+                  ...existing,
+                  mediaType: mediaType || existing.mediaType || 'video',
+                  startedAt: existing.startedAt || null,
+                  initiatorId: socket.userId,
+                  targetId,
+                  employeeId: row.employee_id,
+                  psychologistId: row.psychologist_id,
+                  isEmployeeFreeTier,
+                  timer: existing.timer || null,
+                  maxDurationMs: existing.maxDurationMs || null
+              });
+              const callerResult = await query(
+                  'SELECT display_name FROM users WHERE id = $1',
+                  [socket.userId]
+              );
             const callerName = callerResult.rows[0]?.display_name || 'Someone';
             io.to(`conversation-${conversationId}`).emit('call:offer', {
                 conversationId,
@@ -434,21 +599,36 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('call:answer', async ({ conversationId, sdp }) => {
-        try {
-            if (!conversationId || !sdp) return;
-            const allowed = await ensureConversationAccess(conversationId);
-            if (!allowed) {
-                return socket.emit('error', { message: 'Unauthorized conversation access' });
-            }
-            const active = activeCalls.get(conversationId);
-            if (active && !active.startedAt) {
-                active.startedAt = Date.now();
-            }
-            io.to(`conversation-${conversationId}`).emit('call:answer', {
-                conversationId,
-                sdp,
-                fromUserId: socket.userId
+      socket.on('call:answer', async ({ conversationId, sdp }) => {
+          try {
+              if (!conversationId || !sdp) return;
+              const allowed = await ensureConversationAccess(conversationId);
+              if (!allowed) {
+                  return socket.emit('error', { message: 'Unauthorized conversation access' });
+              }
+              const active = activeCalls.get(conversationId);
+              if (active && !active.startedAt) {
+                  active.startedAt = Date.now();
+                  if (active.isEmployeeFreeTier && active.psychologistId) {
+                      const psychologistCapabilities = await getUserCallCapabilities(active.psychologistId);
+                      const limitMinutes = Math.max(
+                          1,
+                          Number(
+                              psychologistCapabilities.callMinutes ||
+                              ROLE_FLAGS.psychologist?.call_minutes_per_client ||
+                              0
+                          )
+                      );
+                      if (limitMinutes > 0) {
+                          scheduleCallDurationLimit(conversationId, limitMinutes * 60 * 1000, active.psychologistId);
+                      }
+                  }
+                  activeCalls.set(conversationId, active);
+              }
+              io.to(`conversation-${conversationId}`).emit('call:answer', {
+                  conversationId,
+                  sdp,
+                  fromUserId: socket.userId
             });
         } catch (error) {
             console.error('Call answer error:', error);
@@ -472,74 +652,18 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('call:end', async ({ conversationId, reason }) => {
-        try {
-            if (!conversationId) return;
-            const allowed = await ensureConversationAccess(conversationId);
-            if (!allowed) {
-                return socket.emit('error', { message: 'Unauthorized conversation access' });
-            }
-            io.to(`conversation-${conversationId}`).emit('call:end', {
-                conversationId,
-                reason: reason || 'ended',
-                fromUserId: socket.userId
-            });
-            const active = activeCalls.get(conversationId);
-            if (active && active.startedAt) {
-                const convo = await query(
-                    `SELECT employee_id, psychologist_id FROM conversations WHERE id = $1`,
-                    [conversationId]
-                );
-                const row = convo.rows[0];
-                if (row) {
-                    const endedAt = new Date();
-                    const durationSeconds = Math.max(0, Math.round((Date.now() - active.startedAt) / 1000));
-                    await query(
-                        `INSERT INTO call_logs
-                         (conversation_id, psychologist_id, employee_id, media_type, started_at, ended_at, duration_seconds)
-                         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                        [
-                            conversationId,
-                            row.psychologist_id,
-                            row.employee_id,
-                            active.mediaType || 'video',
-                            new Date(active.startedAt),
-                            endedAt,
-                            durationSeconds
-                        ]
-                    );
-                }
-            }
-            if (active && !active.startedAt && active.targetId && socket.userId === active.initiatorId) {
-                const callerResult = await query(
-                    'SELECT display_name FROM users WHERE id = $1',
-                    [active.initiatorId]
-                );
-                const callerName = callerResult.rows[0]?.display_name || 'Someone';
-                const metadata = {
-                    conversationId,
-                    mediaType: active.mediaType || 'video',
-                    callerId: active.initiatorId,
-                    callerName,
-                    url: `/messages?conversation=${conversationId}`
-                };
-                const missedNotification = await createUserNotification({
-                    userId: active.targetId,
-                    type: 'call_missed',
-                    message: `You missed a call from ${callerName}`,
-                    entityType: 'conversation',
-                    entityId: conversationId,
-                    metadata
-                });
-                if (missedNotification) {
-                    io.to(`user-${active.targetId}`).emit('notification', missedNotification);
-                }
-            }
-            activeCalls.delete(conversationId);
-        } catch (error) {
-            console.error('Call end error:', error);
-        }
-    });
+      socket.on('call:end', async ({ conversationId, reason }) => {
+          try {
+              if (!conversationId) return;
+              const allowed = await ensureConversationAccess(conversationId);
+              if (!allowed) {
+                  return socket.emit('error', { message: 'Unauthorized conversation access' });
+              }
+              await endCallSession(conversationId, reason || 'ended', socket.userId);
+          } catch (error) {
+              console.error('Call end error:', error);
+          }
+      });
 
     socket.on('typing', (data) => {
         const { conversationId, isTyping } = data;

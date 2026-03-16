@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
+import AvatarImage from '../components/common/AvatarImage';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import AdvertisingSection from '../components/ads/AdvertisingSection';
 import SponsoredCard from '../components/ads/SponsoredCard';
@@ -280,8 +281,7 @@ const ProfileSection = ({ user, company, onUpdate }) => {
         <div className="profile-section">
             <div className="profile-avatar-container">
                 <div className="profile-avatar">
-                    {user?.avatar_url ? (
-                        <img src={resolveMediaUrl(user.avatar_url)} alt={user.display_name} />
+                    {user?.avatar_url ? (                        <AvatarImage src={user.avatar_url} alt={user.display_name} />
                     ) : (
                         <div className="avatar-placeholder-large">{user?.display_name?.charAt(0) || 'U'}</div>
                     )}

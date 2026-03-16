@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
-import { resolveMediaUrl } from '../../utils/media';
+import AvatarImage from '../../components/common/AvatarImage';
 import './SystemSettings.css';
 
 const DEFAULT_SETTINGS = {
@@ -612,10 +612,7 @@ const SystemSettings = () => {
                                             <div className="admin-identity">
                                                 <div className="avatar-ring">
                                                     {admin.avatar_url ? (
-                                                        <img
-                                                            src={resolveMediaUrl(admin.avatar_url)}
-                                                            alt={admin.display_name || admin.email}
-                                                        />
+                                                        <AvatarImage src={admin.avatar_url} alt={admin.display_name || admin.email} />
                                                     ) : (
                                                         <span>{getAdminInitials(admin)}</span>
                                                     )}
