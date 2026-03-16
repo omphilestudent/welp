@@ -112,3 +112,50 @@
     align-items: center;
     font-size: 0.9rem;
 }
+
+.subscription-card__section {
+    margin-top: 1.5rem;
+}
+
+.subscription-card__section-title {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted, #6b7280);
+    margin-bottom: 0.5rem;
+}
+
+.subscription-card__section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.subscription-card__section-grid span {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted, #6b7280);
+}
+
+.subscription-card__section-grid strong {
+    font-size: 1.05rem;
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.subscription-card__list {
+    list-style: none;
+    padding: 0;
+    margin: 0.75rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--text-color, #111827);
+}
+
+.subscription-card__list li::before {
+    content: '•';
+    color: var(--primary-color, #6366f1);
+    margin-right: 0.5rem;
+}

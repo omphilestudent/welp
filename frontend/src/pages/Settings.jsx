@@ -23,8 +23,10 @@ import {
     FaPlus,
     FaCheckCircle,
     FaExclamationTriangle,
-    FaShieldAlt
+    FaShieldAlt,
+    FaCreditCard
 } from 'react-icons/fa';
+import SubscriptionStatus from '../components/subscription/SubscriptionStatus';
 
 const Settings = () => {
     const navigate = useNavigate();
@@ -305,6 +307,12 @@ const Settings = () => {
                                 onClick={() => setActiveTab('account')}
                             >
                                 <FaLock /> Account
+                            </button>
+                            <button
+                                className={`settings-nav-item ${activeTab === 'subscription' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('subscription')}
+                            >
+                                <FaCreditCard /> Subscription
                             </button>
                             <button
                                 className={`settings-nav-item ${activeTab === 'notifications' ? 'active' : ''}`}
@@ -806,6 +814,16 @@ const Settings = () => {
                                         <FaSave /> {loading ? 'Saving...' : 'Save Preference'}
                                     </button>
                                 </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'subscription' && (
+                            <div className="settings-section">
+                                <h2>Subscription</h2>
+                                <p className="section-description">
+                                    Manage your Welp plan, limits, and advertising capabilities.
+                                </p>
+                                <SubscriptionStatus />
                             </div>
                         )}
 

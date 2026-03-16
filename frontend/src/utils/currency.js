@@ -104,8 +104,8 @@ const CURRENCY_BY_COUNTRY = {
     KW: { code: 'KWD', symbol: 'د.ك' }
 };
 
-const DEFAULT_COUNTRY = 'US';
-const DEFAULT_CURRENCY = { code: 'USD', symbol: '$' };
+const DEFAULT_COUNTRY = 'ZA';
+const DEFAULT_CURRENCY = { code: 'ZAR', symbol: 'R' };
 
 const normalizeCountryInput = (value) => {
     if (!value || typeof value !== 'string') return null;
@@ -114,6 +114,18 @@ const normalizeCountryInput = (value) => {
     }
     const normalized = value.trim().toLowerCase();
     return COUNTRY_NAME_TO_CODE[normalized] || null;
+};
+
+const getStoredCountryPreference = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+        const stored =
+            window.localStorage.getItem('welp_country_preference') ||
+            window.localStorage.getItem('welp_selected_country');
+        return normalizeCountryInput(stored);
+    } catch {
+        return null;
+    }
 };
 
 export const guessCurrencySymbol = (currencyCode = 'USD') => {
@@ -154,6 +166,9 @@ const resolveLocaleCountry = () => {
 };
 
 export const deriveCountryCode = (source) => {
+    const storedPreference = getStoredCountryPreference();
+    if (storedPreference) return storedPreference;
+
     const probeObject = (value) => {
         if (!value || typeof value !== 'object') return null;
         const candidates = [
@@ -163,7 +178,17 @@ export const deriveCountryCode = (source) => {
             value.location?.countryCode,
             value.location?.country,
             value.profile?.countryCode,
-            value.profile?.country
+            value.profile?.country,
+            value.company?.countryCode,
+            value.company?.country,
+            value.company?.address?.country,
+            value.business?.countryCode,
+            value.business?.country,
+            value.businessProfile?.countryCode,
+            value.businessProfile?.country,
+            value.organization?.countryCode,
+            value.organization?.country,
+            value.settings?.country
         ];
         for (const candidate of candidates) {
             const normalized = normalizeCountryInput(candidate);

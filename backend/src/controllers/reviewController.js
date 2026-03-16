@@ -2,6 +2,7 @@
 const { query } = require('../utils/database');
 const { moderateReview, analyzeSentiment } = require('../services/mlServices');
 const { createAdminNotification } = require('../utils/adminNotifications');
+const { triggerReviewNotification } = require('../services/reviewNotificationService');
 
 
 const updateReviewsTable = async () => {
@@ -15,6 +16,10 @@ const updateReviewsTable = async () => {
             ADD COLUMN IF NOT EXISTS moderation_reason VARCHAR(255),
             ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(32)
         `);
+        await query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS notification_status VARCHAR(32) DEFAULT 'pending'");
+        await query("ALTER TABLE reviews ALTER COLUMN notification_status SET DEFAULT 'pending'");
+        await query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS notification_notes TEXT");
+        await query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS notification_last_sent_at TIMESTAMP");
         console.log('✅ Reviews table schema updated successfully');
     } catch (error) {
         console.error('Error updating reviews table:', error.message);
@@ -173,6 +178,10 @@ const createReview = async (req, res) => {
                 is_anonymous: Boolean(review.is_anonymous) || Boolean(authorRow?.is_anonymous)
             }
         };
+
+        triggerReviewNotification(review.id).catch((notifyError) => {
+            console.error('Review notification trigger failed:', notifyError.message);
+        });
 
         await createAdminNotification({
             type: 'review_moderation',

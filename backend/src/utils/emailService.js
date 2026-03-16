@@ -1,6 +1,7 @@
 
 const nodemailer = require('nodemailer');
 require('dotenv').config();
+const { getAudiencePricing } = require('../services/pricingService');
 
 
 const isEmailConfigured = () => {
@@ -44,6 +45,284 @@ if (isEmailConfigured()) {
     console.log('📧 Email service not configured. Running in development mode with console logging.');
 }
 
+
+// ── Review notification helpers ────────────────────────────────────────────────────────────
+const BUSINESS_PLAN_TITLES = {
+    base: 'Base Plan',
+    enhanced: 'Enhanced Plan',
+    premium: 'Premium Plan'
+};
+
+const BUSINESS_PLAN_FEATURES = {
+    base: [
+        '1,000 API calls per day',
+        'Business profile access',
+        'Basic analytics overview'
+    ],
+    enhanced: [
+        '3,000 API calls per day',
+        'Expanded analytics and marketing insights',
+        'Upload promotional media assets'
+    ],
+    premium: [
+        '10,000 API calls per day',
+        'Advanced behavioral analytics and email insights',
+        'Advertise across competitor and partner pages'
+    ]
+};
+
+const FALLBACK_BUSINESS_PRICING = [
+    {
+        tier: 'base',
+        label: BUSINESS_PLAN_TITLES.base,
+        priceLabel: 'R1,000 / month',
+        features: BUSINESS_PLAN_FEATURES.base
+    },
+    {
+        tier: 'enhanced',
+        label: BUSINESS_PLAN_TITLES.enhanced,
+        priceLabel: 'R2,000 / month',
+        features: BUSINESS_PLAN_FEATURES.enhanced
+    },
+    {
+        tier: 'premium',
+        label: BUSINESS_PLAN_TITLES.premium,
+        priceLabel: 'R3,000 / month',
+        features: BUSINESS_PLAN_FEATURES.premium
+    }
+];
+
+const toArray = (value) => {
+    if (value === null || value === undefined) return [];
+    return Array.isArray(value) ? value : [value];
+};
+
+const numberWithCommas = (value) => {
+    const num = Math.round(Number(value) || 0);
+    return num.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');
+};
+
+const formatPriceLabel = (amount, symbol = 'R') => {
+    if (amount === undefined || amount === null || Number.isNaN(Number(amount))) {
+        return `${symbol}${amount || ''}`;
+    }
+    return `${symbol}${numberWithCommas(amount)} / month`;
+};
+
+const detectBusinessTier = (plan) => {
+    const source = String(plan?.planTier || plan?.planCode || plan?.metadata?.planTier || '').toLowerCase();
+    if (!source) return null;
+    if (source.includes('premium') || source.includes('pro')) return 'premium';
+    if (source.includes('enhanced') || source.includes('plus') || source.includes('growth')) return 'enhanced';
+    if (source.includes('base') || source.includes('starter') || source.includes('core')) return 'base';
+    return null;
+};
+
+const buildBusinessPricingOverview = async (countryCode = 'ZA') => {
+    try {
+        const result = await getAudiencePricing('business', { country: countryCode });
+        if (!result || !Array.isArray(result.plans) || !result.plans.length) {
+            throw new Error('No pricing catalog found for business audience');
+        }
+        const symbol = result.currency?.symbol || 'R';
+        const entries = [];
+        for (const plan of result.plans) {
+            const tier = detectBusinessTier(plan);
+            if (!tier || entries.some((entry) => entry.tier === tier)) continue;
+            entries.push({
+                tier,
+                label: BUSINESS_PLAN_TITLES[tier] || plan.planTier || plan.planCode,
+                priceLabel: formatPriceLabel(plan.amountMajor ?? plan.amount_minor / 100, symbol),
+                features: BUSINESS_PLAN_FEATURES[tier] || BUSINESS_PLAN_FEATURES.base
+            });
+        }
+        if (!entries.length) throw new Error('Unable to map catalog rows to tiers');
+        const tierOrder = ['base', 'enhanced', 'premium'];
+        return entries.sort((a, b) => tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier));
+    } catch (error) {
+        console.warn('Business pricing overview fallback used:', error.message);
+        return FALLBACK_BUSINESS_PRICING;
+    }
+};
+
+const buildReviewEmailHtml = ({
+    type,
+    companyName,
+    rating,
+    reviewContent,
+    reviewDate,
+    reviewerName,
+    reviewLocation,
+    dashboardUrl,
+    respondUrl,
+    claimUrl,
+    pricingOverview = FALLBACK_BUSINESS_PRICING
+}) => {
+    const safeCompanyName = companyName || 'your business';
+    const subjectLine = type === 'claimed'
+        ? 'New feedback is waiting in your Welp dashboard'
+        : 'A Welp review is live for your company';
+    const headerColor = type === 'claimed' ? '#111827' : '#0f172a';
+    const ctaLabel = type === 'claimed' ? 'Open Business Dashboard' : 'Claim Your Business Profile';
+    const ctaLink = type === 'claimed' ? (dashboardUrl || respondUrl) : (claimUrl || dashboardUrl);
+    const secondaryCta = type === 'claimed'
+        ? `<a class="cta secondary" href="${respondUrl || dashboardUrl}" target="_blank" rel="noopener noreferrer">Respond to Review</a>`
+        : '';
+    const pricingCards = type === 'claimed'
+        ? ''
+        : `
+        <div class="section">
+            <h3>Business Subscription Pricing Overview</h3>
+            <div class="pricing-grid">
+                ${pricingOverview.map((plan) => `
+                    <div class="pricing-card">
+                        <p class="plan-title">${plan.label}</p>
+                        <p class="plan-price">${plan.priceLabel}</p>
+                        <ul>
+                            ${plan.features.map((feature) => `<li>${feature}</li>`).join('')}
+                        </ul>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <style>
+            body { font-family: Arial, sans-serif; background:#f3f4f6; color:#111827; margin:0; padding:0; }
+            .wrapper { max-width:640px; margin:0 auto; padding:24px; }
+            .card { background:#ffffff; border-radius:16px; padding:32px; box-shadow:0 10px 30px rgba(15,23,42,0.08); }
+            .header { text-align:center; padding-bottom:24px; border-bottom:1px solid #e5e7eb; }
+            .header h1 { margin:0; color:${headerColor}; font-size:24px; }
+            .section { margin-top:24px; }
+            .section h3 { margin:0 0 8px 0; font-size:18px; color:#0f172a; }
+            .details { background:#f9fafb; border-radius:12px; padding:16px; }
+            .details p { margin:4px 0; }
+            .cta { display:inline-block; margin:16px 8px 0 0; padding:12px 20px; border-radius:999px; text-decoration:none; font-weight:600; }
+            .cta.primary { background:#4f46e5; color:#ffffff; }
+            .cta.secondary { background:#e0e7ff; color:#4338ca; }
+            .pricing-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; }
+            .pricing-card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; background:#fdfdfd; }
+            .plan-title { font-weight:600; margin:4px 0; }
+            .plan-price { font-size:18px; margin:4px 0 12px 0; color:#0f172a; }
+            ul { padding-left:18px; margin:0; }
+            footer { margin-top:32px; font-size:12px; color:#6b7280; text-align:center; }
+        </style>
+    </head>
+    <body>
+        <div class="wrapper">
+            <div class="card">
+                <div class="header">
+                    <h1>${subjectLine}</h1>
+                    <p>${safeCompanyName}</p>
+                </div>
+                <div class="section">
+                    <h3>Review Details</h3>
+                    <div class="details">
+                        <p><strong>Rating:</strong> ${rating ?? 'N/A'} / 5</p>
+                        <p><strong>Reviewer:</strong> ${reviewerName || 'Anonymous reviewer'}</p>
+                        <p><strong>Location:</strong> ${reviewLocation || 'Not specified'}</p>
+                        <p><strong>Date:</strong> ${reviewDate || 'Today'}</p>
+                        <p style="margin-top:12px;"><strong>Feedback:</strong></p>
+                        <p>${reviewContent || 'No review text supplied.'}</p>
+                    </div>
+                </div>
+                <div class="section">
+                    <p>${type === 'claimed'
+                        ? 'Reply to reviews promptly to improve trust and keep your analytics current.'
+                        : 'Claim your Welp profile to respond, unlock analytics, and manage advertising placements.'}
+                    </p>
+                    ${ctaLink ? `<a class="cta primary" href="${ctaLink}" target="_blank" rel="noopener noreferrer">${ctaLabel}</a>` : ''}
+                    ${secondaryCta}
+                </div>
+                ${pricingCards}
+                <footer>
+                    <p>Need help? Email support@welp.co.za or manage your notification preferences in the admin dashboard.</p>
+                    <p>&copy; ${new Date().getFullYear()} Welp</p>
+                </footer>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+};
+
+const buildReviewEmailText = (payload, pricingOverview = FALLBACK_BUSINESS_PRICING) => {
+    const lines = [
+        `Company: ${payload.companyName || 'your business'}`,
+        `Rating: ${payload.rating ?? 'N/A'} / 5`,
+        `Reviewer: ${payload.reviewerName || 'Anonymous reviewer'}`,
+        `Location: ${payload.reviewLocation || 'Not specified'}`,
+        `Date: ${payload.reviewDate || 'Today'}`,
+        '',
+        `Review: ${payload.reviewContent || 'No review text supplied.'}`,
+        ''
+    ];
+    if (payload.type === 'claimed') {
+        if (payload.dashboardUrl) lines.push(`Open dashboard: ${payload.dashboardUrl}`);
+        if (payload.respondUrl) lines.push(`Respond to review: ${payload.respondUrl}`);
+    } else {
+        if (payload.claimUrl) lines.push(`Claim profile: ${payload.claimUrl}`);
+        lines.push('', 'Business Subscription Pricing:');
+        pricingOverview.forEach((plan) => {
+            lines.push(`- ${plan.label}: ${plan.priceLabel}`);
+        });
+    }
+    lines.push('', 'You are receiving this email because a new review was posted on Welp.');
+    return lines.join('\n');
+};
+
+const sendReviewNotificationEmail = async (payload = {}) => {
+    const to = toArray(payload.to).filter(Boolean);
+    const cc = toArray(payload.cc).filter(Boolean);
+    if (!to.length) {
+        return { success: false, error: 'No recipient provided' };
+    }
+
+    const type = payload.type === 'claimed' ? 'claimed' : 'unclaimed';
+    let pricingOverview = FALLBACK_BUSINESS_PRICING;
+    if (type !== 'claimed') {
+        pricingOverview = await buildBusinessPricingOverview(payload.companyCountry || 'ZA');
+    }
+
+    const subject = type === 'claimed'
+        ? 'New Review Submitted for Your Business'
+        : 'A Review Has Been Posted About Your Company';
+    const html = buildReviewEmailHtml({
+        ...payload,
+        type,
+        pricingOverview
+    });
+    const text = buildReviewEmailText({ ...payload, type }, pricingOverview);
+
+    if (!transporter) {
+        console.log('\n=== REVIEW NOTIFICATION (DEV MODE) ===');
+        console.log(`To: ${to.join(', ')}`);
+        if (cc.length) console.log(`CC: ${cc.join(', ')}`);
+        console.log(`Subject: ${subject}`);
+        console.log(text.slice(0, 280));
+        console.log('======================================\n');
+        return { success: true, subject, devMode: true };
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to,
+            cc: cc.length ? cc : undefined,
+            subject,
+            html,
+            text
+        });
+        return { success: true, info, subject };
+    } catch (error) {
+        console.error('❌ Failed to send review notification email:', error.message);
+        return { success: false, error: error.message, subject };
+    }
+};
 
 const sendClaimInvitation = async (companyEmail, companyName, companyId) => {
     const claimLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/claim/${companyId}`;
@@ -468,5 +747,6 @@ module.exports = {
     sendEmail,
     sendMarketingEmail,
     sendSubscriptionCancellationEmail,
-    sendApplicationStatusEmail
+    sendApplicationStatusEmail,
+    sendReviewNotificationEmail
 };

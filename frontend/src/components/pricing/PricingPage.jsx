@@ -60,6 +60,20 @@ const PricingPage = () => {
     }, [country, countries]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (country) {
+            window.localStorage.setItem('welp_country_preference', country);
+        }
+    }, [country]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (currency) {
+            window.localStorage.setItem('welp_currency_preference', currency);
+        }
+    }, [currency]);
+
+    useEffect(() => {
         if (userAdjustedRef.current) return;
         setCountry(derivedCountry);
         setCurrency(derivedCurrency.code);

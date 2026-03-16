@@ -6,7 +6,6 @@ import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import AdvertisingSection from '../components/ads/AdvertisingSection';
-import SubscriptionStatus from '../components/subscription/SubscriptionStatus';
 import { resolveMediaUrl } from '../utils/media';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
@@ -1115,8 +1114,6 @@ const Dashboard = () => {
                         await fetchDashboardData();
                     }}
                 />
-                <SubscriptionStatus />
-
                 {/* Tabs */}
                 <div className="dashboard-tabs">
                     {user?.role === 'employee' && (

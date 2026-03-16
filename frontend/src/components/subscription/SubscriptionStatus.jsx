@@ -7,6 +7,7 @@ import {
     cancelSubscription,
     fetchPricingForAudience
 } from '../../services/subscriptionService';
+import { fetchCountries } from '../../services/pricingService';
 import { getMyCampaigns } from '../../services/adService';
 import {
     currencyForCountry,
@@ -101,6 +102,98 @@ const formatPlanDisplayName = (value) => {
         .join(' ');
 };
 
+const BUSINESS_PLAN_ENTITLEMENTS = {
+    base: {
+        label: 'Base Plan',
+        apiLimit: 1000,
+        analyticsLevel: 'Basic analytics',
+        analyticsFeatures: ['Basic profile analytics', 'Basic traffic insights'],
+        advertising: {
+            maxAds: 1,
+            placement: 'Business profile placements & recommendations',
+            mediaSupport: 'Image, video & GIF creative support',
+            features: ['Basic profile visibility', 'No advanced ad placements']
+        }
+    },
+    enhanced: {
+        label: 'Enhanced Plan',
+        apiLimit: 3000,
+        analyticsLevel: 'Expanded analytics',
+        analyticsFeatures: ['Expanded business analytics', 'Marketing performance data', 'Audience interest tracking'],
+        advertising: {
+            maxAds: 5,
+            placement: 'Priority placements with marketing highlights',
+            mediaSupport: 'Image, video & GIF creative support',
+            features: ['Marketing insights', 'Expanded analytics', 'Ability to upload promotional media']
+        }
+    },
+    premium: {
+        label: 'Premium Plan',
+        apiLimit: 10000,
+        analyticsLevel: 'Advanced analytics',
+        analyticsFeatures: ['Advanced behavioral analytics', 'Email engagement insights', 'Campaign performance analytics'],
+        advertising: {
+            maxAds: null,
+            placement: 'Premium spots including competitor profiles',
+            mediaSupport: 'Image, video & GIF creative support',
+            features: ['Unlimited active ads', 'Advertise on other business pages', 'Advanced campaign analytics', 'Email insights on user engagement']
+        }
+    }
+};
+
+const LOCALIZED_PRICING_FALLBACKS = {
+    ZA: {
+        user: {
+            user_premium: { amountMinor: 15000, currencyCode: 'ZAR', currencySymbol: 'R' },
+            premium: { amountMinor: 15000, currencyCode: 'ZAR', currencySymbol: 'R' }
+        },
+        psychologist: {
+            psychologist_standard: { amountMinor: 50000, currencyCode: 'ZAR', currencySymbol: 'R' },
+            standard: { amountMinor: 50000, currencyCode: 'ZAR', currencySymbol: 'R' }
+        },
+        business: {
+            business_base: { amountMinor: 100000, currencyCode: 'ZAR', currencySymbol: 'R' },
+            base: { amountMinor: 100000, currencyCode: 'ZAR', currencySymbol: 'R' },
+            business_enhanced: { amountMinor: 200000, currencyCode: 'ZAR', currencySymbol: 'R' },
+            enhanced: { amountMinor: 200000, currencyCode: 'ZAR', currencySymbol: 'R' },
+            business_premium: { amountMinor: 300000, currencyCode: 'ZAR', currencySymbol: 'R' },
+            premium: { amountMinor: 300000, currencyCode: 'ZAR', currencySymbol: 'R' }
+        }
+    }
+};
+
+const formatMetricValue = (value, { unlimitedLabel = 'Unlimited', fallback = '—' } = {}) => {
+    if (value === null || value === undefined) return fallback;
+    if (value === Infinity || value === -1) return unlimitedLabel;
+    if (!Number.isFinite(value)) return unlimitedLabel;
+    return Number(value).toLocaleString();
+};
+
+const resolveFallbackLocalizedPlan = ({ audience, planCode, planTier, countryCode }) => {
+    if (!countryCode) return null;
+    const normalizedCountry = countryCode.toUpperCase();
+    const audienceKey = toLowerSafe(audience) || 'user';
+    const fallbackByCountry = LOCALIZED_PRICING_FALLBACKS[normalizedCountry];
+    if (!fallbackByCountry) return null;
+    const audienceFallback = fallbackByCountry[audienceKey];
+    if (!audienceFallback) return null;
+    const normalizedPlanCode = toLowerSafe(planCode);
+    const normalizedPlanTier = toLowerSafe(planTier);
+    const entry =
+        audienceFallback[normalizedPlanCode] ||
+        audienceFallback[normalizedPlanTier] ||
+        audienceFallback.default;
+    if (!entry || !Number.isFinite(entry.amountMinor)) return null;
+    const currencyCode = entry.currencyCode || 'ZAR';
+    const currencySymbol = entry.currencySymbol || 'R';
+    return {
+        amountMinor: entry.amountMinor,
+        currencyCode,
+        currencySymbol,
+        priceFormatted: formatAmountMinor(entry.amountMinor, currencyCode, currencySymbol)
+    };
+};
+
 const resolveAdsAuthMessage = (error) => {
     if (error?.response?.status !== 403) {
         return null;
@@ -123,12 +216,25 @@ const SubscriptionStatus = () => {
     const lastSubscriptionFetchRef = useRef(0);
     const lastAdsFetchRef = useRef(0);
     const [localizedPlan, setLocalizedPlan] = useState(null);
+    const [availableCountries, setAvailableCountries] = useState([]);
+    const [countryPreference, setCountryPreference] = useState(null);
     const userId = user?.id ?? null;
     const userRole = user?.role ?? '';
     const normalizedUserRole = useMemo(() => toLowerSafe(userRole), [userRole]);
+    const isBusinessUser = normalizedUserRole === 'business';
     const audienceKey = useMemo(() => deriveAudienceKey(userRole), [userRole]);
     const countryCode = useMemo(() => deriveCountryCode(user || {}), [user]);
-    const preferredCurrency = useMemo(() => currencyForCountry(countryCode), [countryCode]);
+    const fallbackCurrency = useMemo(() => currencyForCountry(countryCode), [countryCode]);
+    const preferredCurrency = useMemo(() => {
+        if (countryPreference) {
+            const code = countryPreference.currency || fallbackCurrency.code;
+            return {
+                code,
+                symbol: countryPreference.currencySymbol || guessCurrencySymbol(code)
+            };
+        }
+        return fallbackCurrency;
+    }, [countryPreference, fallbackCurrency]);
 
     const applySubscriptionSnapshot = useCallback((snapshot) => {
         const normalized = normalizeSubscriptionPayload(snapshot) ?? { ...FREE_PLAN_SNAPSHOT };
@@ -148,8 +254,18 @@ const SubscriptionStatus = () => {
         }
         lastAdsFetchRef.current = now;
         try {
-            const campaigns = await getMyCampaigns();
-            setAdsCapability(campaigns.data?.capabilities || null);
+            const response = await getMyCampaigns();
+            const payload = response.data?.data || response.data || {};
+            const campaigns = Array.isArray(payload.campaigns) ? payload.campaigns : [];
+            const activeCount = payload.activeCount ?? campaigns.filter((campaign) => campaign.status === 'active').length;
+            const capability = payload.capabilities
+                ? {
+                      ...payload.capabilities,
+                      activeCount,
+                      maxActive: payload.maxActive ?? payload.capabilities?.maxActive ?? null
+                  }
+                : null;
+            setAdsCapability(capability);
         } catch (error) {
             const authError = resolveAdsAuthMessage(error);
             if (authError) {
@@ -159,20 +275,70 @@ const SubscriptionStatus = () => {
         }
     }, [normalizedUserRole]);
 
-    const loadLocalizedPlan = useCallback(async (planCode, requestedAudience) => {
+    useEffect(() => {
+        let mounted = true;
+        const loadCountries = async () => {
+            try {
+                const list = await fetchCountries();
+                if (mounted) {
+                    setAvailableCountries(list);
+                }
+            } catch (error) {
+                console.warn('Unable to load country pricing reference:', error?.message || error);
+                if (mounted) {
+                    setAvailableCountries([]);
+                }
+            }
+        };
+        loadCountries();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!countryCode || !availableCountries.length) {
+            setCountryPreference(null);
+            return;
+        }
+        const match = availableCountries.find((entry) => entry.code === countryCode);
+        setCountryPreference(match || null);
+    }, [availableCountries, countryCode]);
+
+    const loadLocalizedPlan = useCallback(async (planCode, requestedAudience, planTierHint) => {
         if (!planCode) {
             setLocalizedPlan(null);
             return;
         }
         const normalizedPlanCode = toLowerSafe(planCode);
         const country = countryCode;
-        const currency = preferredCurrency.code;
         const audience = requestedAudience || 'user';
-        const cacheKey = `${normalizedPlanCode}:${audience}:${country}:${currency}`;
+        const normalizedAudience = toLowerSafe(audience) || 'user';
+        const tryFallback = () => {
+            const fallbackPlan = resolveFallbackLocalizedPlan({
+                audience: normalizedAudience,
+                planCode,
+                planTier: planTierHint,
+                countryCode: country
+            });
+            if (fallbackPlan) {
+                setLocalizedPlan(fallbackPlan);
+                return true;
+            }
+            return false;
+        };
+        const currencyOverride = countryPreference?.currency || null;
+        const cacheCurrency = currencyOverride || preferredCurrency.code;
+        const cacheCountry = country || 'default';
+        const cacheKey = `${normalizedPlanCode}:${audience}:${cacheCountry}:${cacheCurrency}`;
         if (pricingKeyRef.current === cacheKey) return;
         pricingKeyRef.current = cacheKey;
         try {
-            const { data } = await fetchPricingForAudience({ audience, country, currency });
+            const requestParams = { audience, country };
+            if (currencyOverride) {
+                requestParams.currency = currencyOverride;
+            }
+            const { data } = await fetchPricingForAudience(requestParams);
             const plans = Array.isArray(data?.plans) ? data.plans : [];
             const match = plans.find((plan) => {
                 const identifier = toLowerSafe(plan.planCode || plan.plan_code || plan.code);
@@ -181,24 +347,35 @@ const SubscriptionStatus = () => {
                 return tierId && tierId === normalizedPlanCode;
             });
             if (!match) {
-                setLocalizedPlan(null);
+                if (!tryFallback()) {
+                    setLocalizedPlan(null);
+                }
                 return;
             }
+            const resolvedCurrencyCode =
+                match.currencyCode || match.currency_code || data?.currency?.code || cacheCurrency;
+            const resolvedCurrencySymbol =
+                match.currencySymbol ||
+                match.currency_symbol ||
+                data?.currency?.symbol ||
+                preferredCurrency.symbol;
             setLocalizedPlan({
                 priceFormatted: match.priceFormatted
                     || match.price_formatted
                     || (match.amountMinor != null
-                        ? formatAmountMinor(match.amountMinor, match.currencyCode || match.currency_code || currency, match.currencySymbol || match.currency_symbol || preferredCurrency.symbol)
+                        ? formatAmountMinor(match.amountMinor, resolvedCurrencyCode, resolvedCurrencySymbol)
                         : null),
-                currencySymbol: match.currencySymbol || match.currency_symbol || data?.currency?.symbol || preferredCurrency.symbol,
-                currencyCode: match.currencyCode || match.currency_code || data?.currency?.code || currency,
+                currencySymbol: resolvedCurrencySymbol,
+                currencyCode: resolvedCurrencyCode,
                 amountMinor: match.amountMinor ?? match.amount_minor ?? null
             });
         } catch (error) {
             console.warn('Localized pricing unavailable:', error?.message || error);
-            setLocalizedPlan(null);
+            if (!tryFallback()) {
+                setLocalizedPlan(null);
+            }
         }
-    }, [countryCode, preferredCurrency]);
+    }, [countryCode, countryPreference, preferredCurrency]);
 
     const loadSubscription = useCallback(async ({ force = false } = {}) => {
         if (!isAuthenticated || !userId) {
@@ -216,7 +393,11 @@ const SubscriptionStatus = () => {
         try {
             const { data } = await fetchSubscription();
             const normalized = applySubscriptionSnapshot(data?.subscription);
-            await loadLocalizedPlan(normalized?.planCode || normalized?.planCodeNormalized, audienceKey);
+            await loadLocalizedPlan(
+                normalized?.planCode || normalized?.planCodeNormalized,
+                audienceKey,
+                normalized?.planTier || normalized?.plan_tier
+            );
             if (normalizedUserRole === 'business') {
                 await loadAdsCapability({ force: true });
             } else {
@@ -255,14 +436,15 @@ const SubscriptionStatus = () => {
     }, [user?.subscription, applySubscriptionSnapshot]);
 
     const planIdentifier = subscription?.planCode || subscription?.planCodeNormalized;
+    const planTierHint = subscription?.planTier || subscription?.plan_tier || planTierNormalized;
 
     useEffect(() => {
         if (!planIdentifier) {
             setLocalizedPlan(null);
             return;
         }
-        loadLocalizedPlan(planIdentifier, audienceKey);
-    }, [planIdentifier, audienceKey, loadLocalizedPlan]);
+        loadLocalizedPlan(planIdentifier, audienceKey, planTierHint);
+    }, [planIdentifier, audienceKey, planTierHint, loadLocalizedPlan]);
 
     const handleUpgrade = async () => {
         if (actionLoading) return;
@@ -323,6 +505,7 @@ const SubscriptionStatus = () => {
         || (typeof effectiveSubscription.amountMinor === 'number'
             ? formatAmountMinor(effectiveSubscription.amountMinor, currencyCode, currencySymbol)
             : `${currencySymbol}0.00`);
+    const priceDisplay = currencyCode ? `${priceText} (${currencyCode})` : priceText;
     const nextBillingSource = effectiveSubscription.nextBillingDate || effectiveSubscription.next_billing_date;
     const nextBilling = nextBillingSource
         ? new Date(nextBillingSource).toLocaleDateString()
@@ -333,7 +516,79 @@ const SubscriptionStatus = () => {
     const canCancel = paidStatus && isPremiumPlan && effectiveSubscription.cancellable !== false;
     const showUpgrade = !canCancel;
 
-    const adsSummary = adsCapability
+    const businessPlanProfile = isBusinessUser
+        ? BUSINESS_PLAN_ENTITLEMENTS[planTierNormalized] || BUSINESS_PLAN_ENTITLEMENTS.base
+        : null;
+    const businessApiLimit = isBusinessUser
+        ? (effectiveSubscription.limits?.api?.callsPerDay ?? businessPlanProfile?.apiLimit ?? null)
+        : null;
+    const apiUsageToday = isBusinessUser
+        ? (
+            effectiveSubscription.metadata?.apiUsageToday
+            ?? effectiveSubscription.metadata?.apiUsage?.today
+            ?? effectiveSubscription.limits?.api?.usageToday
+            ?? 0
+        )
+        : null;
+    const apiRemaining = isBusinessUser
+        ? (Number.isFinite(businessApiLimit)
+            ? Math.max(businessApiLimit - Number(apiUsageToday || 0), 0)
+            : businessApiLimit)
+        : null;
+    const activeAdsCount = isBusinessUser ? (adsCapability?.activeCount ?? 0) : null;
+    const maxAdsAllowed = isBusinessUser
+        ? (() => {
+            const capabilityMax = adsCapability?.maxActive;
+            const planMax = businessPlanProfile?.advertising?.maxAds;
+            if (capabilityMax === null || capabilityMax === undefined) {
+                if (planMax === null || planMax === undefined) {
+                    return Infinity;
+                }
+                return planMax;
+            }
+            return capabilityMax === null ? Infinity : capabilityMax;
+        })()
+        : null;
+    const adPlacementPermissions = isBusinessUser
+        ? (businessPlanProfile?.advertising?.placement || 'Standard business placements')
+        : null;
+    const analyticsModeLabel = isBusinessUser
+        ? (adsCapability?.analyticsMode
+            ? toTitle(adsCapability.analyticsMode)
+            : businessPlanProfile?.analyticsLevel || 'Limited analytics')
+        : null;
+    const mediaSupportLabel = isBusinessUser
+        ? (businessPlanProfile?.advertising?.mediaSupport || 'Image, video & GIF creative support')
+        : null;
+    const advertisingFeaturesList = isBusinessUser ? (businessPlanProfile?.advertising?.features || []) : [];
+    const analyticsFeaturesList = isBusinessUser ? (businessPlanProfile?.analyticsFeatures || []) : [];
+
+    const businessOverviewItems = isBusinessUser
+        ? [
+            { label: 'Plan', value: businessPlanProfile?.label || planLabel },
+            { label: 'Status', value: statusText },
+            { label: 'Price', value: priceDisplay },
+            { label: 'Next billing', value: nextBilling }
+        ]
+        : [];
+    const usageItems = isBusinessUser
+        ? [
+            { label: 'API calls per day', value: formatMetricValue(businessApiLimit) },
+            { label: 'API usage today', value: formatMetricValue(apiUsageToday ?? 0, { fallback: '0' }) },
+            { label: 'Remaining API calls', value: formatMetricValue(apiRemaining) }
+        ]
+        : [];
+    const advertisingItems = isBusinessUser
+        ? [
+            { label: 'Active ads', value: formatMetricValue(activeAdsCount, { fallback: '0' }) },
+            { label: 'Max ads allowed', value: formatMetricValue(maxAdsAllowed) },
+            { label: 'Ad placement permissions', value: adPlacementPermissions || '—' },
+            { label: 'Campaign analytics access', value: analyticsModeLabel || 'Limited analytics' },
+            { label: 'Media support', value: mediaSupportLabel || 'Image, video & GIF creative support' }
+        ]
+        : [];
+
+    const adsSummary = !isBusinessUser && adsCapability
         ? (!Number.isFinite(adsCapability.maxActive) ? 'Unlimited active ads' : `${adsCapability.maxActive} active ads`) +
         ` • ${adsCapability.analyticsMode || 'limited'} analytics`
         : null;
@@ -356,37 +611,101 @@ const SubscriptionStatus = () => {
                 </button>
             </div>
 
-            <div className="subscription-card__details">
-                <div>
-                    <span>Chat minutes / day</span>
-                    <strong>{chatMinutes}</strong>
-                </div>
-                <div>
-                    <span>Call minutes</span>
-                    <strong>{callMinutes}</strong>
-                </div>
-                <div>
-                    <span>Next billing</span>
-                    <strong>{nextBilling}</strong>
-                </div>
-                <div>
-                    <span>Status</span>
-                    <strong>{statusText}</strong>
-                </div>
-                <div>
-                    <span>Price</span>
-                    <strong>
-                        {priceText}
-                        {currencyCode ? ` (${currencyCode})` : ''}
-                    </strong>
-                </div>
-            </div>
+            {isBusinessUser ? (
+                <>
+                    <div className="subscription-card__section">
+                        <p className="subscription-card__section-title">Subscription Overview</p>
+                        <div className="subscription-card__section-grid">
+                            {businessOverviewItems.map((item) => (
+                                <div key={item.label}>
+                                    <span>{item.label}</span>
+                                    <strong>{item.value}</strong>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
 
-            {adsSummary && (
-                <div className="subscription-card__ads">
-                    <span>Ad entitlements</span>
-                    <strong>{adsSummary}</strong>
-                </div>
+                    <div className="subscription-card__section">
+                        <p className="subscription-card__section-title">Usage Limits</p>
+                        <div className="subscription-card__section-grid">
+                            {usageItems.map((item) => (
+                                <div key={item.label}>
+                                    <span>{item.label}</span>
+                                    <strong>{item.value}</strong>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="subscription-card__section">
+                        <p className="subscription-card__section-title">Advertising Services</p>
+                        <div className="subscription-card__section-grid">
+                            {advertisingItems.map((item) => (
+                                <div key={item.label}>
+                                    <span>{item.label}</span>
+                                    <strong>{item.value}</strong>
+                                </div>
+                            ))}
+                        </div>
+                        {advertisingFeaturesList.length > 0 && (
+                            <ul className="subscription-card__list">
+                                {advertisingFeaturesList.map((feature) => (
+                                    <li key={feature}>{feature}</li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="subscription-card__section">
+                        <p className="subscription-card__section-title">Analytics Access</p>
+                        {analyticsFeaturesList.length > 0 ? (
+                            <ul className="subscription-card__list">
+                                {analyticsFeaturesList.map((feature) => (
+                                    <li key={feature}>{feature}</li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <div className="subscription-card__section-grid">
+                                <div>
+                                    <span>Analytics</span>
+                                    <strong>{analyticsModeLabel || 'Analytics access available'}</strong>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div className="subscription-card__details">
+                        <div>
+                            <span>Chat minutes / day</span>
+                            <strong>{chatMinutes}</strong>
+                        </div>
+                        <div>
+                            <span>Call minutes</span>
+                            <strong>{callMinutes}</strong>
+                        </div>
+                        <div>
+                            <span>Next billing</span>
+                            <strong>{nextBilling}</strong>
+                        </div>
+                        <div>
+                            <span>Status</span>
+                            <strong>{statusText}</strong>
+                        </div>
+                        <div>
+                            <span>Price</span>
+                            <strong>{priceDisplay}</strong>
+                        </div>
+                    </div>
+
+                    {adsSummary && (
+                        <div className="subscription-card__ads">
+                            <span>Ad entitlements</span>
+                            <strong>{adsSummary}</strong>
+                        </div>
+                    )}
+                </>
             )}
 
             <div className="subscription-card__actions">

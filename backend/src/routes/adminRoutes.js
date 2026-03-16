@@ -1,6 +1,6 @@
 
 const express = require('express');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { authorizeAdmin } = require('../middleware/adminAuth');
 const { apiLimiter } = require('../middleware/rateLimiter');
@@ -65,6 +65,13 @@ router.patch('/reviews/:id/moderate',
 );
 router.delete('/reviews/:id', adminController.deleteReview);
 router.patch('/reviews/:id/visibility', adminController.setReviewVisibility);
+router.get('/review-notifications/logs', adminController.getReviewNotificationLogs);
+router.post('/review-notifications/logs/:logId/resend',
+    validate([
+        param('logId').isUUID()
+    ]),
+    adminController.resendReviewNotification
+);
 
 
 router.get('/subscriptions', adminController.getSubscriptions);

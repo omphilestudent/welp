@@ -2,6 +2,8 @@ const { query } = require('../utils/database');
 
 const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'USD').toUpperCase();
 const CURRENCY_CACHE_TTL_MS = Number(process.env.CURRENCY_CACHE_TTL_MS || 300_000);
+const COUNTRY_CACHE_TTL_MS = Number(process.env.COUNTRY_PREFERENCE_CACHE_TTL_MS || 600_000);
+const COUNTRY_LIST_CACHE_TTL_MS = Number(process.env.COUNTRY_LIST_CACHE_TTL_MS || 300_000);
 
 const AUDIENCE_ALIASES = {
     employee: 'user',
@@ -19,7 +21,7 @@ const AUDIENCE_ALIASES = {
     enterprise: 'business'
 };
 
-const COUNTRY_PRICING = {
+const FALLBACK_COUNTRY_PRICING = {
     US: { multiplier: 1.0, currency: 'USD' },
     CA: { multiplier: 0.95, currency: 'CAD' },
     GB: { multiplier: 0.95, currency: 'GBP' },
@@ -71,7 +73,180 @@ const COUNTRY_PRICING = {
     KW: { multiplier: 0.9, currency: 'KWD' }
 };
 
+const COUNTRY_NAME_FALLBACKS = {
+    US: 'United States',
+    CA: 'Canada',
+    GB: 'United Kingdom',
+    IE: 'Ireland',
+    DE: 'Germany',
+    FR: 'France',
+    IT: 'Italy',
+    ES: 'Spain',
+    NL: 'Netherlands',
+    BE: 'Belgium',
+    CH: 'Switzerland',
+    SE: 'Sweden',
+    NO: 'Norway',
+    DK: 'Denmark',
+    FI: 'Finland',
+    PT: 'Portugal',
+    GR: 'Greece',
+    AU: 'Australia',
+    NZ: 'New Zealand',
+    JP: 'Japan',
+    KR: 'South Korea',
+    SG: 'Singapore',
+    CN: 'China',
+    IN: 'India',
+    ID: 'Indonesia',
+    MY: 'Malaysia',
+    TH: 'Thailand',
+    VN: 'Vietnam',
+    PH: 'Philippines',
+    ZA: 'South Africa',
+    NG: 'Nigeria',
+    KE: 'Kenya',
+    EG: 'Egypt',
+    MA: 'Morocco',
+    GH: 'Ghana',
+    TZ: 'Tanzania',
+    UG: 'Uganda',
+    BR: 'Brazil',
+    AR: 'Argentina',
+    CL: 'Chile',
+    CO: 'Colombia',
+    PE: 'Peru',
+    MX: 'Mexico',
+    AE: 'United Arab Emirates',
+    SA: 'Saudi Arabia',
+    IL: 'Israel',
+    TR: 'Turkey',
+    QA: 'Qatar',
+    KW: 'Kuwait'
+};
+
 const currencyCache = new Map();
+const countryPreferenceCache = new Map();
+let countryListCache = { data: null, expiresAt: 0 };
+let countryTableMissing = false;
+
+const buildFallbackCountryEntry = (code) => {
+    if (!code) return null;
+    const normalized = code.toUpperCase();
+    const fallback = FALLBACK_COUNTRY_PRICING[normalized];
+    if (!fallback) return null;
+    return {
+        code: normalized,
+        name: COUNTRY_NAME_FALLBACKS[normalized] || normalized,
+        multiplier: fallback.multiplier ?? 1,
+        currency: (fallback.currency || DEFAULT_CURRENCY).toUpperCase(),
+        currencySymbol: fallback.currency_symbol || null,
+        source: 'fallback'
+    };
+};
+
+const buildFallbackCountryList = () =>
+    Object.entries(FALLBACK_COUNTRY_PRICING)
+        .map(([code, config]) => ({
+            code,
+            name: COUNTRY_NAME_FALLBACKS[code] || code,
+            currency: (config.currency || DEFAULT_CURRENCY).toUpperCase(),
+            currencySymbol: config.currency_symbol || null,
+            multiplier: config.multiplier ?? 1
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+const getCountryPreferenceRecord = async (countryCode) => {
+    if (!countryCode) return null;
+    const normalized = countryCode.toUpperCase();
+    const cached = countryPreferenceCache.get(normalized);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.value;
+    }
+    if (!countryTableMissing) {
+        try {
+            const { rows } = await query(
+                `SELECT country_code, country_name, multiplier, currency, currency_symbol
+                 FROM country_pricing
+                 WHERE UPPER(country_code) = $1
+                   AND is_active = true
+                 LIMIT 1`,
+                [normalized]
+            );
+            if (rows.length) {
+                const record = {
+                    code: normalized,
+                    name: rows[0].country_name || COUNTRY_NAME_FALLBACKS[normalized] || normalized,
+                    multiplier: Number(rows[0].multiplier) || 1,
+                    currency: (rows[0].currency || DEFAULT_CURRENCY).toUpperCase(),
+                    currencySymbol: rows[0].currency_symbol || null,
+                    source: 'db'
+                };
+                countryPreferenceCache.set(normalized, {
+                    value: record,
+                    expiresAt: Date.now() + COUNTRY_CACHE_TTL_MS
+                });
+                return record;
+            }
+        } catch (error) {
+            if (error?.code === '42P01') {
+                countryTableMissing = true;
+            } else {
+                console.warn('Country pricing lookup failed:', error.message);
+            }
+        }
+    }
+    const fallback = buildFallbackCountryEntry(normalized);
+    if (fallback) {
+        countryPreferenceCache.set(normalized, {
+            value: fallback,
+            expiresAt: Date.now() + COUNTRY_CACHE_TTL_MS
+        });
+    }
+    return fallback;
+};
+
+const listCountryPricing = async () => {
+    if (countryListCache.data && countryListCache.expiresAt > Date.now()) {
+        return countryListCache.data;
+    }
+    if (!countryTableMissing) {
+        try {
+            const { rows } = await query(
+                `SELECT country_code, country_name, multiplier, currency, currency_symbol
+                 FROM country_pricing
+                 WHERE is_active = true
+                 ORDER BY country_name ASC`
+            );
+            if (rows.length) {
+                const mapped = rows.map((row) => ({
+                    code: row.country_code.toUpperCase(),
+                    name: row.country_name || COUNTRY_NAME_FALLBACKS[row.country_code] || row.country_code,
+                    currency: (row.currency || DEFAULT_CURRENCY).toUpperCase(),
+                    currencySymbol: row.currency_symbol || null,
+                    multiplier: Number(row.multiplier) || 1
+                }));
+                countryListCache = {
+                    data: mapped,
+                    expiresAt: Date.now() + COUNTRY_LIST_CACHE_TTL_MS
+                };
+                return mapped;
+            }
+        } catch (error) {
+            if (error?.code === '42P01') {
+                countryTableMissing = true;
+            } else {
+                console.warn('Country pricing catalog lookup failed:', error.message);
+            }
+        }
+    }
+    const fallbackList = buildFallbackCountryList();
+    countryListCache = {
+        data: fallbackList,
+        expiresAt: Date.now() + COUNTRY_LIST_CACHE_TTL_MS
+    };
+    return fallbackList;
+};
 
 const parseJson = (raw, fallback) => {
     if (raw === null || raw === undefined) return fallback;
@@ -98,12 +273,18 @@ const formatPrice = (amountMinor, symbol = '$') => {
     return `${symbol}${amount.toFixed(2)}`;
 };
 
-const resolveCountryPreference = (countryCode, explicitCurrency) => {
+const resolveCountryPreference = async (countryCode, explicitCurrency) => {
     const normalizedCountry = countryCode ? countryCode.toUpperCase() : null;
-    const preference = normalizedCountry ? COUNTRY_PRICING[normalizedCountry] : null;
+    const preference = normalizedCountry ? await getCountryPreferenceRecord(normalizedCountry) : null;
     const currencyCode = (explicitCurrency || preference?.currency || DEFAULT_CURRENCY).toUpperCase();
     const multiplier = preference?.multiplier ?? 1;
-    return { currencyCode, multiplier };
+    return {
+        currencyCode,
+        multiplier,
+        countryCode: normalizedCountry,
+        currencySymbol: preference?.currencySymbol || null,
+        source: preference?.source || 'default'
+    };
 };
 
 const getCurrencyRecord = async (code) => {
@@ -231,14 +412,35 @@ const ensureCatalogForCurrency = async (audience, currencyCode, multiplier = 1) 
 
 const getAudiencePricing = async (audienceInput, options = {}) => {
     const normalizedAudience = normalizeAudience(audienceInput);
-    const { currencyCode, multiplier } = resolveCountryPreference(options.country, options.currency);
-    const plans = await ensureCatalogForCurrency(normalizedAudience, currencyCode, multiplier);
-    const currencyMeta = (await getCurrencyRecord(currencyCode)) || { code: currencyCode, symbol: '$' };
+    const preference = await resolveCountryPreference(options.country, options.currency);
+    const plans = await ensureCatalogForCurrency(
+        normalizedAudience,
+        preference.currencyCode,
+        preference.multiplier
+    );
+    const currencyMeta =
+        (await getCurrencyRecord(preference.currencyCode)) || {
+            code: preference.currencyCode,
+            symbol: preference.currencySymbol || '$'
+        };
 
     return {
         audience: normalizedAudience,
-        currency: currencyMeta,
-        multiplier,
+        currency: {
+            ...currencyMeta,
+            symbol: currencyMeta.symbol || preference.currencySymbol || '$'
+        },
+        multiplier: preference.multiplier,
+        country: preference.countryCode,
+        countryPreference:
+            preference.source === 'default'
+                ? null
+                : {
+                      code: preference.countryCode,
+                      currency: preference.currencyCode,
+                      multiplier: preference.multiplier,
+                      source: preference.source
+                  },
         plans
     };
 };
@@ -246,7 +448,9 @@ const getAudiencePricing = async (audienceInput, options = {}) => {
 const getPlanByCode = async (audienceInput, planCode, currencyCode, options = {}) => {
     if (!planCode) return null;
     const normalizedAudience = normalizeAudience(audienceInput);
-    const { currencyCode: resolvedCurrency, multiplier } = resolveCountryPreference(options.country, currencyCode);
+    const preference = await resolveCountryPreference(options.country, currencyCode);
+    const resolvedCurrency = preference.currencyCode;
+    const multiplier = preference.multiplier;
     const plans = await ensureCatalogForCurrency(normalizedAudience, resolvedCurrency, multiplier);
     return plans.find((plan) => plan.planCode === planCode) || null;
 };
@@ -254,6 +458,6 @@ const getPlanByCode = async (audienceInput, planCode, currencyCode, options = {}
 module.exports = {
     getAudiencePricing,
     getPlanByCode,
-    DEFAULT_CURRENCY,
-    COUNTRY_PRICING
+    listCountryPricing,
+    DEFAULT_CURRENCY
 };

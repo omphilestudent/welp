@@ -9,6 +9,10 @@ const {
     STATUS_LABELS: APPLICATION_STATUS_LABELS
 } = require('../services/applicationWorkflowService');
 const { sendApplicationStatusEmail } = require('../utils/emailService');
+const {
+    listReviewNotificationLogs,
+    resendReviewNotificationLog
+} = require('../services/reviewNotificationService');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const tableExists = async (tableName) => {
@@ -797,6 +801,36 @@ const setReviewVisibility = async (req, res) => {
     }
 };
 
+const getReviewNotificationLogs = async (req, res) => {
+    try {
+        const { page = 1, limit = 20, status = 'all', search = '' } = req.query;
+        const result = await listReviewNotificationLogs({ page, limit, status, search });
+        res.json({
+            success: true,
+            logs: result.logs,
+            pagination: result.pagination
+        });
+    } catch (error) {
+        console.error('Get review notification logs error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch review notification activity' });
+    }
+};
+
+const resendReviewNotification = async (req, res) => {
+    try {
+        const { logId } = req.params;
+        const result = await resendReviewNotificationLog(logId, req.user.id);
+        res.json({ success: true, result });
+    } catch (error) {
+        const status = error.status || 500;
+        console.error('Resend review notification error:', error);
+        res.status(status).json({
+            success: false,
+            error: error.message || 'Failed to resend review notification'
+        });
+    }
+};
+
 const listAdminNotifications = async (req, res) => {
     try {
         const rows = await getAdminNotifications(40);
@@ -1506,6 +1540,8 @@ module.exports = {
     moderateReview,
     deleteReview,
     setReviewVisibility,
+    getReviewNotificationLogs,
+    resendReviewNotification,
     listAdminNotifications,
     markNotificationRead,
     getRegistrationApplications,

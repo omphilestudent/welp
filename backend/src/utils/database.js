@@ -66,7 +66,7 @@ const createTables = async () => {
                     CREATE TYPE billing_period AS ENUM ('monthly', 'quarterly', 'annual');
                 END IF;
                 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'media_type') THEN
-                    CREATE TYPE media_type AS ENUM ('text', 'voice', 'video');
+                    CREATE TYPE media_type AS ENUM ('text', 'voice', 'video', 'image', 'gif');
                 END IF;
             END$$;
 
@@ -147,6 +147,18 @@ const createTables = async () => {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (audience, plan_code, currency_code)
+            );
+
+            CREATE TABLE IF NOT EXISTS country_pricing (
+                country_code CHAR(2) PRIMARY KEY,
+                country_name VARCHAR(128) NOT NULL,
+                multiplier NUMERIC(6,3) NOT NULL DEFAULT 1.000,
+                currency VARCHAR(3) NOT NULL,
+                currency_symbol VARCHAR(8) DEFAULT '$',
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                updated_by UUID,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS subscription_records (
@@ -356,9 +368,28 @@ const createTables = async () => {
                 flagged_by UUID REFERENCES users(id),
                 flagged_at TIMESTAMP,
                 flag_reason TEXT,
+                notification_status VARCHAR(32) DEFAULT 'pending',
+                notification_notes TEXT,
+                notification_last_sent_at TIMESTAMP,
                 token_version INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS review_notification_logs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+                company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                email_to TEXT NOT NULL,
+                cc JSONB DEFAULT '[]'::jsonb,
+                subject TEXT NOT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                error TEXT,
+                metadata JSONB DEFAULT '{}'::jsonb,
+                triggered_by UUID REFERENCES users(id),
+                trigger_source VARCHAR(32) DEFAULT 'system',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
 
             -- Replies table
@@ -920,6 +951,10 @@ const runMigrations = async () => {
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flag_reason TEXT;",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT false;",
             "ALTER TABLE reviews ALTER COLUMN is_anonymous SET DEFAULT false;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS notification_status VARCHAR(32) DEFAULT 'pending';",
+            "ALTER TABLE reviews ALTER COLUMN notification_status SET DEFAULT 'pending';",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS notification_notes TEXT;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS notification_last_sent_at TIMESTAMP;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS time_limit_minutes INTEGER DEFAULT 120;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS started_at TIMESTAMP;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;",
@@ -1092,7 +1127,7 @@ const runMigrations = async () => {
                 target_behaviors JSONB,
                 daily_budget_minor BIGINT,
                 bid_type VARCHAR(16) DEFAULT 'cpc',
-                status VARCHAR(32) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'paused', 'completed')),
+                status VARCHAR(32) DEFAULT 'pending_review' CHECK (status IN ('draft', 'pending_review', 'active', 'paused', 'completed', 'rejected')),
                 impressions INT DEFAULT 0,
                 clicks INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1109,6 +1144,11 @@ const runMigrations = async () => {
             ,
             "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;",
             "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS click_redirect_url TEXT;",
+            "ALTER TYPE media_type ADD VALUE IF NOT EXISTS 'image';",
+            "ALTER TYPE media_type ADD VALUE IF NOT EXISTS 'gif';",
+            "ALTER TABLE advertising_campaigns DROP CONSTRAINT IF EXISTS advertising_campaigns_status_check;",
+            "ALTER TABLE advertising_campaigns ADD CONSTRAINT advertising_campaigns_status_check CHECK (status IN ('draft','pending_review','active','paused','completed','rejected'));",
+            "ALTER TABLE advertising_campaigns ALTER COLUMN status SET DEFAULT 'pending_review';",
             `DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'media_type') THEN
