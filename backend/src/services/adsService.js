@@ -50,6 +50,52 @@ const ensureAdSchema = async () => {
     return cachedAdSchema;
 };
 
+const buildAdQueryContext = (tables) => {
+    const joins = [];
+    if (tables.businesses) {
+        joins.push('LEFT JOIN businesses b ON b.id = c.business_id');
+    }
+    if (tables.companies) {
+        joins.push('LEFT JOIN companies comp ON comp.id = c.business_id');
+    }
+
+    const ownerSources = [];
+    if (tables.businesses) {
+        ownerSources.push('b.owner_user_id');
+    }
+    if (tables.companies) {
+        ownerSources.push('comp.claimed_by', 'comp.created_by_user_id');
+    }
+    const ownerExpr = ownerSources.length ? `COALESCE(${ownerSources.join(', ')})` : null;
+    if (ownerExpr) {
+        joins.push(`LEFT JOIN users owner ON owner.id = ${ownerExpr}`);
+    }
+
+    const businessNames = [];
+    if (tables.businesses) businessNames.push('b.name');
+    if (tables.companies) businessNames.push('comp.name');
+    const businessNameExpr = businessNames.length
+        ? `COALESCE(${businessNames.join(', ')})`
+        : `'Unknown Business'`;
+
+    const tierExpr = tables.businesses ? `COALESCE(b.subscription_tier, 'base')` : `'base'`;
+    const subscriptionExpiresExpr = tables.businesses ? 'b.subscription_expires' : 'NULL';
+    const ownerEmailExpr = ownerExpr ? 'owner.email' : 'NULL';
+    const ownerNameExpr = ownerExpr ? 'owner.display_name' : 'NULL';
+    const ownerPhoneExpr = ownerExpr ? 'owner.phone' : 'NULL';
+
+    return {
+        joins: joins.join('\n'),
+        businessNameExpr,
+        tierExpr,
+        subscriptionExpiresExpr,
+        ownerEmailExpr,
+        ownerNameExpr,
+        ownerPhoneExpr,
+        hasOwner: Boolean(ownerExpr)
+    };
+};
+
 const ensureAdTableMetadata = async (forceRefresh = false) => {
     if (!forceRefresh && adTableMetadata.checked) {
         return adTableMetadata;
@@ -72,51 +118,6 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
     return adTableMetadata;
 };
 
-const buildAdQueryContext = (tables) => {
-    const joins = [];
-    if (tables.businesses) {
-        joins.push('LEFT JOIN businesses b ON b.id = c.business_id');
-    }
-    if (tables.companies) {
-        joins.push('LEFT JOIN companies comp ON comp.id = c.business_id');
-    }
-
-    const ownerSources = [];
-    if (tables.businesses) {
-        ownerSources.push('b.owner_user_id');
-    }
-    if (tables.companies) {
-        ownerSources.push('comp.claimed_by', 'comp.created_by_user_id');
-    }
-    const ownerExpr = ownerSources.length ? `COALESCE(${ownerSources.join(', ')})` : null;
-    if (ownerExpr) {
-        joins.push(`LEFT JOIN users owner ON owner.id = ${ownerExpr}`);
-    }
-
-    const businessNameParts = [];
-    if (tables.businesses) businessNameParts.push('b.name');
-    if (tables.companies) businessNameParts.push('comp.name');
-    const businessNameExpr = businessNameParts.length
-        ? `COALESCE(${businessNameParts.join(', ')})`
-        : `'Unknown Business'`;
-
-    const tierExpr = tables.businesses ? `COALESCE(b.subscription_tier, 'base')` : `'base'`;
-    const subscriptionExpiresExpr = tables.businesses ? 'b.subscription_expires' : 'NULL';
-    const ownerEmailExpr = ownerExpr ? 'owner.email' : 'NULL';
-    const ownerNameExpr = ownerExpr ? 'owner.display_name' : 'NULL';
-    const ownerPhoneExpr = ownerExpr ? 'owner.phone' : 'NULL';
-
-    return {
-        joins: joins.join('\n'),
-        businessNameExpr,
-        tierExpr,
-        subscriptionExpiresExpr,
-        ownerEmailExpr,
-        ownerNameExpr,
-        ownerPhoneExpr,
-        hasOwner: Boolean(ownerExpr)
-    };
-};
 
 const getBusinessIdForUser = async (userId) => {
     if (!userId) return null;
@@ -312,7 +313,7 @@ const getBusinessOwner = async (businessId) => {
         const legacy = await query(
             `SELECT c.id,
                     c.name,
-                    'base'::subscription_tier_business AS subscription_tier,
+                    'base' AS subscription_tier,
                     NULL::timestamptz               AS subscription_expires,
                     owner.id                        AS owner_user_id,
                     owner.email,
