@@ -832,6 +832,11 @@ const adminListCampaigns = async (req, res) => {
             startDate: req.query.startDate,
             endDate: req.query.endDate
         };
+        console.log('[adminListCampaigns] user', {
+            id: req.user?.id,
+            role: req.user?.role,
+            filters
+        });
         const campaigns = await adminListAds(filters);
         await logAdminAction({
             adminId: req.user.id,
@@ -840,8 +845,12 @@ const adminListCampaigns = async (req, res) => {
         });
         return res.json({ success: true, campaigns });
     } catch (error) {
-        console.error('Error in adminListCampaigns:', error);
-        return res.status(500).json({ success: false, error: 'Failed to list campaigns' });
+        console.error('[adminListCampaigns] failed', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to list campaigns',
+            details: error?.message
+        });
     }
 };
 

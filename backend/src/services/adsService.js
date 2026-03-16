@@ -507,7 +507,12 @@ const adminListAds = async (filters = {}, options = {}) => {
             await ensureAdTableMetadata(true);
             return adminListAds(filters, { forceRefresh: true });
         }
-        console.error('Error in adminListAds:', error);
+        console.error('[adminListAds] query failed', {
+            error: error?.message,
+            code: error?.code,
+            filters,
+            sql: queryStr
+        });
         throw error;
     }
 };
