@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import api from '../services/api';
+import { resolveMediaUrl } from '../utils/media';
 import toast from 'react-hot-toast';
 import {
     FaUser,
@@ -100,13 +101,6 @@ const Settings = () => {
         } catch (error) {
             console.error('Failed to fetch profile:', error);
         }
-    };
-
-    const resolveMediaUrl = (url) => {
-        if (!url) return '';
-        if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
-        const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
-        return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
     };
 
     const handleAvatarUpload = async (e) => {

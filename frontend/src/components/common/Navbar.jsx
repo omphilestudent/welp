@@ -5,13 +5,7 @@ import { FaComment, FaShieldAlt, FaBriefcase, FaBell } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import socketService from '../../services/socket';
-
-const resolveMediaUrl = (url) => {
-    if (!url) return '';
-    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
-    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
-};
+import { resolveMediaUrl } from '../../utils/media';
 
 const Navbar = () => {
     const { user, logout } = useAuth();

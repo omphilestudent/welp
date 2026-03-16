@@ -7,6 +7,7 @@ import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import AdvertisingSection from '../components/ads/AdvertisingSection';
 import SubscriptionStatus from '../components/subscription/SubscriptionStatus';
+import { resolveMediaUrl } from '../utils/media';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
     FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo,
@@ -25,13 +26,6 @@ import {
 } from 'date-fns';
 
 const BUSINESS_PIE_COLORS = ['#6366f1', '#f59e0b', '#0ea5e9', '#10b981', '#ec4899'];
-
-const resolveMediaUrl = (url) => {
-    if (!url) return '';
-    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
-    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
-};
 
 const VERIFICATION_STEP_LABELS = {
     documents: 'Document verification',

@@ -2,13 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import Loading from '../components/common/Loading';
-
-const resolveMediaUrl = (url) => {
-    if (!url) return '';
-    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
-    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
-};
+import { resolveMediaUrl } from '../utils/media';
 
 const formatDateTime = (value) => {
     if (!value) return '';
