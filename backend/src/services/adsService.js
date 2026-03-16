@@ -5,8 +5,10 @@ const { hasPremiumException } = require('../utils/premiumAccess');
 
 const ACCEPTED_MEDIA_TYPES = ['image', 'video', 'gif'];
 const AD_SCHEMA_TTL_MS = 5 * 60 * 1000;
+let businessTableAvailable = true;
 
 let cachedAdSchema = null;
+let adTableMetadata = { checked: false, businesses: true, companies: true };
 
 const ensureAdSchema = async () => {
     if (cachedAdSchema && cachedAdSchema.expiresAt > Date.now()) {
@@ -46,6 +48,74 @@ const ensureAdSchema = async () => {
         };
     }
     return cachedAdSchema;
+};
+
+const ensureAdTableMetadata = async (forceRefresh = false) => {
+    if (!forceRefresh && adTableMetadata.checked) {
+        return adTableMetadata;
+    }
+    try {
+        const { rows } = await query(
+            `SELECT 
+                to_regclass('public.businesses') IS NOT NULL AS has_businesses,
+                to_regclass('public.companies') IS NOT NULL AS has_companies`
+        );
+        adTableMetadata = {
+            checked: true,
+            businesses: rows[0]?.has_businesses === true,
+            companies: rows[0]?.has_companies === true
+        };
+    } catch (error) {
+        console.warn('Ad table metadata detection failed:', error.message);
+        adTableMetadata.checked = true;
+    }
+    return adTableMetadata;
+};
+
+const buildAdQueryContext = (tables) => {
+    const joins = [];
+    if (tables.businesses) {
+        joins.push('LEFT JOIN businesses b ON b.id = c.business_id');
+    }
+    if (tables.companies) {
+        joins.push('LEFT JOIN companies comp ON comp.id = c.business_id');
+    }
+
+    const ownerSources = [];
+    if (tables.businesses) {
+        ownerSources.push('b.owner_user_id');
+    }
+    if (tables.companies) {
+        ownerSources.push('comp.claimed_by', 'comp.created_by_user_id');
+    }
+    const ownerExpr = ownerSources.length ? `COALESCE(${ownerSources.join(', ')})` : null;
+    if (ownerExpr) {
+        joins.push(`LEFT JOIN users owner ON owner.id = ${ownerExpr}`);
+    }
+
+    const businessNameParts = [];
+    if (tables.businesses) businessNameParts.push('b.name');
+    if (tables.companies) businessNameParts.push('comp.name');
+    const businessNameExpr = businessNameParts.length
+        ? `COALESCE(${businessNameParts.join(', ')})`
+        : `'Unknown Business'`;
+
+    const tierExpr = tables.businesses ? `COALESCE(b.subscription_tier, 'base')` : `'base'`;
+    const subscriptionExpiresExpr = tables.businesses ? 'b.subscription_expires' : 'NULL';
+    const ownerEmailExpr = ownerExpr ? 'owner.email' : 'NULL';
+    const ownerNameExpr = ownerExpr ? 'owner.display_name' : 'NULL';
+    const ownerPhoneExpr = ownerExpr ? 'owner.phone' : 'NULL';
+
+    return {
+        joins: joins.join('\n'),
+        businessNameExpr,
+        tierExpr,
+        subscriptionExpiresExpr,
+        ownerEmailExpr,
+        ownerNameExpr,
+        ownerPhoneExpr,
+        hasOwner: Boolean(ownerExpr)
+    };
 };
 
 const getBusinessIdForUser = async (userId) => {
@@ -218,37 +288,46 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
 };
 
 const getBusinessOwner = async (businessId) => {
-    const result = await query(
-        `SELECT b.id,
-                b.name,
-                b.subscription_tier,
-                b.subscription_expires,
-                u.id   AS owner_user_id,
-                u.email,
-                u.display_name
-         FROM businesses b
-         LEFT JOIN users u ON u.id = b.owner_user_id
-         WHERE b.id = $1`,
-        [businessId]
-    );
-    if (result.rows[0]) {
-        return result.rows[0];
+    const tables = await ensureAdTableMetadata();
+    if (tables.businesses) {
+        const result = await query(
+            `SELECT b.id,
+                    b.name,
+                    b.subscription_tier,
+                    b.subscription_expires,
+                    u.id   AS owner_user_id,
+                    u.email,
+                    u.display_name
+             FROM businesses b
+             LEFT JOIN users u ON u.id = b.owner_user_id
+             WHERE b.id = $1`,
+            [businessId]
+        );
+        if (result.rows[0]) {
+            return result.rows[0];
+        }
     }
 
-    const legacy = await query(
-        `SELECT c.id,
-                c.name,
-                'base'::subscription_tier_business AS subscription_tier,
-                NULL::timestamptz               AS subscription_expires,
-                owner.id                        AS owner_user_id,
-                owner.email,
-                owner.display_name
-         FROM companies c
-         LEFT JOIN users owner ON owner.id = COALESCE(c.claimed_by, c.created_by_user_id)
-         WHERE c.id = $1`,
-        [businessId]
-    );
-    return legacy.rows[0] || null;
+    if (tables.companies) {
+        const legacy = await query(
+            `SELECT c.id,
+                    c.name,
+                    'base'::subscription_tier_business AS subscription_tier,
+                    NULL::timestamptz               AS subscription_expires,
+                    owner.id                        AS owner_user_id,
+                    owner.email,
+                    owner.display_name
+             FROM companies c
+             LEFT JOIN users owner ON owner.id = COALESCE(c.claimed_by, c.created_by_user_id)
+             WHERE c.id = $1`,
+            [businessId]
+        );
+        if (legacy.rows[0]) {
+            return legacy.rows[0];
+        }
+    }
+
+    return null;
 };
 
 const getBusinessAdCapabilities = async ({ userId, email }) => {
@@ -341,16 +420,18 @@ const formatAnalyticsForTier = (campaign, analyticsMode = 'limited') => {
 /**
  * Get all ads with filtering for admin panel
  */
-const adminListAds = async (filters = {}) => {
+const adminListAds = async (filters = {}, options = {}) => {
     const schema = await ensureAdSchema();
+    const tables = await ensureAdTableMetadata(options.forceRefresh === true);
+    const context = buildAdQueryContext(tables);
 
     let queryStr = `
         SELECT 
             c.*,
-            COALESCE(b.name, comp.name) AS business_name,
-            COALESCE(b.subscription_tier, 'base') AS subscription_tier,
-            owner.email AS owner_email,
-            owner.display_name AS owner_name,
+            ${context.businessNameExpr} AS business_name,
+            ${context.tierExpr} AS subscription_tier,
+            ${context.ownerEmailExpr} AS owner_email,
+            ${context.ownerNameExpr} AS owner_name,
             (
                 SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                 FROM ad_placements ap
@@ -360,9 +441,7 @@ const adminListAds = async (filters = {}) => {
             COALESCE(c.clicks, 0) AS clicks,
             COALESCE(c.spend_minor, 0) AS spend_minor
         FROM advertising_campaigns c
-        LEFT JOIN businesses b ON b.id = c.business_id
-        LEFT JOIN companies comp ON comp.id = c.business_id
-        LEFT JOIN users owner ON owner.id = COALESCE(b.owner_user_id, comp.claimed_by, comp.created_by_user_id)
+        ${context.joins}
         WHERE 1=1
     `;
 
@@ -392,13 +471,14 @@ const adminListAds = async (filters = {}) => {
     }
 
     if (filters.tier) {
-        queryStr += ` AND COALESCE(b.subscription_tier, 'base') = $${paramIndex}`;
+        queryStr += ` AND ${context.tierExpr} = $${paramIndex}`;
         params.push(filters.tier);
         paramIndex++;
     }
 
     if (filters.search) {
-        queryStr += ` AND (COALESCE(b.name, comp.name) ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex} OR owner.email ILIKE $${paramIndex})`;
+        const ownerField = context.ownerEmailExpr !== 'NULL' ? context.ownerEmailExpr : `' '`;
+        queryStr += ` AND (${context.businessNameExpr} ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex} OR ${ownerField} ILIKE $${paramIndex})`;
         params.push(`%${filters.search}%`);
         paramIndex++;
     }
@@ -422,6 +502,10 @@ const adminListAds = async (filters = {}) => {
         const result = await query(queryStr, params);
         return result.rows;
     } catch (error) {
+        if (error?.code === '42P01' && !options.forceRefresh) {
+            await ensureAdTableMetadata(true);
+            return adminListAds(filters, { forceRefresh: true });
+        }
         console.error('Error in adminListAds:', error);
         throw error;
     }
@@ -430,44 +514,52 @@ const adminListAds = async (filters = {}) => {
 /**
  * Get single ad details with analytics
  */
-const adminGetAdDetails = async (adId) => {
+const adminGetAdDetails = async (adId, options = {}) => {
     const schema = await ensureAdSchema();
+    const tables = await ensureAdTableMetadata(options.forceRefresh === true);
+    const context = buildAdQueryContext(tables);
 
-    const result = await query(
-        `
-        SELECT 
-            c.*,
-            COALESCE(b.name, comp.name) AS business_name,
-            COALESCE(b.subscription_tier, 'base') AS subscription_tier,
-            b.subscription_expires,
-            owner.id AS owner_user_id,
-            owner.email AS owner_email,
-            owner.display_name AS owner_name,
-            owner.phone AS owner_phone,
-            (
-                SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
-                FROM ad_placements ap
-                WHERE ap.campaign_id = c.id
-            ) AS placements,
-            COALESCE(c.impressions, 0) AS impressions,
-            COALESCE(c.clicks, 0) AS clicks,
-            COALESCE(c.spend_minor, 0) AS spend_minor,
-            CASE 
-                WHEN c.reviewed_by IS NOT NULL THEN (
-                    SELECT display_name FROM users WHERE id = c.reviewed_by
-                )
-                ELSE NULL
-            END AS reviewed_by_name
-        FROM advertising_campaigns c
-        LEFT JOIN businesses b ON b.id = c.business_id
-        LEFT JOIN companies comp ON comp.id = c.business_id
-        LEFT JOIN users owner ON owner.id = COALESCE(b.owner_user_id, comp.claimed_by, comp.created_by_user_id)
-        WHERE c.id = $1
-        `,
-        [adId]
-    );
+    try {
+        const result = await query(
+            `
+            SELECT 
+                c.*,
+                ${context.businessNameExpr} AS business_name,
+                ${context.tierExpr} AS subscription_tier,
+                ${context.subscriptionExpiresExpr} AS subscription_expires,
+                ${context.hasOwner ? 'owner.id' : 'NULL'} AS owner_user_id,
+                ${context.ownerEmailExpr} AS owner_email,
+                ${context.ownerNameExpr} AS owner_name,
+                ${context.ownerPhoneExpr} AS owner_phone,
+                (
+                    SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
+                    FROM ad_placements ap
+                    WHERE ap.campaign_id = c.id
+                ) AS placements,
+                COALESCE(c.impressions, 0) AS impressions,
+                COALESCE(c.clicks, 0) AS clicks,
+                COALESCE(c.spend_minor, 0) AS spend_minor,
+                CASE 
+                    WHEN c.reviewed_by IS NOT NULL THEN (
+                        SELECT display_name FROM users WHERE id = c.reviewed_by
+                    )
+                    ELSE NULL
+                END AS reviewed_by_name
+            FROM advertising_campaigns c
+            ${context.joins}
+            WHERE c.id = $1
+            `,
+            [adId]
+        );
 
-    return result.rows[0] || null;
+        return result.rows[0] || null;
+    } catch (error) {
+        if (error?.code === '42P01' && !options.forceRefresh) {
+            await ensureAdTableMetadata(true);
+            return adminGetAdDetails(adId, { forceRefresh: true });
+        }
+        throw error;
+    }
 };
 
 /**
