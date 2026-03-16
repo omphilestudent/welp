@@ -2,6 +2,20 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { recordClick, recordImpression, fetchPlacementAds } from '../../services/adService';
 import './SponsoredCard.css';
 
+const STATIC_REDIRECT_URL = 'https://welp.africa/static';
+const STATIC_AD = {
+    id: 'welp-care-static',
+    name: 'Bacause We Care',
+    advertiser: 'Welp Camping',
+    media_type: 'image',
+    asset_url: '/logo-1.png',
+    click_redirect_url: STATIC_REDIRECT_URL,
+    location: 'Johannesburg',
+    status: 'active',
+    daily_budget_minor: 0,
+    __static: true
+};
+
 const SponsoredCard = ({
     placement = 'recommended',
     location = '',
@@ -18,9 +32,16 @@ const SponsoredCard = ({
             try {
                 const { data } = await fetchPlacementAds({ placement, location, industry, behaviors });
                 if (!isMounted) return;
-                setCampaign(data.campaigns?.[0] || null);
+                if (data.campaigns?.length) {
+                    setCampaign(data.campaigns[0]);
+                } else {
+                    setCampaign({ ...STATIC_AD });
+                }
             } catch (error) {
                 console.error('Failed to load ads', error);
+                if (isMounted) {
+                    setCampaign({ ...STATIC_AD });
+                }
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -32,7 +53,7 @@ const SponsoredCard = ({
     }, [placement, location, industry, behaviors]);
 
     useEffect(() => {
-        if (!campaign) return;
+        if (!campaign || campaign.__static) return;
         const track = async () => {
             try {
                 await recordImpression(campaign.id);
@@ -45,6 +66,12 @@ const SponsoredCard = ({
 
     const handleClick = async () => {
         if (!campaign) return;
+        if (campaign.__static) {
+            if (campaign.click_redirect_url) {
+                window.open(campaign.click_redirect_url, '_blank', 'noopener');
+            }
+            return;
+        }
         try {
             const { data } = await recordClick(campaign.id);
             if (data.redirectUrl) {
@@ -79,7 +106,7 @@ const SponsoredCard = ({
         );
     }, [campaign]);
 
-    if (!campaign) return null;
+    if (!campaign || loading) return null;
 
     return (
         <article className="sponsored-card" onClick={handleClick}>
@@ -87,9 +114,21 @@ const SponsoredCard = ({
             <div className="sponsored-card__content">
                 <span className="sponsored-card__badge">Sponsored</span>
                 <h3>{campaign.name}</h3>
-                <p className="sponsored-card__meta">
-                    {campaign.status} · {campaign.daily_budget_minor ? `$${(campaign.daily_budget_minor / 100).toFixed(2)} daily` : 'Budget TBD'}
-                </p>
+                {campaign.advertiser && (
+                    <p className="sponsored-card__meta">
+                        {campaign.advertiser}
+                    </p>
+                )}
+                {campaign.tagline && (
+                    <p className="sponsored-card__meta">
+                        {campaign.tagline}
+                    </p>
+                )}
+                {campaign.location && (
+                    <p className="sponsored-card__meta">
+                        {campaign.location}
+                    </p>
+                )}
             </div>
         </article>
     );

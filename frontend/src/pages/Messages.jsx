@@ -11,6 +11,7 @@ import Loading from '../components/common/Loading';
 import toast from 'react-hot-toast';
 import { FaSearch, FaStar, FaUserPlus, FaVideo, FaHistory, FaClock, FaExclamationTriangle } from 'react-icons/fa';
 import { fetchChatUsage } from '../services/chatUsageService';
+import SponsoredCard from '../components/ads/SponsoredCard';
 
 const Messages = () => {
     const [searchParams] = useSearchParams();
@@ -89,7 +90,13 @@ const Messages = () => {
     );
     const lastMessageAuthorId = activeConversation?.last_message?.senderId;
     const hasResponse = currentPsychologist && lastMessageAuthorId === currentPsychologist.id;
-    const sessionLimitMinutes = Math.max(1, Number(activeConversation?.time_limit_minutes ?? 120));
+    const defaultSessionLimit = user?.role === 'employee'
+        ? (chatUsage?.limit || 30)
+        : 120;
+    const sessionLimitMinutes = Math.max(
+        1,
+        Number(activeConversation?.time_limit_minutes ?? defaultSessionLimit)
+    );
     const fallbackStart = activeConversation?.started_at ? new Date(activeConversation.started_at) : null;
     const derivedExpiry = fallbackStart
         ? new Date(fallbackStart.getTime() + sessionLimitMinutes * 60 * 1000)
@@ -108,7 +115,7 @@ const Messages = () => {
     const showTimeWarning = user?.role === 'employee' && timeRemainingMs != null && timeRemainingMs > 0 && timeRemainingMs <= timeWarningThresholdMs;
     const showUpgradeReminder = user?.role === 'employee' && (isConversationExpired || showTimeWarning);
     const autoDeleteNote = user?.role === 'employee'
-        ? 'Free sessions last two hours and delete automatically once the timer runs out.'
+        ? 'Free sessions last 30 minutes and close automatically once the timer runs out.'
         : 'Sessions respect your subscription limits.';
     const canRequestSupport = user?.role === 'employee'
         && visibleConversations.length === 0
@@ -1039,6 +1046,14 @@ const Messages = () => {
                                     </div>
                                 )}
                             </section>
+
+                            <section className="messages-sponsored-slot">
+                                <SponsoredCard
+                                    placement="messages_support"
+                                    location={user?.city || availablePsychologists[0]?.location || ''}
+                                    industry={featuredSpecialization || user?.industry || ''}
+                                />
+                            </section>
                         </div>
                     )}
 
@@ -1048,6 +1063,7 @@ const Messages = () => {
                         callConfig={psychPermissions}
                         isExpired={isConversationExpired}
                         timeRemainingLabel={timeLabel}
+                        sessionLimitMinutes={sessionLimitMinutes}
                         onSendMessage={handleSendMessage}
                         onStartVoiceCall={handleVoiceCall}
                         onStartVideoCall={handleVideoCall}
@@ -1104,6 +1120,7 @@ const Messages = () => {
                 open={allocationModal.open}
                 psychologist={allocationModal.psychologist}
                 remainingMinutes={chatUsage?.remaining}
+                dailyLimit={chatUsage?.limit}
                 loading={allocationModal.loading}
                 onClose={() => setAllocationModal({ open: false, psychologist: null, loading: false })}
                 onConfirm={handleConfirmAllocation}

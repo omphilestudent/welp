@@ -5,7 +5,7 @@ const getLimitForTier = (tier = 'free') => {
     if (tier === 'premium') {
         return PLAN_LIMITS.user_premium?.chatMinutes ?? 120;
     }
-    return PLAN_LIMITS.user_free?.chatMinutes ?? 120;
+    return PLAN_LIMITS.user_free?.chatMinutes ?? 30;
 };
 
 const getTodayKey = () => {

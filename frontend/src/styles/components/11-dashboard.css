@@ -11,6 +11,17 @@
   margin-bottom: 2rem;
 }
 
+.dashboard-sponsored-band {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-sponsored-band .sponsored-card {
+  height: 100%;
+}
+
 .dashboard-title {
   font-size: 2.5rem;
   color: var(--text-primary);

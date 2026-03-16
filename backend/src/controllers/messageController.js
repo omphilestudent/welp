@@ -2,30 +2,41 @@
 const { query } = require('../utils/database');
 const { createUserNotification } = require('../utils/userNotifications');
 const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaService');
+const { PLAN_LIMITS } = require('../services/subscriptionService');
 
-const DAILY_CHAT_LIMIT_MINUTES = 120;
-
-const getActiveSubscription = async (userId) => {
-    const result = await query(
-        `SELECT plan_type, chat_hours_per_day
-         FROM subscriptions
-         WHERE user_id = $1 AND status = 'active'
-         ORDER BY created_at DESC
-         LIMIT 1`,
-        [userId]
-    );
-    return result.rows[0] || null;
+const getChatMinutesForTier = (tier = 'free') => {
+    const normalized = String(tier || 'free').toLowerCase();
+    if (normalized === 'premium') {
+        return PLAN_LIMITS.user_premium?.chatMinutes ?? 120;
+    }
+    return PLAN_LIMITS.user_free?.chatMinutes ?? 30;
 };
 
-const determineTimeLimitMinutes = (subscription) => {
-    if (!subscription) {
-        return DAILY_CHAT_LIMIT_MINUTES;
+const fetchEmployeeTier = async (userId) => {
+    if (!userId) {
+        return 'free';
     }
-    const declaredMinutes = Number(subscription.chat_hours_per_day || 0) * 60;
-    if (declaredMinutes > 0) {
-        return Math.max(DAILY_CHAT_LIMIT_MINUTES, declaredMinutes);
+    try {
+        const tierResult = await query(
+            `SELECT subscription_tier
+             FROM users
+             WHERE id = $1
+             LIMIT 1`,
+            [userId]
+        );
+        return tierResult.rows[0]?.subscription_tier || 'free';
+    } catch (tierError) {
+        // Handle environments that haven't applied the subscription tier migration yet.
+        if (tierError.code === '42703') {
+            console.warn('subscription_tier column missing, defaulting chat tier to free');
+            return 'free';
+        }
+        throw tierError;
     }
-    return DAILY_CHAT_LIMIT_MINUTES;
+};
+
+const getPerSessionCapForUser = (user = {}) => {
+    return getChatMinutesForTier(user.subscription_tier);
 };
 
 const expireConversations = async () => {
@@ -64,9 +75,10 @@ const requestChatWithPsychologist = async (req, res) => {
     try {
         const { psychologistId, initialMessage } = req.body;
         const requestedMinutesRaw = Number(req.body.sessionMinutes);
+        const planCap = getPerSessionCapForUser(req.user);
         const sessionMinutes = Number.isFinite(requestedMinutesRaw)
-            ? Math.min(DAILY_CHAT_LIMIT_MINUTES, Math.max(5, requestedMinutesRaw))
-            : 10;
+            ? Math.min(planCap, Math.max(5, requestedMinutesRaw))
+            : Math.min(planCap, 10);
         await ensureChatQuota(req.user, sessionMinutes);
 
         const psychologist = await query(
@@ -391,18 +403,22 @@ const updateConversationStatus = async (req, res) => {
 
         let result;
         if (status === 'accepted') {
-            const subscription = await getActiveSubscription(conversation.rows[0].employee_id);
-            const timeLimit = determineTimeLimitMinutes(subscription);
+            const employeeTier = await fetchEmployeeTier(conversation.rows[0].employee_id);
+            const tierLimit = getChatMinutesForTier(employeeTier);
+            const storedLimit = Number(conversation.rows[0].time_limit_minutes);
+            const hasStoredLimit = Number.isFinite(storedLimit) && storedLimit > 0;
+            const appliedLimit = hasStoredLimit ? Math.min(storedLimit, tierLimit) : tierLimit;
+
             result = await query(
                 `UPDATE conversations
        SET status = $1,
-           time_limit_minutes = COALESCE(time_limit_minutes, $2),
+           time_limit_minutes = $2,
            started_at = NULL,
            expires_at = NULL,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $3
        RETURNING *`,
-                [status, timeLimit, conversationId]
+                [status, appliedLimit, conversationId]
             );
         } else {
             result = await query(

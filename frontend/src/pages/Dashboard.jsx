@@ -6,6 +6,7 @@ import ReviewList from '../components/reviews/ReviewList';
 import Loading from '../components/common/Loading';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import AdvertisingSection from '../components/ads/AdvertisingSection';
+import SponsoredCard from '../components/ads/SponsoredCard';
 import { resolveMediaUrl } from '../utils/media';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
@@ -1040,6 +1041,18 @@ const Dashboard = () => {
                     <button onClick={handleRefresh} className="refresh-btn" disabled={refreshing}>
                         {refreshing ? 'Refreshing…' : 'Refresh'}
                     </button>
+                </div>
+
+                <div className="dashboard-sponsored-band">
+                    <SponsoredCard
+                        placement="dashboard_primary"
+                        location={selectedCompany?.city || editCompanyForm.city || user?.city || ''}
+                        industry={selectedCompany?.industry || user?.industry || ''}
+                    />
+                    <SponsoredCard
+                        placement="dashboard_growth"
+                        behaviors={[userRole, planTier]}
+                    />
                 </div>
 
                 {error && <div className="alert alert-error">{error}</div>}

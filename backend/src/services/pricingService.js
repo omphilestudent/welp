@@ -153,17 +153,17 @@ const DEFAULT_PLAN_BLUEPRINTS = {
             displayName: 'Premium Plan',
             badge: 'Best value',
             features: [
-                '2 hours psychologist chat per day',
-                'Unlimited reviews',
-                'Video call discounts included',
-                'Choose your psychologist',
-                'Monthly psychologist selection reset',
-                'Priority support'
+                'Priority psychologist access',
+                'Unlimited chat support',
+                'Video/voice scheduling',
+                'Weekly wellbeing reports',
+                'Crisis escalation hotline',
+                'Ability to choose your psychologist'
             ],
             limits: {
                 chat: { minutesPerDay: 120 },
-                video: { discounts: true },
-                perks: { choosePsychologist: true }
+                call: { minutesPerDay: 120 },
+                video: { sessionsPerWeek: 3, minutesPerSession: 60, discount: 20 }
             }
         }
     ],

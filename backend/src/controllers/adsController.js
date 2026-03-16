@@ -305,9 +305,8 @@ const createCampaign = async (req, res) => {
         const bidRateMinor = resolveMinorAmount(req.body.bidRate, req.body.bidRateMinor) || 0;
         const bidType = VALID_BID_TYPES.includes(req.body.bid_type) ? req.body.bid_type : 'cpc';
         const thumbnailUrl = req.body.thumbnailUrl || assetUrl;
-        const premiumOwner = hasPremiumException({ email: req.user.email });
-        const statusValue = premiumOwner ? 'active' : 'pending_review';
-        const reviewStatusValue = premiumOwner ? 'approved' : 'pending';
+        const statusValue = 'pending_review';
+        const reviewStatusValue = 'pending';
         const submittedAt = new Date();
         sanitizedPlacements = placements.map((placement) => ({
             placement: placement.placement,

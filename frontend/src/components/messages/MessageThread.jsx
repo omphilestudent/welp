@@ -13,6 +13,7 @@ const MessageThread = ({
     callConfig,
     isExpired,
     timeRemainingLabel,
+    sessionLimitMinutes = 30,
     onStartVoiceCall,
     onStartVideoCall,
     onOpenSidebar
@@ -138,7 +139,7 @@ const MessageThread = ({
         : user?.role === 'employee';
     const callLimitText = timeRemainingLabel && timeRemainingLabel !== 'No timer'
         ? `Time left: ${timeRemainingLabel}`
-        : `Free limit: ${callConfig?.callLimits?.minutesPerClient || 120} min / client`;
+        : `Daily limit: ${sessionLimitMinutes} min`;
 
     return (
         <div className={`message-thread ${isExpired ? 'is-expired' : ''}`} ref={threadRef}>
@@ -253,6 +254,12 @@ const MessageThread = ({
                         {sending ? 'Sending...' : 'Send'}
                     </button>
                 </form>
+            )}
+
+            {conversation.status === 'accepted' && isExpired && (
+                <div className="pending-message pending-message--expired">
+                    <p>Your allocated chat time has ended. Daily minutes reset every midnight.</p>
+                </div>
             )}
 
             {conversation.status === 'pending' && conversation.employee?.id === user?.id && (

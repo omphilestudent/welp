@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const PRESETS = [10, 20, 30];
 
@@ -7,14 +7,29 @@ const ChatAllocationModal = ({
     onClose,
     onConfirm,
     psychologist,
-    remainingMinutes = 120,
+    remainingMinutes = 30,
+    dailyLimit = 30,
     loading = false
 }) => {
     const [minutes, setMinutes] = useState(10);
     const [customValue, setCustomValue] = useState('');
 
     const safeRemaining = Math.max(0, Number(remainingMinutes) || 0);
-    const disabled = minutes <= 0 || minutes > safeRemaining || loading;
+    const safeLimit = Math.max(0, Number(dailyLimit) || safeRemaining || 30);
+    const computedLimit = safeLimit || safeRemaining || 30;
+    const computedRemaining = safeRemaining || computedLimit;
+    const maxAllowed = Math.max(0, Math.min(computedRemaining, computedLimit));
+    const disabled = minutes <= 0 || minutes > maxAllowed || loading;
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+        const fallback = Math.min(PRESETS[0], maxAllowed || PRESETS[0]);
+        const nextMinutes = fallback > 0 ? fallback : 1;
+        setMinutes(nextMinutes);
+        setCustomValue('');
+    }, [open, maxAllowed]);
 
     const handlePreset = (value) => {
         setMinutes(value);
@@ -64,7 +79,7 @@ const ChatAllocationModal = ({
                                 type="button"
                                 className={`allocation-chip ${minutes === value ? 'active' : ''}`}
                                 onClick={() => handlePreset(value)}
-                                disabled={value > safeRemaining}
+                                disabled={value > maxAllowed}
                             >
                                 {value} min
                             </button>
@@ -74,8 +89,8 @@ const ChatAllocationModal = ({
                             <input
                                 id="custom-minutes"
                                 type="number"
-                                min="5"
-                                max="120"
+                                min="1"
+                                max={computedLimit || 30}
                                 step="5"
                                 value={customValue}
                                 onChange={handleCustomChange}
@@ -84,7 +99,7 @@ const ChatAllocationModal = ({
                         </div>
                     </div>
                     <p className="modal-hint">
-                        Sessions end automatically when allocated minutes expire.
+                        Sessions end automatically when allocated minutes expire (daily max {safeLimit} min).
                     </p>
                 </div>
                 <div className="modal-actions">
@@ -99,7 +114,7 @@ const ChatAllocationModal = ({
                         type="button"
                         className="btn btn-primary"
                         disabled={disabled}
-                        onClick={() => onConfirm(minutes)}
+                        onClick={() => onConfirm(Math.min(minutes, maxAllowed))}
                     >
                         {loading ? 'Allocating...' : `Start ${minutes}-min chat`}
                     </button>
