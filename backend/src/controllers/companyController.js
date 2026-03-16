@@ -83,6 +83,30 @@ const syncCompanyClaimStatus = async () => {
 
 syncCompanyClaimStatus();
 
+const ensureReviewCompanyColumn = async () => {
+    try {
+        await query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS company_id UUID`);
+    } catch (error) {
+        console.warn('reviews.company_id ensure skipped:', error.message);
+    }
+    try {
+        await query(`
+            UPDATE reviews
+            SET company_id = COALESCE(company_id, business_id)
+            WHERE company_id IS NULL AND business_id IS NOT NULL
+        `);
+    } catch (error) {
+        console.warn('reviews company_id backfill skipped:', error.message);
+    }
+    try {
+        await query(`CREATE INDEX IF NOT EXISTS idx_reviews_company_id ON reviews(company_id)`);
+    } catch (error) {
+        console.warn('reviews.company_id index skipped:', error.message);
+    }
+};
+
+ensureReviewCompanyColumn();
+
 const COMPANY_SELECT_SQL = `
     SELECT
         c.*,
@@ -892,10 +916,14 @@ const getCompanyReviewsForBusiness = async (req, res) => {
         }));
 
         if (ownership) {
-            await query(
-                'UPDATE company_owners SET last_review_viewed_at = CURRENT_TIMESTAMP WHERE company_id = $1 AND user_id = $2',
-                [companyId, req.user.id]
-            );
+            try {
+                await query(
+                    'UPDATE company_owners SET last_review_viewed_at = CURRENT_TIMESTAMP WHERE company_id = $1 AND user_id = $2',
+                    [companyId, req.user.id]
+                );
+            } catch (updateError) {
+                console.warn('company_owners metadata update skipped:', updateError.message);
+            }
         }
 
         res.json({

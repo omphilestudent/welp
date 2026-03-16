@@ -314,6 +314,67 @@ const sendEmail = async ({ to, subject, html, text }) => {
     }
 };
 
+const formatPlanLabel = (plan = '') => {
+    if (!plan) return 'your Welp subscription';
+    return plan.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const sendSubscriptionCancellationEmail = async ({ email, name, previousPlan, ownerType }) => {
+    if (!email) {
+        console.log('No recipient email provided for subscription cancellation notice');
+        return { success: false, reason: 'missing-email' };
+    }
+    const planLabel = formatPlanLabel(previousPlan);
+    const greeting = name ? `Hi ${name}` : 'Hello';
+    const subject = 'Your Welp subscription has been cancelled';
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 520px; margin: 0 auto; padding: 24px; background: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb; }
+            .cta { display: inline-block; margin-top: 18px; padding: 10px 18px; background: #4f46e5; color: #fff; border-radius: 999px; text-decoration: none; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <p>${greeting},</p>
+            <p>We've confirmed your request to cancel ${planLabel}. Your account is now on the Welp free tier${ownerType ? ` for your ${ownerType} workspace` : ''}.</p>
+            <p>You can upgrade again at any time to regain premium analytics, extended messaging limits, and advertising tools.</p>
+            <p>If you didn't authorize this change or need help, reply to this email and we'll assist you.</p>
+            <p>- The Welp Team</p>
+            <a class="cta" href="${process.env.FRONTEND_URL || 'https://app.welp.com'}/pricing">Compare plans</a>
+          </div>
+        </body>
+        </html>
+    `;
+    const text = `${greeting},
+
+We've confirmed your request to cancel ${planLabel}. Your account is now on the Welp free tier${ownerType ? ` for your ${ownerType} workspace` : ''}. You can upgrade again anytime from the pricing page.`;
+    if (!transporter) {
+        console.log('\n=== SUBSCRIPTION CANCELLATION (DEV MODE) ===');
+        console.log(`To: ${email}`);
+        console.log(`Subject: ${subject}`);
+        console.log(text);
+        console.log('===========================================\n');
+        return { success: true, devMode: true };
+    }
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject,
+            html,
+            text: text.replace(/\s+/g, ' ').trim()
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to send cancellation email:', error.message);
+        return { success: false, error: error.message };
+    }
+};
+
 const sendMarketingEmail = async ({ to, subject, html, text }) => {
     return sendEmail({ to, subject, html, text });
 };
@@ -325,5 +386,6 @@ module.exports = {
     sendKYCApprovalEmail,
     sendKYCRejectionEmail,
     sendEmail,
-    sendMarketingEmail
+    sendMarketingEmail,
+    sendSubscriptionCancellationEmail
 };

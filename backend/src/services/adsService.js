@@ -40,7 +40,54 @@ const ensureAdSchema = async () => {
     return cachedAdSchema;
 };
 
+const bootstrapBusinessProfile = async (userId) => {
+    if (!userId) return null;
+    try {
+        const ownerResult = await query(
+            `SELECT display_name, email
+             FROM users
+             WHERE id = $1`,
+            [userId]
+        );
+        const companyResult = await query(
+            `SELECT id, name, industry, website
+             FROM companies
+             WHERE claimed_by = $1 OR created_by_user_id = $1
+             ORDER BY updated_at DESC
+             LIMIT 1`,
+            [userId]
+        );
+
+        const fallbackName =
+            companyResult.rows[0]?.name ||
+            (ownerResult.rows[0]?.display_name ? `${ownerResult.rows[0].display_name}'s Workspace` : 'My Business Workspace');
+
+        const insertResult = await query(
+            `INSERT INTO businesses (
+                 owner_user_id,
+                 name,
+                 industry,
+                 website,
+                 status
+             ) VALUES ($1, $2, $3, $4, 'active')
+             RETURNING id`,
+            [
+                userId,
+                fallbackName,
+                companyResult.rows[0]?.industry || null,
+                companyResult.rows[0]?.website || null
+            ]
+        );
+
+        return insertResult.rows[0]?.id || null;
+    } catch (error) {
+        console.warn('Bootstrap business profile failed:', error.message);
+        return null;
+    }
+};
+
 const getBusinessIdForUser = async (userId) => {
+    if (!userId) return null;
     const result = await query(
         `SELECT id
          FROM businesses
@@ -50,7 +97,10 @@ const getBusinessIdForUser = async (userId) => {
          LIMIT 1`,
         [userId]
     );
-    return result.rows[0]?.id || null;
+    if (result.rows[0]?.id) {
+        return result.rows[0].id;
+    }
+    return bootstrapBusinessProfile(userId);
 };
 
 const upsertPlacements = async (campaignId, placements = []) => {

@@ -382,6 +382,7 @@ const Dashboard = () => {
     const normalizedEmail = (user?.email || '').toLowerCase();
     const premiumExceptionActive = normalizedEmail === 'omphilemohlala@welp.com';
     const subscription = user?.subscription;
+    const userRole = user?.role;
     const planTier = (subscription?.plan_tier || subscription?.planTier || subscription?.tier || '').toLowerCase();
     const planCode = (subscription?.planCode || subscription?.plan_code || '').toLowerCase();
     const planTierIsPremium = planTier === 'premium';
@@ -408,6 +409,8 @@ const Dashboard = () => {
     const [calendarDate, setCalendarDate] = useState(new Date());
     const [psychCardCollapse, setPsychCardCollapse] = useState({ schedule: false, leads: false, calls: false });
     const userKey = user ? `${user.id}:${user.role}` : null;
+
+    const dashboardLoadKeyRef = useRef(null);
 
     // Business state
     const [selectedCompanyId, setSelectedCompanyId] = useState(null);
@@ -749,13 +752,18 @@ const Dashboard = () => {
 
     /* ── Lifecycle ── */
     useEffect(() => {
-        if (!user) return;
-        if (user?.role === 'psychologist') setActiveTab('overview');
-        else if (user?.role === 'business') setActiveTab('companies');
+        if (!userKey) {
+            dashboardLoadKeyRef.current = null;
+            return;
+        }
+        if (dashboardLoadKeyRef.current === userKey) return;
+        dashboardLoadKeyRef.current = userKey;
+        if (userRole === 'psychologist') setActiveTab('overview');
+        else if (userRole === 'business') setActiveTab('companies');
         else setActiveTab('reviews');
         fetchDashboardData();
         // only re-run when the authenticated user identity or role changes
-    }, [userKey]);
+    }, [userKey, userRole]);
 
     useEffect(() => {
         if (user?.role === 'business' && selectedCompanyId) {

@@ -10,6 +10,7 @@ const {
     PLAN_LIMITS
 } = require('../services/subscriptionService');
 const { recordAuditLog } = require('../utils/auditLogger');
+const { sendSubscriptionCancellationEmail } = require('../utils/emailService');
 const { hasPremiumException } = require('../utils/premiumAccess');
 
 const ROLE_TO_OWNER = {
@@ -174,6 +175,17 @@ const cancelSubscription = async (req, res) => {
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
         });
+
+        try {
+            await sendSubscriptionCancellationEmail({
+                email: req.user?.email,
+                name: req.user?.full_name || req.user?.display_name || req.user?.first_name || req.user?.name,
+                previousPlan: previous?.plan_code || null,
+                ownerType
+            });
+        } catch (notifyErr) {
+            console.warn('Subscription cancellation email failed:', notifyErr.message);
+        }
 
         return res.json({
             success: true,

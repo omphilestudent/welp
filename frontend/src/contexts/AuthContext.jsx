@@ -1,8 +1,53 @@
 // context/AuthContext.jsx
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useState, useEffect, useCallback, useRef } from "react";
 import api from "../services/api";
 
 export const AuthContext = createContext();
+
+const isObjectLike = (value) => value !== null && typeof value === 'object';
+
+const deepEqual = (a, b) => {
+    if (a === b) return true;
+    if (!isObjectLike(a) || !isObjectLike(b)) return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i += 1) {
+            if (!deepEqual(a[i], b[i])) return false;
+        }
+        return true;
+    }
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+        if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+        if (!deepEqual(a[key], b[key])) return false;
+    }
+    return true;
+};
+
+const mergeUserState = (prev, updates = {}) => {
+    if (!updates || Object.keys(updates).length === 0) return prev;
+    if (!prev) {
+        return { ...updates };
+    }
+    let changed = false;
+    const next = { ...prev };
+    for (const [key, value] of Object.entries(updates)) {
+        const current = prev[key];
+        if (isObjectLike(value) && isObjectLike(current)) {
+            if (!deepEqual(current, value)) {
+                next[key] = value;
+                changed = true;
+            }
+        } else if (current !== value) {
+            next[key] = value;
+            changed = true;
+        }
+    }
+    return changed ? next : prev;
+};
 
 const getStoredToken = () => {
     if (typeof window === "undefined") return null;
@@ -27,6 +72,7 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [isBackendAvailable, setIsBackendAvailable] = useState(true);
     const [rateLimitInfo, setRateLimitInfo] = useState(null);
+    const initializedRef = useRef(false);
 
     // Derived state
     const isAuthenticated = !!user;
@@ -117,6 +163,8 @@ export const AuthProvider = ({ children }) => {
     }, [checkBackendHealth, checkAuth]);
 
     useEffect(() => {
+        if (initializedRef.current) return;
+        initializedRef.current = true;
         initializeAuth();
     }, [initializeAuth]);
 
@@ -361,12 +409,9 @@ export const AuthProvider = ({ children }) => {
     ---------------------------------------
     */
 
-    const updateUser = (updatedUserData) => {
-        setUser(prev => ({
-            ...prev,
-            ...updatedUserData
-        }));
-    };
+    const updateUser = useCallback((updatedUserData = {}) => {
+        setUser((prev) => mergeUserState(prev, updatedUserData));
+    }, []);
 
     /*
     ---------------------------------------

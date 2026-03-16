@@ -13,6 +13,50 @@ const PLAN_LIMITS = {
     business_premium: { tier: 'premium', apiLimit: 10000, displayName: 'Business Premium', ads: { maxActive: null, analytics: 'advanced' } }
 };
 
+const DEFAULT_PRICING_FALLBACK = {
+    user_free: { amountMinor: 0, currencySymbol: '$' },
+    user_premium: { amountMinor: 0, currencySymbol: '$' },
+    psychologist_standard: { amountMinor: 0, currencySymbol: '$' },
+    business_base: { amountMinor: 0, currencySymbol: '$' },
+    business_enhanced: { amountMinor: 0, currencySymbol: '$' },
+    business_premium: { amountMinor: 0, currencySymbol: '$' }
+};
+
+const buildPlanFromLimits = (planCode, currencyCode = DEFAULT_CURRENCY) => {
+    const limits = PLAN_LIMITS[planCode];
+    if (!limits) return null;
+    const fallbackPrice = DEFAULT_PRICING_FALLBACK[planCode] || DEFAULT_PRICING_FALLBACK.user_free;
+    const normalizedLimits = {};
+    if (limits.chatMinutes != null) {
+        normalizedLimits.chat = { minutesPerDay: limits.chatMinutes };
+    }
+    if (limits.callMinutes != null) {
+        normalizedLimits.video = { minutesPerSession: limits.callMinutes };
+    }
+    if (limits.apiLimit != null) {
+        normalizedLimits.api = { callsPerDay: limits.apiLimit };
+    }
+    if (limits.ads) {
+        normalizedLimits.ads = limits.ads;
+    }
+
+    return {
+        planCode,
+        planTier: limits.tier || 'free',
+        plan_tier: limits.tier || 'free',
+        tier: limits.tier || 'free',
+        displayName: limits.displayName || planCode,
+        metadata: { displayName: limits.displayName || planCode },
+        amountMinor: fallbackPrice.amountMinor ?? 0,
+        currencySymbol: fallbackPrice.currencySymbol || '$',
+        currencyCode,
+        billingPeriod: 'monthly',
+        priceFormatted: formatPrice(fallbackPrice.amountMinor ?? 0, fallbackPrice.currencySymbol || '$'),
+        limits: normalizedLimits,
+        features: []
+    };
+};
+
 const parseJson = (raw, fallback) => {
     if (raw === null || raw === undefined) return fallback;
     if (typeof raw === 'string') {
@@ -33,9 +77,12 @@ const formatPrice = (amountMinor, symbol = '$') => {
 };
 
 const getPlanDetails = async (audience, planCode, currencyCode = DEFAULT_CURRENCY, options = {}) => {
-    const plan = await getPlanByCode(audience, planCode, currencyCode, options);
+    let plan = await getPlanByCode(audience, planCode, currencyCode, options);
     if (!plan) {
-        return null;
+        plan = buildPlanFromLimits(planCode, currencyCode);
+        if (!plan) {
+            return null;
+        }
     }
 
     const metadata = plan.metadata || {};
@@ -173,19 +220,27 @@ const cancelSubscriptions = async (ownerType, ownerId) => {
     );
 };
 
-const buildFallbackPayload = (audience) => {
-    const fallbackPlanCode = audience === 'psychologist'
-        ? 'psychologist_standard'
-        : audience === 'business'
-            ? 'business_base'
-            : `${audience}_free`;
-    const limits = PLAN_LIMITS[fallbackPlanCode] || {};
+const FALLBACK_PLAN_MAPPING = {
+    user: { planCode: 'user_free' },
+    psychologist: { planCode: 'user_free', tier: 'free' },
+    business: { planCode: 'business_base' }
+};
+
+const buildFallbackPayload = (audience = 'user') => {
+    const mapping = FALLBACK_PLAN_MAPPING[audience] || FALLBACK_PLAN_MAPPING.user;
+    const fallbackPlanCode = mapping.planCode;
+    const limits = PLAN_LIMITS[fallbackPlanCode] || PLAN_LIMITS.user_free || {};
+    const tier = mapping.tier || limits.tier || 'free';
+    const chatMinutes = limits.chatMinutes ?? (audience === 'user' ? 30 : 0);
+    const callMinutes = limits.callMinutes ?? 0;
+    const apiLimit = limits.apiLimit ?? null;
+
     return {
         planCode: fallbackPlanCode,
-        tier: limits.tier || 'free',
-        chatMinutes: limits.chatMinutes ?? (audience === 'user' ? 30 : 0),
-        callMinutes: limits.callMinutes ?? 0,
-        apiLimit: limits.apiLimit ?? null,
+        tier,
+        chatMinutes,
+        callMinutes,
+        apiLimit,
         ads: limits.ads || {},
         currencySymbol: '$',
         priceFormatted: '$0.00',

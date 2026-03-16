@@ -21,24 +21,32 @@ const Navbar = () => {
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
 
+    const userId = user?.id || null;
+    const userRole = String(user?.role || '').toLowerCase();
+
     useEffect(() => {
-        checkAdminStatus();
-        if (user) {
+        checkAdminStatus(userRole);
+        if (userId) {
             fetchNotifications();
             connectNotificationSocket();
         } else {
             setNotifications([]);
+            socketService.offNotification();
         }
 
         return () => {
             socketService.offNotification();
         };
-    }, [user]);
+    }, [userId, userRole]);
 
-    const checkAdminStatus = async () => {
-        if (!user) return;
+    const checkAdminStatus = async (roleValue) => {
+        if (!roleValue) {
+            setIsAdmin(false);
+            setIsHR(false);
+            return;
+        }
 
-        const normalizedRole = String(user.role || '').toLowerCase();
+        const normalizedRole = String(roleValue || '').toLowerCase();
         const adminRoles = new Set(['admin', 'super_admin', 'superadmin', 'system_admin']);
         if (adminRoles.has(normalizedRole)) {
             try {
