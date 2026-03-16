@@ -520,24 +520,6 @@ const adminListAds = async (filters = {}, options = {}) => {
     const tables = await ensureAdTableMetadata(options.forceRefresh === true);
     const context = buildAdQueryContext(tables);
 
-    const reviewStatusColumn =
-        schema.hasReviewStatus
-            ? ''
-            : `,
-            CASE
-                WHEN c.status IN ('pending_review','pending') THEN 'pending'
-                WHEN c.status IN ('rejected') THEN 'rejected'
-                ELSE 'approved'
-            END AS review_status`;
-
-    const spendColumn = schema.hasSpendMinor ? '' : ', 0::bigint AS spend_minor';
-    const bidRateColumn = schema.hasBidRateMinor ? '' : ', 0::bigint AS bid_rate_minor';
-    const overrideColumn = schema.hasOverride ? '' : ', false AS override_restrictions';
-    const rejectionReasonColumn = schema.hasRejectionReason ? '' : ', NULL AS rejection_reason';
-    const reviewedByColumn = schema.hasReviewedBy ? '' : ', NULL AS reviewed_by';
-    const reviewedAtColumn = schema.hasReviewedAt ? '' : ', NULL AS reviewed_at';
-    const reviewNotesColumn = schema.hasReviewNotes ? '' : ', NULL AS review_notes';
-
     const placementsColumn = tables.placements
         ? `,
             (
@@ -547,12 +529,6 @@ const adminListAds = async (filters = {}, options = {}) => {
             ) AS placements`
         : ", '[]'::jsonb AS placements";
 
-    const impressionsColumn = schema.hasImpressions
-        ? 'COALESCE(c.impressions, 0) AS impressions'
-        : '0::bigint AS impressions';
-    const clicksColumn = schema.hasClicks ? 'COALESCE(c.clicks, 0) AS clicks' : '0::bigint AS clicks';
-    const spendMinorExpr = schema.hasSpendMinor ? 'COALESCE(c.spend_minor, 0)' : '0::bigint';
-
     let queryStr = `
         SELECT 
             c.*,
@@ -560,17 +536,6 @@ const adminListAds = async (filters = {}, options = {}) => {
             ${context.tierExpr} AS subscription_tier,
             ${context.ownerEmailExpr} AS owner_email,
             ${context.ownerNameExpr} AS owner_name,
-            ${impressionsColumn},
-            ${clicksColumn},
-            ${spendMinorExpr} AS spend_minor
-            ${reviewStatusColumn}
-            ${spendColumn}
-            ${bidRateColumn}
-            ${overrideColumn}
-            ${rejectionReasonColumn}
-            ${reviewedByColumn}
-            ${reviewedAtColumn}
-            ${reviewNotesColumn}
             ${placementsColumn}
         FROM advertising_campaigns c
         ${context.joins}
@@ -638,7 +603,29 @@ const adminListAds = async (filters = {}, options = {}) => {
 
     try {
         const result = await query(queryStr, params);
-        return result.rows;
+        return result.rows.map((row) => {
+            const derivedReviewStatus = (() => {
+                if (schema.hasReviewStatus && row.review_status !== undefined) return row.review_status;
+                if (row.status === 'rejected') return 'rejected';
+                if (row.status === 'pending_review' || row.status === 'pending') return 'pending';
+                return 'approved';
+            })();
+
+            return {
+                ...row,
+                review_status: derivedReviewStatus,
+                impressions: schema.hasImpressions ? Number(row.impressions || 0) : 0,
+                clicks: schema.hasClicks ? Number(row.clicks || 0) : 0,
+                spend_minor: schema.hasSpendMinor ? Number(row.spend_minor || 0) : 0,
+                bid_rate_minor: schema.hasBidRateMinor ? Number(row.bid_rate_minor || 0) : 0,
+                override_restrictions: schema.hasOverride ? Boolean(row.override_restrictions) : false,
+                rejection_reason: schema.hasRejectionReason ? row.rejection_reason ?? null : null,
+                reviewed_by: schema.hasReviewedBy ? row.reviewed_by ?? null : null,
+                reviewed_at: schema.hasReviewedAt ? row.reviewed_at ?? null : null,
+                review_notes: schema.hasReviewNotes ? row.review_notes ?? null : null,
+                placements: Array.isArray(row.placements) ? row.placements : (row.placements ?? [])
+            };
+        });
     } catch (error) {
         if (error?.code === '42P01' && !options.forceRefresh) {
             await ensureAdTableMetadata(true);
