@@ -392,7 +392,8 @@ const startScreenFlow = async ({
     userId = null,
     previewMode = false,
     initialContext = {},
-    metadata = {}
+    metadata = {},
+    actorRole = 'anonymous'
 }) => {
     const flow = await flowService.getFlowById(flowId);
     if (!flow) {
@@ -405,6 +406,7 @@ const startScreenFlow = async ({
         err.statusCode = 400;
         throw err;
     }
+    await flowService.ensurePermissionOrThrow(flow.id, actorRole, previewMode ? 'edit' : 'execute');
     const { nodes, lookup } = getNodeMap(flow.definition || {});
     if (!nodes.length) {
         const err = new Error('Flow does not contain any nodes');
@@ -454,7 +456,8 @@ const submitScreenFlowStep = async ({
     flowId,
     sessionId,
     answers = {},
-    userId = null
+    userId = null,
+    actorRole = 'anonymous'
 }) => {
     const session = await flowService.getFlowSessionById(sessionId);
     if (!session) {
@@ -488,6 +491,7 @@ const submitScreenFlowStep = async ({
         err.statusCode = 400;
         throw err;
     }
+    await flowService.ensurePermissionOrThrow(flow.id, actorRole, session.previewMode ? 'edit' : 'execute');
 
     const { nodes, lookup } = getNodeMap(flow.definition || {});
     const currentNode = lookup.get(session.currentNodeId) || nodes.find((n) => n.id === session.currentNodeId);

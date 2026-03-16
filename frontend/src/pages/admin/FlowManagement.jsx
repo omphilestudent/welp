@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../hooks/useAuth';
 import {
     fetchFlows,
     createFlow,
@@ -11,7 +12,14 @@ import {
     fetchFlowTriggers,
     createFlowTrigger,
     updateFlowTrigger,
-    deleteFlowTrigger
+    deleteFlowTrigger,
+    fetchFlowVersions,
+    rollbackFlowVersion,
+    fetchFlowComponents,
+    createFlowComponent,
+    updateFlowComponent,
+    deleteFlowComponent,
+    fetchFlowAnalytics
 } from '../../services/flowService';
 import { startFlowSession, submitFlowSession } from '../../services/flowRuntimeService';
 import './FlowManagement.css';
@@ -47,6 +55,10 @@ const DEFAULT_TRIGGER_FORM = {
 };
 
 const FlowManagement = () => {
+    const { user } = useAuth();
+    const userRole = String(user?.role || '').toLowerCase();
+    const canEditFlows = ['super_admin', 'admin'].includes(userRole);
+
     const [flows, setFlows] = useState([]);
     const [selectedFlowId, setSelectedFlowId] = useState(null);
     const [flowLogs, setFlowLogs] = useState([]);
@@ -68,20 +80,42 @@ const FlowManagement = () => {
     });
     const [triggerForm, setTriggerForm] = useState(DEFAULT_TRIGGER_FORM);
     const [previewState, setPreviewState] = useState(INITIAL_PREVIEW_STATE);
+    const [versions, setVersions] = useState([]);
+    const [versionsLoading, setVersionsLoading] = useState(false);
+    const [analytics, setAnalytics] = useState([]);
+    const [analyticsLoading, setAnalyticsLoading] = useState(false);
+    const [components, setComponents] = useState([]);
+    const [componentLoading, setComponentLoading] = useState(false);
+    const [componentSaving, setComponentSaving] = useState(false);
+    const [componentForm, setComponentForm] = useState({
+        id: null,
+        name: '',
+        type: 'screen',
+        description: '',
+        configText: JSON.stringify({ title: 'Reusable Screen', type: 'screen', inputs: [] }, null, 2),
+        isShared: true
+    });
 
     useEffect(() => {
+        if (!canEditFlows) return;
         loadFlows();
         loadEvents();
         loadTriggers();
-    }, []);
+        loadComponents();
+    }, [canEditFlows]);
 
     useEffect(() => {
+        if (!canEditFlows) return;
         if (selectedFlowId) {
             loadLogs(selectedFlowId);
+            loadVersions(selectedFlowId);
+            loadAnalytics(selectedFlowId);
         } else {
             setFlowLogs([]);
+            setVersions([]);
+            setAnalytics([]);
         }
-    }, [selectedFlowId]);
+    }, [selectedFlowId, canEditFlows]);
 
     const selectedFlow = useMemo(
         () => flows.find((flow) => flow.id === selectedFlowId) || null,
@@ -136,6 +170,150 @@ const FlowManagement = () => {
         }
     };
 
+    const loadVersions = async (flowId) => {
+        setVersionsLoading(true);
+        try {
+            const { data } = await fetchFlowVersions(flowId);
+            setVersions(Array.isArray(data?.data) ? data.data : []);
+        } catch (error) {
+            console.error('Failed to load flow versions', error);
+            toast.error('Unable to load versions');
+        } finally {
+            setVersionsLoading(false);
+        }
+    };
+
+    const loadAnalytics = async (flowId) => {
+        setAnalyticsLoading(true);
+        try {
+            const { data } = await fetchFlowAnalytics(flowId, { days: 30 });
+            setAnalytics(Array.isArray(data?.data) ? data.data : []);
+        } catch (error) {
+            console.error('Failed to load analytics', error);
+        } finally {
+            setAnalyticsLoading(false);
+        }
+    };
+
+    const loadComponents = async () => {
+        setComponentLoading(true);
+        try {
+            const { data } = await fetchFlowComponents();
+            setComponents(Array.isArray(data?.data) ? data.data : []);
+        } catch (error) {
+            console.error('Failed to load components', error);
+            toast.error('Unable to load components');
+        } finally {
+            setComponentLoading(false);
+        }
+    };
+
+    const resetComponentForm = () => {
+        setComponentForm({
+            id: null,
+            name: '',
+            type: 'screen',
+            description: '',
+            configText: JSON.stringify({ title: 'Reusable Screen', type: 'screen', inputs: [] }, null, 2),
+            isShared: true
+        });
+    };
+
+    const handleComponentFieldChange = (field, value) => {
+        setComponentForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleComponentSave = async () => {
+        setComponentSaving(true);
+        try {
+            const config = JSON.parse(componentForm.configText || '{}');
+            if (componentForm.id) {
+                await updateFlowComponent(componentForm.id, {
+                    name: componentForm.name,
+                    description: componentForm.description,
+                    type: componentForm.type,
+                    config,
+                    isShared: componentForm.isShared
+                });
+                toast.success('Component updated');
+            } else {
+                await createFlowComponent({
+                    name: componentForm.name,
+                    description: componentForm.description,
+                    type: componentForm.type,
+                    config,
+                    isShared: componentForm.isShared
+                });
+                toast.success('Component created');
+            }
+            resetComponentForm();
+            await loadComponents();
+        } catch (error) {
+            if (error instanceof SyntaxError) {
+                toast.error('Component config must be valid JSON');
+            } else {
+                console.error('Failed to save component', error);
+                toast.error(error.response?.data?.error || 'Unable to save component');
+            }
+        } finally {
+            setComponentSaving(false);
+        }
+    };
+
+    const handleComponentEdit = (component) => {
+        setComponentForm({
+            id: component.id,
+            name: component.name,
+            type: component.type,
+            description: component.description || '',
+            configText: JSON.stringify(component.config || {}, null, 2),
+            isShared: component.isShared
+        });
+    };
+
+    const handleComponentDelete = async (componentId) => {
+        if (!window.confirm('Delete this component?')) return;
+        try {
+            await deleteFlowComponent(componentId);
+            toast.success('Component deleted');
+            await loadComponents();
+            resetComponentForm();
+        } catch (error) {
+            console.error('Failed to delete component', error);
+            toast.error(error.response?.data?.error || 'Unable to delete component');
+        }
+    };
+
+    const handleComponentInsert = (component) => {
+        const snippet = JSON.stringify(component.config || {}, null, 2);
+        setFlowForm((prev) => ({
+            ...prev,
+            definitionText: `${prev.definitionText}\n\n${snippet}`
+        }));
+        toast.success('Component snippet appended');
+    };
+
+    const analyticsTotals = useMemo(() => {
+        if (!analytics.length) {
+            return { executions: 0, successRate: 0, averageDuration: 0 };
+        }
+        const totals = analytics.reduce(
+            (acc, row) => {
+                acc.executions += Number(row.executions || 0);
+                acc.success += Number(row.success_count || 0);
+                acc.failure += Number(row.failure_count || 0);
+                acc.avgDuration += Number(row.avg_duration_seconds || 0);
+                return acc;
+            },
+            { executions: 0, success: 0, failure: 0, avgDuration: 0 }
+        );
+        return {
+            executions: totals.executions,
+            successRate: totals.executions ? Math.round((totals.success / totals.executions) * 100) : 0,
+            averageDuration: analytics.length ? (totals.avgDuration / analytics.length).toFixed(1) : 0
+        };
+    }, [analytics]);
+
     const hydrateForm = (flow) => {
         if (!flow) {
             setSelectedFlowId(null);
@@ -158,6 +336,20 @@ const FlowManagement = () => {
             isActive: flow.isActive !== false,
             definitionText: JSON.stringify(flow.definition || DEFAULT_DEFINITION, null, 2)
         });
+    };
+
+    const handleRollbackVersion = async (versionId) => {
+        if (!selectedFlowId) return;
+        if (!window.confirm('Rollback to this version?')) return;
+        try {
+            await rollbackFlowVersion(selectedFlowId, versionId);
+            toast.success('Flow rolled back');
+            await loadFlows();
+            await loadVersions(selectedFlowId);
+        } catch (error) {
+            console.error('Failed to rollback version', error);
+            toast.error(error.response?.data?.error || 'Unable to rollback flow');
+        }
     };
 
     const closePreview = () => setPreviewState({ ...INITIAL_PREVIEW_STATE });
@@ -649,6 +841,135 @@ const FlowManagement = () => {
                         )}
                     </div>
                 </form>
+            </section>
+
+            <section className="flow-panel">
+                <h2>Version History</h2>
+                {versionsLoading ? (
+                    <p>Loading versions…</p>
+                ) : versions.length === 0 ? (
+                    <p>No versions available yet.</p>
+                ) : (
+                    <div className="flow-list">
+                        {versions.map((version) => (
+                            <article key={version.id} className="trigger-card">
+                                <h4>Version {version.version}</h4>
+                                <div className="trigger-meta">
+                                    <span>{new Date(version.created_at).toLocaleString()}</span>
+                                </div>
+                                <div className="trigger-actions">
+                                    <button onClick={() => handleRollbackVersion(version.id)}>Rollback</button>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            <section className="flow-panel">
+                <h2>Analytics</h2>
+                {analyticsLoading ? (
+                    <p>Loading analytics…</p>
+                ) : analyticsTotals.executions === 0 ? (
+                    <p>No executions recorded yet.</p>
+                ) : (
+                    <div className="flow-analytics-grid">
+                        <div className="analytics-card">
+                            <h4>Total Executions</h4>
+                            <p>{analyticsTotals.executions}</p>
+                        </div>
+                        <div className="analytics-card">
+                            <h4>Success Rate</h4>
+                            <p>{analyticsTotals.successRate}%</p>
+                        </div>
+                        <div className="analytics-card">
+                            <h4>Avg Duration (s)</h4>
+                            <p>{analyticsTotals.averageDuration}</p>
+                        </div>
+                    </div>
+                )}
+            </section>
+
+            <section className="flow-panel">
+                <div className="flow-page-header">
+                    <h2>Reusable Components</h2>
+                    <p>Build shared screens or actions, then insert them into any flow.</p>
+                </div>
+                <div className="flow-form-row">
+                    <div className="flow-form">
+                        <label>
+                            Name
+                            <input
+                                value={componentForm.name}
+                                placeholder="Onboarding Intro"
+                                onChange={(event) => handleComponentFieldChange('name', event.target.value)}
+                            />
+                        </label>
+                        <label>
+                            Type
+                            <select
+                                value={componentForm.type}
+                                onChange={(event) => handleComponentFieldChange('type', event.target.value)}
+                            >
+                                <option value="screen">Screen</option>
+                                <option value="action">Action</option>
+                                <option value="decision">Decision</option>
+                            </select>
+                        </label>
+                        <label>
+                            Description
+                            <input
+                                value={componentForm.description}
+                                onChange={(event) => handleComponentFieldChange('description', event.target.value)}
+                            />
+                        </label>
+                        <label>
+                            Config (JSON)
+                            <textarea
+                                value={componentForm.configText}
+                                onChange={(event) => handleComponentFieldChange('configText', event.target.value)}
+                            />
+                        </label>
+                        <div className="flow-inline-actions">
+                            <button type="button" className="primary" onClick={handleComponentSave} disabled={componentSaving}>
+                                {componentForm.id ? 'Update Component' : 'Create Component'}
+                            </button>
+                            {componentForm.id && (
+                                <button type="button" onClick={resetComponentForm}>
+                                    Cancel
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flow-trigger-list">
+                        <h3>Library</h3>
+                        {componentLoading ? (
+                            <p>Loading components…</p>
+                        ) : components.length === 0 ? (
+                            <p>No reusable components yet.</p>
+                        ) : (
+                            <div className="flow-list">
+                                {components.map((component) => (
+                                    <article key={component.id} className="trigger-card">
+                                        <h4>{component.name}</h4>
+                                        <div className="trigger-meta">
+                                            <span>{component.type}</span>
+                                            <span>{component.isShared ? 'Shared' : 'Private'}</span>
+                                        </div>
+                                        <p>{component.description}</p>
+                                        <div className="trigger-actions">
+                                            <button onClick={() => handleComponentInsert(component)}>Insert</button>
+                                            <button onClick={() => handleComponentEdit(component)}>Edit</button>
+                                            <button className="danger" onClick={() => handleComponentDelete(component.id)}>
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
             </section>
         </div>
             <FlowPreviewModal

@@ -13,10 +13,12 @@ const handleFlowError = (error, res) => {
 
 const startFlowSession = async (req, res) => {
     try {
+        const actorRole = req.user?.role || 'anonymous';
         const payload = await startScreenFlow({
             flowId: req.params.flowId,
             userId: req.user?.id || null,
             previewMode: Boolean(req.body?.preview),
+            actorRole,
             initialContext: req.body?.context || {},
             metadata: {
                 actorId: req.user?.id || null,
@@ -31,11 +33,13 @@ const startFlowSession = async (req, res) => {
 
 const submitFlowSession = async (req, res) => {
     try {
+        const actorRole = req.user?.role || 'anonymous';
         const payload = await submitScreenFlowStep({
             flowId: req.params.flowId,
             sessionId: req.params.sessionId,
             answers: req.body?.answers || {},
-            userId: req.user?.id || null
+            userId: req.user?.id || null,
+            actorRole
         });
 
         if (payload.validationErrors) {

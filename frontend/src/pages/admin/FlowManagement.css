@@ -380,3 +380,31 @@
     color: #dc2626;
     margin-left: 0.25rem;
 }
+
+.flow-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.analytics-card {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+}
+
+.analytics-card h4 {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(248, 250, 252, 0.8);
+}
+
+.analytics-card p {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+}

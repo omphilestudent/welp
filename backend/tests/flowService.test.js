@@ -28,18 +28,30 @@ const mockRes = () => ({
     try {
         // --- createFlow persists JSON definition ---
         let capturedParams = null;
-        database.query = async (_sql, params) => {
-            capturedParams = params;
-            return {
-                rows: [{
-                    id: 'flow-1',
-                    name: params[0],
-                    type: params[2],
-                    description: params[1],
-                    definition: params[3],
-                    is_active: params[4]
-                }]
-            };
+        database.query = async (sql, params) => {
+            if (sql.includes('INSERT INTO flows')) {
+                capturedParams = params;
+                return {
+                    rows: [{
+                        id: 'flow-1',
+                        name: params[0],
+                        type: params[2],
+                        description: params[1],
+                        definition: params[3],
+                        is_active: params[4]
+                    }]
+                };
+            }
+            if (sql.includes('SELECT COALESCE(MAX')) {
+                return { rows: [{ max: 0 }] };
+            }
+            if (sql.includes('INSERT INTO flow_versions')) {
+                return { rows: [] };
+            }
+            if (sql.includes('INSERT INTO flow_permissions')) {
+                return { rowCount: 1 };
+            }
+            return { rows: [] };
         };
         const created = await flowService.createFlow({
             name: 'Welcome Flow',

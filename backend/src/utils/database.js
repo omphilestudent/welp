@@ -1219,6 +1219,29 @@ const runMigrations = async () => {
             );`,
             "CREATE INDEX IF NOT EXISTS idx_flow_triggers_event ON flow_triggers(event_name);",
             "CREATE INDEX IF NOT EXISTS idx_flow_triggers_active ON flow_triggers(is_active);",
+            `CREATE TABLE IF NOT EXISTS flow_versions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+                version_number INT NOT NULL,
+                definition JSONB NOT NULL,
+                created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(flow_id, version_number)
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_flow_versions_flow ON flow_versions(flow_id);",
+            `CREATE TABLE IF NOT EXISTS flow_components (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(150) NOT NULL,
+                description TEXT,
+                component_type VARCHAR(32) NOT NULL CHECK (component_type IN ('screen','action','decision')),
+                config JSONB NOT NULL,
+                is_shared BOOLEAN DEFAULT true,
+                created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_flow_components_type ON flow_components(component_type);",
             `CREATE TABLE IF NOT EXISTS flow_execution_logs (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
@@ -1247,6 +1270,23 @@ const runMigrations = async () => {
             );`,
             "CREATE INDEX IF NOT EXISTS idx_flow_sessions_flow ON flow_sessions(flow_id);",
             "CREATE INDEX IF NOT EXISTS idx_flow_sessions_user ON flow_sessions(user_id);",
+            `CREATE TABLE IF NOT EXISTS flow_metrics (
+                flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+                window_date DATE NOT NULL,
+                executions INT DEFAULT 0,
+                success_count INT DEFAULT 0,
+                failure_count INT DEFAULT 0,
+                avg_duration_seconds NUMERIC(12,3) DEFAULT 0,
+                PRIMARY KEY(flow_id, window_date)
+            );`,
+            `CREATE TABLE IF NOT EXISTS flow_permissions (
+                flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+                role VARCHAR(64) NOT NULL,
+                can_view BOOLEAN DEFAULT true,
+                can_edit BOOLEAN DEFAULT false,
+                can_execute BOOLEAN DEFAULT false,
+                PRIMARY KEY(flow_id, role)
+            );`,
         ];
 
         for (const migration of migrations) {

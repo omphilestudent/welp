@@ -8,7 +8,16 @@ const {
     listFlowTriggers,
     createFlowTrigger,
     updateFlowTrigger,
-    deleteFlowTrigger
+    deleteFlowTrigger,
+    listFlowVersions,
+    rollbackFlowVersion,
+    listFlowComponents,
+    createFlowComponent,
+    updateFlowComponent,
+    deleteFlowComponent,
+    getFlowAnalytics,
+    getFlowPermissions,
+    upsertFlowPermission
 } = require('../services/flowService');
 const { AVAILABLE_FLOW_EVENTS, executeFlow } = require('../services/flowEngine');
 
@@ -227,6 +236,129 @@ const deleteTriggerController = async (req, res) => {
     }
 };
 
+const listVersionsController = async (req, res) => {
+    try {
+        const versions = await listFlowVersions(req.params.id, Number(req.query.limit) || 20);
+        res.json({ success: true, data: versions });
+    } catch (error) {
+        console.error('Error listing versions:', error);
+        res.status(500).json({ success: false, error: 'Failed to load versions' });
+    }
+};
+
+const rollbackVersionController = async (req, res) => {
+    try {
+        const result = await rollbackFlowVersion({
+            flowId: req.params.id,
+            versionId: req.params.versionId,
+            userId: req.user?.id
+        });
+        if (!result) {
+            return res.status(404).json({ success: false, error: 'Version not found' });
+        }
+        res.json({ success: true, data: formatFlow(result.flow) });
+    } catch (error) {
+        console.error('Error rolling back flow:', error);
+        res.status(500).json({ success: false, error: 'Failed to rollback flow' });
+    }
+};
+
+const listComponentsController = async (req, res) => {
+    try {
+        const components = await listFlowComponents({ type: req.query.type });
+        res.json({ success: true, data: components });
+    } catch (error) {
+        console.error('Error listing components:', error);
+        res.status(500).json({ success: false, error: 'Failed to load components' });
+    }
+};
+
+const createComponentController = async (req, res) => {
+    try {
+        const component = await createFlowComponent({
+            name: req.body.name,
+            description: req.body.description,
+            componentType: req.body.type,
+            config: req.body.config || {},
+            isShared: req.body.isShared !== false,
+            userId: req.user?.id
+        });
+        res.status(201).json({ success: true, data: component });
+    } catch (error) {
+        console.error('Error creating component:', error);
+        res.status(500).json({ success: false, error: 'Failed to create component' });
+    }
+};
+
+const updateComponentController = async (req, res) => {
+    try {
+        const component = await updateFlowComponent(req.params.componentId, {
+            name: req.body.name,
+            description: req.body.description,
+            componentType: req.body.type,
+            config: req.body.config,
+            isShared: req.body.isShared,
+            updatedBy: req.user?.id
+        });
+        if (!component) {
+            return res.status(404).json({ success: false, error: 'Component not found' });
+        }
+        res.json({ success: true, data: component });
+    } catch (error) {
+        console.error('Error updating component:', error);
+        res.status(500).json({ success: false, error: 'Failed to update component' });
+    }
+};
+
+const deleteComponentController = async (req, res) => {
+    try {
+        const component = await deleteFlowComponent(req.params.componentId);
+        if (!component) {
+            return res.status(404).json({ success: false, error: 'Component not found' });
+        }
+        res.json({ success: true, data: component });
+    } catch (error) {
+        console.error('Error deleting component:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete component' });
+    }
+};
+
+const getAnalyticsController = async (req, res) => {
+    try {
+        const days = Number(req.query.days) || 30;
+        const analytics = await getFlowAnalytics(req.params.id, days);
+        res.json({ success: true, data: analytics });
+    } catch (error) {
+        console.error('Error loading analytics:', error);
+        res.status(500).json({ success: false, error: 'Failed to load analytics' });
+    }
+};
+
+const listPermissionsController = async (req, res) => {
+    try {
+        const permissions = await getFlowPermissions(req.params.id);
+        res.json({ success: true, data: permissions });
+    } catch (error) {
+        console.error('Error listing permissions:', error);
+        res.status(500).json({ success: false, error: 'Failed to load permissions' });
+    }
+};
+
+const updatePermissionsController = async (req, res) => {
+    try {
+        const { role, permissions } = req.body;
+        if (!role) {
+            return res.status(400).json({ success: false, error: 'Role is required' });
+        }
+        await upsertFlowPermission(req.params.id, role.toLowerCase(), permissions || {});
+        const updated = await getFlowPermissions(req.params.id);
+        res.json({ success: true, data: updated });
+    } catch (error) {
+        console.error('Error updating permissions:', error);
+        res.status(500).json({ success: false, error: 'Failed to update permissions' });
+    }
+};
+
 module.exports = {
     listFlowController,
     getFlowController,
@@ -239,5 +371,14 @@ module.exports = {
     listTriggersController,
     createTriggerController,
     updateTriggerController,
-    deleteTriggerController
+    deleteTriggerController,
+    listVersionsController,
+    rollbackVersionController,
+    listComponentsController,
+    createComponentController,
+    updateComponentController,
+    deleteComponentController,
+    getAnalyticsController,
+    listPermissionsController,
+    updatePermissionsController
 };
