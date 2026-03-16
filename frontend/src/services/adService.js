@@ -1,32 +1,23 @@
 import api from './api';
 
-export const listCampaigns = (params = {}) => {
-    return api.get('/ads', { params });
-};
+const ADS_BASE = '/ads';
+const ADMIN_BASE = `${ADS_BASE}/admin`;
 
-export const getMyCampaigns = () => {
-    return api.get('/ads/me');
-};
+export const listCampaigns = (params = {}) => api.get(ADS_BASE, { params });
 
-export const createCampaign = (formData) => {
-    return api.post('/ads', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
+export const getMyCampaigns = () => api.get(`${ADS_BASE}/me`);
+
+export const createCampaign = (formData) =>
+    api.post(ADS_BASE, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
     });
-};
 
-export const updateCampaign = (campaignId, formData) => {
-    return api.put(`/ads/${campaignId}`, formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
+export const updateCampaign = (campaignId, formData) =>
+    api.put(`${ADS_BASE}/${campaignId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
     });
-};
 
-export const deleteCampaign = (campaignId) => {
-    return api.delete(`/ads/${campaignId}`);
-};
+export const deleteCampaign = (campaignId) => api.delete(`${ADS_BASE}/${campaignId}`);
 
 export const fetchPlacementAds = ({ placement, location, industry, behaviors } = {}) => {
     const params = {
@@ -35,25 +26,37 @@ export const fetchPlacementAds = ({ placement, location, industry, behaviors } =
         industry,
         behaviors: Array.isArray(behaviors) ? behaviors.join(',') : behaviors
     };
-    return api.get('/ads/placement', { params });
+    return api.get(`${ADS_BASE}/placement`, { params });
 };
 
-export const recordImpression = (campaignId) => {
-    return api.post(`/ads/${campaignId}/impression`);
-};
+export const recordImpression = (campaignId) => api.post(`${ADS_BASE}/${campaignId}/impression`);
 
-export const recordClick = (campaignId) => {
-    return api.post(`/ads/${campaignId}/click`);
-};
+export const recordClick = (campaignId) => api.post(`${ADS_BASE}/${campaignId}/click`);
 
-export const adminListAds = (params = {}) => {
-    return api.get('/admin/ads', { params });
-};
+// ==================== Admin APIs ====================
 
-export const adminApproveAd = (payload) => {
-    return api.post('/admin/ads/approve', payload);
-};
+export const adminListAds = (params = {}) => api.get(`${ADMIN_BASE}/list`, { params });
 
-export const adminRejectAd = (payload) => {
-    return api.post('/admin/ads/reject', payload);
-};
+export const adminGetStats = (params = {}) => api.get(`${ADMIN_BASE}/stats`, { params });
+
+export const adminGetAdDetails = (campaignId) => api.get(`${ADMIN_BASE}/${campaignId}`);
+
+export const adminGetAdAnalytics = (campaignId, params = {}) =>
+    api.get(`${ADMIN_BASE}/${campaignId}/analytics`, { params });
+
+export const adminApproveAd = (payload) => api.post(`${ADMIN_BASE}/approve`, payload);
+
+export const adminRejectAd = (payload) => api.post(`${ADMIN_BASE}/reject`, payload);
+
+export const adminBulkApproveAds = (payload) => api.post(`${ADMIN_BASE}/bulk-approve`, payload);
+
+export const adminBulkRejectAds = (payload) => api.post(`${ADMIN_BASE}/bulk-reject`, payload);
+
+export const adminPauseAd = (campaignId) => api.post(`${ADMIN_BASE}/${campaignId}/pause`);
+
+export const adminResumeAd = (campaignId) => api.post(`${ADMIN_BASE}/${campaignId}/resume`);
+
+export const adminFeatureAd = (campaignId, featured = true) =>
+    api.post(`${ADMIN_BASE}/${campaignId}/feature`, { featured });
+
+export const adminDeleteAd = (campaignId) => api.delete(`${ADMIN_BASE}/${campaignId}`);

@@ -116,12 +116,22 @@ const authorize = (...roles) => {
     const allowedRoles = roles.map(normalizeRole);
     return (req, res, next) => {
         if (!req.user) {
-            return res.status(401).json({ error: 'Authentication required' });
+            return res.status(401).json({
+                success: false,
+                error: 'Authentication required'
+            });
+        }
+
+        if (!allowedRoles.length) {
+            return next();
         }
 
         const userRole = normalizeRole(req.user.role);
         if (!allowedRoles.includes(userRole)) {
-            return res.status(403).json({ error: 'Unauthorized access' });
+            return res.status(403).json({
+                success: false,
+                error: 'Insufficient permissions'
+            });
         }
 
         next();

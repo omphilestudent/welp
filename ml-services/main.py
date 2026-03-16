@@ -1,8 +1,39 @@
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import pipeline
 
-app = FastAPI(title="Welp Content Moderation Service")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+APP_NAME = "Welp Content Moderation Service"
+DEFAULT_ALLOWED_ORIGINS = "https://welphub.onrender.com,http://localhost:5173,http://localhost:3000"
+DEFAULT_PORT = 8000
+
+app = FastAPI(title=APP_NAME)
+
+
+def _parse_allowed_origins() -> list[str]:
+    raw = os.getenv("ALLOWED_ORIGINS", DEFAULT_ALLOWED_ORIGINS)
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+def _server_config(default_port: int) -> dict:
+    return {
+        "host": os.getenv("HOST", "0.0.0.0"),
+        "port": int(os.getenv("PORT", default_port)),
+        "workers": int(os.getenv("WEB_CONCURRENCY", "1")),
+        "log_level": os.getenv("LOG_LEVEL", "info"),
+    }
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_parse_allowed_origins(),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ModerationRequest(BaseModel):
@@ -38,3 +69,9 @@ def moderate_review(payload: ModerationRequest) -> ModerationResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", **_server_config(DEFAULT_PORT))

@@ -9,6 +9,16 @@
     <title>Welp - Employee Reviews & Wellbeing</title>
 </head>
 <body>
+<script>
+    (function () {
+        try {
+            var saved = localStorage.getItem('theme');
+            document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+        } catch (error) {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+    })();
+</script>
 <div id="root"></div>
 <script type="module" src="/src/main.jsx"></script>
 </body>

@@ -3,15 +3,33 @@ import React, { createContext, useState, useEffect } from 'react';
 
 export const ThemeContext = createContext();
 
+const resolveInitialTheme = () => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    try {
+        const saved = window.localStorage.getItem('theme');
+        if (saved === 'dark') return true;
+        if (saved === 'light') return false;
+    } catch {
+        // ignore access errors and fall through to default
+    }
+
+    return false; // default to light mode
+};
+
 export const ThemeProvider = ({ children }) => {
-    const [isDarkMode, setIsDarkMode] = useState(() => {
-        const saved = localStorage.getItem('theme');
-        return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    });
+    const [isDarkMode, setIsDarkMode] = useState(resolveInitialTheme);
 
     useEffect(() => {
-        document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
-        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        const mode = isDarkMode ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', mode);
+        try {
+            window.localStorage.setItem('theme', mode);
+        } catch {
+            // localStorage might be unavailable (private mode); safely ignore
+        }
     }, [isDarkMode]);
 
     const toggleTheme = () => {

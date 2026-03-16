@@ -22,3 +22,13 @@
   background: var(--bg-secondary);
 }
 
+[data-theme="dark"] .navbar-logo {
+  background: none;
+  -webkit-text-fill-color: #fff;
+  color: #fff;
+}
+
+[data-theme="dark"] .navbar-logo span {
+  color: #fff;
+}
+

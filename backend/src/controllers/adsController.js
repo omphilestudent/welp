@@ -1,14 +1,25 @@
 const path = require('path');
 const fs = require('fs');
+const { validationResult } = require('express-validator');
 const { query } = require('../utils/database');
 const {
     getBusinessIdForUser,
-    getBusinessOwner,
     upsertPlacements,
     fetchPlacementCampaigns,
     getBusinessAdCapabilities,
     countActiveCampaigns,
-    formatAnalyticsForTier
+    formatAnalyticsForTier,
+    adminListAds,
+    adminGetAdDetails,
+    adminGetAdAnalytics,
+    adminApproveAd,
+    adminRejectAd,
+    adminBulkApproveAds,
+    adminBulkRejectAds,
+    adminPauseAd,
+    adminResumeAd,
+    adminGetAdStats,
+    logAdminAction
 } = require('../services/adsService');
 const { recordAuditLog } = require('../utils/auditLogger');
 const { hasPremiumException } = require('../utils/premiumAccess');
@@ -18,6 +29,8 @@ fs.mkdirSync(AD_ASSET_FOLDER, { recursive: true });
 
 const VALID_STATUSES = ['draft', 'active', 'paused', 'completed'];
 const VALID_BID_TYPES = ['cpc', 'cpm'];
+let adImpressionsTableReady = false;
+let featureColumnReady = false;
 const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
 const VIDEO_EXTS = ['.mp4', '.webm', '.mov'];
 const GIF_EXTS = ['.gif'];
@@ -27,6 +40,35 @@ const EXTENSION_TYPE_MAP = Object.fromEntries([
     ...VIDEO_EXTS.map((ext) => [ext, 'video']),
     ...GIF_EXTS.map((ext) => [ext, 'gif'])
 ]);
+
+const ensureAdImpressionsTable = async () => {
+    if (adImpressionsTableReady) return;
+    await query(`
+        CREATE TABLE IF NOT EXISTS ad_impressions (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            campaign_id UUID NOT NULL REFERENCES advertising_campaigns(id) ON DELETE CASCADE,
+            user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+            session_id TEXT,
+            clicked BOOLEAN DEFAULT false,
+            ip_address TEXT,
+            user_agent TEXT,
+            spend_minor BIGINT DEFAULT 0,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+    await query('CREATE INDEX IF NOT EXISTS idx_ad_impressions_campaign ON ad_impressions(campaign_id)');
+    adImpressionsTableReady = true;
+};
+
+const ensureFeatureColumn = async () => {
+    if (featureColumnReady) return;
+    await query(
+        'ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false'
+    );
+    featureColumnReady = true;
+};
+
+const isMissingRelationError = (error) => error?.code === '42P01';
 
 const parseList = (value) => {
     if (!value) return [];
@@ -56,7 +98,32 @@ const buildAssetUrl = (req, filename) => {
 };
 
 const parsePlacements = (raw = []) => {
-    return parseList(raw).map((placement) => ({ placement, weight: 1 }));
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+        return raw
+            .map((entry) => {
+                if (typeof entry === 'string') {
+                    return { placement: entry, weight: 1 };
+                }
+                if (entry && typeof entry === 'object') {
+                    return {
+                        placement: entry.placement,
+                        weight: Number(entry.weight ?? 1)
+                    };
+                }
+                return null;
+            })
+            .filter((entry) => entry && entry.placement);
+    }
+    if (typeof raw === 'string') {
+        try {
+            const parsed = JSON.parse(raw);
+            return parsePlacements(parsed);
+        } catch {
+            return parseList(raw).map((placement) => ({ placement, weight: 1 }));
+        }
+    }
+    return [];
 };
 
 const parseBehaviors = (value) => {
@@ -92,21 +159,21 @@ const resolveMinorAmount = (majorValue, minorValue) => {
 
 const createCampaign = async (req, res) => {
     try {
-        console.log('User role:', req.user?.role);
-        if (!req.file) {
-            return res.status(400).json({ error: 'Media file is required' });
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ success: false, errors: errors.array() });
         }
 
         const businessId = await getBusinessIdForUser(req.user.id);
-        console.log('Business ID:', businessId);
         if (!businessId) {
-            return res.status(403).json({ error: 'Business profile not found' });
+            return res.status(403).json({ success: false, error: 'Business profile not found' });
         }
 
         const capabilities = await getBusinessAdCapabilities({ userId: req.user.id, email: req.user.email });
         const existingActive = await countActiveCampaigns(businessId);
         if (Number.isFinite(capabilities.maxActive) && existingActive >= capabilities.maxActive) {
             return res.status(403).json({
+                success: false,
                 error: 'Ad limit reached for your plan',
                 details: {
                     activeCampaigns: existingActive,
@@ -115,21 +182,25 @@ const createCampaign = async (req, res) => {
             });
         }
 
-        const ext = path.extname(req.file.originalname).toLowerCase();
-        const inferredType = EXTENSION_TYPE_MAP[ext];
-        const mediaType = req.body.mediaType || inferredType;
-
-        if (!mediaType || !EXTENSION_TYPE_MAP[ext] || EXTENSION_TYPE_MAP[ext] !== mediaType) {
-            return res.status(400).json({ error: 'Media type does not match file extension' });
-        }
-
-        if (!['image', 'video', 'gif'].includes(mediaType)) {
-            return res.status(400).json({ error: 'Unsupported media type' });
-        }
-
         const placements = parsePlacements(req.body.placements);
         if (!placements.length) {
-            return res.status(400).json({ error: 'At least one placement is required' });
+            return res.status(400).json({ success: false, error: 'At least one placement is required' });
+        }
+
+        let mediaType = req.body.media_type || req.body.mediaType;
+        let assetUrl = req.body.asset_url || req.body.media_url || null;
+        if (req.file) {
+            const ext = path.extname(req.file.originalname).toLowerCase();
+            const inferredType = EXTENSION_TYPE_MAP[ext];
+            mediaType = mediaType || inferredType;
+            if (!mediaType || EXTENSION_TYPE_MAP[ext] !== mediaType) {
+                return res.status(400).json({ success: false, error: 'Media type does not match file extension' });
+            }
+            assetUrl = buildAssetUrl(req, req.file.filename);
+        }
+
+        if (!assetUrl) {
+            return res.status(400).json({ success: false, error: 'Media file is required' });
         }
 
         const targetLocations = parseList(req.body.targetLocations);
@@ -141,8 +212,7 @@ const createCampaign = async (req, res) => {
         const bidType = VALID_BID_TYPES.includes(req.body.bid_type) ? req.body.bid_type : 'cpc';
         const name = String(req.body.name || 'Campaign').trim();
 
-        const thumbnailUrl = req.body.thumbnailUrl || buildAssetUrl(req, req.file.filename);
-        const assetUrl = buildAssetUrl(req, req.file.filename);
+        const thumbnailUrl = req.body.thumbnailUrl || assetUrl;
         const premiumOwner = hasPremiumException({ email: req.user.email });
         const statusValue = premiumOwner ? 'active' : 'pending_review';
         const reviewStatusValue = premiumOwner ? 'approved' : 'pending';
@@ -171,12 +241,12 @@ const createCampaign = async (req, res) => {
             [
                 businessId,
                 name,
-                mediaType,
+                mediaType || 'image',
                 assetUrl,
                 thumbnailUrl,
                 req.body.clickRedirectUrl || null,
-                targetLocations,
-                targetIndustries,
+                targetLocations.length ? targetLocations : null,
+                targetIndustries.length ? targetIndustries : null,
                 behaviors.length ? JSON.stringify(behaviors) : null,
                 dailyBudgetMinor,
                 bidType,
@@ -204,10 +274,14 @@ const createCampaign = async (req, res) => {
             userAgent: req.headers['user-agent']
         });
 
-        return res.status(201).json({ campaign, capabilities });
+        return res.status(201).json({
+            success: true,
+            campaign,
+            capabilities
+        });
     } catch (error) {
         console.error('Create campaign error:', error);
-        return res.status(500).json({ error: 'Unable to create campaign' });
+        return res.status(500).json({ success: false, error: 'Unable to create campaign' });
     }
 };
 
@@ -258,20 +332,43 @@ const listCampaigns = async (req, res) => {
         }
 
         const campaigns = await buildCampaignsQuery(filters, params, { includeAllStatuses });
-        return res.json({ campaigns });
+        return res.json({ success: true, campaigns });
     } catch (error) {
         console.error('List campaigns error:', error);
-        return res.status(500).json({ error: 'Unable to list campaigns' });
+        return res.status(500).json({ success: false, error: 'Unable to list campaigns' });
+    }
+};
+
+const getCampaign = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const campaigns = await buildCampaignsQuery(['c.id = $1'], [id], { includeAllStatuses: true });
+        if (!campaigns.length) {
+            return res.status(404).json({ success: false, error: 'Campaign not found' });
+        }
+        const campaign = campaigns[0];
+        let isOwner = false;
+        const normalizedRole = String(req.user?.role || '').toLowerCase();
+        const isAdmin = ['admin', 'super_admin'].includes(normalizedRole);
+        if (req.user) {
+            const businessId = await getBusinessIdForUser(req.user.id);
+            isOwner = businessId && businessId === campaign.business_id;
+        }
+        if (!isOwner && !isAdmin && campaign.status !== 'active') {
+            return res.status(403).json({ success: false, error: 'Not authorized to view this campaign' });
+        }
+        return res.json({ success: true, campaign });
+    } catch (error) {
+        console.error('Get campaign error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to get campaign' });
     }
 };
 
 const listMyCampaigns = async (req, res) => {
     try {
-        console.log('User role:', req.user?.role);
         const businessId = await getBusinessIdForUser(req.user.id);
-        console.log('Business ID:', businessId);
         if (!businessId) {
-            return res.status(403).json({ error: 'Business profile not found' });
+            return res.status(403).json({ success: false, error: 'Business profile not found' });
         }
 
         const capabilities = await getBusinessAdCapabilities({ userId: req.user.id, email: req.user.email });
@@ -283,10 +380,17 @@ const listMyCampaigns = async (req, res) => {
         const formatted = campaigns.map((campaign) =>
             formatAnalyticsForTier(campaign, capabilities.analyticsMode)
         );
-        return res.json({ campaigns: formatted, capabilities });
+        const activeCount = await countActiveCampaigns(businessId);
+        const payload = {
+            campaigns: formatted,
+            capabilities,
+            activeCount,
+            maxActive: capabilities.maxActive
+        };
+        return res.json({ success: true, ...payload });
     } catch (error) {
         console.error('List my campaigns error:', error);
-        return res.status(500).json({ error: 'Unable to list your campaigns' });
+        return res.status(500).json({ success: false, error: 'Unable to list your campaigns' });
     }
 };
 
@@ -408,7 +512,7 @@ const updateCampaign = async (req, res) => {
             userAgent: req.headers['user-agent']
         });
 
-        return res.json({ campaign: refreshed[0] || null, requiresReview });
+        return res.json({ success: true, campaign: refreshed[0] || null, requiresReview });
     } catch (error) {
         console.error('Update campaign error:', error);
         return res.status(500).json({ error: 'Unable to update campaign' });
@@ -431,6 +535,15 @@ const deleteCampaign = async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to delete this campaign' });
         }
 
+        await query('DELETE FROM ad_placements WHERE campaign_id = $1', [id]);
+        try {
+            await ensureAdImpressionsTable();
+            await query('DELETE FROM ad_impressions WHERE campaign_id = $1', [id]);
+        } catch (logError) {
+            if (isMissingRelationError(logError)) {
+                adImpressionsTableReady = false;
+            }
+        }
         await query('DELETE FROM advertising_campaigns WHERE id = $1', [id]);
         await recordAuditLog({
             userId: req.user.id,
@@ -457,16 +570,39 @@ const getPlacementAds = async (req, res) => {
         const behaviors = parseList(req.query.behaviors);
 
         const campaigns = await fetchPlacementCampaigns({ placement, location, industry, behaviors });
-        return res.json({ campaigns });
+        return res.json({ success: true, campaigns });
     } catch (error) {
         console.error('Fetch placement ads error:', error);
-        return res.status(500).json({ error: 'Unable to load ads' });
+        return res.status(500).json({ success: false, error: 'Unable to load ads' });
     }
 };
 
 const recordImpression = async (req, res) => {
     try {
         const { id } = req.params;
+        const sessionId = req.body?.sessionId || null;
+        const userId = req.body?.userId || null;
+
+        try {
+            await ensureAdImpressionsTable();
+            await query(
+                `INSERT INTO ad_impressions (
+                    campaign_id,
+                    user_id,
+                    session_id,
+                    ip_address,
+                    user_agent
+                ) VALUES ($1, $2, $3, $4, $5)`,
+                [id, userId, sessionId, req.ip, req.headers['user-agent'] || null]
+            );
+        } catch (logError) {
+            if (isMissingRelationError(logError)) {
+                adImpressionsTableReady = false;
+            } else {
+                console.warn('Failed to log impression:', logError.message);
+            }
+        }
+
         const result = await query(
             `UPDATE advertising_campaigns
              SET impressions = impressions + 1,
@@ -482,21 +618,44 @@ const recordImpression = async (req, res) => {
             [id]
         );
         if (!result.rows.length) {
-            return res.status(404).json({ error: 'Campaign not found' });
+            return res.status(404).json({ success: false, error: 'Campaign not found' });
         }
         return res.json({
+            success: true,
             impressions: result.rows[0].impressions,
             spendMinor: Number(result.rows[0].spend_minor || 0)
         });
     } catch (error) {
         console.error('Impression error:', error);
-        return res.status(500).json({ error: 'Unable to track impression' });
+        return res.status(500).json({ success: false, error: 'Unable to track impression' });
     }
 };
 
 const recordClick = async (req, res) => {
     try {
         const { id } = req.params;
+        const sessionId = req.body?.sessionId || null;
+
+        try {
+            await ensureAdImpressionsTable();
+            await query(
+                `UPDATE ad_impressions
+                 SET clicked = true
+                 WHERE campaign_id = $1
+                   AND session_id = $2
+                   AND clicked = false
+                 ORDER BY created_at DESC
+                 LIMIT 1`,
+                [id, sessionId]
+            );
+        } catch (logError) {
+            if (isMissingRelationError(logError)) {
+                adImpressionsTableReady = false;
+            } else {
+                console.warn('Failed to log click:', logError.message);
+            }
+        }
+
         const result = await query(
             `UPDATE advertising_campaigns
              SET clicks = clicks + 1,
@@ -512,27 +671,449 @@ const recordClick = async (req, res) => {
             [id]
         );
         if (!result.rows.length) {
-            return res.status(404).json({ error: 'Campaign not found' });
+            return res.status(404).json({ success: false, error: 'Campaign not found' });
         }
         const campaign = result.rows[0];
         return res.json({
+            success: true,
             clicks: campaign.clicks,
             redirectUrl: campaign.click_redirect_url,
             spendMinor: Number(campaign.spend_minor || 0)
         });
     } catch (error) {
         console.error('Click error:', error);
-        return res.status(500).json({ error: 'Unable to track click' });
+        return res.status(500).json({ success: false, error: 'Unable to track click' });
+    }
+};
+
+const adminListCampaigns = async (req, res) => {
+    try {
+        const filters = {
+            reviewStatus: req.query.reviewStatus,
+            status: req.query.status,
+            tier: req.query.tier,
+            search: req.query.search,
+            startDate: req.query.startDate,
+            endDate: req.query.endDate
+        };
+        const campaigns = await adminListAds(filters);
+        await logAdminAction({
+            adminId: req.user.id,
+            action: 'LIST_CAMPAIGNS',
+            details: { filters }
+        });
+        return res.json({ success: true, campaigns });
+    } catch (error) {
+        console.error('Error in adminListCampaigns:', error);
+        return res.status(500).json({ success: false, error: 'Failed to list campaigns' });
+    }
+};
+
+const adminGetStats = async (req, res) => {
+    try {
+        const days = Number(req.query.days || 30);
+        const stats = await adminGetAdStats(days);
+        return res.json({ success: true, data: stats });
+    } catch (error) {
+        console.error('Error in adminGetStats:', error);
+        return res.status(500).json({ success: false, error: 'Failed to get statistics' });
+    }
+};
+
+const adminGetCampaignDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const campaign = await adminGetAdDetails(id);
+        if (!campaign) {
+            return res.status(404).json({ success: false, error: 'Campaign not found' });
+        }
+
+        let impressionHistory = [];
+        try {
+            await ensureAdImpressionsTable();
+            const history = await query(
+                `SELECT 
+                    date_trunc('hour', created_at) as hour,
+                    COUNT(*) as impressions,
+                    SUM(CASE WHEN clicked THEN 1 ELSE 0 END) as clicks
+                 FROM ad_impressions
+                 WHERE campaign_id = $1
+                   AND created_at >= NOW() - INTERVAL '7 days'
+                 GROUP BY date_trunc('hour', created_at)
+                 ORDER BY hour DESC`,
+                [id]
+            );
+            impressionHistory = history.rows;
+        } catch (logError) {
+            if (isMissingRelationError(logError)) {
+                adImpressionsTableReady = false;
+            } else {
+                console.warn('Failed to load impression history:', logError.message);
+            }
+        }
+        campaign.impression_history = impressionHistory;
+
+        return res.json({ success: true, campaign });
+    } catch (error) {
+        console.error('Error in adminGetCampaignDetails:', error);
+        return res.status(500).json({ success: false, error: 'Failed to get campaign details' });
+    }
+};
+
+const adminGetCampaignAnalytics = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const days = Number(req.query.days || 30);
+        const analytics = await adminGetAdAnalytics(id, days);
+        return res.json({ success: true, data: analytics });
+    } catch (error) {
+        console.error('Error in adminGetCampaignAnalytics:', error);
+        return res.status(500).json({ success: false, error: 'Failed to get campaign analytics' });
+    }
+};
+
+const adminApproveCampaign = async (req, res) => {
+    try {
+        const { adId, overrideRestrictions, notes } = req.body;
+        if (!adId) {
+            return res.status(400).json({ success: false, error: 'Campaign ID is required' });
+        }
+        const result = await adminApproveAd({
+            adId,
+            adminId: req.user.id,
+            overrideRestrictions: Boolean(overrideRestrictions),
+            notes
+        });
+        return res.json({ success: true, data: result, message: 'Campaign approved successfully' });
+    } catch (error) {
+        console.error('Error in adminApproveCampaign:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to approve campaign' });
+    }
+};
+
+const adminRejectCampaign = async (req, res) => {
+    try {
+        const { adId, reason, notes } = req.body;
+        if (!adId) {
+            return res.status(400).json({ success: false, error: 'Campaign ID is required' });
+        }
+        if (!reason) {
+            return res.status(400).json({ success: false, error: 'Rejection reason is required' });
+        }
+        const result = await adminRejectAd({
+            adId,
+            adminId: req.user.id,
+            reason,
+            notes
+        });
+        return res.json({ success: true, data: result, message: 'Campaign rejected successfully' });
+    } catch (error) {
+        console.error('Error in adminRejectCampaign:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to reject campaign' });
+    }
+};
+
+const adminBulkApprove = async (req, res) => {
+    try {
+        const { adIds, overrideRestrictions } = req.body;
+        if (!Array.isArray(adIds) || !adIds.length) {
+            return res.status(400).json({ success: false, error: 'Valid campaign IDs array is required' });
+        }
+        const result = await adminBulkApproveAds({
+            adIds,
+            adminId: req.user.id,
+            overrideRestrictions: Boolean(overrideRestrictions)
+        });
+        return res.json({
+            success: true,
+            data: result,
+            message: `Bulk approval completed: ${result.approved} approved, ${result.failed} failed`
+        });
+    } catch (error) {
+        console.error('Error in adminBulkApprove:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to bulk approve campaigns' });
+    }
+};
+
+const adminBulkReject = async (req, res) => {
+    try {
+        const { adIds, reason } = req.body;
+        if (!Array.isArray(adIds) || !adIds.length) {
+            return res.status(400).json({ success: false, error: 'Valid campaign IDs array is required' });
+        }
+        if (!reason) {
+            return res.status(400).json({ success: false, error: 'Rejection reason is required' });
+        }
+        const result = await adminBulkRejectAds({
+            adIds,
+            adminId: req.user.id,
+            reason
+        });
+        return res.json({
+            success: true,
+            data: result,
+            message: `Bulk rejection completed: ${result.rejected} rejected, ${result.failed} failed`
+        });
+    } catch (error) {
+        console.error('Error in adminBulkReject:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to bulk reject campaigns' });
+    }
+};
+
+const adminPauseCampaign = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await adminPauseAd(id, req.user.id);
+        return res.json({ success: true, data: result, message: 'Campaign paused successfully' });
+    } catch (error) {
+        console.error('Error in adminPauseCampaign:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to pause campaign' });
+    }
+};
+
+const adminResumeCampaign = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await adminResumeAd(id, req.user.id);
+        return res.json({ success: true, data: result, message: 'Campaign resumed successfully' });
+    } catch (error) {
+        console.error('Error in adminResumeCampaign:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to resume campaign' });
+    }
+};
+
+const adminFeatureCampaign = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const featured = req.body?.featured !== undefined ? Boolean(req.body.featured) : true;
+        await ensureFeatureColumn();
+        const result = await query(
+            `UPDATE advertising_campaigns 
+             SET is_featured = $1, updated_at = NOW() 
+             WHERE id = $2 
+             RETURNING *`,
+            [featured, id]
+        );
+        if (!result.rows.length) {
+            return res.status(404).json({ success: false, error: 'Campaign not found' });
+        }
+        await logAdminAction({
+            adminId: req.user.id,
+            action: featured ? 'FEATURE_CAMPAIGN' : 'UNFEATURE_CAMPAIGN',
+            targetId: id,
+            targetType: 'campaign'
+        });
+        return res.json({
+            success: true,
+            data: result.rows[0],
+            message: featured ? 'Campaign featured successfully' : 'Campaign unfeatured successfully'
+        });
+    } catch (error) {
+        console.error('Error in adminFeatureCampaign:', error);
+        return res.status(500).json({ success: false, error: 'Failed to update campaign feature status' });
+    }
+};
+
+const adminDeleteCampaign = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const campaign = await adminGetAdDetails(id);
+        if (!campaign) {
+            return res.status(404).json({ success: false, error: 'Campaign not found' });
+        }
+        await query('DELETE FROM ad_placements WHERE campaign_id = $1', [id]);
+        try {
+            await ensureAdImpressionsTable();
+            await query('DELETE FROM ad_impressions WHERE campaign_id = $1', [id]);
+        } catch (logError) {
+            if (isMissingRelationError(logError)) {
+                adImpressionsTableReady = false;
+            }
+        }
+        await query('DELETE FROM advertising_campaigns WHERE id = $1', [id]);
+        await logAdminAction({
+            adminId: req.user.id,
+            action: 'DELETE_CAMPAIGN',
+            targetId: id,
+            targetType: 'campaign',
+            details: { campaignName: campaign.name }
+        });
+        return res.json({ success: true, message: 'Campaign deleted successfully' });
+    } catch (error) {
+        console.error('Error in adminDeleteCampaign:', error);
+        return res.status(500).json({ success: false, error: 'Failed to delete campaign' });
+    }
+};
+
+const adminExportCampaigns = async (req, res) => {
+    try {
+        const filters = {
+            reviewStatus: req.query.reviewStatus,
+            status: req.query.status,
+            tier: req.query.tier,
+            startDate: req.query.startDate,
+            endDate: req.query.endDate
+        };
+        const campaigns = await adminListAds(filters);
+        const headers = [
+            'ID',
+            'Business Name',
+            'Campaign Name',
+            'Status',
+            'Review Status',
+            'Tier',
+            'Impressions',
+            'Clicks',
+            'CTR',
+            'Spend',
+            'Created At',
+            'Reviewed At',
+            'Reviewer'
+        ];
+        const rows = [headers.join(',')];
+        campaigns.forEach((campaign) => {
+            const ctr = campaign.impressions
+                ? ((campaign.clicks / Math.max(1, campaign.impressions)) * 100).toFixed(2)
+                : 0;
+            rows.push([
+                campaign.id,
+                `"${campaign.business_name || ''}"`,
+                `"${campaign.name || ''}"`,
+                campaign.status,
+                campaign.review_status,
+                campaign.subscription_tier || campaign.tier || '',
+                campaign.impressions || 0,
+                campaign.clicks || 0,
+                ctr,
+                ((campaign.spend_minor || 0) / 100).toFixed(2),
+                campaign.created_at ? new Date(campaign.created_at).toISOString() : '',
+                campaign.reviewed_at ? new Date(campaign.reviewed_at).toISOString() : '',
+                `"${campaign.reviewed_by_name || ''}"`
+            ].join(','));
+        });
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=campaigns_export.csv');
+        res.send(rows.join('\n'));
+        await logAdminAction({
+            adminId: req.user.id,
+            action: 'EXPORT_CAMPAIGNS',
+            details: { filters, count: campaigns.length }
+        });
+    } catch (error) {
+        console.error('Error in adminExportCampaigns:', error);
+        return res.status(500).json({ success: false, error: 'Failed to export campaigns' });
+    }
+};
+
+const adminGenerateReport = async (req, res) => {
+    try {
+        const { startDate, endDate, format = 'json' } = req.query;
+        const stats = await adminGetAdStats(Number(req.query.days || 30));
+        const topByImpressions = await query(
+            `SELECT c.name, b.name as business_name, c.impressions
+             FROM advertising_campaigns c
+             JOIN businesses b ON b.id = c.business_id
+             WHERE ($1::timestamptz IS NULL OR c.created_at >= $1::timestamptz)
+               AND ($2::timestamptz IS NULL OR c.created_at <= $2::timestamptz)
+             ORDER BY c.impressions DESC
+             LIMIT 10`,
+            [startDate || null, endDate || null]
+        );
+        const topByClicks = await query(
+            `SELECT c.name, b.name as business_name, c.clicks
+             FROM advertising_campaigns c
+             JOIN businesses b ON b.id = c.business_id
+             WHERE ($1::timestamptz IS NULL OR c.created_at >= $1::timestamptz)
+               AND ($2::timestamptz IS NULL OR c.created_at <= $2::timestamptz)
+             ORDER BY c.clicks DESC
+             LIMIT 10`,
+            [startDate || null, endDate || null]
+        );
+        const topBySpend = await query(
+            `SELECT c.name, b.name as business_name, c.spend_minor
+             FROM advertising_campaigns c
+             JOIN businesses b ON b.id = c.business_id
+             WHERE ($1::timestamptz IS NULL OR c.created_at >= $1::timestamptz)
+               AND ($2::timestamptz IS NULL OR c.created_at <= $2::timestamptz)
+             ORDER BY c.spend_minor DESC
+             LIMIT 10`,
+            [startDate || null, endDate || null]
+        );
+        const pendingReview = await query(
+            `SELECT COUNT(*) as count
+             FROM advertising_campaigns
+             WHERE review_status = 'pending'`
+        );
+
+        const report = {
+            generated_at: new Date().toISOString(),
+            generated_by: req.user.id,
+            date_range: { startDate, endDate },
+            summary: stats,
+            top_performers: {
+                by_impressions: topByImpressions.rows,
+                by_clicks: topByClicks.rows,
+                by_spend: topBySpend.rows
+            },
+            pending_review: Number(pendingReview.rows[0]?.count || 0)
+        };
+
+        if (format === 'csv') {
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', 'attachment; filename=ads_report.csv');
+            res.send(`metric,value\npending_review,${report.pending_review}`);
+            return;
+        }
+
+        return res.json({ success: true, data: report });
+    } catch (error) {
+        console.error('Error in adminGenerateReport:', error);
+        return res.status(500).json({ success: false, error: 'Failed to generate report' });
+    }
+};
+
+const adminGetAuditLog = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const logs = await query(
+            `SELECT al.*, u.display_name as admin_name
+             FROM admin_audit_log al
+             LEFT JOIN users u ON u.id = al.admin_id
+             WHERE al.target_id = $1 AND al.target_type = 'campaign'
+             ORDER BY al.created_at DESC
+             LIMIT 100`,
+            [id]
+        );
+        return res.json({ success: true, data: logs.rows });
+    } catch (error) {
+        console.error('Error in adminGetAuditLog:', error);
+        return res.status(500).json({ success: false, error: 'Failed to get audit log' });
     }
 };
 
 module.exports = {
     createCampaign,
     listCampaigns,
+    getCampaign,
     listMyCampaigns,
     updateCampaign,
     deleteCampaign,
     getPlacementAds,
     recordImpression,
-    recordClick
+    recordClick,
+    adminListCampaigns,
+    adminGetStats,
+    adminGetCampaignDetails,
+    adminGetCampaignAnalytics,
+    adminApproveCampaign,
+    adminRejectCampaign,
+    adminBulkApprove,
+    adminBulkReject,
+    adminPauseCampaign,
+    adminResumeCampaign,
+    adminFeatureCampaign,
+    adminDeleteCampaign,
+    adminExportCampaigns,
+    adminGenerateReport,
+    adminGetAuditLog
 };

@@ -25,6 +25,10 @@ const ensureAdSchema = async () => {
             hasSpendMinor: columns.includes('spend_minor'),
             hasBidRateMinor: columns.includes('bid_rate_minor'),
             hasOverride: columns.includes('override_restrictions'),
+            hasRejectionReason: columns.includes('rejection_reason'),
+            hasReviewedBy: columns.includes('reviewed_by'),
+            hasReviewedAt: columns.includes('reviewed_at'),
+            hasReviewNotes: columns.includes('review_notes'),
             expiresAt: Date.now() + AD_SCHEMA_TTL_MS
         };
     } catch (error) {
@@ -34,6 +38,10 @@ const ensureAdSchema = async () => {
             hasSpendMinor: false,
             hasBidRateMinor: false,
             hasOverride: false,
+            hasRejectionReason: false,
+            hasReviewedBy: false,
+            hasReviewedAt: false,
+            hasReviewNotes: false,
             expiresAt: Date.now() + AD_SCHEMA_TTL_MS
         };
     }
@@ -311,7 +319,556 @@ const formatAnalyticsForTier = (campaign, analyticsMode = 'limited') => {
     return enriched;
 };
 
+// ==================== ADMIN FUNCTIONS ====================
+
+/**
+ * Get all ads with filtering for admin panel
+ */
+const adminListAds = async (filters = {}) => {
+    const schema = await ensureAdSchema();
+
+    let queryStr = `
+        SELECT 
+            c.*,
+            b.name AS business_name,
+            b.subscription_tier,
+            u.email AS owner_email,
+            u.display_name AS owner_name,
+            (
+                SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
+                FROM ad_placements ap
+                WHERE ap.campaign_id = c.id
+            ) AS placements,
+            COALESCE(c.impressions, 0) AS impressions,
+            COALESCE(c.clicks, 0) AS clicks,
+            COALESCE(c.spend_minor, 0) AS spend_minor
+        FROM advertising_campaigns c
+        JOIN businesses b ON b.id = c.business_id
+        LEFT JOIN users u ON u.id = b.owner_user_id
+        WHERE 1=1
+    `;
+
+    const params = [];
+    let paramIndex = 1;
+
+    // Apply filters
+    if (filters.reviewStatus) {
+        queryStr += ` AND c.review_status = $${paramIndex}`;
+        params.push(filters.reviewStatus);
+        paramIndex++;
+    }
+
+    if (filters.status) {
+        queryStr += ` AND c.status = $${paramIndex}`;
+        params.push(filters.status);
+        paramIndex++;
+    }
+
+    if (filters.tier) {
+        queryStr += ` AND b.subscription_tier = $${paramIndex}`;
+        params.push(filters.tier);
+        paramIndex++;
+    }
+
+    if (filters.search) {
+        queryStr += ` AND (b.name ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`;
+        params.push(`%${filters.search}%`);
+        paramIndex++;
+    }
+
+    if (filters.startDate) {
+        queryStr += ` AND c.created_at >= $${paramIndex}`;
+        params.push(filters.startDate);
+        paramIndex++;
+    }
+
+    if (filters.endDate) {
+        queryStr += ` AND c.created_at <= $${paramIndex}`;
+        params.push(filters.endDate);
+        paramIndex++;
+    }
+
+    // Add ordering
+    queryStr += ` ORDER BY c.created_at DESC`;
+
+    try {
+        const result = await query(queryStr, params);
+        return result.rows;
+    } catch (error) {
+        console.error('Error in adminListAds:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get single ad details with analytics
+ */
+const adminGetAdDetails = async (adId) => {
+    const schema = await ensureAdSchema();
+
+    const result = await query(
+        `
+        SELECT 
+            c.*,
+            b.name AS business_name,
+            b.subscription_tier,
+            b.subscription_expires,
+            u.id AS owner_user_id,
+            u.email AS owner_email,
+            u.display_name AS owner_name,
+            u.phone AS owner_phone,
+            (
+                SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
+                FROM ad_placements ap
+                WHERE ap.campaign_id = c.id
+            ) AS placements,
+            COALESCE(c.impressions, 0) AS impressions,
+            COALESCE(c.clicks, 0) AS clicks,
+            COALESCE(c.spend_minor, 0) AS spend_minor,
+            CASE 
+                WHEN c.reviewed_by IS NOT NULL THEN (
+                    SELECT display_name FROM users WHERE id = c.reviewed_by
+                )
+                ELSE NULL
+            END AS reviewed_by_name
+        FROM advertising_campaigns c
+        JOIN businesses b ON b.id = c.business_id
+        LEFT JOIN users u ON u.id = b.owner_user_id
+        WHERE c.id = $1
+        `,
+        [adId]
+    );
+
+    return result.rows[0] || null;
+};
+
+/**
+ * Get ad analytics over time
+ */
+const adminGetAdAnalytics = async (adId, days = 30) => {
+    const result = await query(
+        `
+        WITH daily_stats AS (
+            SELECT 
+                date_trunc('day', created_at) as date,
+                COUNT(*) as impressions,
+                SUM(CASE WHEN clicked THEN 1 ELSE 0 END) as clicks,
+                SUM(spend_minor) as daily_spend
+            FROM ad_impressions
+            WHERE campaign_id = $1
+                AND created_at >= NOW() - ($2 || ' days')::interval
+            GROUP BY date_trunc('day', created_at)
+            ORDER BY date DESC
+        )
+        SELECT 
+            COALESCE(SUM(impressions), 0)::int as total_impressions,
+            COALESCE(SUM(clicks), 0)::int as total_clicks,
+            COALESCE(SUM(daily_spend), 0)::bigint as total_spend_minor,
+            CASE 
+                WHEN SUM(impressions) > 0 
+                THEN ROUND((SUM(clicks)::numeric / SUM(impressions)::numeric * 100), 2)
+                ELSE 0 
+            END as ctr,
+            jsonb_agg(
+                jsonb_build_object(
+                    'date', date,
+                    'impressions', impressions,
+                    'clicks', clicks,
+                    'spend', daily_spend
+                ) ORDER BY date DESC
+            ) as daily_stats
+        FROM daily_stats
+        `,
+        [adId, days]
+    );
+
+    return result.rows[0] || {
+        total_impressions: 0,
+        total_clicks: 0,
+        total_spend_minor: 0,
+        ctr: 0,
+        daily_stats: []
+    };
+};
+
+/**
+ * Approve an ad
+ */
+const adminApproveAd = async ({ adId, adminId, overrideRestrictions = false, notes = null }) => {
+    const schema = await ensureAdSchema();
+
+    // Check if ad exists
+    const ad = await adminGetAdDetails(adId);
+    if (!ad) {
+        throw new Error('Ad not found');
+    }
+
+    // Update the ad
+    const result = await query(
+        `
+        UPDATE advertising_campaigns
+        SET 
+            review_status = 'approved',
+            status = CASE 
+                WHEN status = 'pending_review' THEN 'active'
+                ELSE status
+            END,
+            reviewed_at = NOW(),
+            reviewed_by = $2,
+            review_notes = $3,
+            override_restrictions = $4,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        `,
+        [adId, adminId, notes, overrideRestrictions]
+    );
+
+    // Log the action
+    await logAdminAction({
+        adminId,
+        action: 'APPROVE_AD',
+        targetId: adId,
+        targetType: 'ad',
+        details: { overrideRestrictions, notes }
+    });
+
+    // Notify the business owner
+    await notifyBusinessOwner(ad.business_id, 'ad_approved', {
+        adName: ad.name,
+        notes
+    });
+
+    return result.rows[0];
+};
+
+/**
+ * Reject an ad
+ */
+const adminRejectAd = async ({ adId, adminId, reason, notes = null }) => {
+    const schema = await ensureAdSchema();
+
+    // Check if ad exists
+    const ad = await adminGetAdDetails(adId);
+    if (!ad) {
+        throw new Error('Ad not found');
+    }
+
+    // Update the ad
+    let updateQuery = `
+        UPDATE advertising_campaigns
+        SET 
+            review_status = 'rejected',
+            status = 'rejected',
+            reviewed_at = NOW(),
+            reviewed_by = $2,
+            review_notes = $3,
+            rejection_reason = $4,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+    `;
+
+    const result = await query(updateQuery, [adId, adminId, notes || reason, reason]);
+
+    // Log the action
+    await logAdminAction({
+        adminId,
+        action: 'REJECT_AD',
+        targetId: adId,
+        targetType: 'ad',
+        details: { reason, notes }
+    });
+
+    // Notify the business owner
+    await notifyBusinessOwner(ad.business_id, 'ad_rejected', {
+        adName: ad.name,
+        reason,
+        notes
+    });
+
+    return result.rows[0];
+};
+
+/**
+ * Bulk approve multiple ads
+ */
+const adminBulkApproveAds = async ({ adIds, adminId, overrideRestrictions = false }) => {
+    const results = [];
+    const errors = [];
+
+    for (const adId of adIds) {
+        try {
+            const result = await adminApproveAd({
+                adId,
+                adminId,
+                overrideRestrictions,
+                notes: 'Bulk approved'
+            });
+            results.push(result);
+        } catch (error) {
+            errors.push({ adId, error: error.message });
+        }
+    }
+
+    return {
+        approved: results.length,
+        failed: errors.length,
+        results,
+        errors
+    };
+};
+
+/**
+ * Bulk reject multiple ads
+ */
+const adminBulkRejectAds = async ({ adIds, adminId, reason }) => {
+    const results = [];
+    const errors = [];
+
+    for (const adId of adIds) {
+        try {
+            const result = await adminRejectAd({
+                adId,
+                adminId,
+                reason,
+                notes: `Bulk reject: ${reason}`
+            });
+            results.push(result);
+        } catch (error) {
+            errors.push({ adId, error: error.message });
+        }
+    }
+
+    return {
+        rejected: results.length,
+        failed: errors.length,
+        results,
+        errors
+    };
+};
+
+/**
+ * Pause an active ad
+ */
+const adminPauseAd = async (adId, adminId) => {
+    const ad = await adminGetAdDetails(adId);
+    if (!ad) {
+        throw new Error('Ad not found');
+    }
+
+    if (ad.status !== 'active') {
+        throw new Error('Can only pause active ads');
+    }
+
+    const result = await query(
+        `
+        UPDATE advertising_campaigns
+        SET 
+            status = 'paused',
+            updated_at = NOW(),
+            paused_by = $2,
+            paused_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        `,
+        [adId, adminId]
+    );
+
+    // Log the action
+    await logAdminAction({
+        adminId,
+        action: 'PAUSE_AD',
+        targetId: adId,
+        targetType: 'ad'
+    });
+
+    return result.rows[0];
+};
+
+/**
+ * Resume a paused ad
+ */
+const adminResumeAd = async (adId, adminId) => {
+    const ad = await adminGetAdDetails(adId);
+    if (!ad) {
+        throw new Error('Ad not found');
+    }
+
+    if (ad.status !== 'paused') {
+        throw new Error('Can only resume paused ads');
+    }
+
+    const result = await query(
+        `
+        UPDATE advertising_campaigns
+        SET 
+            status = 'active',
+            updated_at = NOW(),
+            resumed_by = $2,
+            resumed_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        `,
+        [adId, adminId]
+    );
+
+    // Log the action
+    await logAdminAction({
+        adminId,
+        action: 'RESUME_AD',
+        targetId: adId,
+        targetType: 'ad'
+    });
+
+    return result.rows[0];
+};
+
+/**
+ * Get ad review statistics
+ */
+const adminGetAdStats = async (days = 30) => {
+    const result = await query(
+        `
+        SELECT 
+            COUNT(*) as total_ads,
+            COUNT(CASE WHEN review_status = 'pending' THEN 1 END) as pending_review,
+            COUNT(CASE WHEN review_status = 'approved' THEN 1 END) as approved,
+            COUNT(CASE WHEN review_status = 'rejected' THEN 1 END) as rejected,
+            COALESCE(SUM(spend_minor), 0) as total_spend_minor,
+            COALESCE(SUM(impressions), 0) as total_impressions,
+            COALESCE(SUM(clicks), 0) as total_clicks,
+            AVG(CASE WHEN impressions > 0 THEN clicks::float / impressions ELSE 0 END) * 100 as avg_ctr,
+            COUNT(DISTINCT business_id) as unique_businesses
+        FROM advertising_campaigns
+        WHERE created_at >= NOW() - ($1 || ' days')::interval
+        `,
+        [days]
+    );
+
+    // Get daily trend
+    const dailyTrend = await query(
+        `
+        SELECT 
+            date_trunc('day', created_at) as date,
+            COUNT(*) as submissions,
+            COUNT(CASE WHEN review_status = 'approved' THEN 1 END) as approved,
+            COUNT(CASE WHEN review_status = 'rejected' THEN 1 END) as rejected,
+            AVG(CASE 
+                WHEN reviewed_at IS NOT NULL 
+                THEN EXTRACT(EPOCH FROM (reviewed_at - created_at))/3600
+                ELSE NULL 
+            END)::numeric(10,2) as avg_review_hours
+        FROM advertising_campaigns
+        WHERE created_at >= NOW() - ($1 || ' days')::interval
+        GROUP BY date_trunc('day', created_at)
+        ORDER BY date DESC
+        `,
+        [days]
+    );
+
+    return {
+        summary: result.rows[0] || {},
+        dailyTrend: dailyTrend.rows
+    };
+};
+
+/**
+ * Log admin actions for audit trail
+ */
+const logAdminAction = async ({ adminId, action, targetId, targetType, details = {} }) => {
+    try {
+        await query(
+            `
+            INSERT INTO admin_audit_log (
+                admin_id,
+                action,
+                target_id,
+                target_type,
+                details,
+                ip_address,
+                user_agent,
+                created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            `,
+            [
+                adminId,
+                action,
+                targetId,
+                targetType,
+                JSON.stringify(details),
+                null, // IP address would come from request
+                null  // User agent would come from request
+            ]
+        );
+    } catch (error) {
+        console.error('Failed to log admin action:', error);
+        // Don't throw - logging should not break the main operation
+    }
+};
+
+/**
+ * Notify business owner about ad status changes
+ */
+const notifyBusinessOwner = async (businessId, notificationType, data = {}) => {
+    try {
+        // Get business owner's email
+        const business = await getBusinessOwner(businessId);
+        if (!business || !business.email) {
+            console.warn(`No email found for business ${businessId}`);
+            return;
+        }
+
+        // Create notification in database
+        await query(
+            `
+            INSERT INTO notifications (
+                user_id,
+                type,
+                title,
+                message,
+                data,
+                created_at
+            ) VALUES ($1, $2, $3, $4, $5, NOW())
+            `,
+            [
+                business.owner_user_id,
+                notificationType,
+                getNotificationTitle(notificationType),
+                getNotificationMessage(notificationType, data),
+                JSON.stringify(data)
+            ]
+        );
+
+        // TODO: Send email notification
+        // await sendEmail(business.email, notificationType, data);
+    } catch (error) {
+        console.error('Failed to notify business owner:', error);
+    }
+};
+
+const getNotificationTitle = (type) => {
+    const titles = {
+        ad_approved: 'Your Ad Has Been Approved',
+        ad_rejected: 'Your Ad Was Rejected',
+        ad_paused: 'Your Ad Has Been Paused',
+        ad_resumed: 'Your Ad Has Been Resumed'
+    };
+    return titles[type] || 'Ad Status Update';
+};
+
+const getNotificationMessage = (type, data) => {
+    const messages = {
+        ad_approved: `Your ad "${data.adName}" has been approved and is now live.`,
+        ad_rejected: `Your ad "${data.adName}" was rejected. Reason: ${data.reason}`,
+        ad_paused: `Your ad "${data.adName}" has been paused by an administrator.`,
+        ad_resumed: `Your ad "${data.adName}" has been resumed.`
+    };
+    return messages[type] || 'Your ad status has been updated.';
+};
+
 module.exports = {
+    // Original exports
     getBusinessIdForUser,
     getBusinessOwner,
     upsertPlacements,
@@ -319,5 +876,18 @@ module.exports = {
     fetchPlacementCampaigns,
     getBusinessAdCapabilities,
     countActiveCampaigns,
-    formatAnalyticsForTier
+    formatAnalyticsForTier,
+
+    // New admin exports
+    adminListAds,
+    adminGetAdDetails,
+    adminGetAdAnalytics,
+    adminApproveAd,
+    adminRejectAd,
+    adminBulkApproveAds,
+    adminBulkRejectAds,
+    adminPauseAd,
+    adminResumeAd,
+    adminGetAdStats,
+    logAdminAction
 };
