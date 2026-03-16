@@ -45,6 +45,7 @@ import CalendarTroubleshoot from './pages/admin/CalendarTroubleshoot';
 import ClaimRequests from './pages/admin/ClaimRequests';
 import MarketingEmails from './pages/admin/MarketingEmails';
 import AdApprovals from './pages/admin/AdApprovals';
+import FlowManagement from './pages/admin/FlowManagement';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
@@ -169,6 +170,7 @@ function App() {
                                     <Route path="claims" element={<ClaimRequests />} />
                                     <Route path="marketing" element={<MarketingEmails />} />
                                     <Route path="ads" element={<AdApprovals />} />
+                                    <Route path="flows" element={<FlowManagement />} />
                                     <Route path="calendar" element={<CalendarTroubleshoot />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />

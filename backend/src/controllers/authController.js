@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
 const { createAdminNotification } = require('../utils/adminNotifications');
+const { emitFlowEvent } = require('../services/flowEngine');
 const { enqueueMarketingForUser } = require('../services/marketingEmailService');
 const { getTokenFromRequest } = require('../middleware/auth');
 const {
@@ -304,6 +305,16 @@ const registerEmployee = async (req, res) => {
         const employeeSubscriptionRecord = await getActiveSubscription(employeeOwnerType, user.id);
         const employeeSubscriptionData = await getPlanPayload(employeeSubscriptionRecord, employeeOwnerType);
 
+        emitFlowEvent('user.signup', {
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            displayName: user.display_name,
+            source: 'employee_registration'
+        }).catch((eventError) => {
+            console.warn('Flow event dispatch failed (signup):', eventError.message);
+        });
+
         return res.status(201).json({
             success: true,
             message: 'Account created successfully',
@@ -493,6 +504,16 @@ const registerPsychologist = async (req, res) => {
         const psychSubscriptionRecord = await getActiveSubscription(psychOwnerType, user.id);
         const psychSubscriptionData = await getPlanPayload(psychSubscriptionRecord, psychOwnerType);
         const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
+
+        emitFlowEvent('user.signup', {
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            displayName: user.display_name,
+            source: 'psychologist_registration'
+        }).catch((eventError) => {
+            console.warn('Flow event dispatch failed (psychologist signup):', eventError.message);
+        });
 
         return res.status(201).json({
             success: true,
@@ -753,6 +774,17 @@ const registerBusiness = async (req, res) => {
         const businessSubscriptionRecord = await getActiveSubscription(businessOwnerType, user.id);
         const businessSubscriptionData = await getPlanPayload(businessSubscriptionRecord, businessOwnerType);
         const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
+
+        emitFlowEvent('user.signup', {
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            displayName: user.display_name,
+            source: 'business_registration',
+            companyName
+        }).catch((eventError) => {
+            console.warn('Flow event dispatch failed (business signup):', eventError.message);
+        });
 
         return res.status(201).json({
             success: true,

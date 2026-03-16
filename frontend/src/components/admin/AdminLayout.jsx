@@ -26,7 +26,8 @@ import {
     FaRobot,
     FaUserCheck,
     FaEnvelope,
-    FaBullhorn
+    FaBullhorn,
+    FaProjectDiagram
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
@@ -148,6 +149,12 @@ const AdminLayout = () => {
             icon: <FaEnvelope />,
             label: 'Email Marketing',
             color: '#f59e0b'
+        },
+        {
+            path: '/admin/flows',
+            icon: <FaProjectDiagram />,
+            label: 'Flow Builder',
+            color: '#14b8a6'
         },
         {
             path: '/admin/subscriptions',

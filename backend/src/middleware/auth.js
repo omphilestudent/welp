@@ -138,4 +138,12 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { authenticate, authorize, getTokenFromRequest };
+const authenticateOptional = (req, res, next) => {
+    const token = getTokenFromRequest(req);
+    if (!token) {
+        return next();
+    }
+    return authenticate(req, res, next);
+};
+
+module.exports = { authenticate, authenticateOptional, authorize, getTokenFromRequest };

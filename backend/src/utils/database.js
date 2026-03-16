@@ -1194,6 +1194,59 @@ const runMigrations = async () => {
                     USING media_type::media_type;
                 END IF;
             END $$;`,
+            `CREATE TABLE IF NOT EXISTS flows (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(150) NOT NULL,
+                description TEXT,
+                type VARCHAR(20) NOT NULL CHECK (type IN ('screen','trigger')),
+                definition JSONB NOT NULL DEFAULT '{}'::jsonb,
+                is_active BOOLEAN DEFAULT true,
+                created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_flows_type ON flows(type);",
+            "CREATE INDEX IF NOT EXISTS idx_flows_active ON flows(is_active);",
+            `CREATE TABLE IF NOT EXISTS flow_triggers (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+                event_name VARCHAR(100) NOT NULL,
+                conditions JSONB NOT NULL DEFAULT '{}'::jsonb,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_flow_triggers_event ON flow_triggers(event_name);",
+            "CREATE INDEX IF NOT EXISTS idx_flow_triggers_active ON flow_triggers(is_active);",
+            `CREATE TABLE IF NOT EXISTS flow_execution_logs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+                user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                flow_type VARCHAR(20),
+                status VARCHAR(32) DEFAULT 'in_progress',
+                started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                ended_at TIMESTAMPTZ,
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_flow_logs_flow_id ON flow_execution_logs(flow_id);",
+            "CREATE INDEX IF NOT EXISTS idx_flow_logs_status ON flow_execution_logs(status);",
+            `CREATE TABLE IF NOT EXISTS flow_sessions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+                user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                status VARCHAR(24) DEFAULT 'in_progress' CHECK (status IN ('in_progress','completed','aborted')),
+                current_node_id VARCHAR(128),
+                context JSONB NOT NULL DEFAULT '{}'::jsonb,
+                preview_mode BOOLEAN DEFAULT false,
+                execution_log_id UUID REFERENCES flow_execution_logs(id) ON DELETE SET NULL,
+                last_submitted_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_flow_sessions_flow ON flow_sessions(flow_id);",
+            "CREATE INDEX IF NOT EXISTS idx_flow_sessions_user ON flow_sessions(user_id);",
         ];
 
         for (const migration of migrations) {

@@ -3,6 +3,7 @@ const { query } = require('../utils/database');
 const { createUserNotification } = require('../utils/userNotifications');
 const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaService');
 const { PLAN_LIMITS } = require('../services/subscriptionService');
+const { emitFlowEvent } = require('../services/flowEngine');
 
 const getChatMinutesForTier = (tier = 'free') => {
     const normalized = String(tier || 'free').toLowerCase();
@@ -672,6 +673,16 @@ const sendMessage = async (req, res) => {
         if (io && notification) {
             io.to(`user-${recipientId}`).emit('notification', notification);
         }
+
+        emitFlowEvent('message.created', {
+            conversationId,
+            messageId: result.rows[0]?.id,
+            senderId: req.user.id,
+            recipientId,
+            preview: (content || '').slice(0, 160)
+        }).catch((eventError) => {
+            console.warn('Flow event dispatch failed (message.created):', eventError.message);
+        });
     } catch (error) {
         console.error('Send message error:', error);
         res.status(500).json({ error: 'Failed to send message' });

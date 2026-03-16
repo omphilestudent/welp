@@ -12,6 +12,7 @@ const {
 const { recordAuditLog } = require('../utils/auditLogger');
 const { sendSubscriptionCancellationEmail } = require('../utils/emailService');
 const { hasPremiumException } = require('../utils/premiumAccess');
+const { emitFlowEvent } = require('../services/flowEngine');
 
 const ROLE_TO_OWNER = {
     employee: 'user',
@@ -102,6 +103,17 @@ const subscribePlan = async (req, res) => {
             userAgent: req.headers['user-agent']
         });
 
+        emitFlowEvent('subscription.changed', {
+            userId: req.user.id,
+            ownerType,
+            planCode: plan.planCode,
+            action: 'upgrade',
+            amountMinor: plan.amountMinor,
+            currency: currencyCode
+        }).catch((eventError) => {
+            console.warn('Flow event dispatch failed (subscription upgrade):', eventError.message);
+        });
+
         return res.json({
             success: true,
             subscription: {
@@ -186,6 +198,17 @@ const cancelSubscription = async (req, res) => {
         } catch (notifyErr) {
             console.warn('Subscription cancellation email failed:', notifyErr.message);
         }
+
+        emitFlowEvent('subscription.changed', {
+            userId: req.user.id,
+            ownerType,
+            planCode: previous?.plan_code || fallbackPayload.planCode,
+            action: 'cancel',
+            amountMinor: previous?.amount_minor || 0,
+            currency: previous?.currency_code || DEFAULT_CURRENCY
+        }).catch((eventError) => {
+            console.warn('Flow event dispatch failed (subscription cancel):', eventError.message);
+        });
 
         return res.json({
             success: true,

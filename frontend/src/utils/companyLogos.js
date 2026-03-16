@@ -1,20 +1,25 @@
 // Shared logo resolution helper for company cards and profile pages.
 
+const simpleIcon = (slug, color = '0F172A') => {
+    const normalized = color.replace('#', '');
+    return `https://cdn.simpleicons.org/${slug}/${normalized}`;
+};
+
 // Known company logos using multiple working CDN sources.
 // Each entry is an array of URLs tried in order until one loads successfully.
 const KNOWN_COMPANY_LOGOS = {
     'google': [
-        'https://cdn.simpleicons.org/google',
+        simpleIcon('google', '#4285F4'),
         'https://www.google.com/favicon.ico',
     ],
     'deepseek ai': [
-        'https://cdn.simpleicons.org/deepseek',
+        simpleIcon('deepseek', '#0F172A'),
     ],
     'meta': [
-        'https://cdn.simpleicons.org/meta',
+        simpleIcon('meta'),
     ],
     'facebook': [
-        'https://cdn.simpleicons.org/facebook',
+        simpleIcon('facebook'),
     ],
     'capitec bank': [
         'https://img.logo.dev/capitecbank.co.za?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
@@ -43,136 +48,132 @@ const KNOWN_COMPANY_LOGOS = {
     ],
     'mr price': [
         'https://img.logo.dev/mrpricegroup.com?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
-        'https://logo.clearbit.com/mrpricegroup.com',
         'https://mrpricegroup.com/favicon.ico',
     ],
     'mrprice': [
         'https://img.logo.dev/mrpricegroup.com?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
-        'https://logo.clearbit.com/mrpricegroup.com',
         'https://mrpricegroup.com/favicon.ico',
     ],
     'mr price group': [
         'https://img.logo.dev/mrpricegroup.com?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
-        'https://logo.clearbit.com/mrpricegroup.com',
         'https://mrpricegroup.com/favicon.ico',
     ],
     'mrp': [
         'https://img.logo.dev/mrp.com?token=pk_X9JGkMBBQQaXJjxCNg9EFQ',
-        'https://logo.clearbit.com/mrp.com',
         'https://mrp.com/favicon.ico',
     ],
     'apple inc.': [
-        'https://cdn.simpleicons.org/apple',
+        simpleIcon('apple'),
         'https://www.apple.com/favicon.ico',
     ],
     'apple': [
-        'https://cdn.simpleicons.org/apple',
+        simpleIcon('apple'),
         'https://www.apple.com/favicon.ico',
     ],
     'amazon': [
-        'https://cdn.simpleicons.org/amazon',
+        simpleIcon('amazon'),
         'https://www.amazon.com/favicon.ico',
     ],
     'microsoft': [
-        'https://cdn.simpleicons.org/microsoft',
+        simpleIcon('microsoft'),
         'https://www.microsoft.com/favicon.ico',
     ],
     'tesla': [
-        'https://cdn.simpleicons.org/tesla',
+        simpleIcon('tesla'),
         'https://www.tesla.com/favicon.ico',
     ],
     'netflix': [
-        'https://cdn.simpleicons.org/netflix',
+        simpleIcon('netflix'),
     ],
     'spotify': [
-        'https://cdn.simpleicons.org/spotify',
+        simpleIcon('spotify'),
         'https://www.spotify.com/favicon.ico',
     ],
     'airbnb': [
-        'https://cdn.simpleicons.org/airbnb',
+        simpleIcon('airbnb'),
         'https://www.airbnb.com/favicon.ico',
     ],
     'uber': [
-        'https://cdn.simpleicons.org/uber',
+        simpleIcon('uber'),
         'https://www.uber.com/favicon.ico',
     ],
     'linkedin': [
-        'https://cdn.simpleicons.org/linkedin',
+        simpleIcon('linkedin'),
     ],
     'salesforce': [
-        'https://cdn.simpleicons.org/salesforce',
+        simpleIcon('salesforce'),
         'https://www.salesforce.com/favicon.ico',
     ],
     'oracle': [
-        'https://cdn.simpleicons.org/oracle',
+        simpleIcon('oracle'),
         'https://www.oracle.com/favicon.ico',
     ],
     'ibm': [
-        'https://cdn.simpleicons.org/ibm',
+        simpleIcon('ibm'),
         'https://www.ibm.com/favicon.ico',
     ],
     'intel': [
-        'https://cdn.simpleicons.org/intel',
+        simpleIcon('intel'),
         'https://www.intel.com/favicon.ico',
     ],
     'nvidia': [
-        'https://cdn.simpleicons.org/nvidia',
+        simpleIcon('nvidia'),
         'https://www.nvidia.com/favicon.ico',
     ],
     'adobe': [
-        'https://cdn.simpleicons.org/adobe',
+        simpleIcon('adobe'),
         'https://www.adobe.com/favicon.ico',
     ],
     'shopify': [
-        'https://cdn.simpleicons.org/shopify',
+        simpleIcon('shopify'),
     ],
     'slack': [
-        'https://cdn.simpleicons.org/slack',
+        simpleIcon('slack'),
     ],
     'figma': [
-        'https://cdn.simpleicons.org/figma',
+        simpleIcon('figma'),
     ],
     'github': [
-        'https://cdn.simpleicons.org/github',
+        simpleIcon('github'),
     ],
     'gitlab': [
-        'https://cdn.simpleicons.org/gitlab',
+        simpleIcon('gitlab'),
     ],
     'notion': [
-        'https://cdn.simpleicons.org/notion',
+        simpleIcon('notion'),
     ],
     'stripe': [
-        'https://cdn.simpleicons.org/stripe',
+        simpleIcon('stripe'),
     ],
     'twitter': [
-        'https://cdn.simpleicons.org/twitter',
+        simpleIcon('twitter'),
     ],
     'x': [
-        'https://cdn.simpleicons.org/x',
+        simpleIcon('x'),
     ],
     'openai': [
-        'https://cdn.simpleicons.org/openai',
+        simpleIcon('openai'),
     ],
     'samsung': [
-        'https://cdn.simpleicons.org/samsung',
+        simpleIcon('samsung'),
     ],
     'sony': [
-        'https://cdn.simpleicons.org/sony',
+        simpleIcon('sony'),
     ],
     'tiktok': [
-        'https://cdn.simpleicons.org/tiktok',
+        simpleIcon('tiktok'),
     ],
     'youtube': [
-        'https://cdn.simpleicons.org/youtube',
+        simpleIcon('youtube'),
     ],
     'paypal': [
-        'https://cdn.simpleicons.org/paypal',
+        simpleIcon('paypal'),
     ],
     'visa': [
-        'https://cdn.simpleicons.org/visa',
+        simpleIcon('visa'),
     ],
     'mastercard': [
-        'https://cdn.simpleicons.org/mastercard',
+        simpleIcon('mastercard'),
     ],
 };
 
