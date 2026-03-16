@@ -9,6 +9,13 @@
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
 }
 
 .btn::before {

@@ -12,6 +12,8 @@ import './AdvertisingSection.css';
 
 const PLACEMENTS = ['business_profile', 'search_results', 'category', 'recommended'];
 const BID_TYPES = ['cpc', 'cpm'];
+const MAX_MEDIA_BYTES = 15 * 1024 * 1024;
+const MAX_MEDIA_MB = Math.round(MAX_MEDIA_BYTES / (1024 * 1024));
 
 const INITIAL_FORM = {
     name: '',
@@ -133,12 +135,19 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
 
     const handleSubmit = async (event) => {
         event.preventDefault();
+        if (saving) {
+            return;
+        }
         if (!selectedPlacements.length) {
             toast.error('Select at least one placement');
             return;
         }
         if (!editing && !mediaFile) {
             toast.error('Please upload a media file');
+            return;
+        }
+        if (mediaFile && mediaFile.size > MAX_MEDIA_BYTES) {
+            toast.error(`Media file exceeds ${MAX_MEDIA_MB}MB limit`);
             return;
         }
         if (limitReached) {
@@ -173,7 +182,10 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
             await loadCampaigns();
         } catch (error) {
             console.error('Save campaign failed:', error);
-            toast.error(error.response?.data?.error || 'Failed to save campaign');
+            const backendMessage = error.response?.data?.error;
+            const details = error.response?.data?.details;
+            const detailText = Array.isArray(details) && details.length ? `: ${details.join(', ')}` : '';
+            toast.error(backendMessage ? `${backendMessage}${detailText}` : 'Failed to save campaign');
         } finally {
             setSaving(false);
         }

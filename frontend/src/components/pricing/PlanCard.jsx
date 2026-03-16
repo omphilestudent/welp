@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { FaCheckCircle, FaCrown, FaChartLine, FaBolt } from 'react-icons/fa';
+import { formatPlanPrice } from '../../utils/currency';
 
 const formatLimitValue = (value) => {
     if (value === null || value === undefined) return '—';
@@ -50,7 +51,7 @@ const PlanCard = ({
     highlighted = false
 }) => {
     const isCurrent = subscription?.planCode === plan.planCode;
-    const price = plan.priceFormatted || `${plan.currencySymbol || '$'}${(plan.amountMajor || 0).toFixed(2)}`;
+    const price = formatPlanPrice(plan);
     const limitEntries = useMemo(() => flattenLimits(plan.limits), [plan.limits]);
 
     const adsLimit = plan.limits?.ads;

@@ -40,6 +40,8 @@ const EXTENSION_TYPE_MAP = Object.fromEntries([
     ...VIDEO_EXTS.map((ext) => [ext, 'video']),
     ...GIF_EXTS.map((ext) => [ext, 'gif'])
 ]);
+const VALID_PLACEMENTS = new Set(['business_profile', 'search_results', 'category', 'recommended']);
+let adCampaignSchemaReady = false;
 
 const ensureAdImpressionsTable = async () => {
     if (adImpressionsTableReady) return;
@@ -66,6 +68,30 @@ const ensureFeatureColumn = async () => {
         'ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false'
     );
     featureColumnReady = true;
+};
+
+const ensureAdCampaignSchema = async () => {
+    if (adCampaignSchemaReady) return;
+    try {
+        await query(
+            "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS review_status VARCHAR(32) DEFAULT 'pending'"
+        );
+        await query("ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS review_notes TEXT");
+        await query("ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ DEFAULT NOW()");
+        await query("ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ");
+        await query(
+            "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL"
+        );
+        await query(
+            "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS spend_minor BIGINT DEFAULT 0"
+        );
+        await query(
+            "ALTER TABLE advertising_campaigns ADD COLUMN IF NOT EXISTS bid_rate_minor BIGINT DEFAULT 0"
+        );
+        adCampaignSchemaReady = true;
+    } catch (error) {
+        console.warn('ensureAdCampaignSchema failed:', error.message);
+    }
 };
 
 const isMissingRelationError = (error) => error?.code === '42P01';
@@ -158,15 +184,78 @@ const resolveMinorAmount = (majorValue, minorValue) => {
 };
 
 const createCampaign = async (req, res) => {
+    let businessId = null;
     try {
+        await ensureAdCampaignSchema();
+
+        const validationIssues = [];
+        const placements = parsePlacements(req.body.placements);
+        const campaignName = String(req.body.name || req.body.campaignName || '').trim();
+        const hasUploadedMedia = Boolean(req.file);
+        const providedMediaUrl = req.body.asset_url || req.body.media_url || null;
+
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ success: false, errors: errors.array() });
+            validationIssues.push(
+                ...errors.array().map((issue) => issue.msg || `Invalid value for ${issue.param}`)
+            );
         }
 
-        const businessId = await getBusinessIdForUser(req.user.id);
+        if (!campaignName) {
+            validationIssues.push('Campaign name is required');
+        }
+        if (!placements.length) {
+            validationIssues.push('At least one placement is required');
+        }
+        const invalidPlacements = placements.filter(
+            (placement) => !VALID_PLACEMENTS.has(placement.placement)
+        );
+        if (invalidPlacements.length) {
+            validationIssues.push(
+                `Unsupported placements: ${invalidPlacements.map((entry) => entry.placement).join(', ')}`
+            );
+        }
+        if (!hasUploadedMedia && !providedMediaUrl) {
+            validationIssues.push('Upload a media file to submit your campaign');
+        }
+
+        const dailyBudgetMinor = resolveMinorAmount(req.body.dailyBudget, req.body.dailyBudgetMinor);
+        if (!Number.isFinite(dailyBudgetMinor) || dailyBudgetMinor <= 0) {
+            validationIssues.push('Daily budget must be greater than 0');
+        }
+
+        if (validationIssues.length) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid campaign payload',
+                details: validationIssues
+            });
+        }
+
+        const normalizedCampaignName = campaignName || 'Campaign';
+
+        businessId = await getBusinessIdForUser(req.user.id);
         if (!businessId) {
             return res.status(403).json({ success: false, error: 'Business profile not found' });
+        }
+
+        const businessResult = await query(
+            `SELECT id, status
+             FROM companies
+             WHERE id = $1`,
+            [businessId]
+        );
+        if (!businessResult.rows.length) {
+            return res.status(400).json({
+                success: false,
+                error: 'Business profile does not exist'
+            });
+        }
+        if (businessResult.rows[0].status && businessResult.rows[0].status !== 'active') {
+            return res.status(403).json({
+                success: false,
+                error: 'Business profile must be active to create campaigns'
+            });
         }
 
         const capabilities = await getBusinessAdCapabilities({ userId: req.user.id, email: req.user.email });
@@ -182,13 +271,8 @@ const createCampaign = async (req, res) => {
             });
         }
 
-        const placements = parsePlacements(req.body.placements);
-        if (!placements.length) {
-            return res.status(400).json({ success: false, error: 'At least one placement is required' });
-        }
-
         let mediaType = req.body.media_type || req.body.mediaType;
-        let assetUrl = req.body.asset_url || req.body.media_url || null;
+        let assetUrl = providedMediaUrl;
         if (req.file) {
             const ext = path.extname(req.file.originalname).toLowerCase();
             const inferredType = EXTENSION_TYPE_MAP[ext];
@@ -199,24 +283,30 @@ const createCampaign = async (req, res) => {
             assetUrl = buildAssetUrl(req, req.file.filename);
         }
 
-        if (!assetUrl) {
-            return res.status(400).json({ success: false, error: 'Media file is required' });
-        }
-
         const targetLocations = parseList(req.body.targetLocations);
         const targetIndustries = parseList(req.body.targetIndustries);
         const behaviors = parseBehaviors(req.body.behaviors);
-
-        const dailyBudgetMinor = resolveMinorAmount(req.body.dailyBudget, req.body.dailyBudgetMinor);
         const bidRateMinor = resolveMinorAmount(req.body.bidRate, req.body.bidRateMinor) || 0;
         const bidType = VALID_BID_TYPES.includes(req.body.bid_type) ? req.body.bid_type : 'cpc';
-        const name = String(req.body.name || 'Campaign').trim();
-
         const thumbnailUrl = req.body.thumbnailUrl || assetUrl;
         const premiumOwner = hasPremiumException({ email: req.user.email });
         const statusValue = premiumOwner ? 'active' : 'pending_review';
         const reviewStatusValue = premiumOwner ? 'approved' : 'pending';
         const submittedAt = new Date();
+        const sanitizedPlacements = placements.map((placement) => ({
+            placement: placement.placement,
+            weight:
+                Number.isFinite(placement.weight) && placement.weight > 0
+                    ? Math.round(placement.weight)
+                    : 1
+        }));
+
+        console.info('Creating advertising campaign', {
+            userId: req.user.id,
+            businessId,
+            hasUpload: hasUploadedMedia,
+            placements: sanitizedPlacements.map((placement) => placement.placement)
+        });
 
         const { rows } = await query(
             `INSERT INTO advertising_campaigns (
@@ -240,7 +330,7 @@ const createCampaign = async (req, res) => {
             ) RETURNING *`,
             [
                 businessId,
-                name,
+                normalizedCampaignName,
                 mediaType || 'image',
                 assetUrl,
                 thumbnailUrl,
@@ -258,9 +348,9 @@ const createCampaign = async (req, res) => {
         );
 
         const campaign = rows[0];
-        await upsertPlacements(campaign.id, placements);
+        await upsertPlacements(campaign.id, sanitizedPlacements);
 
-        campaign.placements = placements;
+        campaign.placements = sanitizedPlacements;
 
         await recordAuditLog({
             userId: req.user.id,
@@ -268,7 +358,7 @@ const createCampaign = async (req, res) => {
             action: 'ad.created',
             entityType: 'advertising_campaign',
             entityId: campaign.id,
-            newValues: { name, mediaType, businessId },
+            newValues: { name: normalizedCampaignName, mediaType, businessId },
             metadata: { source: 'dashboard' },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
@@ -280,12 +370,25 @@ const createCampaign = async (req, res) => {
             capabilities
         });
     } catch (error) {
-        console.error('Create campaign error:', error);
-        return res.status(500).json({ success: false, error: 'Unable to create campaign' });
+        const dbErrorHints = {
+            '22P02': 'Please double-check your numeric fields (budget/bid).',
+            '23503': 'Linked business profile is invalid. Please refresh your business settings.',
+            '42703': 'Database schema is missing required advertising columns. Please run migrations.'
+        };
+        const friendlyError = dbErrorHints[error?.code] || 'Unable to create campaign';
+        const statusCode = error?.code === '22P02' || error?.code === '23503' ? 400 : 500;
+        console.error('Create campaign error:', {
+            userId: req.user?.id,
+            businessId,
+            code: error?.code,
+            message: error?.message
+        });
+        return res.status(statusCode).json({ success: false, error: friendlyError });
     }
 };
 
 const buildCampaignsQuery = async (filters = [], params = [], options = {}) => {
+    await ensureAdCampaignSchema();
     if (!options.includeAllStatuses) {
         filters.push(`c.review_status = 'approved'`);
     }

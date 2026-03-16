@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaTimes, FaShieldAlt } from 'react-icons/fa';
+import { formatPlanPrice } from '../../utils/currency';
 
 const UpgradeModal = ({ plan, open, onClose, onConfirm, submitting }) => {
     if (!open || !plan) return null;
@@ -19,7 +20,7 @@ const UpgradeModal = ({ plan, open, onClose, onConfirm, submitting }) => {
 
                 <section className="upgrade-modal__body">
                     <div className="upgrade-modal__price">
-                        <span>{plan.priceFormatted || `${plan.currencySymbol || '$'}${(plan.amountMajor || 0).toFixed(2)}`}</span>
+                        <span>{formatPlanPrice(plan)}</span>
                         <small>/ {plan.billingPeriod || 'monthly'}</small>
                     </div>
                     <ul>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaComment, FaShieldAlt, FaBriefcase, FaBell } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
@@ -10,10 +10,12 @@ import { resolveMediaUrl } from '../../utils/media';
 const Navbar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [isAdmin, setIsAdmin] = useState(false);
     const [isHR, setIsHR] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const userId = user?.id || null;
     const userRole = String(user?.role || '').toLowerCase();
@@ -32,6 +34,11 @@ const Navbar = () => {
             socketService.offNotification();
         };
     }, [userId, userRole]);
+
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+        setShowNotifications(false);
+    }, [location.pathname]);
 
     const checkAdminStatus = async (roleValue) => {
         if (!roleValue) {
@@ -66,8 +73,17 @@ const Navbar = () => {
     };
 
     const handleLogout = async () => {
+        closeMobileMenu();
         await logout();
         navigate('/');
+    };
+
+    const toggleMobileMenu = () => {
+        setIsMobileMenuOpen((prev) => !prev);
+    };
+
+    const closeMobileMenu = () => {
+        setIsMobileMenuOpen(false);
     };
 
     const fetchNotifications = async () => {
@@ -115,22 +131,36 @@ const Navbar = () => {
         <>
             <nav className="navbar">
                 <div className="navbar-container">
-                    <Link to="/" className="navbar-logo">
+                    <Link to="/" className="navbar-logo" onClick={closeMobileMenu}>
                         <img src="/logo-1.png" alt="Welp" className="navbar-logo-image" />
                         <span>Welp</span>
                     </Link>
 
-                    <div className="navbar-menu">
-                        <Link to="/search" className="navbar-link">
+                    <button
+                        type="button"
+                        className="navbar-toggle"
+                        onClick={toggleMobileMenu}
+                        aria-expanded={isMobileMenuOpen}
+                        aria-label="Toggle navigation menu"
+                    >
+                        <span />
+                        <span />
+                        <span />
+                    </button>
+
+                    <div className={`navbar-menu ${isMobileMenuOpen ? 'navbar-menu--open' : ''}`}>
+                        <Link to="/search" className="navbar-link" onClick={closeMobileMenu}>
                             Companies
                         </Link>
-                        <Link to="/pricing" className="navbar-link">
-                            Pricing
-                        </Link>
+                        {!user && (
+                            <Link to="/pricing" className="navbar-link" onClick={closeMobileMenu}>
+                                Pricing
+                            </Link>
+                        )}
 
                         {!user && (
                             <>
-                                <Link to="/register/psychologist" className="navbar-link">
+                                <Link to="/register/psychologist" className="navbar-link" onClick={closeMobileMenu}>
                                     Join as Psychologist
                                 </Link>
                             </>
@@ -140,7 +170,7 @@ const Navbar = () => {
                             <>
                                 {user.role === 'employee' && (
                                     <>
-                                        <Link to="/dashboard" className="btn btn-primary navbar-dashboard-btn">
+                                        <Link to="/dashboard" className="btn btn-primary navbar-dashboard-btn" onClick={closeMobileMenu}>
                                             Dashboard
                                         </Link>
                                     </>
@@ -148,10 +178,10 @@ const Navbar = () => {
 
                                 {user.role === 'psychologist' && (
                                     <>
-                                        <Link to="/dashboard" className="btn btn-secondary">
+                                        <Link to="/dashboard" className="btn btn-secondary" onClick={closeMobileMenu}>
                                             Dashboard
                                         </Link>
-                                        <Link to="/messages" className="navbar-link">
+                                        <Link to="/messages" className="navbar-link" onClick={closeMobileMenu}>
                                             Messages
                                         </Link>
                                     </>
@@ -159,10 +189,10 @@ const Navbar = () => {
 
                                 {user.role === 'business' && (
                                     <>
-                                        <Link to="/search" className="navbar-link">
+                                        <Link to="/search" className="navbar-link" onClick={closeMobileMenu}>
                                             Search Companies
                                         </Link>
-                                        <Link to="/dashboard" className="navbar-link">
+                                        <Link to="/dashboard" className="navbar-link" onClick={closeMobileMenu}>
                                             Business Dashboard
                                         </Link>
                                     </>
@@ -175,14 +205,14 @@ const Navbar = () => {
                                             <FaShieldAlt /> Admin
                                         </button>
                                         <div className="nav-dropdown-content">
-                                            <Link to="/admin/dashboard">Dashboard</Link>
-                                            <Link to="/admin/users">Users</Link>
-                                            <Link to="/admin/pricing">Pricing</Link>
-                                            <Link to="/admin/companies">Companies</Link>
-                                            <Link to="/admin/reviews">Reviews</Link>
-                                            <Link to="/admin/subscriptions">Subscriptions</Link>
+                                            <Link to="/admin/dashboard" onClick={closeMobileMenu}>Dashboard</Link>
+                                            <Link to="/admin/users" onClick={closeMobileMenu}>Users</Link>
+                                            <Link to="/admin/pricing" onClick={closeMobileMenu}>Pricing</Link>
+                                            <Link to="/admin/companies" onClick={closeMobileMenu}>Companies</Link>
+                                            <Link to="/admin/reviews" onClick={closeMobileMenu}>Reviews</Link>
+                                            <Link to="/admin/subscriptions" onClick={closeMobileMenu}>Subscriptions</Link>
                                             {user.role === 'super_admin' && (
-                                                <Link to="/admin/settings">Settings</Link>
+                                                <Link to="/admin/settings" onClick={closeMobileMenu}>Settings</Link>
                                             )}
                                         </div>
                                     </div>
@@ -195,22 +225,22 @@ const Navbar = () => {
                                             <FaBriefcase /> HR
                                         </button>
                                         <div className="nav-dropdown-content">
-                                            <Link to="/hr/dashboard">Dashboard</Link>
-                                            <Link to="/hr/jobs">Job Postings</Link>
-                                            <Link to="/hr/applications">Applications</Link>
-                                            <Link to="/hr/interviews">Interviews</Link>
-                                            <Link to="/hr/employees">Employee Relations</Link>
-                                            <Link to="/hr/departments">Departments</Link>
+                                            <Link to="/hr/dashboard" onClick={closeMobileMenu}>Dashboard</Link>
+                                            <Link to="/hr/jobs" onClick={closeMobileMenu}>Job Postings</Link>
+                                            <Link to="/hr/applications" onClick={closeMobileMenu}>Applications</Link>
+                                            <Link to="/hr/interviews" onClick={closeMobileMenu}>Interviews</Link>
+                                            <Link to="/hr/employees" onClick={closeMobileMenu}>Employee Relations</Link>
+                                            <Link to="/hr/departments" onClick={closeMobileMenu}>Departments</Link>
                                         </div>
                                     </div>
                                 )}
 
-                                <Link to="/settings" className="navbar-link">
+                                <Link to="/settings" className="navbar-link" onClick={closeMobileMenu}>
                                     Settings
                                 </Link>
 
                                 {user.role === 'employee' && (
-                                    <Link to="/messages" className="btn btn-primary">
+                                    <Link to="/messages" className="btn btn-primary" onClick={closeMobileMenu}>
                                         <FaComment /> Messages
                                     </Link>
                                 )}
@@ -249,7 +279,7 @@ const Navbar = () => {
                                     )}
                                 </div>
 
-                                <Link to="/settings" className="navbar-avatar" aria-label="Profile">
+                                <Link to="/settings" className="navbar-avatar" aria-label="Profile" onClick={closeMobileMenu}>
                                     {user?.avatar_url ? (
                                         <img src={resolveMediaUrl(user.avatar_url)} alt={user.display_name || 'Profile'} />
                                     ) : (
@@ -265,10 +295,10 @@ const Navbar = () => {
                             </>
                         ) : (
                             <>
-                                <Link to="/login" className="btn btn-primary">
+                                <Link to="/login" className="btn btn-primary" onClick={closeMobileMenu}>
                                     Login
                                 </Link>
-                                <Link to="/register" className="btn btn-secondary">
+                                <Link to="/register" className="btn btn-secondary" onClick={closeMobileMenu}>
                                     Sign Up
                                 </Link>
                             </>
@@ -276,6 +306,10 @@ const Navbar = () => {
                     </div>
                 </div>
             </nav>
+
+            {isMobileMenuOpen && (
+                <div className="navbar-mobile-overlay" onClick={closeMobileMenu} aria-hidden="true" />
+            )}
 
         </>
     );

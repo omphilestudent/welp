@@ -80,11 +80,18 @@ const Settings = () => {
     });
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const canBecomePsychologist = user?.role !== 'psychologist' && user?.role !== 'business';
 
     useEffect(() => {
         fetchProfile();
         fetchSettings();
     }, []);
+
+    useEffect(() => {
+        if (!canBecomePsychologist && activeTab === 'become-psychologist') {
+            setActiveTab('profile');
+        }
+    }, [canBecomePsychologist, activeTab]);
 
     const fetchProfile = async () => {
         try {
@@ -329,7 +336,7 @@ const Settings = () => {
                             >
                                 {isDarkMode ? <FaMoon /> : <FaSun />} Appearance
                             </button>
-                            {user?.role !== 'psychologist' && (
+                            {canBecomePsychologist && (
                                 <button
                                     className={`settings-nav-item ${activeTab === 'become-psychologist' ? 'active' : ''}`}
                                     onClick={() => setActiveTab('become-psychologist')}
@@ -803,7 +810,7 @@ const Settings = () => {
                         )}
 
                         {}
-                        {activeTab === 'become-psychologist' && (
+                        {canBecomePsychologist && activeTab === 'become-psychologist' && (
                             <div className="settings-section">
                                 <h2>Become a Psychologist</h2>
                                 <p className="section-description">

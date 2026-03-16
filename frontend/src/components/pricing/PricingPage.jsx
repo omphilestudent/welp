@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
@@ -9,22 +9,26 @@ import UpgradeModal from './UpgradeModal';
 import { fetchCountries, fetchPricingByAudience } from '../../services/pricingService';
 import { fetchSubscription, upgradeSubscription } from '../../services/subscriptionService';
 import { getMyCampaigns } from '../../services/adService';
+import { currencyForCountry, deriveCountryCode } from '../../utils/currency';
 
 const PREMIUM_EMAIL = 'omphilemohlala@welp.com';
 
 const PricingPage = () => {
     const { user, isAuthenticated } = useAuth();
+    const derivedCountry = useMemo(() => deriveCountryCode(user || {}), [user]);
+    const derivedCurrency = useMemo(() => currencyForCountry(derivedCountry), [derivedCountry]);
     const [searchParams, setSearchParams] = useSearchParams();
     const [countries, setCountries] = useState([]);
     const [audience, setAudience] = useState(() => searchParams.get('role') || 'employee');
-    const [country, setCountry] = useState('US');
-    const [currency, setCurrency] = useState('USD');
+    const [country, setCountry] = useState(derivedCountry);
+    const [currency, setCurrency] = useState(derivedCurrency.code);
     const [pricing, setPricing] = useState(null);
     const [subscription, setSubscription] = useState(null);
     const [adsCapabilities, setAdsCapabilities] = useState(null);
     const [loading, setLoading] = useState(true);
     const [upgradePlan, setUpgradePlan] = useState(null);
     const [upgradePending, setUpgradePending] = useState(false);
+    const userAdjustedRef = useRef(false);
 
     const isBusinessAudience = audience === 'business';
     const premiumExceptionActive = (user?.email || '').toLowerCase() === PREMIUM_EMAIL;
@@ -34,16 +38,19 @@ const PricingPage = () => {
             try {
                 const list = await fetchCountries();
                 setCountries(list);
-                if (list.length && country === 'US') {
-                    setCountry(list[0].code);
-                    setCurrency(list[0].currency || 'USD');
+                if (list.length && !userAdjustedRef.current) {
+                    const preferred = list.find((row) => row.code === derivedCountry) || list[0];
+                    if (preferred) {
+                        setCountry(preferred.code);
+                        setCurrency(preferred.currency || derivedCurrency.code);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch countries', error);
             }
         };
         initCountries();
-    }, []);
+    }, [derivedCountry, derivedCurrency.code]);
 
     useEffect(() => {
         const entry = countries.find((row) => row.code === country);
@@ -51,6 +58,12 @@ const PricingPage = () => {
             setCurrency(entry.currency);
         }
     }, [country, countries]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (userAdjustedRef.current) return;
+        setCountry(derivedCountry);
+        setCurrency(derivedCurrency.code);
+    }, [derivedCountry, derivedCurrency.code]);
 
     const loadSubscription = useCallback(async () => {
         if (!isAuthenticated) return;
@@ -99,7 +112,7 @@ const PricingPage = () => {
             }
         };
         fetchPricing();
-        setSearchParams({ role: audience });
+        setSearchParams({ role: audience, country });
     }, [audience, country, currency, setSearchParams]);
 
     const handleUpgrade = async (plan) => {
@@ -108,7 +121,7 @@ const PricingPage = () => {
         try {
             await upgradeSubscription({
                 planCode: plan.planCode,
-                currency: plan.currencyCode || pricing?.currency?.code || 'USD'
+                currency: plan.currencyCode || pricing?.currency?.code || currency || derivedCurrency.code
             });
             toast.success(`Upgraded to ${plan.metadata?.displayName || plan.planCode}`);
             await loadSubscription();
@@ -151,9 +164,15 @@ const PricingPage = () => {
                 <CurrencyToggle
                     countries={countries}
                     selectedCountry={country}
-                    onCountryChange={setCountry}
+                    onCountryChange={(value) => {
+                        userAdjustedRef.current = true;
+                        setCountry(value);
+                    }}
                     selectedCurrency={currency}
-                    onCurrencyChange={setCurrency}
+                    onCurrencyChange={(value) => {
+                        userAdjustedRef.current = true;
+                        setCurrency(value);
+                    }}
                 />
             </header>
 
