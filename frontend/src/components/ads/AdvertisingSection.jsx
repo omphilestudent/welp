@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -24,6 +24,18 @@ const INITIAL_FORM = {
     behaviors: ''
 };
 
+const normalizeCapabilities = (raw) => {
+    if (!raw) return null;
+    const maxActive = Number.isFinite(raw.maxActive) ? raw.maxActive : null;
+    const remaining = Number.isFinite(raw.remaining) ? raw.remaining : null;
+    return {
+        ...raw,
+        maxActive,
+        remaining,
+        unlimited: raw.unlimited || maxActive === null
+    };
+};
+
 const AdvertisingSection = ({ premiumExceptionActive = false }) => {
     const { user } = useAuth();
     const [campaigns, setCampaigns] = useState([]);
@@ -34,20 +46,11 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
     const [saving, setSaving] = useState(false);
     const [capabilities, setCapabilities] = useState(null);
     const [editingCampaign, setEditingCampaign] = useState(null);
+    const userId = user?.id;
+    const userRole = user?.role;
+    const isBusinessUser = userRole === 'business';
 
-    const normalizeCapabilities = (raw) => {
-        if (!raw) return null;
-        const maxActive = Number.isFinite(raw.maxActive) ? raw.maxActive : null;
-        const remaining = Number.isFinite(raw.remaining) ? raw.remaining : null;
-        return {
-            ...raw,
-            maxActive,
-            remaining,
-            unlimited: raw.unlimited || maxActive === null
-        };
-    };
-
-    const loadCampaigns = async () => {
+    const loadCampaigns = useCallback(async () => {
         setLoading(true);
         try {
             const { data } = await getMyCampaigns();
@@ -67,13 +70,16 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
-        if (user?.role === 'business') {
-            loadCampaigns();
+        if (!isBusinessUser || !userId) {
+            setCampaigns([]);
+            setCapabilities(null);
+            return;
         }
-    }, [user]);
+        loadCampaigns();
+    }, [isBusinessUser, userId, loadCampaigns]);
 
     const handleFieldChange = (field) => (event) => {
         setForm((prev) => ({

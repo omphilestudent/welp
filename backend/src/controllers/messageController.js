@@ -169,12 +169,12 @@ const sendMessageRequest = async (req, res) => {
 
 
         const existing = await query(
-            'SELECT id FROM conversations WHERE employee_id = $1 AND psychologist_id = $2',
+            'SELECT * FROM conversations WHERE employee_id = $1 AND psychologist_id = $2 LIMIT 1',
             [employeeId, req.user.id]
         );
 
         if (existing.rows.length > 0) {
-            return res.status(400).json({ error: 'Conversation already exists' });
+            return res.status(200).json(existing.rows[0]);
         }
 
 
@@ -186,11 +186,13 @@ const sendMessageRequest = async (req, res) => {
         );
 
 
-        await query(
-            `INSERT INTO messages (conversation_id, sender_id, content)
-       VALUES ($1, $2, $3)`,
-            [conversation.rows[0].id, req.user.id, initialMessage]
-        );
+        if (initialMessage && initialMessage.trim()) {
+            await query(
+                `INSERT INTO messages (conversation_id, sender_id, content)
+                 VALUES ($1, $2, $3)`,
+                [conversation.rows[0].id, req.user.id, initialMessage.trim()]
+            );
+        }
 
         const sender = await query(
             'SELECT display_name FROM users WHERE id = $1',

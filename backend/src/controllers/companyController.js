@@ -163,7 +163,7 @@ const fetchRecentPublicReviews = async (companyId, limit = 5) => {
              json_build_object(
                  'id', u.id,
                  'displayName', u.display_name,
-                 'isAnonymous', u.is_anonymous,
+                 'isAnonymous', COALESCE(r.is_anonymous, u.is_anonymous),
                  'avatarUrl', u.avatar_url
              ) as author,
              COALESCE(replies_data.replies, '[]'::json) as replies
@@ -849,9 +849,9 @@ const getCompanyReviewsForBusiness = async (req, res) => {
         }
 
         if (type === 'anonymous') {
-            conditions.push('COALESCE(u.is_anonymous, false) = true');
+            conditions.push('COALESCE(r.is_anonymous, u.is_anonymous, false) = true');
         } else if (type === 'employee') {
-            conditions.push('COALESCE(u.is_anonymous, false) = false');
+            conditions.push('COALESCE(r.is_anonymous, u.is_anonymous, false) = false');
         }
 
         const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -878,7 +878,7 @@ const getCompanyReviewsForBusiness = async (req, res) => {
                  json_build_object(
                          'id', u.id,
                          'displayName', u.display_name,
-                         'isAnonymous', u.is_anonymous,
+                         'isAnonymous', COALESCE(r.is_anonymous, u.is_anonymous),
                          'avatarUrl', u.avatar_url,
                          'role', u.role
                  ) as author,
@@ -954,8 +954,8 @@ const getCompanyAnalytics = async (req, res) => {
             `SELECT
                  ROUND(COALESCE(AVG(r.rating), 0)::numeric, 2) as avg_rating,
                  COUNT(r.id) as total_reviews,
-                 COUNT(CASE WHEN u.is_anonymous THEN 1 END) as anonymous_reviews,
-                 COUNT(CASE WHEN NOT COALESCE(u.is_anonymous, false) THEN 1 END) as employee_reviews
+                 COUNT(CASE WHEN COALESCE(r.is_anonymous, u.is_anonymous, false) THEN 1 END) as anonymous_reviews,
+                 COUNT(CASE WHEN NOT COALESCE(r.is_anonymous, u.is_anonymous, false) THEN 1 END) as employee_reviews
              FROM reviews r
                       LEFT JOIN users u ON r.author_id = u.id
              WHERE r.company_id = $1`,

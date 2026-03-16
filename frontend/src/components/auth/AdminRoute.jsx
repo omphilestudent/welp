@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
@@ -7,23 +7,21 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
     const { user, loading: authLoading } = useAuth();
     const [isAuthorized, setIsAuthorized] = useState(null);
     const [checking, setChecking] = useState(true);
-    const navigate = useNavigate();
+    const userId = user?.id ?? null;
+    const normalizedRole = useMemo(
+        () => (user ? String(user.role || '').toLowerCase().trim() : ''),
+        [user?.role]
+    );
 
     useEffect(() => {
         let isMounted = true;
 
-    const checkAuthorization = async () => {
-            console.log('=== AdminRoute Check ===');
-            console.log('User:', user);
-            console.log('User role:', user?.role);
-
+        const checkAuthorization = async () => {
             if (authLoading) {
-                console.log('Auth still loading...');
                 return;
             }
 
-            if (!user) {
-                console.log('No user - redirect to login');
+            if (!userId) {
                 if (isMounted) {
                     setIsAuthorized(false);
                     setChecking(false);
@@ -31,7 +29,7 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
                 return;
             }
 
-            const userRole = String(user.role || '').toLowerCase().trim();
+            const userRole = normalizedRole;
             const adminRoles = ['admin', 'super_admin', 'administrator', 'superadmin', 'system_admin'];
             const hrRoles = ['hr_admin'];
 
@@ -40,7 +38,6 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
                 : adminRoles.includes(userRole);
 
             if (roleAllowed) {
-                console.log('User has required role - authorized');
                 if (isMounted) {
                     setIsAuthorized(true);
                     setChecking(false);
@@ -50,19 +47,14 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
 
             // If not admin by role, try API verification
             try {
-                console.log('Checking admin access via API...');
-                // Use skipAuthRedirect to prevent automatic redirect
                 const profileEndpoint = requiredRole === 'hr' ? '/hr/profile' : '/admin/profile';
                 await api.get(profileEndpoint, {
                     skipAuthRedirect: true  // This is key!
                 });
-                console.log('API check passed - authorized');
                 if (isMounted) {
                     setIsAuthorized(true);
                 }
             } catch (error) {
-                console.log('API check failed:', error.response?.status);
-                console.log('Access denied - not authorized');
                 if (isMounted) {
                     setIsAuthorized(false);
                 }
@@ -78,7 +70,7 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
         return () => {
             isMounted = false;
         };
-    }, [user, authLoading, navigate]);
+    }, [userId, normalizedRole, authLoading, requiredRole]);
 
     if (authLoading || checking) {
         return (
@@ -104,11 +96,8 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
     }
 
     if (!isAuthorized) {
-        console.log('Redirecting to home - not authorized');
         return <Navigate to="/" replace />;
     }
-
-    console.log('Access granted - rendering children');
     return children;
 };
 

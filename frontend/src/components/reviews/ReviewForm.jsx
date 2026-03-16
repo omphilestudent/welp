@@ -11,6 +11,7 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
         rating: initialData.rating || 0,
         content: initialData.content || '',
         isPublic: initialData.isPublic !== undefined ? initialData.isPublic : true,
+        isAnonymous: initialData.isAnonymous !== undefined ? initialData.isAnonymous : false,
         occupation: user?.occupation || '',
         workplaceId: user?.workplace_id || null
     });
@@ -137,6 +138,20 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
                 </label>
                 <p className="checkbox-help">
                     Public reviews can be seen by everyone.
+                </p>
+            </div>
+
+            <div className="form-group">
+                <label className="checkbox-label">
+                    <input
+                        type="checkbox"
+                        checked={formData.isAnonymous}
+                        onChange={(e) => setFormData({ ...formData, isAnonymous: e.target.checked })}
+                    />
+                    <span>Post this review anonymously</span>
+                </label>
+                <p className="checkbox-help">
+                    When checked, your name will be hidden from the company and psychologists reviewing this post.
                 </p>
             </div>
 

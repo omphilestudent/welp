@@ -178,18 +178,21 @@ const Messages = () => {
         fetchConversations();
     }, []);
 
-    useEffect(() => {
-        if (user?.role === 'psychologist') {
-            fetchPsychologistSidebar();
-        }
-    }, [user]);
+    const userId = user?.id;
+    const userRole = user?.role;
 
     useEffect(() => {
-        if (user?.role === 'employee') {
+        if (userRole === 'psychologist' && userId) {
+            fetchPsychologistSidebar();
+        }
+    }, [userId, userRole]);
+
+    useEffect(() => {
+        if (userRole === 'employee' && userId) {
             fetchSubscription();
             fetchAvailablePsychologists();
         }
-    }, [user]);
+    }, [userId, userRole]);
 
     useEffect(() => {
         const conversationId = searchParams.get('conversation');
@@ -252,17 +255,18 @@ const Messages = () => {
     }, [activeConversation]);
 
     useEffect(() => {
-        if (user) {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            if (token) {
-                socketService.connect(token);
-            }
-
-            return () => {
-                socketService.disconnect();
-            };
+        if (!userId) {
+            return;
         }
-    }, [user]);
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (token) {
+            socketService.connect(token);
+        }
+
+        return () => {
+            socketService.disconnect();
+        };
+    }, [userId]);
 
     useEffect(() => {
         const handleOffer = (payload) => {
@@ -326,7 +330,7 @@ const Messages = () => {
             socketService.offCallIce();
             socketService.offCallEnd();
         };
-    }, [user, ensureConversationActive, callState.status]);
+    }, [userId, ensureConversationActive, callState.status]);
 
     const startRingtone = () => {
         stopRingtone();

@@ -348,6 +348,7 @@ const createTables = async () => {
                 rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
                 content TEXT NOT NULL,
                 is_public BOOLEAN DEFAULT true,
+                is_anonymous BOOLEAN DEFAULT false,
                 moderated_by UUID REFERENCES users(id),
                 moderated_at TIMESTAMP,
                 moderation_reason TEXT,
@@ -586,6 +587,48 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS biography TEXT;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10,2);
             ALTER TABLE business_applications ADD COLUMN IF NOT EXISTS claim_company_id UUID REFERENCES companies(id);
+
+            ALTER TABLE psychologist_applications
+                ADD COLUMN IF NOT EXISTS documents JSONB,
+                ADD COLUMN IF NOT EXISTS document_verified BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS document_verified_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS document_verified_by UUID REFERENCES users(id),
+                ADD COLUMN IF NOT EXISTS document_notes TEXT,
+                ADD COLUMN IF NOT EXISTS ownership_verified BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS ownership_verified_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS ownership_verified_by UUID REFERENCES users(id),
+                ADD COLUMN IF NOT EXISTS ownership_notes TEXT,
+                ADD COLUMN IF NOT EXISTS experience_verified BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS experience_verified_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS experience_verified_by UUID REFERENCES users(id),
+                ADD COLUMN IF NOT EXISTS experience_notes TEXT,
+                ADD COLUMN IF NOT EXISTS experience_details JSONB,
+                ALTER COLUMN status SET DEFAULT 'pending_review';
+
+            ALTER TABLE business_applications
+                ADD COLUMN IF NOT EXISTS documents JSONB,
+                ADD COLUMN IF NOT EXISTS document_verified BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS document_verified_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS document_verified_by UUID REFERENCES users(id),
+                ADD COLUMN IF NOT EXISTS document_notes TEXT,
+                ADD COLUMN IF NOT EXISTS ownership_verified BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS ownership_verified_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS ownership_verified_by UUID REFERENCES users(id),
+                ADD COLUMN IF NOT EXISTS ownership_notes TEXT,
+                ADD COLUMN IF NOT EXISTS ownership_evidence JSONB,
+                ALTER COLUMN status SET DEFAULT 'pending_review';
+
+            ALTER TABLE claim_requests
+                ADD COLUMN IF NOT EXISTS documents JSONB,
+                ADD COLUMN IF NOT EXISTS document_verified BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS document_verified_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS document_verified_by UUID REFERENCES users(id),
+                ADD COLUMN IF NOT EXISTS document_notes TEXT,
+                ADD COLUMN IF NOT EXISTS ownership_verified BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS ownership_verified_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS ownership_verified_by UUID REFERENCES users(id),
+                ADD COLUMN IF NOT EXISTS ownership_notes TEXT,
+                ALTER COLUMN status SET DEFAULT 'pending_review';
 
             -- Indexes
             CREATE INDEX IF NOT EXISTS idx_users_role                       ON users(role);
@@ -873,6 +916,8 @@ const runMigrations = async () => {
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_by UUID;",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP;",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS flag_reason TEXT;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT false;",
+            "ALTER TABLE reviews ALTER COLUMN is_anonymous SET DEFAULT false;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS time_limit_minutes INTEGER DEFAULT 120;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS started_at TIMESTAMP;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;",

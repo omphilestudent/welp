@@ -319,6 +319,14 @@ const formatPlanLabel = (plan = '') => {
     return plan.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
+const APPLICATION_STATUS_LABELS = {
+    pending_review: 'Pending Review',
+    under_verification: 'Under Verification',
+    awaiting_information: 'Additional Information Required',
+    approved: 'Approved',
+    rejected: 'Rejected'
+};
+
 const sendSubscriptionCancellationEmail = async ({ email, name, previousPlan, ownerType }) => {
     if (!email) {
         console.log('No recipient email provided for subscription cancellation notice');
@@ -379,6 +387,78 @@ const sendMarketingEmail = async ({ to, subject, html, text }) => {
     return sendEmail({ to, subject, html, text });
 };
 
+const formatApplicationTypeLabel = (type) => type === 'business' ? 'business claim' : 'psychologist application';
+
+const sendApplicationStatusEmail = async ({ email, name, type, status, notes }) => {
+    if (!email) return { success: false, reason: 'missing-email' };
+    const normalizedStatus = APPLICATION_STATUS_LABELS[status] || status;
+    const greeting = name ? `Hi ${name}` : 'Hello';
+    const typeLabel = formatApplicationTypeLabel(type);
+    const subjectByStatus = {
+        approved: `Your ${typeLabel} has been approved`,
+        rejected: `Update on your ${typeLabel}`,
+        awaiting_information: `More information needed for your ${typeLabel}`
+    };
+    const subject = subjectByStatus[status] || `Status updated for your ${typeLabel}`;
+    const statusMessage = status === 'approved'
+        ? 'We have completed our review and unlocked full access to your dashboard.'
+        : status === 'rejected'
+            ? 'After reviewing your documents we were unable to approve this submission.'
+            : 'We need a little more information to complete your verification.';
+
+    const actionLine = status === 'awaiting_information'
+        ? 'Please reply to this email with the requested documents or upload them from your dashboard.'
+        : status === 'approved'
+            ? 'You can now log in to Welp and start using all features immediately.'
+            : 'You are welcome to re-apply once the outstanding items are resolved.';
+
+    const detailBlock = notes
+        ? `<p style="margin:16px 0;padding:12px 16px;background:#f5f5f5;border-radius:8px;"><strong>Reviewer notes:</strong><br>${notes}</p>`
+        : '';
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <p>${greeting},</p>
+            <p>The status of your ${typeLabel} is now <strong>${normalizedStatus}</strong>.</p>
+            <p>${statusMessage}</p>
+            ${detailBlock}
+            <p>${actionLine}</p>
+            <p style="margin-top:24px;">— The Welp Compliance Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+    const text = `${greeting},
+
+The status of your ${typeLabel} is now ${normalizedStatus}. ${statusMessage} ${notes ? `Notes: ${notes}.` : ''} ${actionLine}`;
+
+    if (!transporter) {
+        console.log('\n=== APPLICATION STATUS (DEV MODE) ===');
+        console.log(`To: ${email}`);
+        console.log(`Subject: ${subject}`);
+        console.log(text);
+        console.log('=====================================\n');
+        return { success: true, devMode: true };
+    }
+
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject,
+            html,
+            text
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to send application status email:', error.message);
+        return { success: false, error: error.message };
+    }
+};
+
 module.exports = {
     sendClaimInvitation,
     sendVerificationEmail,
@@ -387,5 +467,6 @@ module.exports = {
     sendKYCRejectionEmail,
     sendEmail,
     sendMarketingEmail,
-    sendSubscriptionCancellationEmail
+    sendSubscriptionCancellationEmail,
+    sendApplicationStatusEmail
 };

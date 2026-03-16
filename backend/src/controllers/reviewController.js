@@ -27,7 +27,7 @@ updateReviewsTable();
 
 const createReview = async (req, res) => {
     try {
-        const { companyId, rating, content, isPublic = true } = req.body;
+        const { companyId, rating, content, isPublic = true, isAnonymous = false } = req.body;
 
 
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -112,6 +112,7 @@ const createReview = async (req, res) => {
                 rating,
                 content,
                 is_public,
+                is_anonymous,
                 author_occupation,
                 author_workplace_id,
                 sentiment_label,
@@ -121,7 +122,7 @@ const createReview = async (req, res) => {
                 is_flagged,
                 flag_reason
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
              RETURNING *`,
             [
                 companyId,
@@ -129,6 +130,7 @@ const createReview = async (req, res) => {
                 rating,
                 content,
                 isPublic,
+                Boolean(isAnonymous),
                 user.rows[0]?.occupation,
                 user.rows[0]?.workplace_id,
                 sentiment.sentiment,
@@ -162,9 +164,14 @@ const createReview = async (req, res) => {
             [req.user.id]
         );
 
+        const authorRow = author.rows[0] || {};
+
         const reviewPayload = {
             ...review,
-            author: author.rows[0]
+            author: {
+                ...authorRow,
+                is_anonymous: Boolean(review.is_anonymous) || Boolean(authorRow?.is_anonymous)
+            }
         };
 
         await createAdminNotification({
@@ -224,7 +231,7 @@ const getCompanyReviews = async (req, res) => {
                  json_build_object(
                          'id', u.id,
                          'displayName', u.display_name,
-                         'isAnonymous', u.is_anonymous,
+                         'isAnonymous', COALESCE(r.is_anonymous, u.is_anonymous),
                          'occupation', r.author_occupation,
                          'avatarUrl', u.avatar_url,
                          'workplace', CASE
@@ -474,15 +481,16 @@ const getMyReviews = async (req, res) => {
                          'name', c.name,
                          'logo_url', c.logo_url
                  ) as company,
-                 json_build_object(
-                         'id', u.id,
-                         'displayName', u.display_name,
-                         'occupation', u.occupation,
-                         'avatarUrl', u.avatar_url,
-                         'workplace', CASE
-                                          WHEN u.workplace_id IS NOT NULL THEN
-                                              json_build_object(
-                                                      'id', w.id,
+                json_build_object(
+                        'id', u.id,
+                        'displayName', u.display_name,
+                        'isAnonymous', COALESCE(r.is_anonymous, u.is_anonymous),
+                        'occupation', u.occupation,
+                        'avatarUrl', u.avatar_url,
+                        'workplace', CASE
+                                         WHEN u.workplace_id IS NOT NULL THEN
+                                             json_build_object(
+                                                     'id', w.id,
                                                       'name', w.name,
                                                       'logo_url', w.logo_url
                                               )
@@ -528,12 +536,12 @@ const getReviewById = async (req, res) => {
         const result = await query(
             `SELECT
                  r.*,
-                 json_build_object(
-                         'id', u.id,
-                         'displayName', u.display_name,
-                         'isAnonymous', u.is_anonymous,
-                         'occupation', r.author_occupation,
-                         'avatarUrl', u.avatar_url,
+                json_build_object(
+                        'id', u.id,
+                        'displayName', u.display_name,
+                        'isAnonymous', COALESCE(r.is_anonymous, u.is_anonymous),
+                        'occupation', r.author_occupation,
+                        'avatarUrl', u.avatar_url,
                          'workplace', CASE
                                           WHEN r.author_workplace_id IS NOT NULL THEN
                                               json_build_object(

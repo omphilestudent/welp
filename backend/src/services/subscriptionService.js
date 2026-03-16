@@ -234,6 +234,7 @@ const buildFallbackPayload = (audience = 'user') => {
     const chatMinutes = limits.chatMinutes ?? (audience === 'user' ? 30 : 0);
     const callMinutes = limits.callMinutes ?? 0;
     const apiLimit = limits.apiLimit ?? null;
+    const symbol = '$';
 
     return {
         planCode: fallbackPlanCode,
@@ -242,8 +243,11 @@ const buildFallbackPayload = (audience = 'user') => {
         callMinutes,
         apiLimit,
         ads: limits.ads || {},
-        currencySymbol: '$',
-        priceFormatted: '$0.00',
+        displayName: limits.displayName || fallbackPlanCode,
+        currencyCode: DEFAULT_CURRENCY,
+        currencySymbol: symbol,
+        amountMinor: 0,
+        priceFormatted: `${symbol}0.00`,
         nextBillingDate: null,
         status: 'free'
     };
@@ -262,7 +266,10 @@ const getPlanPayload = async (record, audience) => {
     const apiLimit = limits.api?.callsPerDay ?? plan?.apiLimit ?? planLimits.apiLimit ?? null;
     const adsLimits = limits.ads || plan?.ads || planLimits.ads || {};
     const currencySymbol = plan?.currencySymbol || record.metadata?.currencySymbol || '$';
+    const currencyCode = plan?.currencyCode || record.currency_code || DEFAULT_CURRENCY;
+    const amountMinor = Number(record.amount_minor ?? plan?.amountMinor ?? 0);
     const planTier = plan?.tier || planLimits.tier || 'free';
+    const displayName = plan?.displayName || planLimits.displayName || plan?.metadata?.displayName || record.plan_code;
 
     return {
         planCode: record.plan_code,
@@ -273,8 +280,11 @@ const getPlanPayload = async (record, audience) => {
         callMinutes,
         apiLimit,
         ads: adsLimits,
+        displayName,
+        currencyCode,
         currencySymbol,
-        priceFormatted: plan?.priceFormatted || formatPrice(record.amount_minor, currencySymbol),
+        amountMinor,
+        priceFormatted: plan?.priceFormatted || formatPrice(amountMinor, currencySymbol),
         nextBillingDate: record.ends_at,
         status: record.status,
         metadata: record.metadata,

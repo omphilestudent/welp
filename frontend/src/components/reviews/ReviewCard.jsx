@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import StarRating from './StarRating';
@@ -8,10 +9,12 @@ import toast from 'react-hot-toast';
 
 const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [showReplyForm, setShowReplyForm] = useState(false);
     const [replyContent, setReplyContent] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [messaging, setMessaging] = useState(false);
 
     const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 
@@ -24,7 +27,11 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
     };
 
     const reviewCreatedAt = review.created_at || review.createdAt;
-    const isAuthorAnonymous = review.author?.isAnonymous || review.author?.is_anonymous;
+    const isAuthorAnonymous = Boolean(
+        review.is_anonymous ||
+        review.author?.isAnonymous ||
+        review.author?.is_anonymous
+    );
     const reviewerRoleRaw = review.author?.role || review.author_role || '';
     const reviewerRole = !isAuthorAnonymous && reviewerRoleRaw
         ? reviewerRoleRaw.replace(/_/g, ' ')
@@ -74,18 +81,25 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
             toast.error('This reviewer cannot be messaged yet.');
             return;
         }
-        if (review.author?.isAnonymous || review.author?.is_anonymous) {
+        if (isAuthorAnonymous) {
             toast.error('Anonymous reviewers cannot be messaged.');
             return;
         }
+        if (messaging) return;
         try {
-            await api.post('/messages/conversations/request', {
+            setMessaging(true);
+            const { data } = await api.post('/messages/conversations/request', {
                 employeeId: authorId,
                 initialMessage: 'Hello, I read your review and wanted to offer private support.'
             });
             toast.success('Private message request sent');
+            if (data?.id) {
+                navigate(`/messages?conversation=${data.id}`);
+            }
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to send private message');
+        } finally {
+            setMessaging(false);
         }
     };
 
@@ -128,8 +142,12 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
 
             {user?.role === 'psychologist' && (
                 <div className="review-actions">
-                    <button onClick={handlePrivateMessage} className="btn btn-primary btn-small">
-                        Private encrypted message
+                    <button
+                        onClick={handlePrivateMessage}
+                        className="btn btn-primary btn-small"
+                        disabled={messaging}
+                    >
+                        {messaging ? 'Sending...' : 'Private encrypted message'}
                     </button>
                 </div>
             )}

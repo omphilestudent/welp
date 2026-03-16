@@ -2,6 +2,13 @@
 const { query } = require('../utils/database');
 const bcrypt = require('bcryptjs');
 const { getAdminNotifications, markAdminNotificationRead } = require('../utils/adminNotifications');
+const { recordAuditLog } = require('../utils/auditLogger');
+const {
+    listApplications,
+    applyApplicationAction,
+    STATUS_LABELS: APPLICATION_STATUS_LABELS
+} = require('../services/applicationWorkflowService');
+const { sendApplicationStatusEmail } = require('../utils/emailService');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const tableExists = async (tableName) => {
@@ -41,6 +48,42 @@ const getTableColumns = async (tableName) => {
         return [];
     }
 };
+
+const APPLICATION_STATUS_ALIASES = {
+    pending: 'pending_review',
+    pending_review: 'pending_review',
+    review: 'pending_review',
+    verifying: 'under_verification',
+    verification: 'under_verification',
+    under_verification: 'under_verification',
+    awaiting: 'awaiting_information',
+    awaiting_information: 'awaiting_information',
+    info: 'awaiting_information',
+    approved: 'approved',
+    rejected: 'rejected',
+    all: 'all'
+};
+
+const normalizeApplicationStatusFilter = (value) => {
+    if (!value) return 'pending_review';
+    const key = String(value).toLowerCase().trim();
+    return APPLICATION_STATUS_ALIASES[key] || 'all';
+};
+
+const normalizeApplicationTypeFilter = (value) => {
+    if (!value || value === 'all') return 'all';
+    const key = String(value).toLowerCase().trim();
+    return ['psychologist', 'business'].includes(key) ? key : 'all';
+};
+
+const APPLICATION_ACTIONS = new Set([
+    'verify_documents',
+    'verify_ownership',
+    'verify_experience',
+    'request_info',
+    'approve',
+    'reject'
+]);
 
 const logAdminAction = async (adminId, action, entityType, entityId, oldValues, newValues) => {
     try {
@@ -778,86 +821,10 @@ const markNotificationRead = async (req, res) => {
 
 const getRegistrationApplications = async (req, res) => {
     try {
-        const { status = 'all', type = 'all' } = req.query;
-
-        const apps = [];
-
-        if (type === 'all' || type === 'psychologist') {
-            if (await tableExists('psychologist_applications')) {
-                const columns = await getTableColumns('psychologist_applications');
-                const hasUserId = columns.includes('user_id');
-                const hasEmail = columns.includes('email');
-                const hasFullName = columns.includes('full_name');
-
-                const baseWhere = status !== 'all' ? 'WHERE pa.status = $1' : '';
-                const params = status !== 'all' ? [status] : [];
-
-                if (hasUserId) {
-                    const result = await query(
-                        `SELECT pa.*, u.email as user_email, u.display_name as user_name
-                         FROM psychologist_applications pa
-                         JOIN users u ON pa.user_id = u.id
-                         ${baseWhere}
-                         ORDER BY pa.created_at DESC`,
-                        params
-                    );
-                    result.rows.forEach(r => apps.push({ ...r, application_type: 'psychologist' }));
-                } else {
-                    const result = await query(
-                        `SELECT pa.*
-                         FROM psychologist_applications pa
-                         ${baseWhere}
-                         ORDER BY pa.created_at DESC`,
-                        params
-                    );
-                    result.rows.forEach(r => apps.push({
-                        ...r,
-                        user_email: hasEmail ? r.email : null,
-                        user_name: hasFullName ? r.full_name : null,
-                        application_type: 'psychologist'
-                    }));
-                }
-            }
-        }
-
-        if (type === 'all' || type === 'business') {
-            if (await tableExists('business_applications')) {
-                const columns = await getTableColumns('business_applications');
-                const hasUserId = columns.includes('user_id');
-                const hasEmail = columns.includes('email');
-
-                const baseWhere = status !== 'all' ? 'WHERE ba.status = $1' : '';
-                const params = status !== 'all' ? [status] : [];
-
-                if (hasUserId) {
-                    const result = await query(
-                        `SELECT ba.*, u.email as user_email, u.display_name as user_name
-                         FROM business_applications ba
-                         JOIN users u ON ba.user_id = u.id
-                         ${baseWhere}
-                         ORDER BY ba.created_at DESC`,
-                        params
-                    );
-                    result.rows.forEach(r => apps.push({ ...r, application_type: 'business' }));
-                } else {
-                    const result = await query(
-                        `SELECT ba.*
-                         FROM business_applications ba
-                         ${baseWhere}
-                         ORDER BY ba.created_at DESC`,
-                        params
-                    );
-                    result.rows.forEach(r => apps.push({
-                        ...r,
-                        user_email: hasEmail ? r.email : null,
-                        user_name: r.company_name || null,
-                        application_type: 'business'
-                    }));
-                }
-            }
-        }
-
-        res.json({ applications: apps });
+        const normalizedType = normalizeApplicationTypeFilter(req.query.type || 'all');
+        const normalizedStatus = normalizeApplicationStatusFilter(req.query.status || 'pending_review');
+        const applications = await listApplications({ type: normalizedType, status: normalizedStatus });
+        res.json({ applications });
     } catch (error) {
         console.error('Get registration applications error:', error);
         res.status(500).json({ error: 'Failed to fetch applications' });
@@ -867,81 +834,88 @@ const getRegistrationApplications = async (req, res) => {
 const reviewRegistrationApplication = async (req, res) => {
     try {
         const { id } = req.params;
-        const { type, status, notes } = req.body;
-
-        if (!['psychologist', 'business'].includes(type)) {
+        const normalizedType = normalizeApplicationTypeFilter(req.body.type);
+        if (normalizedType === 'all') {
             return res.status(400).json({ error: 'Invalid application type' });
         }
-        if (!['approved', 'rejected'].includes(status)) {
-            return res.status(400).json({ error: 'Invalid status' });
+
+        let actionInput = req.body.action || req.body.status;
+        if (!actionInput) {
+            return res.status(400).json({ error: 'Action is required' });
+        }
+        let action = String(actionInput).toLowerCase().trim();
+        if (action === 'approved') action = 'approve';
+        if (action === 'rejected') action = 'reject';
+        if (!APPLICATION_ACTIONS.has(action)) {
+            return res.status(400).json({ error: 'Invalid action for this application' });
         }
 
-        const table = type === 'psychologist' ? 'psychologist_applications' : 'business_applications';
-        if (!await tableExists(table)) {
-            return res.status(404).json({ error: 'Applications table not found' });
-        }
+        const notes = req.body.notes || req.body.adminNotes || null;
 
-        await query(
-            `ALTER TABLE ${table}
-                ADD COLUMN IF NOT EXISTS admin_notes TEXT,
-                ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
-                ADD COLUMN IF NOT EXISTS reviewed_by UUID`
-        );
+        const result = await applyApplicationAction({
+            type: normalizedType,
+            id,
+            action,
+            adminId: req.user.id,
+            notes
+        });
 
-        const appResult = await query(
-            `UPDATE ${table}
-             SET status = $1,
-                 admin_notes = $2,
-                 reviewed_at = CURRENT_TIMESTAMP,
-                 reviewed_by = $3,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $4
-             RETURNING *`,
-            [status, notes || null, req.user.id, id]
-        );
-
-        if (!appResult.rows.length) {
+        if (!result) {
             return res.status(404).json({ error: 'Application not found' });
         }
 
-        const app = appResult.rows[0];
+        const summary = result.summary;
+        const applicantId = summary?.applicantId || result.updated?.user_id || null;
+        const applicantEmail = summary?.applicant_email || result.updated?.user_email || null;
 
-        const hasIsActive = await columnExists('users', 'is_active');
-        const hasIsVerified = await columnExists('users', 'is_verified');
-        const hasStatus = await columnExists('users', 'status');
+        if (applicantId) {
+            const hasIsActive = await columnExists('users', 'is_active');
+            const hasIsVerified = await columnExists('users', 'is_verified');
+            const hasStatus = await columnExists('users', 'status');
 
-        let userId = app.user_id;
-        if (!userId) {
-            const columns = await getTableColumns(table);
-            const emailColumn = columns.includes('email') ? 'email' : null;
-            const fallbackEmail = emailColumn ? app[emailColumn] : null;
-            if (fallbackEmail) {
-                const userResult = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [fallbackEmail]);
-                userId = userResult.rows[0]?.id;
-            }
-        }
-
-        if (status === 'approved') {
-            const updates = [];
-            const params = [];
-            let idx = 1;
-
-            if (hasIsActive) { updates.push(`is_active = $${idx++}`); params.push(true); }
-            if (hasIsVerified) { updates.push(`is_verified = $${idx++}`); params.push(true); }
-            if (hasStatus) { updates.push(`status = $${idx++}`); params.push('active'); }
-            if (updates.length > 0) {
-                if (userId) {
-                    params.push(userId);
+            if (summary?.status === 'approved') {
+                const updates = [];
+                const params = [];
+                let idx = 1;
+                if (hasIsActive) { updates.push(`is_active = $${idx++}`); params.push(true); }
+                if (hasIsVerified) { updates.push(`is_verified = $${idx++}`); params.push(true); }
+                if (hasStatus) { updates.push(`status = $${idx++}`); params.push('active'); }
+                if (updates.length) {
+                    params.push(applicantId);
                     await query(`UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`, params);
                 }
+            } else if (summary?.status === 'rejected' && hasStatus) {
+                await query('UPDATE users SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', ['rejected', applicantId]);
             }
         }
 
-        if (status === 'rejected' && hasStatus && userId) {
-            await query('UPDATE users SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', ['rejected', userId]);
+        await recordAuditLog({
+            userId: applicantId,
+            adminId: req.user.id,
+            actorRole: req.user.role,
+            action: `application.${action}`,
+            entityType: `${normalizedType}_application`,
+            entityId: id,
+            oldValues: { status: result.previous?.status },
+            newValues: { status: summary?.status },
+            metadata: { applicationType: normalizedType }
+        });
+
+        if (['approve', 'reject', 'request_info'].includes(action) && applicantEmail) {
+            try {
+                await sendApplicationStatusEmail({
+                    email: applicantEmail,
+                    name: summary.applicant_name,
+                    type: normalizedType,
+                    status: summary.status,
+                    notes
+                });
+            } catch (emailError) {
+                console.warn('Application status email failed:', emailError.message);
+            }
         }
 
-        res.json({ success: true, application: app });
+        res.json({ success: true, application: summary });
     } catch (error) {
         console.error('Review registration application error:', error);
         res.status(500).json({ error: 'Failed to update application' });

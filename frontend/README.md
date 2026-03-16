@@ -24,3 +24,25 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and update the values for your environment:
+
+```bash
+cp .env.example .env
+# edit VITE_API_URL to point at your backend, e.g. https://welp-4ipy.onrender.com/api
+```
+
+`VITE_API_URL` is baked into the bundle at build time, so remember to set it wherever the app is deployed (Render, Vercel, etc.).
+
+## Deploying to Render
+
+1. Create a new **Static Site** (or Web Service) in Render that uses this repository.
+2. Set **Root Directory** to `frontend`.
+3. Set the build command to `npm install && npm run build`.
+4. Set the publish directory to `dist`.
+5. Add an environment variable `VITE_API_URL=https://welp-4ipy.onrender.com/api` (or the appropriate backend URL).
+6. For a Web Service instead of Static Site, use the start command `npm run preview -- --host 0.0.0.0 --port $PORT`.
+
+The build script already runs `node ./node_modules/vite/bin/vite.js build`, which works reliably in Render's sandbox.

@@ -13,6 +13,7 @@ const {
     getActiveSubscription,
     getPlanPayload
 } = require('../services/subscriptionService');
+const { getLatestApplicationStatusForUser } = require('../services/applicationWorkflowService');
 
 const ROLE_TO_OWNER = {
     employee: 'user',
@@ -399,12 +400,14 @@ const registerPsychologist = async (req, res) => {
         const psychOwnerType = ROLE_TO_OWNER[String(user.role || 'employee').toLowerCase()] || 'user';
         const psychSubscriptionRecord = await getActiveSubscription(psychOwnerType, user.id);
         const psychSubscriptionData = await getPlanPayload(psychSubscriptionRecord, psychOwnerType);
+        const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
 
         return res.status(201).json({
             success: true,
             message: 'Application submitted successfully. You will be notified by email once reviewed.',
             userId: user.id,
-            subscription: psychSubscriptionData
+            subscription: psychSubscriptionData,
+            applicationStatus
         });
     } catch (error) {
         console.error('Register psychologist error:', error);
@@ -619,12 +622,14 @@ const registerBusiness = async (req, res) => {
         const businessOwnerType = ROLE_TO_OWNER[String(user.role || 'employee').toLowerCase()] || 'user';
         const businessSubscriptionRecord = await getActiveSubscription(businessOwnerType, user.id);
         const businessSubscriptionData = await getPlanPayload(businessSubscriptionRecord, businessOwnerType);
+        const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
 
         return res.status(201).json({
             success: true,
             message: 'Application submitted successfully. Our team will review your information and reach out within 1–2 business days.',
             userId: user.id,
-            subscription: businessSubscriptionData
+            subscription: businessSubscriptionData,
+            applicationStatus
         });
     } catch (error) {
         console.error('Register business error:', error);
@@ -701,6 +706,8 @@ const login = async (req, res) => {
             cookieOptions.maxAge = rememberDays * 24 * 60 * 60 * 1000;
         }
 
+        const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
+
         console.info('Login success', {
             email: loginEmail,
             role: normalizedRole,
@@ -718,7 +725,8 @@ const login = async (req, res) => {
                 email: user.email,
                 displayName: user.display_name,
                 role: user.role,
-                subscription: subscriptionPayload
+                subscription: subscriptionPayload,
+                applicationStatus
             }
         });
     } catch (error) {
@@ -740,6 +748,7 @@ const getMe = async (req, res) => {
         const ownerType = ROLE_TO_OWNER[normalizedRole] || 'user';
         const planRecord = await getActiveSubscription(ownerType, user.id);
         const subscriptionPayload = await getPlanPayload(planRecord, ownerType);
+        const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
 
         return res.json({
             success: true,
@@ -753,7 +762,8 @@ const getMe = async (req, res) => {
                 createdAt: user.created_at,
                 avatarUrl: user.avatar_url,
                 avatar_url: user.avatar_url,
-                subscription: subscriptionPayload
+                subscription: subscriptionPayload,
+                applicationStatus
             }
         });
     } catch (error) {
@@ -817,6 +827,7 @@ const refreshToken = async (req, res) => {
         const ownerType = ROLE_TO_OWNER[normalizedRole] || 'user';
         const planRecord = await getActiveSubscription(ownerType, user.id);
         const subscriptionInfo = await getPlanPayload(planRecord, ownerType);
+        const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
 
         return res.json({
             success: true,
@@ -826,7 +837,8 @@ const refreshToken = async (req, res) => {
                 email: user.email,
                 displayName: user.display_name,
                 role: user.role,
-                subscription: subscriptionInfo
+                subscription: subscriptionInfo,
+                applicationStatus
             }
         });
     } catch (error) {
