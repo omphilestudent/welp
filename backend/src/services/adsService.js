@@ -231,7 +231,24 @@ const getBusinessOwner = async (businessId) => {
          WHERE b.id = $1`,
         [businessId]
     );
-    return result.rows[0] || null;
+    if (result.rows[0]) {
+        return result.rows[0];
+    }
+
+    const legacy = await query(
+        `SELECT c.id,
+                c.name,
+                'base'::subscription_tier_business AS subscription_tier,
+                NULL::timestamptz               AS subscription_expires,
+                owner.id                        AS owner_user_id,
+                owner.email,
+                owner.display_name
+         FROM companies c
+         LEFT JOIN users owner ON owner.id = COALESCE(c.claimed_by, c.created_by_user_id)
+         WHERE c.id = $1`,
+        [businessId]
+    );
+    return legacy.rows[0] || null;
 };
 
 const getBusinessAdCapabilities = async ({ userId, email }) => {
@@ -330,10 +347,10 @@ const adminListAds = async (filters = {}) => {
     let queryStr = `
         SELECT 
             c.*,
-            b.name AS business_name,
-            b.subscription_tier,
-            u.email AS owner_email,
-            u.display_name AS owner_name,
+            COALESCE(b.name, comp.name) AS business_name,
+            COALESCE(b.subscription_tier, 'base') AS subscription_tier,
+            owner.email AS owner_email,
+            owner.display_name AS owner_name,
             (
                 SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                 FROM ad_placements ap
@@ -343,8 +360,9 @@ const adminListAds = async (filters = {}) => {
             COALESCE(c.clicks, 0) AS clicks,
             COALESCE(c.spend_minor, 0) AS spend_minor
         FROM advertising_campaigns c
-        JOIN businesses b ON b.id = c.business_id
-        LEFT JOIN users u ON u.id = b.owner_user_id
+        LEFT JOIN businesses b ON b.id = c.business_id
+        LEFT JOIN companies comp ON comp.id = c.business_id
+        LEFT JOIN users owner ON owner.id = COALESCE(b.owner_user_id, comp.claimed_by, comp.created_by_user_id)
         WHERE 1=1
     `;
 
@@ -374,13 +392,13 @@ const adminListAds = async (filters = {}) => {
     }
 
     if (filters.tier) {
-        queryStr += ` AND b.subscription_tier = $${paramIndex}`;
+        queryStr += ` AND COALESCE(b.subscription_tier, 'base') = $${paramIndex}`;
         params.push(filters.tier);
         paramIndex++;
     }
 
     if (filters.search) {
-        queryStr += ` AND (b.name ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`;
+        queryStr += ` AND (COALESCE(b.name, comp.name) ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex} OR owner.email ILIKE $${paramIndex})`;
         params.push(`%${filters.search}%`);
         paramIndex++;
     }
@@ -419,13 +437,13 @@ const adminGetAdDetails = async (adId) => {
         `
         SELECT 
             c.*,
-            b.name AS business_name,
-            b.subscription_tier,
+            COALESCE(b.name, comp.name) AS business_name,
+            COALESCE(b.subscription_tier, 'base') AS subscription_tier,
             b.subscription_expires,
-            u.id AS owner_user_id,
-            u.email AS owner_email,
-            u.display_name AS owner_name,
-            u.phone AS owner_phone,
+            owner.id AS owner_user_id,
+            owner.email AS owner_email,
+            owner.display_name AS owner_name,
+            owner.phone AS owner_phone,
             (
                 SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                 FROM ad_placements ap
@@ -441,8 +459,9 @@ const adminGetAdDetails = async (adId) => {
                 ELSE NULL
             END AS reviewed_by_name
         FROM advertising_campaigns c
-        JOIN businesses b ON b.id = c.business_id
-        LEFT JOIN users u ON u.id = b.owner_user_id
+        LEFT JOIN businesses b ON b.id = c.business_id
+        LEFT JOIN companies comp ON comp.id = c.business_id
+        LEFT JOIN users owner ON owner.id = COALESCE(b.owner_user_id, comp.claimed_by, comp.created_by_user_id)
         WHERE c.id = $1
         `,
         [adId]

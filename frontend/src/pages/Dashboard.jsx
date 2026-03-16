@@ -1045,13 +1045,15 @@ const Dashboard = () => {
 
                 <div className="dashboard-sponsored-band">
                     <SponsoredCard
-                        placement="dashboard_primary"
+                        placement="business_profile"
                         location={selectedCompany?.city || editCompanyForm.city || user?.city || ''}
                         industry={selectedCompany?.industry || user?.industry || ''}
+                        rotateIntervalMs={42000}
                     />
                     <SponsoredCard
-                        placement="dashboard_growth"
+                        placement="search_results"
                         behaviors={[userRole, planTier]}
+                        rotateIntervalMs={56000}
                     />
                 </div>
 

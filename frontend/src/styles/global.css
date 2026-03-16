@@ -133,3 +133,19 @@ button {
     background-size: 1000px 100%;
     animation: shimmer 2s infinite;
 }
+
+.ads-rail {
+    padding: 2rem 0;
+}
+
+.ads-rail__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+}
+
+.messages-sponsored-slot {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}

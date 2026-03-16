@@ -1100,9 +1100,15 @@ const Messages = () => {
 
                             <section className="messages-sponsored-slot">
                                 <SponsoredCard
-                                    placement="messages_support"
+                                    placement="search_results"
                                     location={user?.city || availablePsychologists[0]?.location || ''}
                                     industry={featuredSpecialization || user?.industry || ''}
+                                    rotateIntervalMs={50000}
+                                />
+                                <SponsoredCard
+                                    placement="category"
+                                    behaviors={[userRole, featuredSpecialization].filter(Boolean)}
+                                    rotateIntervalMs={65000}
                                 />
                             </section>
                         </div>

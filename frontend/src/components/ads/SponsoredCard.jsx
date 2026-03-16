@@ -5,7 +5,7 @@ import './SponsoredCard.css';
 const STATIC_REDIRECT_URL = 'https://welp.africa/static';
 const STATIC_AD = {
     id: 'welp-care-static',
-    name: 'Bacause We Care',
+    name: 'Because We Care',
     advertiser: 'Welp Camping',
     media_type: 'image',
     asset_url: '/logo-1.png',
@@ -20,9 +20,11 @@ const SponsoredCard = ({
     placement = 'recommended',
     location = '',
     industry = '',
-    behaviors = []
+    behaviors = [],
+    rotateIntervalMs = 45000
 }) => {
-    const [campaign, setCampaign] = useState(null);
+    const [campaigns, setCampaigns] = useState([]);
+    const [activeIndex, setActiveIndex] = useState(0);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -32,15 +34,16 @@ const SponsoredCard = ({
             try {
                 const { data } = await fetchPlacementAds({ placement, location, industry, behaviors });
                 if (!isMounted) return;
-                if (data.campaigns?.length) {
-                    setCampaign(data.campaigns[0]);
-                } else {
-                    setCampaign({ ...STATIC_AD });
-                }
+                const available = Array.isArray(data?.campaigns) && data.campaigns.length
+                    ? data.campaigns
+                    : [{ ...STATIC_AD }];
+                setCampaigns(available);
+                setActiveIndex(0);
             } catch (error) {
                 console.error('Failed to load ads', error);
                 if (isMounted) {
-                    setCampaign({ ...STATIC_AD });
+                    setCampaigns([{ ...STATIC_AD }]);
+                    setActiveIndex(0);
                 }
             } finally {
                 if (isMounted) setLoading(false);
@@ -51,6 +54,16 @@ const SponsoredCard = ({
             isMounted = false;
         };
     }, [placement, location, industry, behaviors]);
+
+    useEffect(() => {
+        if (campaigns.length <= 1) return undefined;
+        const interval = setInterval(() => {
+            setActiveIndex((prev) => (prev + 1) % campaigns.length);
+        }, Math.max(rotateIntervalMs, 10000));
+        return () => clearInterval(interval);
+    }, [campaigns, rotateIntervalMs]);
+
+    const campaign = campaigns[activeIndex] || null;
 
     useEffect(() => {
         if (!campaign || campaign.__static) return;

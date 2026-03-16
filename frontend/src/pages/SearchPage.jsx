@@ -7,6 +7,7 @@ import CompanySearch from '../components/companies/CompanySearch';
 import Loading from '../components/common/Loading';
 import { FaBuilding } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
+import SponsoredCard from '../components/ads/SponsoredCard';
 
 const SearchPage = () => {
     const [searchParams] = useSearchParams();
@@ -194,6 +195,22 @@ const SearchPage = () => {
                             </div>
                         ))}
                     </div>
+                )}
+
+                {!loading && (
+                    <section className="ads-rail">
+                        <div className="ads-rail__grid">
+                            <SponsoredCard
+                                placement="search_results"
+                                rotateIntervalMs={48000}
+                            />
+                            <SponsoredCard
+                                placement="category"
+                                rotateIntervalMs={60000}
+                                behaviors={[query].filter(Boolean)}
+                            />
+                        </div>
+                    </section>
                 )}
 
                 {!loading && companies.length === 0 && (

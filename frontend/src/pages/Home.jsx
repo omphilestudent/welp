@@ -93,9 +93,12 @@ const Home = () => {
                 </div>
             </section>
 
-            <div className="container">
-                <SponsoredCard placement="recommended" />
-            </div>
+            <section className="ads-rail">
+                <div className="container ads-rail__grid">
+                    <SponsoredCard placement="recommended" rotateIntervalMs={40000} />
+                    <SponsoredCard placement="search_results" rotateIntervalMs={52000} />
+                </div>
+            </section>
 
             {}
             <section className="companies-section">
@@ -119,6 +122,12 @@ const Home = () => {
                             View All Companies
                         </button>
                     </div>
+                </div>
+            </section>
+
+            <section className="ads-rail">
+                <div className="container ads-rail__grid">
+                    <SponsoredCard placement="business_profile" rotateIntervalMs={60000} />
                 </div>
             </section>
 
