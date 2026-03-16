@@ -33,6 +33,12 @@ const resolveMediaUrl = (url) => {
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
+const VERIFICATION_STEP_LABELS = {
+    documents: 'Document verification',
+    ownership: 'Ownership confirmation',
+    experience: 'Experience verification'
+};
+
 /* ─────────────────────────────────────────────
    Star Rating Display
 ───────────────────────────────────────────── */
@@ -383,6 +389,7 @@ const Dashboard = () => {
     const premiumExceptionActive = normalizedEmail === 'omphilemohlala@welp.com';
     const subscription = user?.subscription;
     const userRole = user?.role;
+    const applicationStatus = user?.applicationStatus || user?.application_status || null;
     const planTier = (subscription?.plan_tier || subscription?.planTier || subscription?.tier || '').toLowerCase();
     const planCode = (subscription?.planCode || subscription?.plan_code || '').toLowerCase();
     const planTierIsPremium = planTier === 'premium';
@@ -1004,6 +1011,15 @@ const Dashboard = () => {
 
     const outgoingRequests = pendingRequests.filter((r) => r.initial_message?.senderId === user?.id);
     const incomingRequests = pendingRequests.filter((r) => r.initial_message?.senderId && r.initial_message?.senderId !== user?.id);
+    const shouldShowApplicationBanner = Boolean(
+        applicationStatus && ['business', 'psychologist'].includes((userRole || '').toLowerCase())
+    );
+    const outstandingSteps = shouldShowApplicationBanner && applicationStatus?.checklist
+        ? Object.entries(applicationStatus.checklist).filter(([, step]) => !step.verified)
+        : [];
+    const lastTimelineEvent = applicationStatus?.timeline?.length
+        ? applicationStatus.timeline[applicationStatus.timeline.length - 1]
+        : null;
 
     /* ── Analytics summary stats ── */
     const avgRating = companyAnalytics?.averageRating
@@ -1034,6 +1050,66 @@ const Dashboard = () => {
                 </div>
 
                 {error && <div className="alert alert-error">{error}</div>}
+                {shouldShowApplicationBanner && applicationStatus && (
+                    <div
+                        className="application-status-card"
+                        style={{
+                            marginBottom: '1.5rem',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '1.25rem',
+                            background: '#f8fafc'
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div>
+                                <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>Verification status</p>
+                                <h3 style={{ margin: '0.25rem 0' }}>{applicationStatus.statusLabel}</h3>
+                                <p style={{ margin: 0, color: '#475569' }}>
+                                    Submitted {applicationStatus.submittedAt ? format(new Date(applicationStatus.submittedAt), 'MMM d, yyyy') : '—'} · {applicationStatus.profile_type}
+                                </p>
+                            </div>
+                            <div style={{ minWidth: '200px' }}>
+                                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Checklist progress</span>
+                                <div style={{ marginTop: '0.35rem', height: '8px', background: '#e2e8f0', borderRadius: '999px' }}>
+                                    <div
+                                        style={{
+                                            width: `${applicationStatus.verificationProgress || 0}%`,
+                                            height: '100%',
+                                            borderRadius: '999px',
+                                            background: '#2563eb'
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ fontSize: '0.85rem', color: '#475569' }}>
+                                    {applicationStatus.verificationProgress || 0}% complete
+                                </div>
+                            </div>
+                        </div>
+                        {applicationStatus.adminNotes && (
+                            <div style={{ marginTop: '0.75rem', padding: '0.75rem 1rem', borderRadius: '12px', background: '#fff', border: '1px solid #e2e8f0' }}>
+                                <strong>Reviewer notes:</strong> {applicationStatus.adminNotes}
+                            </div>
+                        )}
+                        <div style={{ marginTop: '0.75rem' }}>
+                            <strong>Next steps:</strong>
+                            {outstandingSteps.length > 0 ? (
+                                <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.25rem', color: '#475569' }}>
+                                    {outstandingSteps.map(([key]) => (
+                                        <li key={key}>{VERIFICATION_STEP_LABELS[key] || key}</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p style={{ margin: '0.35rem 0 0', color: '#475569' }}>All verification steps are complete. Our team will finalize your application shortly.</p>
+                            )}
+                        </div>
+                        {lastTimelineEvent && (
+                            <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+                                Last update: {lastTimelineEvent.label} on {lastTimelineEvent.at ? format(new Date(lastTimelineEvent.at), 'MMM d, yyyy HH:mm') : '—'}
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 <ProfileSection
                     user={user}

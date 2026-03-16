@@ -21,3 +21,12 @@ npm run dev
 ## Environment
 
 Create `backend/.env` with required DB/auth variables before running the server.
+At minimum set:
+
+```dotenv
+PORT=5000
+DATABASE_URL=...
+JWT_SECRET=...
+# Comma-separated list of allowed frontend origins (production + local)
+FRONTEND_URL=https://welphub.onrender.com,http://localhost:5173,http://localhost:3000
+```

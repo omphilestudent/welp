@@ -27,6 +27,81 @@ const STARTER_PLAN_CODES = {
     business: 'business_base'
 };
 
+const APPLICATION_DOCUMENT_REQUIREMENTS = {
+    psychologist: {
+        license: 'Professional license or certification',
+        government_id: 'Government-issued identification',
+        qualification: 'Proof of qualifications'
+    },
+    business: {
+        registration_certificate: 'Business registration certificate',
+        ownership_proof: 'Proof of ownership or authorization'
+    }
+};
+
+const sanitizeDocumentType = (value, fallback = 'document') => {
+    if (!value) return fallback;
+    const normalized = String(value).toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+    return normalized || fallback;
+};
+
+const normalizeDocumentEntry = (doc, fallbackKey = '', configKey = 'document') => {
+    if (!doc) return null;
+    if (typeof doc === 'string') {
+        return normalizeDocumentEntry({ url: doc, type: fallbackKey || configKey }, fallbackKey, configKey);
+    }
+    const url = (doc.url || doc.href || doc.path || doc.location || '').trim();
+    if (!url) return null;
+    const type = sanitizeDocumentType(doc.type || doc.documentType || fallbackKey || configKey);
+    const label = doc.label || doc.name || doc.displayName || APPLICATION_DOCUMENT_REQUIREMENTS.psychologist?.[type]
+        || APPLICATION_DOCUMENT_REQUIREMENTS.business?.[type]
+        || (fallbackKey ? fallbackKey.replace(/_/g, ' ') : 'Document');
+    return {
+        id: doc.id || `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type,
+        label,
+        url,
+        filename: doc.filename || doc.originalName || null,
+        uploadedAt: doc.uploadedAt || doc.uploaded_at || new Date().toISOString()
+    };
+};
+
+const parseApplicationDocuments = (rawDocuments, defaultKey) => {
+    if (!rawDocuments) return [];
+    let source = rawDocuments;
+    if (typeof rawDocuments === 'string') {
+        try {
+            source = JSON.parse(rawDocuments);
+        } catch (error) {
+            console.warn('Failed to parse documents payload:', error.message);
+            return [];
+        }
+    }
+    if (Array.isArray(source)) {
+        return source
+            .map((doc, index) => normalizeDocumentEntry(doc, `doc_${index}`, defaultKey))
+            .filter(Boolean);
+    }
+    if (typeof source === 'object') {
+        return Object.entries(source)
+            .map(([key, value]) => normalizeDocumentEntry({ ...value, type: value?.type || key }, key, defaultKey))
+            .filter(Boolean);
+    }
+    return [];
+};
+
+const ensureRequiredDocuments = (documents, requirementMap = {}) => {
+    const missing = Object.entries(requirementMap)
+        .filter(([key]) => !documents.some((doc) => doc.type === key && doc.url))
+        .map(([, label]) => label);
+    if (missing.length > 0) {
+        const message = `Missing required documents: ${missing.join(', ')}`;
+        const error = new Error(message);
+        error.statusCode = 400;
+        throw error;
+    }
+};
+
 const tableExists = async (tableName) => {
     try {
         const result = await query(
@@ -134,7 +209,7 @@ const getUserByEmailForLogin = async (email) => {
     const hasStatus = await columnExists('users', 'status');
     const hasTokenVersion = await columnExists('users', 'token_version');
 
-    let selectPart = `SELECT id, email, password_hash, role, display_name`;
+    let selectPart = `SELECT id, email, password_hash, role, display_name, avatar_url`;
     selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
     selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
     selectPart += hasStatus ? `, status` : `, NULL::text as status`;
@@ -267,7 +342,8 @@ const registerPsychologist = async (req, res) => {
             sessionFormats,
             practiceLocation,
             bio,
-            website
+            website,
+            documents
         } = req.body;
 
         if (!email || !password) {
@@ -283,6 +359,13 @@ const registerPsychologist = async (req, res) => {
         const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
         if (existing.rows.length > 0) {
             return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+
+        const documentPayload = parseApplicationDocuments(documents, 'psychologist_document');
+        try {
+            ensureRequiredDocuments(documentPayload, APPLICATION_DOCUMENT_REQUIREMENTS.psychologist);
+        } catch (error) {
+            return res.status(error.statusCode || 400).json({ error: error.message });
         }
 
         const passwordHash = await bcrypt.hash(password, 12);
@@ -311,7 +394,7 @@ const registerPsychologist = async (req, res) => {
         if (hasStatus) {
             cols.push('status');
             placeholders.push(`$${idx}`);
-            params.push('pending');
+            params.push('pending_review');
             idx += 1;
         }
 
@@ -325,7 +408,7 @@ const registerPsychologist = async (req, res) => {
         if (appTableAvailable) {
             const appCols = ['user_id', 'status', 'license_number', 'license_body'];
             const appPlaceholders = ['$1', '$2', '$3', '$4'];
-            const appParams = [user.id, 'pending', licenseNumber, licenseBody];
+            const appParams = [user.id, 'pending_review', licenseNumber, licenseBody];
             let appIdx = 5;
 
             const optionalFields = {
@@ -355,6 +438,14 @@ const registerPsychologist = async (req, res) => {
                 }
             }
 
+            const hasDocColumn = await columnExists('psychologist_applications', 'documents');
+            if (hasDocColumn) {
+                appCols.push('documents');
+                appPlaceholders.push(`$${appIdx}::jsonb`);
+                appParams.push(JSON.stringify(documentPayload));
+                appIdx += 1;
+            }
+
             await query(
                 `INSERT INTO psychologist_applications (${appCols.join(', ')}) VALUES (${appPlaceholders.join(', ')})`,
                 appParams
@@ -375,7 +466,8 @@ const registerPsychologist = async (req, res) => {
                             therapyTypes,
                             practiceLocation,
                             bio,
-                            website
+                            website,
+                            documents: documentPayload
                         },
                         appliedAt: new Date()
                     }), user.id]
@@ -435,7 +527,9 @@ const registerBusiness = async (req, res) => {
             registrationNumber,
             claimExistingProfile,
             claimCompanyId,
-            howDidYouHear
+            howDidYouHear,
+            documents,
+            contactPhone
         } = req.body;
 
         if (!email || !password) {
@@ -446,6 +540,14 @@ const registerBusiness = async (req, res) => {
         }
         if (!companyName) {
             return res.status(400).json({ error: 'Company name is required' });
+        }
+        const normalizedRegistrationNumber = String(registrationNumber || '').trim();
+        if (!normalizedRegistrationNumber) {
+            return res.status(400).json({ error: 'Business registration number is required' });
+        }
+        const normalizedContactPhone = String(contactPhone || '').trim();
+        if (!normalizedContactPhone) {
+            return res.status(400).json({ error: 'A business contact phone number is required' });
         }
 
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -476,6 +578,13 @@ const registerBusiness = async (req, res) => {
 
         const passwordHash = await bcrypt.hash(password, 12);
 
+        const documentPayload = parseApplicationDocuments(documents, 'business_document');
+        try {
+            ensureRequiredDocuments(documentPayload, APPLICATION_DOCUMENT_REQUIREMENTS.business);
+        } catch (error) {
+            return res.status(error.statusCode || 400).json({ error: error.message });
+        }
+
         const hasIsActive = await columnExists('users', 'is_active');
         const hasIsVerified = await columnExists('users', 'is_verified');
         const hasStatus = await columnExists('users', 'status');
@@ -501,7 +610,7 @@ const registerBusiness = async (req, res) => {
         if (hasStatus) {
             cols.push('status');
             placeholders.push(`$${idx}`);
-            params.push('pending');
+            params.push('pending_review');
             idx += 1;
         }
         if (hasJobTitle && jobTitle) {
@@ -521,7 +630,7 @@ const registerBusiness = async (req, res) => {
         if (appTableAvailable) {
             const appCols = ['user_id', 'status', 'company_name'];
             const appPlaceholders = ['$1', '$2', '$3'];
-            const appParams = [user.id, 'pending', companyName];
+            const appParams = [user.id, 'pending_review', companyName];
             let appIdx = 4;
 
             const optionalFields = {
@@ -532,10 +641,16 @@ const registerBusiness = async (req, res) => {
                 country: country || null,
                 company_description: companyDescription || null,
                 linkedin_url: linkedinUrl || null,
-                registration_number: registrationNumber || null,
+                registration_number: normalizedRegistrationNumber,
                 claim_existing_profile: claimExistingProfile ?? false,
                 claim_company_id: claimCompanyId || null,
-                how_did_you_hear: howDidYouHear || null
+                how_did_you_hear: howDidYouHear || null,
+                contact_information: {
+                    name: displayName,
+                    email: email.toLowerCase(),
+                    phone: normalizedContactPhone,
+                    jobTitle: jobTitle || null
+                }
             };
 
             for (const [column, value] of Object.entries(optionalFields)) {
@@ -549,6 +664,14 @@ const registerBusiness = async (req, res) => {
                     appParams.push(value);
                     appIdx += 1;
                 }
+            }
+
+            const hasDocColumn = await columnExists('business_applications', 'documents');
+            if (hasDocColumn) {
+                appCols.push('documents');
+                appPlaceholders.push(`$${appIdx}::jsonb`);
+                appParams.push(JSON.stringify(documentPayload));
+                appIdx += 1;
             }
 
             await query(
@@ -570,10 +693,17 @@ const registerBusiness = async (req, res) => {
                             country,
                             companyDescription,
                             linkedinUrl,
-                            registrationNumber,
+                            registrationNumber: normalizedRegistrationNumber,
                             claimExistingProfile,
                             claimCompanyId,
-                            howDidYouHear
+                            howDidYouHear,
+                            contactInformation: {
+                                name: displayName,
+                                email: email.toLowerCase(),
+                                phone: normalizedContactPhone,
+                                jobTitle
+                            },
+                            documents: documentPayload
                         },
                         appliedAt: new Date()
                     }), user.id]
@@ -670,22 +800,28 @@ const login = async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        if (user.status === 'pending' || user.is_active === false) {
+        const normalizedStatus = String(user.status || '').toLowerCase();
+        const blockedStatuses = new Set(['pending', 'pending_review', 'under_verification', 'awaiting_information']);
+        if (blockedStatuses.has(normalizedStatus) || user.is_active === false) {
             const roleMessage = {
-                psychologist: 'Your psychologist application is under review. You will be notified once approved.',
-                business: 'Your business application is under review. You will be notified once approved.'
+                psychologist: normalizedStatus === 'awaiting_information'
+                    ? 'We need a bit more information to finish verifying your psychologist account.'
+                    : 'Your psychologist application is under review. You will be notified once approved.',
+                business: normalizedStatus === 'awaiting_information'
+                    ? 'We need additional information to verify your business application.'
+                    : 'Your business application is under review. You will be notified once approved.'
             };
             console.warn('Login blocked: inactive_or_pending', {
                 email: loginEmail,
                 role: normalizedRole,
                 isAdminRole,
-                status: user.status,
+                status: normalizedStatus,
                 is_active: user.is_active,
                 ip: loginIp
             });
             return res.status(403).json({
                 error: roleMessage[user.role] || 'Your account is pending approval.',
-                status: 'pending'
+                status: normalizedStatus || 'pending'
             });
         }
 
@@ -724,7 +860,11 @@ const login = async (req, res) => {
                 id: user.id,
                 email: user.email,
                 displayName: user.display_name,
+                display_name: user.display_name,
                 role: user.role,
+                avatarUrl: user.avatar_url,
+                avatar_url: user.avatar_url,
+                status: user.status,
                 subscription: subscriptionPayload,
                 applicationStatus
             }

@@ -49,6 +49,32 @@ const mergeUserState = (prev, updates = {}) => {
     return changed ? next : prev;
 };
 
+const normalizeUserPayload = (user = null) => {
+    if (!user || typeof user !== 'object') {
+        return user;
+    }
+    const normalized = { ...user };
+    if (user.displayName && !user.display_name) {
+        normalized.display_name = user.displayName;
+    }
+    if (user.display_name && !user.displayName) {
+        normalized.displayName = user.display_name;
+    }
+    if (user.avatarUrl && !user.avatar_url) {
+        normalized.avatar_url = user.avatarUrl;
+    }
+    if (user.avatar_url && !user.avatarUrl) {
+        normalized.avatarUrl = user.avatar_url;
+    }
+    if (user.applicationStatus && !user.application_status) {
+        normalized.application_status = user.applicationStatus;
+    }
+    if (user.application_status && !user.applicationStatus) {
+        normalized.applicationStatus = user.application_status;
+    }
+    return normalized;
+};
+
 const getStoredToken = () => {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -110,7 +136,7 @@ export const AuthProvider = ({ children }) => {
             const { data } = await api.get("/auth/me");
 
             console.log("Auth restored:", data);
-            setUser(data.user);
+            setUser(normalizeUserPayload(data.user));
             setRateLimitInfo(null);
         } catch (error) {
             console.error("Auth check failed:", error.message);
@@ -142,7 +168,7 @@ export const AuthProvider = ({ children }) => {
     const refreshUser = useCallback(async () => {
         try {
             const { data } = await api.get("/auth/me");
-            setUser(data.user);
+            setUser(normalizeUserPayload(data.user));
             setRateLimitInfo(null);
             return data.user;
         } catch (error) {
@@ -223,7 +249,7 @@ export const AuthProvider = ({ children }) => {
                 sessionStorage.setItem("token", data.token);
             }
             api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
-            setUser(data.user);
+            setUser(normalizeUserPayload(data.user));
             setRateLimitInfo(null);
 
             console.log("✅ Login successful:", data.user);
@@ -307,7 +333,7 @@ export const AuthProvider = ({ children }) => {
                 api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
             }
 
-            setUser(data.user);
+            setUser(normalizeUserPayload(data.user));
             setRateLimitInfo(null);
 
             return {
@@ -410,7 +436,8 @@ export const AuthProvider = ({ children }) => {
     */
 
     const updateUser = useCallback((updatedUserData = {}) => {
-        setUser((prev) => mergeUserState(prev, updatedUserData));
+        const normalized = normalizeUserPayload(updatedUserData);
+        setUser((prev) => mergeUserState(prev, normalized));
     }, []);
 
     /*

@@ -40,42 +40,71 @@ const ensureAdSchema = async () => {
     return cachedAdSchema;
 };
 
+const getBusinessIdForUser = async (userId) => {
+    if (!userId) return null;
+    const companyResult = await query(
+        `SELECT id
+         FROM companies
+         WHERE claimed_by = $1
+            OR created_by_user_id = $1
+         ORDER BY updated_at DESC
+         LIMIT 1`,
+        [userId]
+    );
+    if (companyResult.rows[0]?.id) {
+        return companyResult.rows[0].id;
+    }
+    return bootstrapBusinessProfile(userId);
+};
+
 const bootstrapBusinessProfile = async (userId) => {
     if (!userId) return null;
     try {
-        const ownerResult = await query(
-            `SELECT display_name, email
-             FROM users
-             WHERE id = $1`,
-            [userId]
-        );
-        const companyResult = await query(
-            `SELECT id, name, industry, website
-             FROM companies
-             WHERE claimed_by = $1 OR created_by_user_id = $1
-             ORDER BY updated_at DESC
-             LIMIT 1`,
-            [userId]
-        );
+        const [ownerResult, workspaceResult] = await Promise.all([
+            query(
+                `SELECT display_name, email
+                 FROM users
+                 WHERE id = $1`,
+                [userId]
+            ),
+            query(
+                `SELECT name, industry, website
+                 FROM businesses
+                 WHERE owner_user_id = $1
+                 ORDER BY updated_at DESC
+                 LIMIT 1`,
+                [userId]
+            )
+        ]);
 
-        const fallbackName =
-            companyResult.rows[0]?.name ||
-            (ownerResult.rows[0]?.display_name ? `${ownerResult.rows[0].display_name}'s Workspace` : 'My Business Workspace');
+        const baseName =
+            workspaceResult.rows[0]?.name ||
+            (ownerResult.rows[0]?.display_name
+                ? `${ownerResult.rows[0].display_name}'s Workspace`
+                : 'My Business Workspace');
+        const slug = String(userId).replace(/[^a-z0-9]/gi, '').slice(0, 6) || Date.now().toString(36);
+        const uniqueName = `${baseName} ${slug}`.trim().slice(0, 240);
 
         const insertResult = await query(
-            `INSERT INTO businesses (
-                 owner_user_id,
+            `INSERT INTO companies (
                  name,
                  industry,
                  website,
+                 created_by_user_id,
+                 claimed_by,
+                 is_claimed,
                  status
-             ) VALUES ($1, $2, $3, $4, 'active')
+             ) VALUES ($1, $2, $3, $4, $4, true, 'active')
+             ON CONFLICT (name) DO UPDATE
+                 SET claimed_by = EXCLUDED.claimed_by,
+                     created_by_user_id = EXCLUDED.created_by_user_id,
+                     updated_at = CURRENT_TIMESTAMP
              RETURNING id`,
             [
-                userId,
-                fallbackName,
-                companyResult.rows[0]?.industry || null,
-                companyResult.rows[0]?.website || null
+                uniqueName,
+                workspaceResult.rows[0]?.industry || null,
+                workspaceResult.rows[0]?.website || null,
+                userId
             ]
         );
 
@@ -84,23 +113,6 @@ const bootstrapBusinessProfile = async (userId) => {
         console.warn('Bootstrap business profile failed:', error.message);
         return null;
     }
-};
-
-const getBusinessIdForUser = async (userId) => {
-    if (!userId) return null;
-    const result = await query(
-        `SELECT id
-         FROM businesses
-         WHERE owner_user_id = $1
-           AND status = 'active'
-         ORDER BY updated_at DESC
-         LIMIT 1`,
-        [userId]
-    );
-    if (result.rows[0]?.id) {
-        return result.rows[0].id;
-    }
-    return bootstrapBusinessProfile(userId);
 };
 
 const upsertPlacements = async (campaignId, placements = []) => {

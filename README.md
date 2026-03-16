@@ -31,6 +31,10 @@ Welp is a company review platform focused on employee experience and wellbeing, 
 - Axios for API calls
 - Socket.io-client for real-time updates
 
+## Environments
+
+- **Production**: https://welphub.onrender.com
+
 ## Repository Structure
 
 Use this as the source of truth for naming and navigation.

@@ -30,9 +30,9 @@ const APPLICATION_CONFIG = {
             { key: 'experience', column: 'experience', label: 'Experience verified' }
         ],
         requiredDocuments: [
-            'Professional license or certification',
-            'Government-issued identification',
-            'Proof of qualifications'
+            { type: 'license', label: 'Professional license or certification' },
+            { type: 'government_id', label: 'Government-issued identification' },
+            { type: 'qualification', label: 'Proof of qualifications' }
         ],
         profileLabel: 'Psychologist'
     },
@@ -43,9 +43,8 @@ const APPLICATION_CONFIG = {
             { key: 'ownership', column: 'ownership', label: 'Ownership confirmed' }
         ],
         requiredDocuments: [
-            'Business registration certificate',
-            'Business registration number',
-            'Official business contact information'
+            { type: 'registration_certificate', label: 'Business registration certificate' },
+            { type: 'ownership_proof', label: 'Proof of ownership or authorization' }
         ],
         profileLabel: 'Business Owner'
     }
@@ -78,20 +77,72 @@ const parseJson = (raw, fallback) => {
     }
 };
 
-const normalizeDocuments = (row) => {
+const normalizeDocType = (value) => {
+    if (!value) return null;
+    const normalized = String(value).toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+    return normalized || null;
+};
+
+const normalizeRequiredDocumentsConfig = (docs = []) => docs.map((doc, index) => {
+    if (typeof doc === 'string') {
+        return {
+            type: normalizeDocType(doc) || `document_${index}`,
+            label: doc
+        };
+    }
+    return {
+        type: normalizeDocType(doc?.type) || `document_${index}`,
+        label: doc?.label || doc?.name || doc?.type || `Document ${index + 1}`
+    };
+});
+
+const findRequiredDocLabel = (config, type) => {
+    if (!type) return null;
+    const match = (config.requiredDocuments || []).find((doc) => normalizeDocType(doc.type) === type);
+    return match?.label || null;
+};
+
+const formatDocumentRecord = (doc, index, row, config) => {
+    if (!doc) return null;
+    if (typeof doc === 'string') {
+        return formatDocumentRecord({ url: doc }, index, row, config);
+    }
+    const url = doc.url || doc.href || doc.path || doc.location || null;
+    if (!url) return null;
+    const type = normalizeDocType(doc.type || doc.documentType || doc.id || `doc_${index}`) || `doc_${index}`;
+    const label = doc.label
+        || findRequiredDocLabel(config, type)
+        || doc.name
+        || doc.filename
+        || `Document ${index + 1}`;
+    return {
+        id: doc.id || `${type}_${index}`,
+        type,
+        label,
+        url,
+        filename: doc.filename || doc.originalName || null,
+        uploadedAt: doc.uploadedAt || doc.uploaded_at || row.updated_at || row.created_at || null
+    };
+};
+
+const normalizeDocuments = (row, config) => {
     const docs = parseJson(row.documents, null);
     if (Array.isArray(docs)) {
-        return docs;
+        return docs
+            .map((doc, index) => formatDocumentRecord(doc, index, row, config))
+            .filter(Boolean);
     }
     if (docs && typeof docs === 'object') {
-        return Object.entries(docs).map(([key, value]) => ({
-            id: value?.id || key,
-            label: value?.label || value?.name || key,
-            url: value?.url || value?.href || value
-        }));
+        return Object.entries(docs)
+            .map(([key, value], index) => formatDocumentRecord({ ...(value || {}), type: value?.type || key }, index, row, config))
+            .filter(Boolean);
     }
     return [];
 };
+
+Object.values(APPLICATION_CONFIG).forEach((config) => {
+    config.requiredDocuments = normalizeRequiredDocumentsConfig(config.requiredDocuments);
+});
 
 const buildChecklist = (row, config) => {
     const checklist = {};
@@ -101,6 +152,7 @@ const buildChecklist = (row, config) => {
             verified: Boolean(row[`${prefix}_verified`]),
             verifiedAt: row[`${prefix}_verified_at`] || null,
             verifiedBy: row[`${prefix}_verified_by`] || null,
+            verifiedByName: row[`${prefix}_verified_by_name`] || null,
             notes: row[`${prefix}_notes`] || null
         };
     });
@@ -168,7 +220,7 @@ const mapApplicationRow = (row, type) => {
         verificationProgress: totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 0,
         readyForDecision: completedSteps === totalSteps,
         requiredDocuments: config.requiredDocuments,
-        documents: normalizeDocuments(row),
+        documents: normalizeDocuments(row, config),
         adminNotes: row.admin_notes || null,
         metadata: {
             licenseNumber: row.license_number || row.licenseNumber || null,
@@ -179,19 +231,40 @@ const mapApplicationRow = (row, type) => {
             registrationNumber: row.registration_number || null,
             companyName: row.company_name || null,
             jobTitle: row.job_title || null,
-            country: row.country || null
+            country: row.country || null,
+            contactInformation: parseJson(row.contact_information, null)
         },
+        reviewedBy: row.reviewed_by || null,
+        reviewedByName: row.reviewed_by_name || null,
         timeline: buildTimeline(row, config)
     };
 };
 
-const buildBaseQuery = (config) => `
-    SELECT app.*,
-           u.email AS user_email,
-           u.display_name AS user_name
-    FROM ${config.table} app
-    LEFT JOIN users u ON app.user_id = u.id
-`;
+const buildBaseQuery = (config) => {
+    const selectParts = [
+        'app.*',
+        'u.email AS user_email',
+        'u.display_name AS user_name'
+    ];
+    const joins = [
+        'LEFT JOIN users u ON app.user_id = u.id'
+    ];
+
+    config.steps.forEach((step) => {
+        const alias = `${step.column}_reviewer`;
+        selectParts.push(`${alias}.display_name AS ${step.column}_verified_by_name`);
+        joins.push(`LEFT JOIN users ${alias} ON app.${step.column}_verified_by = ${alias}.id`);
+    });
+
+    selectParts.push('review_admin.display_name AS reviewed_by_name');
+    joins.push('LEFT JOIN users review_admin ON app.reviewed_by = review_admin.id');
+
+    return `
+        SELECT ${selectParts.join(', ')}
+        FROM ${config.table} app
+        ${joins.join('\n        ')}
+    `;
+};
 
 const listApplications = async ({ status = 'all', type = 'all' } = {}) => {
     const aggregated = [];

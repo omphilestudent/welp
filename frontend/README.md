@@ -2,6 +2,10 @@
 
 React + Vite client for the Welp platform.
 
+## Production URL
+
+The Render-hosted production build is available at https://welphub.onrender.com.
+
 ## Folder Structure
 
 - `src/pages/` — route-level pages (`PascalCase.jsx`)

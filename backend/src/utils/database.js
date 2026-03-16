@@ -574,6 +574,7 @@ const createTables = async () => {
                 registration_number VARCHAR(100),
                 claim_existing_profile BOOLEAN DEFAULT false,
                 claim_company_id UUID REFERENCES companies(id),
+                contact_information JSONB,
                 how_did_you_hear TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -615,6 +616,7 @@ const createTables = async () => {
                 ADD COLUMN IF NOT EXISTS ownership_verified_at TIMESTAMP,
                 ADD COLUMN IF NOT EXISTS ownership_verified_by UUID REFERENCES users(id),
                 ADD COLUMN IF NOT EXISTS ownership_notes TEXT,
+                ADD COLUMN IF NOT EXISTS contact_information JSONB,
                 ADD COLUMN IF NOT EXISTS ownership_evidence JSONB,
                 ALTER COLUMN status SET DEFAULT 'pending_review';
 

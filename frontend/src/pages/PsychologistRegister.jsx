@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import { resolveMediaUrl } from '../utils/media';
 import './Register.css';
 
 const STEPS = ['Account', 'Credentials', 'Practice', 'Review'];
@@ -18,6 +19,17 @@ const THERAPY_TYPES = [
     'Mindfulness-Based', 'Acceptance & Commitment (ACT)', 'Solution-Focused',
     'Dialectical Behaviour (DBT)', 'Humanistic / Person-Centred',
 ];
+
+const PSY_REQUIRED_DOCUMENTS = [
+    { type: 'license', label: 'Professional license or certification' },
+    { type: 'government_id', label: 'Government-issued identification' },
+    { type: 'qualification', label: 'Proof of qualifications' }
+];
+
+const PSY_DOCUMENT_LABELS = PSY_REQUIRED_DOCUMENTS.reduce((acc, doc) => {
+    acc[doc.type] = doc.label;
+    return acc;
+}, {});
 
 const empty = {
     // Step 1 — account
@@ -39,6 +51,8 @@ const PsychologistRegister = () => {
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [showPw, setShowPw]       = useState(false);
+    const [documents, setDocuments] = useState({});
+    const [docUploading, setDocUploading] = useState({});
 
     const set = (field) => (e) => {
         const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -54,6 +68,48 @@ const PsychologistRegister = () => {
         }));
     };
 
+    const handleDocumentUpload = async (type, file) => {
+        if (!file) return;
+        setDocUploading((prev) => ({ ...prev, [type]: true }));
+        try {
+            const formData = new FormData();
+            formData.append('document', file);
+            const { data } = await api.post('/applications/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setDocuments((prev) => ({
+                ...prev,
+                [type]: {
+                    type,
+                    label: PSY_DOCUMENT_LABELS[type],
+                    url: data.url,
+                    filename: file.name,
+                    uploadedAt: new Date().toISOString()
+                }
+            }));
+            toast.success(`${PSY_DOCUMENT_LABELS[type]} uploaded`);
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to upload document');
+        } finally {
+            setDocUploading((prev) => ({ ...prev, [type]: false }));
+        }
+    };
+
+    const onDocumentInputChange = (type) => async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        await handleDocumentUpload(type, file);
+        event.target.value = '';
+    };
+
+    const removeDocument = (type) => {
+        setDocuments((prev) => {
+            const next = { ...prev };
+            delete next[type];
+            return next;
+        });
+    };
+
     // ── Validation per step ───────────────────────────────────────────────
     const validateStep = () => {
         if (step === 0) {
@@ -66,6 +122,8 @@ const PsychologistRegister = () => {
             if (!form.licenseNumber) return 'License / registration number is required';
             if (!form.licenseBody)   return 'Licensing body is required';
             if (!form.yearsExperience) return 'Years of experience is required';
+            const missingDoc = PSY_REQUIRED_DOCUMENTS.find((doc) => !documents[doc.type]);
+            if (missingDoc) return `Please upload ${missingDoc.label}`;
         }
         if (step === 2) {
             if (form.specialisations.length === 0) return 'Select at least one specialisation';
@@ -107,6 +165,7 @@ const PsychologistRegister = () => {
                 practiceLocation: form.practiceLocation,
                 bio:             form.bio,
                 website:         form.website,
+                documents:       Object.values(documents)
             });
 
             setSubmitted(true);
@@ -253,6 +312,72 @@ const PsychologistRegister = () => {
                                         <label>Highest qualification & institution</label>
                                         <input type="text" value={form.qualifications} onChange={set('qualifications')} placeholder="e.g. PhD Clinical Psychology, UCT" />
                                     </div>
+                                    <div className="reg-field">
+                                        <label>Verification documents *</label>
+                                        <p className="reg-field-hint">Upload clear scans or PDFs for each required document.</p>
+                                        <div
+                                            className="reg-doc-grid"
+                                            style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
+                                        >
+                                            {PSY_REQUIRED_DOCUMENTS.map((doc) => {
+                                                const current = documents[doc.type];
+                                                return (
+                                                    <div
+                                                        key={doc.type}
+                                                        className="reg-doc-card"
+                                                        style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: '#fff' }}
+                                                    >
+                                                        <strong style={{ display: 'block', marginBottom: '0.35rem' }}>{doc.label}</strong>
+                                                        {current ? (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                                <span className="reg-field-hint">{current.filename || 'Uploaded document'}</span>
+                                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                    <a
+                                                                        href={resolveMediaUrl(current.url)}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="reg-btn-ghost"
+                                                                        style={{ padding: '0.35rem 0.65rem', borderRadius: '999px' }}
+                                                                    >
+                                                                        Preview
+                                                                    </a>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="reg-btn-ghost"
+                                                                        style={{ padding: '0.35rem 0.65rem', borderRadius: '999px' }}
+                                                                        onClick={() => removeDocument(doc.type)}
+                                                                    >
+                                                                        Replace
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <label
+                                                                className="reg-btn-ghost"
+                                                                style={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.4rem',
+                                                                    padding: '0.4rem 0.75rem',
+                                                                    borderRadius: '999px',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                <input
+                                                                    type="file"
+                                                                    accept=".pdf,.png,.jpg,.jpeg"
+                                                                    onChange={onDocumentInputChange(doc.type)}
+                                                                    disabled={!!docUploading[doc.type]}
+                                                                    style={{ display: 'none' }}
+                                                                />
+                                                                {docUploading[doc.type] ? 'Uploading…' : 'Upload file'}
+                                                            </label>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -351,6 +476,16 @@ const PsychologistRegister = () => {
                                     <ReviewRow label="Session formats" value={form.sessionFormats.join(', ') || '—'} />
                                     <ReviewRow label="Languages"     value={form.languages} />
                                     <ReviewRow label="Location"      value={form.practiceLocation || '—'} />
+                                    <div className="reg-field" style={{ marginTop: '1rem' }}>
+                                        <label>Documents</label>
+                                        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem', color: '#475569', fontSize: '0.9rem' }}>
+                                            {PSY_REQUIRED_DOCUMENTS.map((doc) => (
+                                                <li key={doc.type}>
+                                                    {documents[doc.type] ? '✔' : '•'} {doc.label}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
                                 </div>
                             )}
                         </motion.div>

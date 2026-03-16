@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
+import { resolveMediaUrl } from '../../utils/media';
 import {
     FaTachometerAlt,
     FaUsers,
@@ -39,6 +40,7 @@ const AdminLayout = () => {
         role_name: 'admin',
         department: 'Administration'
     });
+    const adminAvatar = resolveMediaUrl(user?.avatar_url || adminInfo?.avatar_url);
 
     const userRole = String(user?.role || adminInfo?.role_name || '').toLowerCase().trim();
     const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(userRole);
@@ -239,8 +241,11 @@ const AdminLayout = () => {
 
                 <div className="admin-profile">
                     <div className="admin-avatar">
-                        {user?.avatar_url ? (
-                            <img src={user.avatar_url} alt={user.display_name} />
+                        {adminAvatar ? (
+                            <img
+                                src={adminAvatar}
+                                alt={user?.display_name || user?.displayName || adminInfo?.display_name || 'Admin user'}
+                            />
                         ) : (
                             <div className="avatar-placeholder">
                                 <FaUserCircle />

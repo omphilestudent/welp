@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import { resolveMediaUrl } from '../utils/media';
 import './Register.css';
 
 const STEPS = ['Account', 'Company', 'Details', 'Review'];
@@ -18,9 +19,19 @@ const COMPANY_SIZES = [
     '1–10', '11–50', '51–200', '201–500', '501–1000', '1000+',
 ];
 
+const BUSINESS_REQUIRED_DOCUMENTS = [
+    { type: 'registration_certificate', label: 'Business registration certificate' },
+    { type: 'ownership_proof', label: 'Proof of ownership or authorization' }
+];
+
+const BUSINESS_DOCUMENT_LABELS = BUSINESS_REQUIRED_DOCUMENTS.reduce((acc, doc) => {
+    acc[doc.type] = doc.label;
+    return acc;
+}, {});
+
 const empty = {
     // Step 1 — account
-    displayName: '', email: '', password: '', confirmPassword: '', jobTitle: '',
+    displayName: '', email: '', password: '', confirmPassword: '', jobTitle: '', contactPhone: '',
     // Step 2 — company basics
     companyName: '', companyWebsite: '', industry: '', companySize: '', country: '',
     // Step 3 — additional details
@@ -43,6 +54,8 @@ const BusinessRegister = () => {
     const [selectedClaimCompany, setSelectedClaimCompany] = useState(null);
     const claimSectionRef = useRef(null);
     const claimSearchInputRef = useRef(null);
+    const [documents, setDocuments] = useState({});
+    const [docUploading, setDocUploading] = useState({});
 
     const set = (field) => (e) => {
         const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -62,11 +75,54 @@ const BusinessRegister = () => {
         }
     };
 
+    const handleDocumentUpload = async (type, file) => {
+        if (!file) return;
+        setDocUploading((prev) => ({ ...prev, [type]: true }));
+        try {
+            const formData = new FormData();
+            formData.append('document', file);
+            const { data } = await api.post('/applications/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setDocuments((prev) => ({
+                ...prev,
+                [type]: {
+                    type,
+                    label: BUSINESS_DOCUMENT_LABELS[type],
+                    url: data.url,
+                    filename: file.name,
+                    uploadedAt: new Date().toISOString()
+                }
+            }));
+            toast.success(`${BUSINESS_DOCUMENT_LABELS[type]} uploaded`);
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to upload document');
+        } finally {
+            setDocUploading((prev) => ({ ...prev, [type]: false }));
+        }
+    };
+
+    const onDocumentInputChange = (type) => async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        await handleDocumentUpload(type, file);
+        event.target.value = '';
+    };
+
+    const removeDocument = (type) => {
+        setDocuments((prev) => {
+            const next = { ...prev };
+            delete next[type];
+            return next;
+        });
+    };
+
     const getStepError = (currentStep) => {
         if (currentStep === 0) {
             if (!form.displayName) return 'Full name is required';
             if (!form.email)       return 'Email is required';
             if (!form.jobTitle)    return 'Job title is required';
+            if (!form.contactPhone) return 'Work phone number is required';
             if (!form.password || form.password.length < 8) return 'Password must be at least 8 characters';
             if (form.password !== form.confirmPassword) return 'Passwords do not match';
         }
@@ -78,6 +134,9 @@ const BusinessRegister = () => {
             if (form.claimExistingProfile && !form.claimCompanyId) return 'Select the company you want to claim';
         }
         if (currentStep === 2) {
+            if (!form.registrationNumber) return 'Company registration number is required';
+            const missingDoc = BUSINESS_REQUIRED_DOCUMENTS.find((doc) => !documents[doc.type]);
+            if (missingDoc) return `Please upload ${missingDoc.label}`;
             if (!form.agreeTerms) return 'Please accept the terms';
         }
         return null;
@@ -169,6 +228,7 @@ const BusinessRegister = () => {
                 displayName:         form.displayName,
                 role:                'business',
                 jobTitle:            form.jobTitle,
+                contactPhone:        form.contactPhone,
                 companyName:         form.companyName,
                 companyWebsite:      form.companyWebsite,
                 industry:            form.industry,
@@ -180,6 +240,7 @@ const BusinessRegister = () => {
                 claimExistingProfile: form.claimExistingProfile,
                 claimCompanyId: form.claimExistingProfile ? form.claimCompanyId || undefined : undefined,
                 howDidYouHear:       form.howDidYouHear,
+                documents:           Object.values(documents)
             });
 
             setSubmitted(true);
@@ -315,6 +376,10 @@ const BusinessRegister = () => {
                                     <div className="reg-field">
                                         <label>Work email address *</label>
                                         <input type="email" value={form.email} onChange={set('email')} placeholder="jane@company.com" />
+                                    </div>
+                                    <div className="reg-field">
+                                        <label>Work phone number *</label>
+                                        <input type="tel" value={form.contactPhone} onChange={set('contactPhone')} placeholder="+27 11 555 1234" />
                                     </div>
                                     <div className="reg-field">
                                         <label>Password *</label>
@@ -487,8 +552,72 @@ const BusinessRegister = () => {
                                             <input type="url" value={form.linkedinUrl} onChange={set('linkedinUrl')} placeholder="https://linkedin.com/company/…" />
                                         </div>
                                         <div className="reg-field">
-                                            <label>Company registration number</label>
-                                            <input type="text" value={form.registrationNumber} onChange={set('registrationNumber')} placeholder="Optional" />
+                                            <label>Company registration number *</label>
+                                            <input type="text" value={form.registrationNumber} onChange={set('registrationNumber')} placeholder="e.g. 2019/123456/07" />
+                                        </div>
+                                    </div>
+                                    <div className="reg-field">
+                                        <label>Verification documents *</label>
+                                        <p className="reg-field-hint">Upload supporting documents to verify your business.</p>
+                                        <div
+                                            style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
+                                        >
+                                            {BUSINESS_REQUIRED_DOCUMENTS.map((doc) => {
+                                                const current = documents[doc.type];
+                                                return (
+                                                    <div
+                                                        key={doc.type}
+                                                        style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: '#fff' }}
+                                                    >
+                                                        <strong style={{ display: 'block', marginBottom: '0.35rem' }}>{doc.label}</strong>
+                                                        {current ? (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                                <span className="reg-field-hint">{current.filename || 'Uploaded document'}</span>
+                                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                    <a
+                                                                        href={resolveMediaUrl(current.url)}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="reg-btn-ghost"
+                                                                        style={{ padding: '0.35rem 0.65rem', borderRadius: '999px' }}
+                                                                    >
+                                                                        Preview
+                                                                    </a>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="reg-btn-ghost"
+                                                                        style={{ padding: '0.35rem 0.65rem', borderRadius: '999px' }}
+                                                                        onClick={() => removeDocument(doc.type)}
+                                                                    >
+                                                                        Replace
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <label
+                                                                className="reg-btn-ghost"
+                                                                style={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.4rem',
+                                                                    padding: '0.4rem 0.75rem',
+                                                                    borderRadius: '999px',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                <input
+                                                                    type="file"
+                                                                    accept=".pdf,.png,.jpg,.jpeg"
+                                                                    onChange={onDocumentInputChange(doc.type)}
+                                                                    disabled={!!docUploading[doc.type]}
+                                                                    style={{ display: 'none' }}
+                                                                />
+                                                                    {docUploading[doc.type] ? 'Uploading…' : 'Upload file'}
+                                                            </label>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                     <div className="reg-field">
@@ -523,6 +652,7 @@ const BusinessRegister = () => {
                                     </div>
                                     <ReviewRow label="Contact name"  value={form.displayName} />
                                     <ReviewRow label="Job title"     value={form.jobTitle} />
+                                    <ReviewRow label="Contact phone" value={form.contactPhone} />
                                     <ReviewRow label="Email"         value={form.email} />
                                     <ReviewRow label="Company"       value={form.companyName} />
                                     <ReviewRow label="Website"       value={form.companyWebsite || '—'} />
@@ -530,6 +660,16 @@ const BusinessRegister = () => {
                                     <ReviewRow label="Company size"  value={`${form.companySize} employees`} />
                                     <ReviewRow label="Country"       value={form.country} />
                                     <ReviewRow label="Claiming profile" value={form.claimExistingProfile ? 'Yes' : 'No'} />
+                                    <div className="reg-field" style={{ marginTop: '1rem' }}>
+                                        <label>Documents</label>
+                                        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem', color: '#475569', fontSize: '0.9rem' }}>
+                                            {BUSINESS_REQUIRED_DOCUMENTS.map((doc) => (
+                                                <li key={doc.type}>
+                                                    {documents[doc.type] ? '✔' : '•'} {doc.label}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
                                 </div>
                             )}
                         </motion.div>

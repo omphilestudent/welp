@@ -352,7 +352,7 @@ const sendSubscriptionCancellationEmail = async ({ email, name, previousPlan, ow
             <p>You can upgrade again at any time to regain premium analytics, extended messaging limits, and advertising tools.</p>
             <p>If you didn't authorize this change or need help, reply to this email and we'll assist you.</p>
             <p>- The Welp Team</p>
-            <a class="cta" href="${process.env.FRONTEND_URL || 'https://app.welp.com'}/pricing">Compare plans</a>
+            <a class="cta" href="${process.env.FRONTEND_URL || 'https://welphub.onrender.com'}/pricing">Compare plans</a>
           </div>
         </body>
         </html>
