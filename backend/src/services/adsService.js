@@ -8,7 +8,23 @@ const AD_SCHEMA_TTL_MS = 5 * 60 * 1000;
 let businessTableAvailable = true;
 
 let cachedAdSchema = null;
-let adTableMetadata = { checked: false, businesses: true, companies: true };
+let adTableMetadata = {
+    checked: false,
+    businesses: false,
+    companies: false,
+    placements: false,
+    businessCols: {
+        name: false,
+        ownerUserId: false,
+        subscriptionTier: false,
+        subscriptionExpires: false
+    },
+    companyCols: {
+        name: false,
+        claimedBy: false,
+        createdByUserId: false
+    }
+};
 
 const ensureAdSchema = async () => {
     if (cachedAdSchema && cachedAdSchema.expiresAt > Date.now()) {
@@ -26,6 +42,8 @@ const ensureAdSchema = async () => {
             hasReviewStatus: columns.includes('review_status'),
             hasSpendMinor: columns.includes('spend_minor'),
             hasBidRateMinor: columns.includes('bid_rate_minor'),
+            hasImpressions: columns.includes('impressions'),
+            hasClicks: columns.includes('clicks'),
             hasOverride: columns.includes('override_restrictions'),
             hasRejectionReason: columns.includes('rejection_reason'),
             hasReviewedBy: columns.includes('reviewed_by'),
@@ -39,6 +57,8 @@ const ensureAdSchema = async () => {
             hasReviewStatus: false,
             hasSpendMinor: false,
             hasBidRateMinor: false,
+            hasImpressions: false,
+            hasClicks: false,
             hasOverride: false,
             hasRejectionReason: false,
             hasReviewedBy: false,
@@ -60,11 +80,12 @@ const buildAdQueryContext = (tables) => {
     }
 
     const ownerSources = [];
-    if (tables.businesses) {
+    if (tables.businesses && tables.businessCols?.ownerUserId) {
         ownerSources.push('b.owner_user_id');
     }
     if (tables.companies) {
-        ownerSources.push('comp.claimed_by', 'comp.created_by_user_id');
+        if (tables.companyCols?.claimedBy) ownerSources.push('comp.claimed_by');
+        if (tables.companyCols?.createdByUserId) ownerSources.push('comp.created_by_user_id');
     }
     const ownerExpr = ownerSources.length ? `COALESCE(${ownerSources.join(', ')})` : null;
     if (ownerExpr) {
@@ -72,14 +93,20 @@ const buildAdQueryContext = (tables) => {
     }
 
     const businessNames = [];
-    if (tables.businesses) businessNames.push('b.name');
-    if (tables.companies) businessNames.push('comp.name');
+    if (tables.businesses && tables.businessCols?.name) businessNames.push('b.name');
+    if (tables.companies && tables.companyCols?.name) businessNames.push('comp.name');
     const businessNameExpr = businessNames.length
         ? `COALESCE(${businessNames.join(', ')})`
         : `'Unknown Business'`;
 
-    const tierExpr = tables.businesses ? `COALESCE(b.subscription_tier, 'base')` : `'base'`;
-    const subscriptionExpiresExpr = tables.businesses ? 'b.subscription_expires' : 'NULL';
+    const tierExpr =
+        tables.businesses && tables.businessCols?.subscriptionTier
+            ? `COALESCE(b.subscription_tier, 'base')`
+            : `'base'`;
+    const subscriptionExpiresExpr =
+        tables.businesses && tables.businessCols?.subscriptionExpires
+            ? 'b.subscription_expires'
+            : 'NULL';
     const ownerEmailExpr = ownerExpr ? 'owner.email' : 'NULL';
     const ownerNameExpr = ownerExpr ? 'owner.display_name' : 'NULL';
     const ownerPhoneExpr = ownerExpr ? 'owner.phone' : 'NULL';
@@ -104,16 +131,73 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
         const { rows } = await query(
             `SELECT 
                 to_regclass('public.businesses') IS NOT NULL AS has_businesses,
-                to_regclass('public.companies') IS NOT NULL AS has_companies`
+                to_regclass('public.companies') IS NOT NULL AS has_companies,
+                to_regclass('public.ad_placements') IS NOT NULL AS has_ad_placements,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'name'
+                ) AS businesses_has_name,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'owner_user_id'
+                ) AS businesses_has_owner_user_id,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'subscription_tier'
+                ) AS businesses_has_subscription_tier,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'subscription_expires'
+                ) AS businesses_has_subscription_expires,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'name'
+                ) AS companies_has_name,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'claimed_by'
+                ) AS companies_has_claimed_by,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'created_by_user_id'
+                ) AS companies_has_created_by_user_id`
         );
         adTableMetadata = {
             checked: true,
             businesses: rows[0]?.has_businesses === true,
-            companies: rows[0]?.has_companies === true
+            companies: rows[0]?.has_companies === true,
+            placements: rows[0]?.has_ad_placements === true,
+            businessCols: {
+                name: rows[0]?.businesses_has_name === true,
+                ownerUserId: rows[0]?.businesses_has_owner_user_id === true,
+                subscriptionTier: rows[0]?.businesses_has_subscription_tier === true,
+                subscriptionExpires: rows[0]?.businesses_has_subscription_expires === true
+            },
+            companyCols: {
+                name: rows[0]?.companies_has_name === true,
+                claimedBy: rows[0]?.companies_has_claimed_by === true,
+                createdByUserId: rows[0]?.companies_has_created_by_user_id === true
+            }
         };
     } catch (error) {
         console.warn('Ad table metadata detection failed:', error.message);
-        adTableMetadata.checked = true;
+        adTableMetadata = {
+            checked: true,
+            businesses: false,
+            companies: false,
+            placements: false,
+            businessCols: {
+                name: false,
+                ownerUserId: false,
+                subscriptionTier: false,
+                subscriptionExpires: false
+            },
+            companyCols: {
+                name: false,
+                claimedBy: false,
+                createdByUserId: false
+            }
+        };
     }
     return adTableMetadata;
 };
@@ -195,6 +279,9 @@ const bootstrapBusinessProfile = async (userId) => {
 };
 
 const upsertPlacements = async (campaignId, placements = []) => {
+    const tables = await ensureAdTableMetadata();
+    if (!tables.placements) return;
+
     await query('DELETE FROM ad_placements WHERE campaign_id = $1', [campaignId]);
     if (!placements.length) return;
 
@@ -249,6 +336,7 @@ const buildBehaviorFilter = (filters, params, behaviors = []) => {
 
 const fetchPlacementCampaigns = async ({ placement, location, industry, behaviors = [] }) => {
     const schema = await ensureAdSchema();
+    const tables = await ensureAdTableMetadata();
     const filters = ["c.status = 'active'"];
     if (schema.hasReviewStatus) {
         filters.push("c.review_status = 'approved'");
@@ -265,19 +353,25 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
     const spendColumn = schema.hasSpendMinor ? '' : ', 0::bigint AS spend_minor';
     const bidRateColumn = schema.hasBidRateMinor ? '' : ', 0::bigint AS bid_rate_minor';
     const overrideColumn = schema.hasOverride ? '' : ', false AS override_restrictions';
-
-    const result = await query(
-        `
-        SELECT
-            c.*${reviewColumn}${spendColumn}${bidRateColumn}${overrideColumn},
+    const placementsColumn = tables.placements
+        ? `,
             (
                 SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                 FROM ad_placements ap
                 WHERE ap.campaign_id = c.id
-            ) AS placements
+            ) AS placements`
+        : ", '[]'::jsonb AS placements";
+    const placementsOrderBy = tables.placements
+        ? `(SELECT COALESCE(MAX(ap.weight), 0) FROM ad_placements ap WHERE ap.campaign_id = c.id) DESC,`
+        : '';
+
+    const result = await query(
+        `
+        SELECT
+            c.*${reviewColumn}${spendColumn}${bidRateColumn}${overrideColumn}${placementsColumn}
         FROM advertising_campaigns c
         ${whereClause}
-        ORDER BY (SELECT COALESCE(MAX(ap.weight), 0) FROM ad_placements ap WHERE ap.campaign_id = c.id) DESC,
+        ORDER BY ${placementsOrderBy}
                  c.daily_budget_minor DESC,
                  c.impressions ASC
         LIMIT 10
@@ -426,6 +520,39 @@ const adminListAds = async (filters = {}, options = {}) => {
     const tables = await ensureAdTableMetadata(options.forceRefresh === true);
     const context = buildAdQueryContext(tables);
 
+    const reviewStatusColumn =
+        schema.hasReviewStatus
+            ? ''
+            : `,
+            CASE
+                WHEN c.status IN ('pending_review','pending') THEN 'pending'
+                WHEN c.status IN ('rejected') THEN 'rejected'
+                ELSE 'approved'
+            END AS review_status`;
+
+    const spendColumn = schema.hasSpendMinor ? '' : ', 0::bigint AS spend_minor';
+    const bidRateColumn = schema.hasBidRateMinor ? '' : ', 0::bigint AS bid_rate_minor';
+    const overrideColumn = schema.hasOverride ? '' : ', false AS override_restrictions';
+    const rejectionReasonColumn = schema.hasRejectionReason ? '' : ', NULL AS rejection_reason';
+    const reviewedByColumn = schema.hasReviewedBy ? '' : ', NULL AS reviewed_by';
+    const reviewedAtColumn = schema.hasReviewedAt ? '' : ', NULL AS reviewed_at';
+    const reviewNotesColumn = schema.hasReviewNotes ? '' : ', NULL AS review_notes';
+
+    const placementsColumn = tables.placements
+        ? `,
+            (
+                SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
+                FROM ad_placements ap
+                WHERE ap.campaign_id = c.id
+            ) AS placements`
+        : ", '[]'::jsonb AS placements";
+
+    const impressionsColumn = schema.hasImpressions
+        ? 'COALESCE(c.impressions, 0) AS impressions'
+        : '0::bigint AS impressions';
+    const clicksColumn = schema.hasClicks ? 'COALESCE(c.clicks, 0) AS clicks' : '0::bigint AS clicks';
+    const spendMinorExpr = schema.hasSpendMinor ? 'COALESCE(c.spend_minor, 0)' : '0::bigint';
+
     let queryStr = `
         SELECT 
             c.*,
@@ -433,14 +560,18 @@ const adminListAds = async (filters = {}, options = {}) => {
             ${context.tierExpr} AS subscription_tier,
             ${context.ownerEmailExpr} AS owner_email,
             ${context.ownerNameExpr} AS owner_name,
-            (
-                SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
-                FROM ad_placements ap
-                WHERE ap.campaign_id = c.id
-            ) AS placements,
-            COALESCE(c.impressions, 0) AS impressions,
-            COALESCE(c.clicks, 0) AS clicks,
-            COALESCE(c.spend_minor, 0) AS spend_minor
+            ${impressionsColumn},
+            ${clicksColumn},
+            ${spendMinorExpr} AS spend_minor
+            ${reviewStatusColumn}
+            ${spendColumn}
+            ${bidRateColumn}
+            ${overrideColumn}
+            ${rejectionReasonColumn}
+            ${reviewedByColumn}
+            ${reviewedAtColumn}
+            ${reviewNotesColumn}
+            ${placementsColumn}
         FROM advertising_campaigns c
         ${context.joins}
         WHERE 1=1
@@ -451,18 +582,24 @@ const adminListAds = async (filters = {}, options = {}) => {
 
     // Apply filters
     if (filters.reviewStatus) {
-        if (filters.reviewStatus === 'pending') {
-            queryStr += ` AND (
-                c.review_status = $${paramIndex}
-                OR c.review_status IS NULL
-                OR c.review_status = 'pending_review'
-                OR c.status = 'pending_review'
-            )`;
-        } else {
-            queryStr += ` AND c.review_status = $${paramIndex}`;
+        if (schema.hasReviewStatus) {
+            if (filters.reviewStatus === 'pending') {
+                queryStr += ` AND (
+                    c.review_status = $${paramIndex}
+                    OR c.review_status IS NULL
+                    OR c.review_status = 'pending_review'
+                    OR c.status = 'pending_review'
+                )`;
+            } else {
+                queryStr += ` AND c.review_status = $${paramIndex}`;
+            }
+            params.push(filters.reviewStatus);
+            paramIndex++;
+        } else if (filters.reviewStatus === 'pending') {
+            queryStr += ` AND c.status IN ('pending_review','pending')`;
+        } else if (filters.reviewStatus === 'rejected') {
+            queryStr += ` AND c.status IN ('rejected')`;
         }
-        params.push(filters.reviewStatus);
-        paramIndex++;
     }
 
     if (filters.status) {
