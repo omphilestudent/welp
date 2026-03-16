@@ -590,7 +590,8 @@ const FlowManagement = () => {
     };
 
     return (
-        <div className="flow-management">
+        <>
+            <div className="flow-management">
             <div className="flow-page-header">
                 <h1>Automation Flows</h1>
                 <p>
@@ -971,14 +972,14 @@ const FlowManagement = () => {
                     </div>
                 </div>
             </section>
-        </div>
+            </div>
             <FlowPreviewModal
                 state={previewState}
                 onClose={closePreview}
                 onSubmit={submitPreviewStep}
                 onRestart={restartPreview}
             />
-        </div>
+        </>
     );
 };
 
