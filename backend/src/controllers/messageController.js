@@ -1,6 +1,9 @@
 
 const { query } = require('../utils/database');
 const { createUserNotification } = require('../utils/userNotifications');
+const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaService');
+
+const DAILY_CHAT_LIMIT_MINUTES = 120;
 
 const getActiveSubscription = async (userId) => {
     const result = await query(
@@ -15,13 +18,14 @@ const getActiveSubscription = async (userId) => {
 };
 
 const determineTimeLimitMinutes = (subscription) => {
-    if (!subscription) return 120;
-    if (subscription.plan_type === 'premium') {
-        const premiumHours = Number(subscription.chat_hours_per_day) || 4;
-        return Math.max(120, premiumHours * 60);
+    if (!subscription) {
+        return DAILY_CHAT_LIMIT_MINUTES;
     }
-    const freeHours = Number(subscription.chat_hours_per_day) || 2;
-    return Math.min(120, freeHours * 60);
+    const declaredMinutes = Number(subscription.chat_hours_per_day || 0) * 60;
+    if (declaredMinutes > 0) {
+        return Math.max(DAILY_CHAT_LIMIT_MINUTES, declaredMinutes);
+    }
+    return DAILY_CHAT_LIMIT_MINUTES;
 };
 
 const expireConversations = async () => {
@@ -59,7 +63,11 @@ const expireConversationById = async (conversationId) => {
 const requestChatWithPsychologist = async (req, res) => {
     try {
         const { psychologistId, initialMessage } = req.body;
-
+        const requestedMinutesRaw = Number(req.body.sessionMinutes);
+        const sessionMinutes = Number.isFinite(requestedMinutesRaw)
+            ? Math.min(DAILY_CHAT_LIMIT_MINUTES, Math.max(5, requestedMinutesRaw))
+            : 10;
+        await ensureChatQuota(req.user, sessionMinutes);
 
         const psychologist = await query(
             'SELECT id, role, is_verified FROM users WHERE id = $1 AND role = $2',
@@ -86,10 +94,10 @@ const requestChatWithPsychologist = async (req, res) => {
 
 
         const conversation = await query(
-            `INSERT INTO conversations (employee_id, psychologist_id, status)
-             VALUES ($1, $2, $3)
+            `INSERT INTO conversations (employee_id, psychologist_id, status, time_limit_minutes)
+             VALUES ($1, $2, $3, $4)
                  RETURNING *`,
-            [req.user.id, psychologistId, 'pending']
+            [req.user.id, psychologistId, 'pending', sessionMinutes]
         );
 
 
@@ -109,7 +117,12 @@ const requestChatWithPsychologist = async (req, res) => {
             type: 'message_request',
             message: `${senderName} sent you a chat request`,
             entityType: 'conversation',
-            entityId: conversation.rows[0].id
+            entityId: conversation.rows[0].id,
+            metadata: {
+                conversationId: conversation.rows[0].id,
+                senderName,
+                url: `/messages?conversation=${conversation.rows[0].id}`
+            }
         });
         const io = req.app?.get('io');
         if (io && notification) {
@@ -118,7 +131,10 @@ const requestChatWithPsychologist = async (req, res) => {
 
         res.status(201).json({
             message: 'Chat request sent successfully',
-            conversation: conversation.rows[0]
+            conversation: conversation.rows[0],
+            allocation: {
+                minutes: sessionMinutes
+            }
         });
     } catch (error) {
         console.error('Request chat error:', error);
@@ -129,7 +145,8 @@ const requestChatWithPsychologist = async (req, res) => {
 
 const getAvailablePsychologists = async (req, res) => {
     try {
-        const result = await query(
+        const limit = Number(process.env.PSYCHOLOGIST_VISIBLE_LIMIT || 6);
+        const { rows } = await query(
             `SELECT
                  id,
                  display_name,
@@ -142,10 +159,47 @@ const getAvailablePsychologists = async (req, res) => {
                  biography
              FROM users
              WHERE role = 'psychologist' AND is_verified = true
-             ORDER BY display_name`
+             ORDER BY RANDOM()
+             LIMIT 25`
         );
 
-        res.json(result.rows);
+        if (rows.length === 0) {
+            return res.json([]);
+        }
+
+        const psychologistIds = rows.map((row) => row.id);
+        const visibilityResult = await query(
+            `SELECT psychologist_id, expires_at
+             FROM psychologist_profile_views
+             WHERE user_id = $1
+               AND psychologist_id = ANY($2::uuid[])`,
+            [req.user.id, psychologistIds]
+        );
+        const visibilityMap = new Map(
+            visibilityResult.rows.map((row) => [row.psychologist_id, new Date(row.expires_at)])
+        );
+
+        const selected = [];
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 60 * 60 * 1000);
+
+        for (const psychologist of rows) {
+            if (selected.length >= limit) break;
+            const viewExpiry = visibilityMap.get(psychologist.id);
+            if (viewExpiry && viewExpiry > now) {
+                continue;
+            }
+            selected.push(psychologist);
+            await query(
+                `INSERT INTO psychologist_profile_views (user_id, psychologist_id, seen_at, expires_at)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (user_id, psychologist_id)
+                 DO UPDATE SET seen_at = EXCLUDED.seen_at, expires_at = EXCLUDED.expires_at`,
+                [req.user.id, psychologist.id, now, expiresAt]
+            );
+        }
+
+        res.json(selected);
     } catch (error) {
         console.error('Get psychologists error:', error);
         res.status(500).json({ error: 'Failed to fetch psychologists' });
@@ -204,7 +258,12 @@ const sendMessageRequest = async (req, res) => {
             type: 'message_request',
             message: `${senderName} sent you a chat request`,
             entityType: 'conversation',
-            entityId: conversation.rows[0].id
+            entityId: conversation.rows[0].id,
+            metadata: {
+                conversationId: conversation.rows[0].id,
+                senderName,
+                url: `/messages?conversation=${conversation.rows[0].id}`
+            }
         });
         const io = req.app?.get('io');
         if (io && notification) {
@@ -337,9 +396,9 @@ const updateConversationStatus = async (req, res) => {
             result = await query(
                 `UPDATE conversations
        SET status = $1,
-           started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
-           expires_at = CURRENT_TIMESTAMP + make_interval(mins => $2),
-           time_limit_minutes = $2,
+           time_limit_minutes = COALESCE(time_limit_minutes, $2),
+           started_at = NULL,
+           expires_at = NULL,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $3
        RETURNING *`,
@@ -529,6 +588,24 @@ const sendMessage = async (req, res) => {
             return res.status(403).json({ error: 'Conversation time has expired' });
         }
 
+        if (!convo.started_at) {
+            const sessionUpdate = await query(
+                `UPDATE conversations
+                 SET started_at = CURRENT_TIMESTAMP,
+                     expires_at = CASE
+                        WHEN time_limit_minutes IS NOT NULL THEN CURRENT_TIMESTAMP + make_interval(mins => time_limit_minutes)
+                        ELSE CURRENT_TIMESTAMP + INTERVAL '120 minutes'
+                     END
+                 WHERE id = $1
+                 RETURNING started_at, expires_at`,
+                [conversationId]
+            );
+            if (sessionUpdate.rows.length) {
+                convo.started_at = sessionUpdate.rows[0].started_at;
+                convo.expires_at = sessionUpdate.rows[0].expires_at;
+            }
+        }
+
         const result = await query(
             `INSERT INTO messages (conversation_id, sender_id, content)
        VALUES ($1, $2, $3)
@@ -568,7 +645,13 @@ const sendMessage = async (req, res) => {
             type: 'message',
             message: `${senderName} sent you a message`,
             entityType: 'conversation',
-            entityId: conversationId
+            entityId: conversationId,
+            metadata: {
+                conversationId,
+                senderName,
+                preview: (content || '').slice(0, 140),
+                url: `/messages?conversation=${conversationId}`
+            }
         });
         if (io && notification) {
             io.to(`user-${recipientId}`).emit('notification', notification);
@@ -732,6 +815,19 @@ const startVideoSession = async (req, res) => {
     }
 };
 
+const getChatUsageSummary = async (req, res) => {
+    try {
+        const summary = await getUsageSummary(req.user);
+        res.json({
+            success: true,
+            data: summary
+        });
+    } catch (error) {
+        console.error('Get chat usage error:', error);
+        res.status(500).json({ success: false, error: 'Failed to load chat usage' });
+    }
+};
+
 module.exports = {
 
     requestChatWithPsychologist,
@@ -748,5 +844,6 @@ module.exports = {
     getUnreadCount,
     blockConversation,
     deleteConversation,
-    startVideoSession
+    startVideoSession,
+    getChatUsageSummary
 };

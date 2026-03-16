@@ -5,7 +5,7 @@ const DEFAULT_PLAN_DURATION_DAYS = Number(process.env.DEFAULT_PLAN_DURATION_DAYS
 const DEFAULT_CURRENCY = (PRICING_DEFAULT_CURRENCY || process.env.DEFAULT_CURRENCY || 'USD').toUpperCase();
 
 const PLAN_LIMITS = {
-    user_free: { tier: 'free', chatMinutes: 30, callMinutes: 0, displayName: 'Free', videoDiscount: 0, videoSessionsPerWeek: 1 },
+    user_free: { tier: 'free', chatMinutes: 120, callMinutes: 0, displayName: 'Free', videoDiscount: 0, videoSessionsPerWeek: 1 },
     user_premium: { tier: 'premium', chatMinutes: 120, callMinutes: 90, displayName: 'Premium', videoDiscount: 20, videoSessionsPerWeek: 3 },
     psychologist_standard: { tier: 'premium', chatMinutes: 180, callMinutes: 120, displayName: 'Psychologist Partner' },
     business_base: { tier: 'base', apiLimit: 1000, displayName: 'Business Base', ads: { maxActive: 1, analytics: 'limited' } },

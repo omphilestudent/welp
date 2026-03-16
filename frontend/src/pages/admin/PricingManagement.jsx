@@ -150,7 +150,8 @@ const PricingManagement = () => {
     };
 
     const filterCountries = (data = countryPricing) => {
-        let filtered = [...data];
+        const normalizedData = Array.isArray(data) ? data.map(normalizeCountryEntry) : [];
+        let filtered = [...normalizedData];
 
         // Apply search filter
         if (searchTerm) {

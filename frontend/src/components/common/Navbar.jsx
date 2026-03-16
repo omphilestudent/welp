@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import socketService from '../../services/socket';
 import { resolveMediaUrl } from '../../utils/media';
+import { presentNotificationFromPayload } from '../../utils/systemNotifications';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -106,6 +107,7 @@ const Navbar = () => {
                 const exists = prev.some((item) => item.id === notification.id);
                 return exists ? prev : [notification, ...prev].slice(0, 20);
             });
+            void presentNotificationFromPayload(notification);
         });
     };
 

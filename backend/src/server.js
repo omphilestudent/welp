@@ -28,6 +28,8 @@ const adminPricingRoutes = require('./routes/admin/pricingRoutes');
 const adsRoutes = require('./routes/adsRoutes');
 const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
 const { initEmailMarketingTables, startEmailCampaignScheduler } = require('./services/emailMarketingService');
+const { query } = require('./utils/database');
+const { createUserNotification } = require('./utils/userNotifications');
 
 // Database connection with better error handling
 const { sequelize, testConnection } = require('./models');
@@ -287,8 +289,6 @@ io.on('connection', (socket) => {
                 return socket.emit('error', { message: 'Message too long (max 5000 characters)' });
             }
 
-            const { query } = require('./utils/database');
-
             // Check conversation access
             const conversationAccess = await query(
                 `SELECT id, employee_id, psychologist_id FROM conversations
@@ -328,16 +328,23 @@ io.on('connection', (socket) => {
             // Emit to all in conversation
             io.to(`conversation-${conversationId}`).emit('ml-services-message', message);
 
-            const { createUserNotification } = require('./utils/userNotifications');
             const convo = conversationAccess.rows[0];
             const recipientId = convo.employee_id === socket.userId ? convo.psychologist_id : convo.employee_id;
             const senderName = message.sender?.display_name || 'Someone';
+            const metadata = {
+                conversationId,
+                senderId: socket.userId,
+                senderName,
+                preview: String(content).slice(0, 140),
+                url: `/messages?conversation=${conversationId}`
+            };
             const notification = await createUserNotification({
                 userId: recipientId,
                 type: 'message',
                 message: `${senderName} sent you a message`,
                 entityType: 'conversation',
-                entityId: conversationId
+                entityId: conversationId,
+                metadata
             });
 
             if (notification) {
@@ -353,7 +360,6 @@ io.on('connection', (socket) => {
     });
 
     const ensureConversationAccess = async (conversationId) => {
-        const { query } = require('./utils/database');
         const conversationAccess = await query(
             `SELECT id, employee_id, psychologist_id FROM conversations
              WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
@@ -369,19 +375,60 @@ io.on('connection', (socket) => {
             if (!allowed) {
                 return socket.emit('error', { message: 'Unauthorized conversation access' });
             }
+            const convoParticipants = await query(
+                `SELECT employee_id, psychologist_id FROM conversations WHERE id = $1`,
+                [conversationId]
+            );
+            if (!convoParticipants.rows.length) {
+                return socket.emit('error', { message: 'Conversation not found' });
+            }
+            const row = convoParticipants.rows[0];
+            const targetId = row.employee_id === socket.userId ? row.psychologist_id : row.employee_id;
             if (!activeCalls.has(conversationId)) {
                 activeCalls.set(conversationId, {
                     mediaType: mediaType || 'video',
-                    startedAt: Date.now(),
-                    initiatorId: socket.userId
+                    startedAt: null,
+                    initiatorId: socket.userId,
+                    targetId
                 });
+            } else {
+                const existing = activeCalls.get(conversationId);
+                existing.mediaType = mediaType || existing.mediaType || 'video';
+                existing.targetId = targetId;
+                activeCalls.set(conversationId, existing);
             }
+            const callerResult = await query(
+                'SELECT display_name FROM users WHERE id = $1',
+                [socket.userId]
+            );
+            const callerName = callerResult.rows[0]?.display_name || 'Someone';
             io.to(`conversation-${conversationId}`).emit('call:offer', {
                 conversationId,
                 sdp,
                 mediaType,
-                fromUserId: socket.userId
+                fromUserId: socket.userId,
+                callerName
             });
+            if (targetId) {
+                const metadata = {
+                    conversationId,
+                    mediaType: mediaType || 'video',
+                    callerId: socket.userId,
+                    callerName,
+                    url: `/messages?conversation=${conversationId}&focus=call`
+                };
+                const incomingNotification = await createUserNotification({
+                    userId: targetId,
+                    type: 'call_incoming',
+                    message: `${callerName} is calling you`,
+                    entityType: 'conversation',
+                    entityId: conversationId,
+                    metadata
+                });
+                if (incomingNotification) {
+                    io.to(`user-${targetId}`).emit('notification', incomingNotification);
+                }
+            }
         } catch (error) {
             console.error('Call offer error:', error);
         }
@@ -439,7 +486,6 @@ io.on('connection', (socket) => {
             });
             const active = activeCalls.get(conversationId);
             if (active && active.startedAt) {
-                const { query } = require('./utils/database');
                 const convo = await query(
                     `SELECT employee_id, psychologist_id FROM conversations WHERE id = $1`,
                     [conversationId]
@@ -462,6 +508,31 @@ io.on('connection', (socket) => {
                             durationSeconds
                         ]
                     );
+                }
+            }
+            if (active && !active.startedAt && active.targetId && socket.userId === active.initiatorId) {
+                const callerResult = await query(
+                    'SELECT display_name FROM users WHERE id = $1',
+                    [active.initiatorId]
+                );
+                const callerName = callerResult.rows[0]?.display_name || 'Someone';
+                const metadata = {
+                    conversationId,
+                    mediaType: active.mediaType || 'video',
+                    callerId: active.initiatorId,
+                    callerName,
+                    url: `/messages?conversation=${conversationId}`
+                };
+                const missedNotification = await createUserNotification({
+                    userId: active.targetId,
+                    type: 'call_missed',
+                    message: `You missed a call from ${callerName}`,
+                    entityType: 'conversation',
+                    entityId: conversationId,
+                    metadata
+                });
+                if (missedNotification) {
+                    io.to(`user-${active.targetId}`).emit('notification', missedNotification);
                 }
             }
             activeCalls.delete(conversationId);

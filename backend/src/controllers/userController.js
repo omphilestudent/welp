@@ -185,7 +185,8 @@ const getSettings = async (req, res) => {
                 language: 'en',
                 timezone: 'UTC',
                 two_factor_enabled: false,
-                login_alerts: true
+                login_alerts: true,
+                system_notification_state: 'default'
             });
         }
 
@@ -212,7 +213,8 @@ const updateSettings = async (req, res) => {
             language,
             timezone,
             twoFactorEnabled,
-            loginAlerts
+            loginAlerts,
+            systemNotificationState
         } = req.body;
 
         const current = await query(
@@ -227,9 +229,9 @@ const updateSettings = async (req, res) => {
                 user_id, theme, email_notifications, message_notifications, review_notifications,
                 marketing_notifications, product_updates, security_alerts,
                 profile_visibility, data_sharing, language, timezone,
-                two_factor_enabled, login_alerts
+                two_factor_enabled, login_alerts, system_notification_state
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             ON CONFLICT (user_id)
             DO UPDATE SET
                 theme = $2,
@@ -245,6 +247,7 @@ const updateSettings = async (req, res) => {
                 timezone = $12,
                 two_factor_enabled = $13,
                 login_alerts = $14,
+                system_notification_state = $15,
                 updated_at = CURRENT_TIMESTAMP`,
             [
                 req.user.id,
@@ -260,7 +263,8 @@ const updateSettings = async (req, res) => {
                 resolve(language, existing.language || 'en'),
                 resolve(timezone, existing.timezone || 'UTC'),
                 resolve(twoFactorEnabled, existing.two_factor_enabled ?? false),
-                resolve(loginAlerts, existing.login_alerts ?? true)
+                resolve(loginAlerts, existing.login_alerts ?? true),
+                resolve(systemNotificationState, existing.system_notification_state || 'default')
             ]
         );
 

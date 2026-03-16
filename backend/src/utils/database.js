@@ -904,6 +904,8 @@ const runMigrations = async () => {
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier subscription_tier_user DEFAULT 'free';",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires TIMESTAMP WITH TIME ZONE;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_chat_quota_mins INT DEFAULT 30;",
+            "ALTER TABLE users ALTER COLUMN daily_chat_quota_mins SET DEFAULT 120;",
+            "UPDATE users SET daily_chat_quota_mins = 120 WHERE daily_chat_quota_mins IS NULL OR daily_chat_quota_mins < 120;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS used_chat_minutes INT DEFAULT 0;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_chat_reset DATE DEFAULT CURRENT_DATE;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_psychologist_id UUID;",
@@ -922,6 +924,7 @@ const runMigrations = async () => {
                 timezone VARCHAR(50) DEFAULT 'UTC',
                 two_factor_enabled BOOLEAN DEFAULT false,
                 login_alerts BOOLEAN DEFAULT true,
+                system_notification_state VARCHAR(16) DEFAULT 'default',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`,
@@ -1046,6 +1049,14 @@ const runMigrations = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(psychologist_id, employee_id)
             );`,
+            `CREATE TABLE IF NOT EXISTS psychologist_profile_views (
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                PRIMARY KEY(user_id, psychologist_id)
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_psych_profile_views_expiry ON psychologist_profile_views(expires_at);",
             "ALTER TABLE psychologist_leads ADD COLUMN IF NOT EXISTS source_review_id UUID REFERENCES reviews(id);",
             "CREATE INDEX IF NOT EXISTS idx_psych_schedule_psychologist ON psychologist_schedule_items(psychologist_id);",
             "CREATE INDEX IF NOT EXISTS idx_psych_leads_psychologist ON psychologist_leads(psychologist_id);",
@@ -1059,10 +1070,13 @@ const runMigrations = async () => {
                 message TEXT NOT NULL,
                 entity_type VARCHAR(50),
                 entity_id UUID,
+                metadata JSONB DEFAULT '{}'::jsonb,
                 is_read BOOLEAN DEFAULT false,
                 read_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`,
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS system_notification_state VARCHAR(16) DEFAULT 'default';",
+            "ALTER TABLE user_notifications ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;",
             "CREATE INDEX IF NOT EXISTS idx_user_notifications_user ON user_notifications(user_id);",
             "CREATE INDEX IF NOT EXISTS idx_user_notifications_unread ON user_notifications(user_id, is_read) WHERE is_read = false;",
             `CREATE TABLE IF NOT EXISTS mental_health_resources (

@@ -6,9 +6,11 @@ import api from '../services/api';
 import socketService from '../services/socket';
 import ConversationList from '../components/messages/ConversationList';
 import MessageThread from '../components/messages/MessageThread';
+import ChatAllocationModal from '../components/messages/ChatAllocationModal';
 import Loading from '../components/common/Loading';
 import toast from 'react-hot-toast';
 import { FaSearch, FaStar, FaUserPlus, FaVideo, FaHistory, FaClock, FaExclamationTriangle } from 'react-icons/fa';
+import { fetchChatUsage } from '../services/chatUsageService';
 
 const Messages = () => {
     const [searchParams] = useSearchParams();
@@ -26,7 +28,8 @@ const Messages = () => {
     const [psychPermissions, setPsychPermissions] = useState(null);
     const [availablePsychologists, setAvailablePsychologists] = useState([]);
     const [subscription, setSubscription] = useState(null);
-    const [isRequestingSupport, setIsRequestingSupport] = useState(false);
+    const [chatUsage, setChatUsage] = useState(null);
+    const [allocationModal, setAllocationModal] = useState({ open: false, psychologist: null, loading: false });
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [now, setNow] = useState(Date.now());
     const [callState, setCallState] = useState({ status: 'idle', mediaType: 'video', conversationId: null, fromUserId: null });
@@ -107,7 +110,10 @@ const Messages = () => {
     const autoDeleteNote = user?.role === 'employee'
         ? 'Free sessions last two hours and delete automatically once the timer runs out.'
         : 'Sessions respect your subscription limits.';
-    const canRequestSupport = user?.role === 'employee' && visibleConversations.length === 0 && !!featuredPsychologist;
+    const canRequestSupport = user?.role === 'employee'
+        && visibleConversations.length === 0
+        && !!featuredPsychologist
+        && (chatUsage?.remaining ?? 1) > 0;
     const canStartVideoCall = Boolean(activeConversation) && !isConversationExpired;
 
     const fetchConversations = async () => {
@@ -145,6 +151,16 @@ const Messages = () => {
             console.error('Failed to load subscription', err);
         }
     };
+
+    const loadChatUsage = useCallback(async () => {
+        if (user?.role !== 'employee') return;
+        try {
+            const summary = await fetchChatUsage();
+            setChatUsage(summary);
+        } catch (error) {
+            console.error('Failed to load chat usage', error);
+        }
+    }, [user?.role]);
 
     const fetchAvailablePsychologists = async () => {
         try {
@@ -191,8 +207,9 @@ const Messages = () => {
         if (userRole === 'employee' && userId) {
             fetchSubscription();
             fetchAvailablePsychologists();
+            loadChatUsage();
         }
-    }, [userId, userRole]);
+    }, [userId, userRole, loadChatUsage]);
 
     useEffect(() => {
         const conversationId = searchParams.get('conversation');
@@ -233,7 +250,7 @@ const Messages = () => {
     }, [activeConversation?.id]);
 
     useEffect(() => {
-        const interval = setInterval(() => setNow(Date.now()), 30000);
+        const interval = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(interval);
     }, []);
 
@@ -376,20 +393,32 @@ const Messages = () => {
         new Notification(title, { body: 'Open Welp to respond.' });
     };
 
-    const handleRequestPsychologist = async (psychologist) => {
+    const handleRequestPsychologist = (psychologist) => {
         if (!psychologist) return;
-        setIsRequestingSupport(true);
+        setAllocationModal({
+            open: true,
+            psychologist,
+            loading: false
+        });
+    };
+
+    const handleConfirmAllocation = async (minutes) => {
+        if (!allocationModal.psychologist || !minutes) return;
+        setAllocationModal((prev) => ({ ...prev, loading: true }));
         try {
             await api.post('/messages/request-chat', {
-                psychologistId: psychologist.id,
+                psychologistId: allocationModal.psychologist.id,
+                sessionMinutes: minutes,
                 initialMessage: 'Hi, I am looking for confidential support when you are free.'
             });
             toast.success('Request sent. The psychologist will reach out shortly.');
+            setAllocationModal({ open: false, psychologist: null, loading: false });
             fetchConversations();
+            fetchAvailablePsychologists();
+            loadChatUsage();
         } catch (err) {
             toast.error(err?.response?.data?.error || 'Failed to request support');
-        } finally {
-            setIsRequestingSupport(false);
+            setAllocationModal((prev) => ({ ...prev, loading: false }));
         }
     };
 
@@ -882,6 +911,22 @@ const Messages = () => {
                 <div className="messages-main">
                     {user?.role === 'employee' && (
                         <div className="employee-support-panel">
+                            {chatUsage && (
+                                <section className="chat-usage-card">
+                                    <div>
+                                        <p className="status-label">Today's chat time</p>
+                                        <h4>{chatUsage.remaining} minutes remaining</h4>
+                                    <p className="conversation-status-subtitle">
+                                        Used {chatUsage.used} / {chatUsage.limit} minutes
+                                    </p>
+                                    {chatUsage.remaining <= 0 && (
+                                        <p className="upgrade-reminder">
+                                            Daily limit reached. Come back tomorrow for more chats.
+                                        </p>
+                                    )}
+                                    </div>
+                                </section>
+                            )}
                             <section className="available-psych-card">
                                 <div className="available-psych-card__header">
                                     <span>Available psychologist</span>
@@ -920,9 +965,9 @@ const Messages = () => {
                                     <button
                                         className="btn btn-primary btn-small"
                                         onClick={() => handleRequestPsychologist(featuredPsychologist)}
-                                        disabled={!canRequestSupport || isRequestingSupport || !featuredPsychologist}
+                                        disabled={!canRequestSupport || allocationModal.loading || !featuredPsychologist}
                                     >
-                                        {isRequestingSupport ? 'Requesting...' : 'Request private support'}
+                                        {allocationModal.loading ? 'Requesting...' : 'Request private support'}
                                     </button>
                                     {featuredPsychologist?.website && (
                                         <a
@@ -1055,6 +1100,14 @@ const Messages = () => {
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
+            <ChatAllocationModal
+                open={allocationModal.open}
+                psychologist={allocationModal.psychologist}
+                remainingMinutes={chatUsage?.remaining}
+                loading={allocationModal.loading}
+                onClose={() => setAllocationModal({ open: false, psychologist: null, loading: false })}
+                onConfirm={handleConfirmAllocation}
+            />
         </div>
     );
 };

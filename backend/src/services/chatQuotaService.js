@@ -5,7 +5,7 @@ const getLimitForTier = (tier = 'free') => {
     if (tier === 'premium') {
         return PLAN_LIMITS.user_premium?.chatMinutes ?? 120;
     }
-    return PLAN_LIMITS.user_free?.chatMinutes ?? 30;
+    return PLAN_LIMITS.user_free?.chatMinutes ?? 120;
 };
 
 const getTodayKey = () => {
@@ -51,7 +51,23 @@ const ensureChatQuota = async (user, minutes = 1) => {
     };
 };
 
+const getUsageSummary = async (user) => {
+    const quotaDate = getTodayKey();
+    const limit = getLimitForTier(user.subscription_tier);
+    const used = await fetchUsage(user.id, quotaDate);
+    const remaining = Math.max(0, limit - used);
+    return {
+        date: quotaDate,
+        used,
+        remaining,
+        limit
+    };
+};
+
 module.exports = {
     getLimitForTier,
-    ensureChatQuota
+    ensureChatQuota,
+    fetchUsage,
+    getTodayKey,
+    getUsageSummary
 };

@@ -125,10 +125,218 @@ const COUNTRY_NAME_FALLBACKS = {
     KW: 'Kuwait'
 };
 
+const BLUEPRINT_BASE_CURRENCY = 'ZAR';
+const DEFAULT_PLAN_BLUEPRINTS = {
+    user: [
+        {
+            planCode: 'user_free',
+            planTier: 'free',
+            amountMinor: 0,
+            displayName: 'Free Plan',
+            features: [
+                '30 minutes psychologist chat per day',
+                'Unlimited business reviews',
+                'Random psychologist assignment',
+                'No video call discounts'
+            ],
+            limits: {
+                chat: { minutesPerDay: 30 },
+                reviews: { unlimited: true },
+                perks: { choosePsychologist: false }
+            },
+            isDefault: true
+        },
+        {
+            planCode: 'user_premium',
+            planTier: 'premium',
+            amountMinor: 15000,
+            displayName: 'Premium Plan',
+            badge: 'Best value',
+            features: [
+                '2 hours psychologist chat per day',
+                'Unlimited reviews',
+                'Video call discounts included',
+                'Choose your psychologist',
+                'Monthly psychologist selection reset',
+                'Priority support'
+            ],
+            limits: {
+                chat: { minutesPerDay: 120 },
+                video: { discounts: true },
+                perks: { choosePsychologist: true }
+            }
+        }
+    ],
+    psychologist: [
+        {
+            planCode: 'psychologist_standard',
+            planTier: 'premium',
+            amountMinor: 50000,
+            displayName: 'Psychologist Partner',
+            features: [
+                'Client matching based on specialization',
+                'Priority access to paying clients',
+                'Video call scheduling tools',
+                'Calendar integration',
+                'Analytics dashboard',
+                'Marketing exposure',
+                'Verified client reviews',
+                'API keys for CRM integration'
+            ],
+            limits: {
+                leads: { priority: true },
+                analytics: { level: 'advanced' }
+            },
+            isDefault: true
+        }
+    ],
+    business: [
+        {
+            planCode: 'business_base',
+            planTier: 'base',
+            amountMinor: 100000,
+            displayName: 'Base Plan',
+            features: [
+                '1,000 API calls per day',
+                'Business profile access',
+                'Basic analytics'
+            ],
+            limits: {
+                api: { callsPerDay: 1000 },
+                ads: { maxActive: 1, analytics: 'limited' }
+            },
+            isDefault: true
+        },
+        {
+            planCode: 'business_enhanced',
+            planTier: 'enhanced',
+            amountMinor: 200000,
+            displayName: 'Enhanced Plan',
+            features: [
+                '3,000 API calls per day',
+                'Expanded analytics',
+                'Marketing insights',
+                'Upload promotional media'
+            ],
+            limits: {
+                api: { callsPerDay: 3000 },
+                ads: { maxActive: 5, analytics: 'standard' }
+            },
+            badge: 'Growth'
+        },
+        {
+            planCode: 'business_premium',
+            planTier: 'premium',
+            amountMinor: 300000,
+            displayName: 'Premium Plan',
+            features: [
+                '10,000 API calls per day',
+                'Advanced analytics',
+                'Email insights on user behavior',
+                'Advertisement capabilities',
+                'Advertise on other business pages',
+                'Priority campaign support'
+            ],
+            limits: {
+                api: { callsPerDay: 10000 },
+                ads: { maxActive: null, analytics: 'advanced' },
+                email: { insights: true }
+            },
+            badge: 'Premium'
+        }
+    ]
+};
+
 const currencyCache = new Map();
 const countryPreferenceCache = new Map();
 let countryListCache = { data: null, expiresAt: 0 };
 let countryTableMissing = false;
+let subscriptionCountryTableMissing = false;
+
+const SUBSCRIPTION_COUNTRY_BASE_QUERY = `
+    SELECT sp.country_code,
+           sp.country_name,
+           sp.multiplier,
+           sp.currency_code,
+           sp.client_paid_monthly_zar,
+           sp.psychologist_monthly_zar,
+           sp.business_base_monthly_zar,
+           sp.business_enhanced_monthly_zar,
+           sp.business_premium_monthly_zar,
+           c.symbol AS currency_symbol
+    FROM subscription_pricing_by_country sp
+    LEFT JOIN currencies c ON c.code = sp.currency_code
+`;
+
+const mapSubscriptionCountryRow = (row) => {
+    if (!row) return null;
+    const code = row.country_code ? row.country_code.toUpperCase() : null;
+    if (!code) return null;
+    const currencyCode = (row.currency_code || DEFAULT_CURRENCY).toUpperCase();
+    const multiplier = Number(row.multiplier) || 1;
+    return {
+        code,
+        name: row.country_name || COUNTRY_NAME_FALLBACKS[code] || code,
+        multiplier,
+        currency: currencyCode,
+        currencySymbol: row.currency_symbol || null,
+        prices: {
+            client: row.client_paid_monthly_zar != null ? Number(row.client_paid_monthly_zar) : null,
+            psychologist: row.psychologist_monthly_zar != null ? Number(row.psychologist_monthly_zar) : null,
+            businessBase: row.business_base_monthly_zar != null ? Number(row.business_base_monthly_zar) : null,
+            businessEnhanced: row.business_enhanced_monthly_zar != null ? Number(row.business_enhanced_monthly_zar) : null,
+            businessPremium: row.business_premium_monthly_zar != null ? Number(row.business_premium_monthly_zar) : null
+        },
+        source: 'subscription'
+    };
+};
+
+const fetchSubscriptionCountryRecord = async (code) => {
+    if (subscriptionCountryTableMissing || !code) {
+        return null;
+    }
+    try {
+        const { rows } = await query(
+            `${SUBSCRIPTION_COUNTRY_BASE_QUERY}
+             WHERE UPPER(sp.country_code) = $1
+             LIMIT 1`,
+            [code]
+        );
+        if (rows.length) {
+            return mapSubscriptionCountryRow(rows[0]);
+        }
+    } catch (error) {
+        if (error?.code === '42P01') {
+            subscriptionCountryTableMissing = true;
+        } else {
+            console.warn('Subscription country pricing lookup failed:', error.message);
+        }
+    }
+    return null;
+};
+
+const fetchSubscriptionCountryList = async () => {
+    if (subscriptionCountryTableMissing) {
+        return null;
+    }
+    try {
+        const { rows } = await query(
+            `${SUBSCRIPTION_COUNTRY_BASE_QUERY}
+             ORDER BY sp.country_name ASC`
+        );
+        if (rows.length === 0) {
+            return [];
+        }
+        return rows.map(mapSubscriptionCountryRow).filter(Boolean);
+    } catch (error) {
+        if (error?.code === '42P01') {
+            subscriptionCountryTableMissing = true;
+        } else {
+            console.warn('Subscription country pricing catalog lookup failed:', error.message);
+        }
+        return null;
+    }
+};
 
 const buildFallbackCountryEntry = (code) => {
     if (!code) return null;
@@ -162,6 +370,14 @@ const getCountryPreferenceRecord = async (countryCode) => {
     const cached = countryPreferenceCache.get(normalized);
     if (cached && cached.expiresAt > Date.now()) {
         return cached.value;
+    }
+    const subscriptionRecord = await fetchSubscriptionCountryRecord(normalized);
+    if (subscriptionRecord) {
+        countryPreferenceCache.set(normalized, {
+            value: subscriptionRecord,
+            expiresAt: Date.now() + COUNTRY_CACHE_TTL_MS
+        });
+        return subscriptionRecord;
     }
     if (!countryTableMissing) {
         try {
@@ -209,6 +425,14 @@ const getCountryPreferenceRecord = async (countryCode) => {
 const listCountryPricing = async () => {
     if (countryListCache.data && countryListCache.expiresAt > Date.now()) {
         return countryListCache.data;
+    }
+    const subscriptionList = await fetchSubscriptionCountryList();
+    if (Array.isArray(subscriptionList) && subscriptionList.length) {
+        countryListCache = {
+            data: subscriptionList,
+            expiresAt: Date.now() + COUNTRY_LIST_CACHE_TTL_MS
+        };
+        return subscriptionList;
     }
     if (!countryTableMissing) {
         try {

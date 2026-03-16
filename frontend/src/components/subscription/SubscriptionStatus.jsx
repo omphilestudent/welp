@@ -439,15 +439,15 @@ const SubscriptionStatus = () => {
         subscription?.planTier || subscription?.plan_tier || subscription?.planTierNormalized
     );
     const planIdentifier = subscription?.planCode || subscription?.planCodeNormalized;
-    const planTierHint = subscription?.planTier || subscription?.plan_tier || subscriptionTierNormalized;
+    const planTierHintValue = subscription?.planTier || subscription?.plan_tier || subscriptionTierNormalized;
 
     useEffect(() => {
         if (!planIdentifier) {
             setLocalizedPlan(null);
             return;
         }
-        loadLocalizedPlan(planIdentifier, audienceKey, planTierHint);
-    }, [planIdentifier, audienceKey, planTierHint, loadLocalizedPlan]);
+        loadLocalizedPlan(planIdentifier, audienceKey, planTierHintValue);
+    }, [planIdentifier, audienceKey, planTierHintValue, loadLocalizedPlan]);
 
     const handleUpgrade = async () => {
         if (actionLoading) return;

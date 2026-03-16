@@ -17,16 +17,17 @@ const shouldNotifyUser = async (userId) => {
     }
 };
 
-const createUserNotification = async ({ userId, type, message, entityType, entityId }) => {
+const createUserNotification = async ({ userId, type, message, entityType, entityId, metadata }) => {
     if (!userId) return null;
     const allow = await shouldNotifyUser(userId);
     if (!allow) return null;
+    const payload = metadata && typeof metadata === 'object' ? metadata : {};
 
     const result = await query(
-        `INSERT INTO user_notifications (user_id, type, message, entity_type, entity_id)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO user_notifications (user_id, type, message, entity_type, entity_id, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb)
          RETURNING *`,
-        [userId, type, message, entityType || null, entityId || null]
+        [userId, type, message, entityType || null, entityId || null, JSON.stringify(payload)]
     );
     return result.rows[0] || null;
 };

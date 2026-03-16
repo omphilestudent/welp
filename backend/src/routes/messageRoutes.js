@@ -42,9 +42,9 @@ router.patch('/conversations/:conversationId/status',
 router.post('/request-chat',
     authenticate,
     authorize('employee'),
-    applyTierLimits({ feature: 'chat' }),
     validate([
         body('psychologistId').isUUID(),
+        body('sessionMinutes').isInt({ min: 5, max: 120 }).withMessage('Session minutes must be between 5 and 120'),
         body('initialMessage').optional().trim()
     ]),
     messageController.requestChatWithPsychologist
@@ -63,6 +63,12 @@ router.get('/conversations',
     messageController.getConversations
 );
 
+router.get('/chat-usage',
+    authenticate,
+    authorize('employee'),
+    messageController.getChatUsageSummary
+);
+
 router.get('/conversations/:conversationId/messages',
     authenticate,
     messageController.getConversationMessages
@@ -70,7 +76,6 @@ router.get('/conversations/:conversationId/messages',
 
 router.post('/conversations/:conversationId/messages',
     authenticate,
-    applyTierLimits({ feature: 'chat' }),
     messageLimiter,
     validate(messageValidation),
     messageController.sendMessage

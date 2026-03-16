@@ -58,7 +58,7 @@ const markAllRead = async (req, res) => {
         await query(
             `UPDATE user_notifications
              SET is_read = true, read_at = CURRENT_TIMESTAMP
-             WHERE user_id = $1 AND is_read = false`,
+            WHERE user_id = $1 AND is_read = false`,
             [req.user.id]
         );
         res.json({ message: 'Notifications marked as read' });
@@ -68,9 +68,32 @@ const markAllRead = async (req, res) => {
     }
 };
 
+const updatePermission = async (req, res) => {
+    try {
+        const rawState = typeof req.body?.state === 'string' ? req.body.state.toLowerCase() : 'default';
+        const allowedStates = new Set(['granted', 'denied', 'default']);
+        const state = allowedStates.has(rawState) ? rawState : 'default';
+
+        await query(
+            `INSERT INTO user_settings (user_id, system_notification_state)
+             VALUES ($1, $2)
+             ON CONFLICT (user_id) DO UPDATE
+             SET system_notification_state = EXCLUDED.system_notification_state,
+                 updated_at = CURRENT_TIMESTAMP`,
+            [req.user.id, state]
+        );
+
+        res.json({ success: true, state });
+    } catch (error) {
+        console.error('Update notification permission error:', error);
+        res.status(500).json({ error: 'Failed to update notification permission' });
+    }
+};
+
 module.exports = {
     listNotifications,
     getUnreadCount,
     markNotificationRead,
-    markAllRead
+    markAllRead,
+    updatePermission
 };
