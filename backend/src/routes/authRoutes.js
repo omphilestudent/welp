@@ -7,6 +7,7 @@ const {
     registerBusiness,
     login,
     getMe,
+    getSessionSettings,
     logout,
     refreshToken
 } = require('../controllers/authController');
@@ -25,5 +26,6 @@ router.post('/refresh', refreshToken);
 
 // Protected
 router.get('/me', authenticate, getMe);
+router.get('/session-settings', authenticate, getSessionSettings);
 
 module.exports = router;

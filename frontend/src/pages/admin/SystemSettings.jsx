@@ -10,6 +10,8 @@ const DEFAULT_SETTINGS = {
     registrationEnabled: true,
     defaultUserRole: 'user',
     sessionTimeout: 30,
+    inactivityTimeoutMinutes: 30,
+    autoLogoutEnabled: false,
     maxLoginAttempts: 5,
     twoFactorAuth: false,
     emailNotifications: true,
@@ -28,6 +30,8 @@ const KEY_MAP = {
     registrationEnabled: 'registration_enabled',
     defaultUserRole: 'default_user_role',
     sessionTimeout: 'session_timeout',
+    inactivityTimeoutMinutes: 'inactivity_timeout_minutes',
+    autoLogoutEnabled: 'auto_logout_enabled',
     maxLoginAttempts: 'max_login_attempts',
     twoFactorAuth: 'two_factor_auth',
     emailNotifications: 'email_notifications',
@@ -56,6 +60,7 @@ const TAB_OPTIONS = [
     { id: 'admins', label: 'Admin Management' },
     { id: 'general', label: 'General' },
     { id: 'security', label: 'Security' },
+    { id: 'session', label: 'Session Management' },
     { id: 'system', label: 'System' }
 ];
 
@@ -112,14 +117,6 @@ const FIELD_GROUPS = {
     ],
     security: [
         {
-            name: 'sessionTimeout',
-            label: 'Session Timeout (minutes)',
-            type: 'number',
-            min: 5,
-            max: 240,
-            helper: 'Users will be logged out after this period of inactivity.'
-        },
-        {
             name: 'maxLoginAttempts',
             label: 'Max Login Attempts',
             type: 'number',
@@ -136,6 +133,22 @@ const FIELD_GROUPS = {
             name: 'emailNotifications',
             label: 'Notify On Suspicious Logins',
             type: 'checkbox'
+        }
+    ],
+    session: [
+        {
+            name: 'inactivityTimeoutMinutes',
+            label: 'Inactivity Timeout (minutes)',
+            type: 'number',
+            min: 5,
+            max: 240,
+            helper: 'Suggested values: 5, 10, 15, 30, 60 minutes.'
+        },
+        {
+            name: 'autoLogoutEnabled',
+            label: 'Enable Auto Logout',
+            type: 'checkbox',
+            helper: 'Automatically sign out inactive users across all tabs.'
         }
     ],
     system: [
@@ -669,7 +682,7 @@ const SystemSettings = () => {
                     </div>
                 </section>
             )}
-            {['general', 'security', 'system'].includes(activeTab) && (
+            {['general', 'security', 'session', 'system'].includes(activeTab) && (
                 <section className="settings-card">
                     <div className="card-header">
                         <div>

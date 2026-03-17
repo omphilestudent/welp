@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const INACTIVITY_LOGOUT_FLAG = 'welp_inactivity_logout';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -53,6 +54,10 @@ api.interceptors.response.use(
 
         // Handle 401 errors
         if (error.response?.status === 401) {
+            const message = String(error.response?.data?.message || error.response?.data?.error || '');
+            if (message.toLowerCase().includes('inactivity')) {
+                localStorage.setItem(INACTIVITY_LOGOUT_FLAG, JSON.stringify({ reason: 'timeout', at: Date.now() }));
+            }
             localStorage.removeItem('token');
             sessionStorage.removeItem('token');
             window.location.href = '/login';

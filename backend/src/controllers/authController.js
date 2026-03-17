@@ -5,6 +5,7 @@ const { createAdminNotification } = require('../utils/adminNotifications');
 const { emitFlowEvent } = require('../services/flowEngine');
 const { enqueueMarketingForUser } = require('../services/marketingEmailService');
 const { getTokenFromRequest } = require('../middleware/auth');
+const { fetchSessionSettings } = require('../utils/sessionSettings');
 const {
     createSubscriptionRecord,
     updateUserSubscriptionTier,
@@ -876,6 +877,19 @@ const login = async (req, res) => {
 
         const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
 
+        try {
+            const hasLastLogin = await columnExists('users', 'last_login');
+            const hasLastActive = await columnExists('users', 'last_active');
+            if (hasLastLogin || hasLastActive) {
+                const setParts = [];
+                if (hasLastLogin) setParts.push('last_login = CURRENT_TIMESTAMP');
+                if (hasLastActive) setParts.push('last_active = CURRENT_TIMESTAMP');
+                await query(`UPDATE users SET ${setParts.join(', ')} WHERE id = $1`, [user.id]);
+            }
+        } catch (updateError) {
+            console.warn('Failed to update login activity:', updateError.message);
+        }
+
         console.info('Login success', {
             email: loginEmail,
             role: normalizedRole,
@@ -953,6 +967,20 @@ const logout = async (req, res) => {
     return res.json({ success: true, message: 'Logged out successfully' });
 };
 
+const getSessionSettings = async (req, res) => {
+    try {
+        const settings = await fetchSessionSettings();
+        return res.json({
+            inactivityTimeout: settings.inactivityTimeoutMinutes,
+            inactivityTimeoutMinutes: settings.inactivityTimeoutMinutes,
+            autoLogoutEnabled: settings.autoLogoutEnabled
+        });
+    } catch (error) {
+        console.error('Session settings fetch failed:', error);
+        return res.status(500).json({ error: 'Failed to fetch session settings' });
+    }
+};
+
 const refreshToken = async (req, res) => {
     try {
         const token = getTokenFromRequest(req);
@@ -1025,6 +1053,7 @@ module.exports = {
     registerBusiness,
     login,
     getMe,
+    getSessionSettings,
     logout,
     refreshToken
 };

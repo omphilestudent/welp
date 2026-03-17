@@ -5,6 +5,21 @@ const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaServi
 const { PLAN_LIMITS } = require('../services/subscriptionService');
 const { emitFlowEvent } = require('../services/flowEngine');
 
+const columnExists = async (tableName, columnName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+            )`,
+            [tableName, columnName]
+        );
+        return result.rows[0]?.exists === true;
+    } catch {
+        return false;
+    }
+};
+
 const getChatMinutesForTier = (tier = 'free') => {
     const normalized = String(tier || 'free').toLowerCase();
     if (normalized === 'premium') {
@@ -41,6 +56,10 @@ const getPerSessionCapForUser = (user = {}) => {
 };
 
 const expireConversations = async () => {
+    const hasExpiresAt = await columnExists('conversations', 'expires_at');
+    if (!hasExpiresAt) {
+        return;
+    }
     const expired = await query(
         `SELECT id
          FROM conversations
@@ -468,6 +487,20 @@ const getConversations = async (req, res) => {
     try {
         await expireConversations();
 
+        const [
+            hasUserAnonymous,
+            hasAvatar,
+            hasSpecialization,
+            hasMessageRead,
+            hasSystemMessage
+        ] = await Promise.all([
+            columnExists('users', 'is_anonymous'),
+            columnExists('users', 'avatar_url'),
+            columnExists('users', 'specialization'),
+            columnExists('messages', 'is_read'),
+            columnExists('messages', 'is_system_message')
+        ]);
+
         const statusFilter = ['pending', 'accepted', 'rejected', 'blocked', 'ended'];
         let whereClause = '';
         if (req.user.role === 'employee') {
@@ -480,40 +513,49 @@ const getConversations = async (req, res) => {
 
         const params = [req.user.id, statusFilter];
 
+        const employeeAvatar = hasAvatar ? 'employee.avatar_url' : 'NULL';
+        const employeeAnon = hasUserAnonymous ? 'employee.is_anonymous' : 'false';
+        const psychologistAvatar = hasAvatar ? 'psychologist.avatar_url' : 'NULL';
+        const psychologistSpec = hasSpecialization ? 'psychologist.specialization' : 'NULL';
+        const systemMessageValue = hasSystemMessage ? 'is_system_message' : 'false';
+        const unreadCountSelect = hasMessageRead
+            ? `(
+          SELECT COUNT(*)
+          FROM messages
+          WHERE conversation_id = c.id
+            AND sender_id != $1
+            AND is_read = false
+        ) as unread_count`
+            : '0 as unread_count';
+
         const result = await query(
             `SELECT
         c.*,
         json_build_object(
           'id', employee.id,
           'display_name', employee.display_name,
-          'avatar_url', employee.avatar_url,
-          'is_anonymous', employee.is_anonymous
+          'avatar_url', ${employeeAvatar},
+          'is_anonymous', ${employeeAnon}
         ) as employee,
         json_build_object(
           'id', psychologist.id,
           'display_name', psychologist.display_name,
-          'avatar_url', psychologist.avatar_url,
-          'specialization', psychologist.specialization
+          'avatar_url', ${psychologistAvatar},
+          'specialization', ${psychologistSpec}
         ) as psychologist,
         (
           SELECT json_build_object(
             'content', content,
             'createdAt', created_at,
             'senderId', sender_id,
-            'isSystemMessage', is_system_message
+            'isSystemMessage', ${systemMessageValue}
           )
           FROM messages
           WHERE conversation_id = c.id
           ORDER BY created_at DESC
           LIMIT 1
         ) as last_message,
-        (
-          SELECT COUNT(*)
-          FROM messages
-          WHERE conversation_id = c.id
-            AND sender_id != $1
-            AND is_read = false
-        ) as unread_count
+        ${unreadCountSelect}
        FROM conversations c
        JOIN users employee ON c.employee_id = employee.id
        JOIN users psychologist ON c.psychologist_id = psychologist.id
@@ -694,6 +736,10 @@ const markMessagesAsRead = async (req, res) => {
     try {
         const { conversationId } = req.params;
 
+        const hasIsRead = await columnExists('messages', 'is_read');
+        if (!hasIsRead) {
+            return res.json({ message: 'Messages marked as read' });
+        }
 
         const conversation = await query(
             `SELECT * FROM conversations
@@ -722,6 +768,10 @@ const markMessagesAsRead = async (req, res) => {
 
 const getUnreadCount = async (req, res) => {
     try {
+        const hasIsRead = await columnExists('messages', 'is_read');
+        if (!hasIsRead) {
+            return res.json({ count: 0 });
+        }
         let conversationIds;
 
         if (req.user.role === 'employee') {

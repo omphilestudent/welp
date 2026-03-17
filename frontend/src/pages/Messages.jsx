@@ -671,7 +671,7 @@ const Messages = () => {
         setCallStartedAt(null);
     };
 
-    const endCall = (notify = true) => {
+    function endCall(notify = true) {
         if (notify && callState.conversationId) {
             socketService.emitCallEnd({ conversationId: callState.conversationId, reason: 'ended' });
         }
@@ -691,7 +691,7 @@ const Messages = () => {
         setIncomingOffer(null);
         stopRingtone();
         setCallStartedAt(null);
-    };
+    }
 
     const toggleMute = () => {
         const stream = localStreamRef.current;

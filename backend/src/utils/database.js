@@ -840,6 +840,12 @@ const insertDefaultData = async () => {
 const runMigrations = async () => {
     try {
         const migrations = [
+            `CREATE TABLE IF NOT EXISTS system_settings (
+                key VARCHAR(120) PRIMARY KEY,
+                value JSONB,
+                updated_by UUID,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
             // Currency table hardening (backfill legacy columns)
             "ALTER TABLE currencies ADD COLUMN IF NOT EXISTS symbol VARCHAR(8) NOT NULL DEFAULT '$';",
             "ALTER TABLE currencies ALTER COLUMN symbol SET DEFAULT '$';",

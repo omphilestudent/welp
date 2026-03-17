@@ -62,6 +62,13 @@ const Login = () => {
         }
     }, [message]);
 
+    useEffect(() => {
+        const raw = localStorage.getItem('welp_inactivity_logout');
+        if (!raw) return;
+        localStorage.removeItem('welp_inactivity_logout');
+        toast.error('You have been logged out due to inactivity.');
+    }, []);
+
     // Clear errors when switching login methods
     useEffect(() => {
         if (loginMethod) {

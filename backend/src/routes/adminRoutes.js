@@ -133,6 +133,7 @@ router.patch('/subscriptions/pricing/:countryCode', adminController.updateCountr
 
 
 router.get('/settings', adminController.getSystemSettings);
+router.get('/session-settings', adminController.getSessionSettings);
 
 // Marketing email templates
 router.get('/marketing/templates', marketingController.listTemplates);
@@ -204,6 +205,14 @@ router.post('/ml/train', adminController.trainMlModel);
 router.post('/ml/predict', adminController.predictMl);
 
 router.patch('/settings', adminController.updateSystemSettings);
+router.post('/session-settings',
+    validate([
+        body('inactivityTimeoutMinutes').optional().isInt({ min: 1 }),
+        body('inactivityTimeout').optional().isInt({ min: 1 }),
+        body('autoLogoutEnabled').optional().isBoolean()
+    ]),
+    adminController.updateSessionSettings
+);
 
 
 router.get('/audit-logs', adminController.getAuditLogs);

@@ -3,6 +3,7 @@ const { query } = require('../utils/database');
 const bcrypt = require('bcryptjs');
 const { getAdminNotifications, markAdminNotificationRead } = require('../utils/adminNotifications');
 const { recordAuditLog } = require('../utils/auditLogger');
+const { fetchSessionSettings, persistSessionSettings } = require('../utils/sessionSettings');
 const {
     listApplications,
     applyApplicationAction,
@@ -1092,6 +1093,55 @@ const updateSystemSettings = async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to update settings' }); }
 };
 
+const getSessionSettings = async (req, res) => {
+    try {
+        const settings = await fetchSessionSettings();
+        return res.json({
+            inactivityTimeout: settings.inactivityTimeoutMinutes,
+            inactivityTimeoutMinutes: settings.inactivityTimeoutMinutes,
+            autoLogoutEnabled: settings.autoLogoutEnabled
+        });
+    } catch (error) {
+        console.error('Failed to fetch session settings:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch session settings' });
+    }
+};
+
+const updateSessionSettings = async (req, res) => {
+    try {
+        const timeoutRaw = req.body.inactivityTimeoutMinutes ?? req.body.inactivityTimeout;
+        const autoLogoutRaw = req.body.autoLogoutEnabled;
+
+        const updates = {};
+        if (timeoutRaw !== undefined) {
+            const parsedTimeout = Number(timeoutRaw);
+            if (!Number.isFinite(parsedTimeout) || parsedTimeout <= 0) {
+                return res.status(400).json({ error: 'Inactivity timeout must be a positive number of minutes' });
+            }
+            updates.inactivityTimeoutMinutes = parsedTimeout;
+        }
+        if (autoLogoutRaw !== undefined) {
+            if (typeof autoLogoutRaw !== 'boolean') {
+                return res.status(400).json({ error: 'Auto logout enabled must be a boolean' });
+            }
+            updates.autoLogoutEnabled = autoLogoutRaw;
+        }
+        if (!Object.keys(updates).length) {
+            return res.status(400).json({ error: 'No session settings provided' });
+        }
+        const settings = await persistSessionSettings(updates, req.user?.id || null);
+        return res.json({
+            success: true,
+            inactivityTimeout: settings.inactivityTimeoutMinutes,
+            inactivityTimeoutMinutes: settings.inactivityTimeoutMinutes,
+            autoLogoutEnabled: settings.autoLogoutEnabled
+        });
+    } catch (error) {
+        console.error('Failed to update session settings:', error.message);
+        return res.status(500).json({ error: 'Failed to update session settings' });
+    }
+};
+
 
 const superAdminRoles = ['super_admin', 'superadmin', 'system_admin'];
 
@@ -1554,6 +1604,8 @@ module.exports = {
     getCountryPricing,
     addCountryPricing,
     updateCountryPricing,
+    getSessionSettings,
+    updateSessionSettings,
     getSystemSettings,
     updateSystemSettings,
     getMlInteractions,

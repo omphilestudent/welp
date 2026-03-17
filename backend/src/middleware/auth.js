@@ -2,10 +2,66 @@
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
 const { getRoleFlags } = require('./roleFlags');
+const { fetchSessionSettings } = require('../utils/sessionSettings');
 
 const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS || 60_000);
 const authCache = new Map();
 const authInFlight = new Map();
+const SESSION_SETTINGS_CACHE_TTL_MS = Number(process.env.SESSION_SETTINGS_CACHE_TTL_MS || 60_000);
+const INACTIVITY_GRACE_MS = Number(process.env.INACTIVITY_GRACE_MS || 10_000);
+const LAST_ACTIVE_UPDATE_INTERVAL_MS = Number(process.env.LAST_ACTIVE_UPDATE_INTERVAL_MS || 30_000);
+let sessionSettingsCache = { value: null, expiresAt: 0 };
+
+const getSessionSettingsCached = async () => {
+    if (sessionSettingsCache.value && sessionSettingsCache.expiresAt > Date.now()) {
+        return sessionSettingsCache.value;
+    }
+    try {
+        const settings = await fetchSessionSettings();
+        sessionSettingsCache = { value: settings, expiresAt: Date.now() + SESSION_SETTINGS_CACHE_TTL_MS };
+        return settings;
+    } catch (error) {
+        console.warn('Failed to load session settings:', error.message);
+        const fallback = { inactivityTimeoutMinutes: 30, autoLogoutEnabled: false };
+        sessionSettingsCache = { value: fallback, expiresAt: Date.now() + SESSION_SETTINGS_CACHE_TTL_MS };
+        return fallback;
+    }
+};
+
+const enforceInactivityTimeout = async (userId) => {
+    const settings = await getSessionSettingsCached();
+    if (!userId) return { expired: false };
+
+    if (!settings.autoLogoutEnabled) {
+        await query(
+            `UPDATE users
+             SET last_active = CURRENT_TIMESTAMP
+             WHERE id = $1
+               AND (last_active IS NULL OR last_active < (CURRENT_TIMESTAMP - INTERVAL '30 seconds'))`,
+            [userId]
+        );
+        return { expired: false };
+    }
+
+    const timeoutMs = Math.max(0, Number(settings.inactivityTimeoutMinutes || 0) * 60_000);
+    if (!timeoutMs) {
+        return { expired: false };
+    }
+
+    const result = await query('SELECT last_active FROM users WHERE id = $1', [userId]);
+    const lastActiveRaw = result.rows[0]?.last_active;
+    const lastActiveMs = lastActiveRaw ? new Date(lastActiveRaw).getTime() : null;
+    const now = Date.now();
+    if (lastActiveMs && now - lastActiveMs > timeoutMs + INACTIVITY_GRACE_MS) {
+        return { expired: true };
+    }
+
+    if (!lastActiveMs || now - lastActiveMs > LAST_ACTIVE_UPDATE_INTERVAL_MS) {
+        await query('UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = $1', [userId]);
+    }
+
+    return { expired: false };
+};
 
 const getTokenFromRequest = (req) => {
     const cookieToken = req.cookies?.token;
@@ -35,17 +91,27 @@ const authenticate = async (req, res, next) => {
     }
 
     const cached = authCache.get(token);
-    if (cached && cached.expiresAt > Date.now()) {
-        req.user = cached.user;
+    const finalizeAuth = async (user) => {
+        req.user = user;
+        try {
+            const inactivity = await enforceInactivityTimeout(user?.id);
+            if (inactivity.expired) {
+                return res.status(401).json({ error: 'Session expired due to inactivity', message: 'Session expired due to inactivity' });
+            }
+        } catch (error) {
+            console.warn('Failed to enforce inactivity timeout:', error.message);
+        }
         return next();
+    };
+    if (cached && cached.expiresAt > Date.now()) {
+        return finalizeAuth(cached.user);
     }
 
     const inFlight = authInFlight.get(token);
     if (inFlight) {
         try {
             const user = await inFlight;
-            req.user = user;
-            return next();
+            return finalizeAuth(user);
         } catch (error) {
             console.error('Auth DB error:', error.message);
             return res.status(503).json({ error: 'Authentication service unavailable. Please try again.' });
@@ -106,8 +172,7 @@ const authenticate = async (req, res, next) => {
     }
     authInFlight.delete(token);
 
-    req.user = user;
-    next();
+    return finalizeAuth(user);
 };
 
 const normalizeRole = (value) => String(value || '').toLowerCase();

@@ -1,10 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
 import SystemNotificationBootstrapper from './components/system/SystemNotificationBootstrapper';
+import InactivityManager from './components/system/InactivityManager';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -69,7 +71,9 @@ function App() {
     return (
         <ThemeProvider>
             <AuthProvider>
+                <Toaster position="top-right" />
                 <SystemNotificationBootstrapper />
+                <InactivityManager />
                 <Router
                     future={{
                         v7_startTransition: true,
