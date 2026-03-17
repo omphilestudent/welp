@@ -45,7 +45,7 @@ const KodiLogin = () => {
                     type="password"
                     autoComplete="current-password"
                 />
-                <button disabled={loading} type="submit">
+                <button disabled={loading} type="submit" className="btn btn-primary">
                     {loading ? 'Signing in…' : 'Sign in'}
                 </button>
             </form>
@@ -54,4 +54,3 @@ const KodiLogin = () => {
 };
 
 export default KodiLogin;
-

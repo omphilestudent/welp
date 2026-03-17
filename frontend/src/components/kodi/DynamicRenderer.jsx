@@ -1,47 +1,83 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import DataTable from './components/DataTable';
+import Tabs from './components/Tabs';
+import Accordion from './components/Accordion';
+import Button from './components/Button';
+import NotificationPanel from './components/NotificationPanel';
+import FormBuilder from './components/FormBuilder';
+import CardList from './components/CardList';
+import RecordViewer from './components/RecordViewer';
+import CaseWidget from './components/widgets/CaseWidget';
+import AdsWidget from './components/widgets/AdsWidget';
+import ClientApplicationsWidget from './components/widgets/ClientApplicationsWidget';
 
-const UnknownComponent = ({ name, type, props }) => (
-    <div className="kodi-dyn-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-            <strong>{name || 'Unknown component'}</strong>
-            <span style={{ opacity: 0.7 }}>{type}</span>
-        </div>
-        {props ? (
-            <pre style={{ marginTop: 12, fontSize: 12, opacity: 0.9, overflowX: 'auto' }}>
-                {JSON.stringify(props, null, 2)}
-            </pre>
-        ) : null}
+const componentMap = {
+    DataTable,
+    RecordViewer,
+    CardList,
+    ClientApplicationsWidget,
+    CaseWidget,
+    AdsWidget,
+    Tabs,
+    Accordion,
+    Button,
+    FormBuilder,
+    NotificationPanel
+};
+
+const UnknownComponent = ({ name }) => (
+    <div className="kodi-dyn-missing">
+        Component not found: <strong>{name}</strong>
     </div>
 );
 
-// NOTE: For production, you’ll likely want a secure sandboxed runtime
-// for user-authored components. For now, render metadata + props only.
-const renderComponent = ({ component, props }) => {
+const resolveComponentName = (slot) => {
+    if (!slot) return null;
+    // Layout can store full component objects (builder), or a reference.
     return (
-        <UnknownComponent
-            name={component?.name}
-            type={component?.type}
-            props={props}
-        />
+        slot.component_name
+        || slot.componentName
+        || slot.name
+        || slot.component?.name
+        || slot.component?.component_name
+        || null
     );
 };
 
-const DynamicRenderer = ({ layout, components }) => {
+const resolveProps = (slot) => {
+    if (!slot) return {};
+    return slot.props || slot.settings || {};
+};
+
+export const renderComponent = ({ componentName, props, context, events }) => {
+    const Comp = componentMap[componentName];
+    if (!Comp) return <UnknownComponent name={componentName} />;
+    return <Comp props={props} context={context} events={events} />;
+};
+
+const DynamicRenderer = ({ layout, context = {}, events = {} }) => {
     const rows = layout?.rows || [];
-    const compById = new Map((components || []).map((m) => [m.component?.id, m]));
+    const normalized = useMemo(() => (Array.isArray(rows) ? rows : []), [rows]);
 
     return (
         <div className="kodi-layout">
-            {rows.map((row, rowIndex) => (
-                <div key={`row-${rowIndex}`} className="kodi-row">
+            {normalized.map((row, rowIndex) => (
+                <div key={row.id || `row-${rowIndex}`} className="kodi-layout-row">
                     {(row.columns || []).map((col, colIndex) => (
-                        <div key={`col-${rowIndex}-${colIndex}`} className="kodi-col">
+                        <div
+                            key={col.id || `col-${rowIndex}-${colIndex}`}
+                            className="kodi-layout-col"
+                            style={col.width ? { flex: `${col.width} 0 0` } : undefined}
+                        >
                             {(col.components || []).map((slot, slotIndex) => {
-                                const match = compById.get(slot.componentId) || null;
-                                const mergedProps = { ...(slot.props || {}), ...(match?.props || {}) };
+                                const componentName = resolveComponentName(slot);
+                                if (!componentName) {
+                                    return <UnknownComponent key={`slot-${slotIndex}`} name="(missing name)" />;
+                                }
+                                const props = resolveProps(slot);
                                 return (
-                                    <div key={`slot-${rowIndex}-${colIndex}-${slotIndex}`} className="kodi-slot">
-                                        {renderComponent({ component: match?.component, props: mergedProps })}
+                                    <div key={slot.instanceId || `slot-${rowIndex}-${colIndex}-${slotIndex}`} className="kodi-layout-slot">
+                                        {renderComponent({ componentName, props, context, events })}
                                     </div>
                                 );
                             })}

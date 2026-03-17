@@ -356,6 +356,10 @@ const FlowManagement = () => {
 
     const openPreview = async (flow) => {
         if (!flow) return;
+        if (String(flow.type || '').toLowerCase() !== 'screen') {
+            toast.error('Preview is only available for Screen flows.');
+            return;
+        }
         setPreviewState({
             ...INITIAL_PREVIEW_STATE,
             open: true,
@@ -626,7 +630,10 @@ const FlowManagement = () => {
                                     <button
                                         className="secondary"
                                         onClick={() => openPreview(flow)}
-                                        disabled={previewState.loading && previewState.flow?.id === flow.id && previewState.open}
+                                        disabled={
+                                            String(flow.type || '').toLowerCase() !== 'screen'
+                                            || (previewState.loading && previewState.flow?.id === flow.id && previewState.open)
+                                        }
                                     >
                                         Preview
                                     </button>

@@ -660,14 +660,16 @@ const adminListAds = async (filters = {}, options = {}) => {
     if (filters.reviewStatus) {
         if (schema.hasReviewStatus) {
             if (normalizedReviewStatus === 'pending') {
+                // review_status can be an enum in some DBs; compare via ::text to avoid invalid enum casts
+                // (e.g. comparing to 'pending_review' when enum does not include it).
                 queryStr += ` AND (
-                    c.review_status = $${paramIndex}
+                    c.review_status::text = $${paramIndex}
                     OR c.review_status IS NULL
-                    OR c.review_status = 'pending_review'
+                    OR c.review_status::text = 'pending_review'
                     OR c.status = 'pending_review'
                 )`;
             } else {
-                queryStr += ` AND c.review_status = $${paramIndex}`;
+                queryStr += ` AND c.review_status::text = $${paramIndex}`;
             }
             params.push(normalizedReviewStatus || filters.reviewStatus);
             paramIndex++;

@@ -31,8 +31,8 @@ if (isEmailConfigured()) {
 
         transporter.verify((error) => {
             if (error) {
-                console.log('⚠️ Email service configured but not working:', error.message);
-                transporter = null;
+                // Don't disable transporter on verify failure (often transient).
+                console.log('⚠️ Email service configured but verify failed:', error.message);
             } else {
                 console.log('✅ Email service is ready to send messages');
             }
@@ -44,6 +44,12 @@ if (isEmailConfigured()) {
 } else {
     console.log('📧 Email service not configured. Running in development mode with console logging.');
 }
+
+const getPrimaryFrontendUrl = () => {
+    const raw = process.env.FRONTEND_URL || process.env.SITE_URL || 'https://welphub.onrender.com';
+    const first = String(raw).split(',').map((part) => part.trim()).filter(Boolean)[0];
+    return first || 'https://welphub.onrender.com';
+};
 
 
 // ── Review notification helpers ────────────────────────────────────────────────────────────
@@ -742,7 +748,7 @@ async function sendMessageNotificationEmail({ senderName, receiverName, receiver
     if (!receiverEmail) return { success: false, reason: 'missing-email' };
     const greeting = receiverName ? `Hi ${receiverName}` : 'Hi there';
     const subject = `New message from ${senderName || 'a Welp user'}`;
-    const baseUrl = process.env.FRONTEND_URL || process.env.SITE_URL || 'https://welphub.onrender.com';
+    const baseUrl = getPrimaryFrontendUrl();
     const redirectPath = `/messages?conversation=${conversationId}`;
     const loginUrl = `${baseUrl}/login?redirect=${encodeURIComponent(redirectPath)}`;
     const html = `
@@ -768,6 +774,80 @@ async function sendMessageNotificationEmail({ senderName, receiverName, receiver
 You have received a new message from ${senderName || 'a Welp user'}.
 
 Login to continue the chat: ${loginUrl}
+
+— The Welp Team`;
+
+    return sendEmail({ to: receiverEmail, subject, html, text });
+}
+
+async function sendConversationRequestEmail({ senderName, receiverName, receiverEmail, conversationId }) {
+    if (!receiverEmail) return { success: false, reason: 'missing-email' };
+    const greeting = receiverName ? `Hi ${receiverName}` : 'Hi there';
+    const subject = `New chat request from ${senderName || 'a Welp user'}`;
+    const baseUrl = getPrimaryFrontendUrl();
+    const redirectPath = `/messages?conversation=${conversationId}`;
+    const loginUrl = `${baseUrl}/login?redirect=${encodeURIComponent(redirectPath)}`;
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <p>${greeting},</p>
+            <p><strong>${senderName || 'A Welp user'}</strong> sent you a chat request.</p>
+            <p style="margin: 20px 0;">
+              <a href="${loginUrl}" style="display: inline-block; background: #0ea5e9; color: #ffffff; padding: 10px 18px; border-radius: 999px; text-decoration: none;">
+                Review request
+              </a>
+            </p>
+            <p style="margin-top: 24px;">— The Welp Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+
+    const text = `${greeting},
+
+${senderName || 'A Welp user'} sent you a chat request.
+
+Review request: ${loginUrl}
+
+— The Welp Team`;
+
+    return sendEmail({ to: receiverEmail, subject, html, text });
+}
+
+async function sendConversationAcceptedEmail({ senderName, receiverName, receiverEmail, conversationId }) {
+    if (!receiverEmail) return { success: false, reason: 'missing-email' };
+    const greeting = receiverName ? `Hi ${receiverName}` : 'Hi there';
+    const subject = `Chat request accepted by ${senderName || 'a Welp user'}`;
+    const baseUrl = getPrimaryFrontendUrl();
+    const redirectPath = `/messages?conversation=${conversationId}`;
+    const loginUrl = `${baseUrl}/login?redirect=${encodeURIComponent(redirectPath)}`;
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <p>${greeting},</p>
+            <p>Your chat request was accepted by <strong>${senderName || 'a Welp user'}</strong>.</p>
+            <p style="margin: 20px 0;">
+              <a href="${loginUrl}" style="display: inline-block; background: #22c55e; color: #ffffff; padding: 10px 18px; border-radius: 999px; text-decoration: none;">
+                Open chat
+              </a>
+            </p>
+            <p style="margin-top: 24px;">— The Welp Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+
+    const text = `${greeting},
+
+Your chat request was accepted by ${senderName || 'a Welp user'}.
+
+Open chat: ${loginUrl}
 
 — The Welp Team`;
 
@@ -825,5 +905,7 @@ module.exports = {
     sendApplicationStatusEmail,
     sendReviewNotificationEmail,
     sendMessageNotificationEmail,
+    sendConversationRequestEmail,
+    sendConversationAcceptedEmail,
     sendTicketNotificationEmail
 };

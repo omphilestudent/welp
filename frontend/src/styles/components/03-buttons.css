@@ -18,6 +18,55 @@
   text-align: center;
 }
 
+/* --------------------------------------------------------------------------
+   Compatibility: some older pages use variant classes without `.btn`.
+   Give them the same base styling so buttons aren’t unstyled.
+-------------------------------------------------------------------------- */
+
+.btn-primary:not(.btn),
+.btn-secondary:not(.btn),
+.btn-danger:not(.btn),
+.secondary:not(.btn),
+.danger:not(.btn) {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.secondary:not(.btn) {
+  background: transparent;
+  border: 2px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.secondary:not(.btn):hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+}
+
+.danger:not(.btn) {
+  background: var(--error-text);
+  color: white;
+}
+
+.danger:not(.btn):hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
 .btn::before {
   content: '';
   position: absolute;

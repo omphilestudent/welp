@@ -1,0 +1,202 @@
+.kodi-dyn-missing,
+.kodi-comp-empty {
+  padding: 12px;
+  border: 1px dashed rgba(84, 105, 141, 0.35);
+  border-radius: 12px;
+  background: rgba(248, 249, 252, 0.9);
+  color: var(--text-secondary);
+}
+
+.kodi-layout {
+  display: grid;
+  gap: 14px;
+}
+
+.kodi-layout-row {
+  display: flex;
+  gap: 14px;
+}
+
+.kodi-layout-col {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.kodi-layout-slot {
+  border-radius: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.04));
+  overflow: hidden;
+}
+
+.kodi-comp {
+  padding: 14px;
+}
+
+.kodi-input {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+  background: #fff;
+}
+
+.kodi-input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
+
+.kodi-table__top {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.kodi-table__title,
+.kodi-widget__title,
+.kodi-cards__title,
+.kodi-record__title,
+.kodi-notifications__title,
+.kodi-form__title {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.kodi-table__wrap {
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.kodi-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kodi-table th,
+.kodi-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+.kodi-table th {
+  background: rgba(248, 249, 252, 0.9);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.kodi-table__pager {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 10px;
+}
+
+.kodi-tabs__bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.kodi-tabs__tab {
+  border: 1px solid var(--border-color);
+  background: #fff;
+  padding: 8px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.kodi-tabs__tab.active {
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.kodi-accordion__item {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.kodi-accordion__header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: rgba(248, 249, 252, 0.9);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.kodi-accordion__body {
+  padding: 12px;
+}
+
+.kodi-widget__list,
+.kodi-notifications__list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.kodi-widget__row,
+.kodi-notifications__item {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(248, 249, 252, 0.75);
+}
+
+.kodi-cards__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.kodi-cards__card {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: rgba(248, 249, 252, 0.75);
+}
+
+.kodi-record__json {
+  margin-top: 10px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.kodi-form__field {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.kodi-form__actions {
+  margin-top: 12px;
+}
+

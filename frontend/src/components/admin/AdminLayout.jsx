@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import AvatarImage from '../common/AvatarImage';
@@ -26,16 +26,21 @@ import {
     FaUserCheck,
     FaEnvelope,
     FaBullhorn,
-    FaProjectDiagram
+    FaProjectDiagram,
+    FaChevronDown,
+    FaChevronRight
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
 const AdminLayout = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [sidebarSearch, setSidebarSearch] = useState('');
+    const [builderOpen, setBuilderOpen] = useState(true);
     const [adminInfo, setAdminInfo] = useState({
         role_name: 'admin',
         department: 'Administration'
@@ -46,7 +51,12 @@ const AdminLayout = () => {
     const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(userRole);
     const isAdminAccess = ['admin', 'super_admin', 'superadmin', 'system_admin'].includes(userRole);
     const isHrAdmin = userRole === 'hr_admin';
-    const isHrAccess = isHrAdmin || isAdminAccess || userRole === 'employee';
+
+    const isInAdminArea = location.pathname.startsWith('/admin');
+    const isInHrArea = location.pathname.startsWith('/hr');
+
+    // HR navigation should only appear within /hr routes.
+    const showHrNav = isInHrArea && isHrAdmin;
 
     useEffect(() => {
         if (isAdminAccess || isHrAdmin) {
@@ -104,6 +114,27 @@ const AdminLayout = () => {
         }
     };
 
+    const builderItems = [
+        {
+            path: '/admin/kodi/builder',
+            icon: <FaProjectDiagram />,
+            label: 'Kodi Builder',
+            color: '#7c3aed'
+        },
+        {
+            path: '/admin/flows',
+            icon: <FaProjectDiagram />,
+            label: 'Flow Builder',
+            color: '#14b8a6'
+        },
+        {
+            path: '/admin/flows/advanced',
+            icon: <FaProjectDiagram />,
+            label: 'Flow Builder (Advanced)',
+            color: '#0f766e'
+        }
+    ];
+
     const navItems = [
         {
             path: '/admin/dashboard',
@@ -152,12 +183,6 @@ const AdminLayout = () => {
             icon: <FaEnvelope />,
             label: 'Email Marketing',
             color: '#f59e0b'
-        },
-        {
-            path: '/admin/flows',
-            icon: <FaProjectDiagram />,
-            label: 'Flow Builder',
-            color: '#14b8a6'
         },
         {
             path: '/kodi',
@@ -280,6 +305,31 @@ const AdminLayout = () => {
 
     const unreadCount = notifications.filter(n => !n.read).length;
 
+    const searchTerm = sidebarSearch.trim().toLowerCase();
+    const matchItem = (item) => {
+        if (!searchTerm) return true;
+        return String(item.label).toLowerCase().includes(searchTerm)
+            || String(item.path).toLowerCase().includes(searchTerm);
+    };
+
+    const filteredNavItems = useMemo(() => navItems.filter(matchItem), [navItems, searchTerm]);
+    const filteredBuilderItems = useMemo(() => builderItems.filter(matchItem), [builderItems, searchTerm]);
+    const filteredSuperAdminItems = useMemo(() => superAdminNavItems.filter(matchItem), [superAdminNavItems, searchTerm]);
+    const filteredHrItems = useMemo(() => hrNavItems.filter(matchItem), [hrNavItems, searchTerm]);
+    const filteredHrAdminItems = useMemo(() => hrAdminNavItems.filter(matchItem), [hrAdminNavItems, searchTerm]);
+
+    const handleSidebarSearchKeyDown = (e) => {
+        if (e.key !== 'Enter') return;
+        const first =
+            filteredBuilderItems[0]
+            || filteredNavItems[0]
+            || (isSuperAdmin ? filteredSuperAdminItems[0] : null)
+            || (showHrNav ? (filteredHrAdminItems[0] || filteredHrItems[0]) : null);
+        if (first?.path) {
+            navigate(first.path);
+        }
+    };
+
     return (
         <div className={`admin-layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
             {}
@@ -316,14 +366,50 @@ const AdminLayout = () => {
 
                 <div className="sidebar-search">
                     <FaSearch className="search-icon" />
-                    <input type="text" placeholder="Search..." />
+                    <input
+                        type="text"
+                        placeholder="Search..."
+                        value={sidebarSearch}
+                        onChange={(e) => setSidebarSearch(e.target.value)}
+                        onKeyDown={handleSidebarSearchKeyDown}
+                    />
                 </div>
 
                 <nav className="sidebar-nav">
-                    {isAdminAccess && (
+                    {isAdminAccess && isInAdminArea && (
                         <div className="nav-section">
                             <h3>Administration</h3>
-                            {navItems.map(item => (
+
+                            {/* Builder dropdown */}
+                            <button
+                                type="button"
+                                className="nav-link"
+                                onClick={() => setBuilderOpen((prev) => !prev)}
+                                style={{ '--item-color': '#14b8a6' }}
+                            >
+                                <span className="nav-icon"><FaProjectDiagram /></span>
+                                {sidebarOpen && (
+                                    <span className="nav-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                        <span>Builder</span>
+                                        <span style={{ opacity: 0.8 }}>{builderOpen ? <FaChevronDown /> : <FaChevronRight />}</span>
+                                    </span>
+                                )}
+                            </button>
+                            {builderOpen && filteredBuilderItems.map(item => (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    className={({ isActive }) =>
+                                        `nav-link ${isActive ? 'active' : ''}`
+                                    }
+                                    style={{ '--item-color': item.color, paddingLeft: sidebarOpen ? 42 : undefined }}
+                                >
+                                    <span className="nav-icon">{item.icon}</span>
+                                    {sidebarOpen && <span className="nav-label">{item.label}</span>}
+                                </NavLink>
+                            ))}
+
+                            {filteredNavItems.map(item => (
                                 <NavLink
                                     key={item.path}
                                     to={item.path}
@@ -339,10 +425,10 @@ const AdminLayout = () => {
                         </div>
                     )}
 
-                    {isSuperAdmin && (
+                    {isSuperAdmin && isInAdminArea && (
                         <div className="nav-section">
                             <h3>Super Admin</h3>
-                            {superAdminNavItems.map(item => (
+                            {filteredSuperAdminItems.map(item => (
                                 <NavLink
                                     key={item.path}
                                     to={item.path}
@@ -358,10 +444,10 @@ const AdminLayout = () => {
                         </div>
                     )}
 
-                    {isHrAccess && (
+                    {showHrNav && (
                         <div className="nav-section">
                             <h3>Human Resources</h3>
-                            {hrNavItems.map(item => (
+                            {filteredHrItems.map(item => (
                                 <NavLink
                                     key={item.path}
                                     to={item.path}
@@ -374,7 +460,7 @@ const AdminLayout = () => {
                                     {sidebarOpen && <span className="nav-label">{item.label}</span>}
                                 </NavLink>
                             ))}
-                            {isHrAdmin && hrAdminNavItems.map(item => (
+                            {filteredHrAdminItems.map(item => (
                                 <NavLink
                                     key={item.path}
                                     to={item.path}

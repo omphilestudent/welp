@@ -1,7 +1,11 @@
 
 const { query } = require('../utils/database');
 const { createUserNotification } = require('../utils/userNotifications');
-const { sendMessageNotificationEmail } = require('../utils/emailService');
+const {
+    sendMessageNotificationEmail,
+    sendConversationRequestEmail,
+    sendConversationAcceptedEmail
+} = require('../utils/emailService');
 const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaService');
 const { PLAN_LIMITS } = require('../services/subscriptionService');
 const { emitFlowEvent } = require('../services/flowEngine');
@@ -139,9 +143,22 @@ const shouldSendChatEmail = (senderRole, receiverRole) => {
         || (sender === 'psychologist' && receiver === 'employee');
 };
 
-const notifyChatEmail = async ({ senderId, recipientId, conversationId }) => {
+const EMAIL_THROTTLE_MS = Number(process.env.CHAT_EMAIL_THROTTLE_MS || 2 * 60 * 1000);
+const emailThrottle = new Map(); // key -> lastSentMs
+
+const shouldThrottleEmail = ({ conversationId, recipientId, kind }) => {
+    const key = `${kind || 'message'}:${conversationId}:${recipientId}`;
+    const last = emailThrottle.get(key) || 0;
+    const now = Date.now();
+    if (now - last < EMAIL_THROTTLE_MS) return true;
+    emailThrottle.set(key, now);
+    return false;
+};
+
+const notifyChatEmail = async ({ senderId, recipientId, conversationId, kind = 'message' }) => {
     if (!senderId || !recipientId || !conversationId) return;
     try {
+        if (shouldThrottleEmail({ conversationId, recipientId, kind })) return;
         const userRows = await query(
             `SELECT id, email, display_name, role
              FROM users
@@ -153,12 +170,20 @@ const notifyChatEmail = async ({ senderId, recipientId, conversationId }) => {
         if (!sender || !recipient || !recipient.email) return;
         if (!shouldSendChatEmail(sender.role, recipient.role)) return;
 
-        await sendMessageNotificationEmail({
+        const payload = {
             senderName: sender.display_name || sender.email,
             receiverName: recipient.display_name || recipient.email,
             receiverEmail: recipient.email,
             conversationId
-        });
+        };
+
+        if (kind === 'request' && typeof sendConversationRequestEmail === 'function') {
+            await sendConversationRequestEmail(payload);
+        } else if (kind === 'accepted' && typeof sendConversationAcceptedEmail === 'function') {
+            await sendConversationAcceptedEmail(payload);
+        } else {
+            await sendMessageNotificationEmail(payload);
+        }
     } catch (error) {
         console.warn('Message notification email failed:', error?.message || error);
     }
@@ -261,7 +286,8 @@ const requestChatWithPsychologist = async (req, res) => {
         await notifyChatEmail({
             senderId: req.user.id,
             recipientId: psychologistId,
-            conversationId: conversation.rows[0].id
+            conversationId: conversation.rows[0].id,
+            kind: 'request'
         });
 
         const sender = await query(
@@ -431,7 +457,8 @@ const sendMessageRequest = async (req, res) => {
             await notifyChatEmail({
                 senderId: req.user.id,
                 recipientId: employeeId,
-                conversationId: current.id
+                conversationId: current.id,
+                kind: 'request'
             });
             return res.status(201).json(reopened.rows[0]);
         }
@@ -451,12 +478,14 @@ const sendMessageRequest = async (req, res) => {
                  VALUES ($1, $2, $3)`,
                 [conversation.rows[0].id, req.user.id, initialMessage.trim()]
             );
-            await notifyChatEmail({
-                senderId: req.user.id,
-                recipientId: employeeId,
-                conversationId: conversation.rows[0].id
-            });
         }
+
+        await notifyChatEmail({
+            senderId: req.user.id,
+            recipientId: employeeId,
+            conversationId: conversation.rows[0].id,
+            kind: 'request'
+        });
 
         const sender = await query(
             'SELECT display_name FROM users WHERE id = $1',
@@ -651,6 +680,17 @@ const updateConversationStatus = async (req, res) => {
                  VALUES ($1, $2, $3, true)`,
                 [conversationId, req.user.id, systemMessage]
             );
+        }
+
+        if (status === 'accepted') {
+            const convoRow = conversation.rows[0];
+            const otherUserId = req.user.id === convoRow.employee_id ? convoRow.psychologist_id : convoRow.employee_id;
+            await notifyChatEmail({
+                senderId: req.user.id,
+                recipientId: otherUserId,
+                conversationId,
+                kind: 'accepted'
+            });
         }
 
         res.json(result.rows[0]);
@@ -979,7 +1019,8 @@ const sendMessage = async (req, res) => {
         notifyChatEmail({
             senderId: req.user.id,
             recipientId,
-            conversationId
+            conversationId,
+            kind: 'message'
         }).catch((emailError) => {
             console.warn('Message email notify failed:', emailError?.message || emailError);
         });

@@ -52,17 +52,16 @@ const KodiPage = () => {
                         <p style={{ opacity: 0.8, marginTop: 6 }}>{bundle.page.description}</p>
                     ) : null}
                 </div>
-                <button onClick={() => { setKodiPageToken(null); navigate(`/kodi/page/${pageSlug}/login`, { replace: true }); }}>
+                <button className="btn btn-secondary" onClick={() => { setKodiPageToken(null); navigate(`/kodi/page/${pageSlug}/login`, { replace: true }); }}>
                     Sign out
                 </button>
             </header>
 
             <div style={{ marginTop: 16 }}>
-                <DynamicRenderer layout={bundle.page.layout || {}} components={bundle.components || []} />
+                <DynamicRenderer layout={bundle.page.layout || {}} context={{ page: bundle.page }} />
             </div>
         </div>
     );
 };
 
 export default KodiPage;
-
