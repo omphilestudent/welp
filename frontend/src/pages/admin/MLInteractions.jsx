@@ -77,7 +77,7 @@ const MLInteractions = () => {
     };
 
     const userRole = String(user?.role || '').toLowerCase().trim();
-    const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(userRole);
+    const isSuperAdmin = ['super_admin', 'superadmin'].includes(userRole);
 
     // Filter interactions based on selected filters
     const filteredInteractions = useMemo(() => {

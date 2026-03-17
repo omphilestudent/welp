@@ -76,7 +76,15 @@ router.post('/review-notifications/logs/:logId/resend',
 
 router.get('/subscriptions', adminController.getSubscriptions);
 router.get('/subscriptions/:id', adminController.getSubscriptionDetails);
+router.post('/subscriptions', adminController.createSubscription);
+router.patch('/subscriptions/:id', adminController.updateSubscription);
+router.put('/subscriptions/:id', adminController.updateSubscription);
 router.patch('/subscriptions/:id/cancel', adminController.cancelSubscription);
+router.post('/subscriptions/:id/cancel', adminController.cancelSubscription);
+router.get('/subscriptions/revenue', adminController.getRevenueAnalytics);
+router.get('/subscriptions/stats', adminController.getSubscriptionAnalytics);
+router.get('/subscriptions/pricing', adminController.getCountryPricing);
+router.get('/subscriptions/export', adminController.exportSubscriptions);
 
 router.get('/ads', adminAdsController.listAds);
 router.post('/ads/approve',

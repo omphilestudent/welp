@@ -1,0 +1,11 @@
+Test,Status,Notes
+backend/tests/autoReviewHelpers.test.js,passed,Completed
+backend/tests/adWorkflow.test.js,passed,Completed
+backend/tests/emailMarketingService.test.js,passed,Completed
+backend/tests/emailMarketingApi.test.js,blocked,Database connection error (DATABASE_URL)
+backend/tests/adminPricing.test.js,blocked,Database connection error (DATABASE_URL)
+backend/tests/pricingServiceCountry.test.js,blocked,Database connection error (DATABASE_URL)
+backend/tests/flowService.test.js,blocked,Database connection error (DATABASE_URL)
+backend/tests/flowRuntimeEngine.test.js,blocked,Database connection error (DATABASE_URL)
+
+Run summary,partial,"npm test timed out after 120s; DB connection failed."

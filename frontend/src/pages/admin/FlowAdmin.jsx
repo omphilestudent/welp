@@ -13,9 +13,6 @@ const getLifecycleMode = (flow) => {
 const getTypeLabel = (type) => {
     const normalized = String(type || '').toLowerCase();
     if (normalized === 'screen') return 'Screen Flow';
-    if (normalized === 'automation') return 'Automation Flow';
-    if (normalized === 'scheduled') return 'Scheduled Flow';
-    if (normalized === 'event') return 'Event Flow';
     return 'Trigger Flow';
 };
 
@@ -40,7 +37,7 @@ const FlowAdmin = () => {
     const [createForm, setCreateForm] = useState({
         name: '',
         description: '',
-        type: 'automation'
+        type: 'trigger'
     });
 
     const sortedFlows = useMemo(() => {
@@ -271,9 +268,8 @@ const FlowAdmin = () => {
                                     value={createForm.type}
                                     onChange={(e) => setCreateForm((p) => ({ ...p, type: e.target.value }))}
                                 >
-                                    <option value="automation">Automation</option>
-                                    <option value="scheduled">Scheduled</option>
-                                    <option value="event">Event-based</option>
+                                    <option value="trigger">Trigger</option>
+                                    <option value="screen">Screen</option>
                                 </select>
                             </label>
                             <div className="flow-admin-modal-actions">

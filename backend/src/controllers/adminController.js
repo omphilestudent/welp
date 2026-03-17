@@ -107,7 +107,7 @@ const ensureSystemSettingsTable = async () => {
             { key: 'site_url', value: JSON.stringify('https://welphub.onrender.com') },
             { key: 'maintenance_mode', value: JSON.stringify(false) },
             { key: 'registration_enabled', value: JSON.stringify(true) },
-            { key: 'default_user_role', value: JSON.stringify('user') },
+            { key: 'default_user_role', value: JSON.stringify('employee') },
             { key: 'session_timeout', value: JSON.stringify(30) },
             { key: 'inactivity_timeout_minutes', value: JSON.stringify(30) },
             { key: 'auto_logout_enabled', value: JSON.stringify(false) },
@@ -1078,6 +1078,76 @@ const getSubscriptionDetails = async (req, res) => {
     }
 };
 
+const createSubscription = async (req, res) => {
+    try {
+        if (!await tableExists('subscriptions')) {
+            return res.status(404).json({ error: 'Subscriptions table not found' });
+        }
+        const userId = req.body.user_id ?? req.body.userId;
+        if (!userId && await columnExists('subscriptions', 'user_id')) {
+            return res.status(400).json({ error: 'user_id is required' });
+        }
+
+        const columns = [];
+        const values = [];
+        const params = [];
+        let idx = 1;
+
+        const tryAdd = async (column, value) => {
+            if (value === undefined) return;
+            if (!await columnExists('subscriptions', column)) return;
+            columns.push(column);
+            values.push(`$${idx}`);
+            params.push(value);
+            idx++;
+        };
+
+        const planType = req.body.plan_type ?? req.body.planType;
+        const status = req.body.status ?? 'active';
+        const price = req.body.price;
+        const currencyCode = req.body.currency_code ?? req.body.currencyCode;
+        const currencySymbol = req.body.currency_symbol ?? req.body.currencySymbol;
+        const autoRenew = req.body.auto_renew ?? req.body.autoRenew;
+        const chatHours = req.body.chat_hours_per_day ?? req.body.chatHoursPerDay;
+        const videoCalls = req.body.video_calls_per_week ?? req.body.videoCallsPerWeek;
+        const leadsPerMonth = req.body.leads_per_month ?? req.body.leadsPerMonth;
+        const acceptsAssignments = req.body.accepts_assignments ?? req.body.acceptsAssignments;
+        const countryCode = req.body.country_code ?? req.body.countryCode;
+
+        await tryAdd('user_id', userId);
+        if (planType !== undefined) {
+            await tryAdd('plan_type', planType);
+            await tryAdd('plan', planType);
+        }
+        await tryAdd('status', status);
+        await tryAdd('price', price);
+        await tryAdd('currency_code', currencyCode);
+        await tryAdd('currency_symbol', currencySymbol);
+        await tryAdd('auto_renew', autoRenew);
+        await tryAdd('chat_hours_per_day', chatHours);
+        await tryAdd('video_calls_per_week', videoCalls);
+        await tryAdd('leads_per_month', leadsPerMonth);
+        await tryAdd('accepts_assignments', acceptsAssignments);
+        await tryAdd('country_code', countryCode);
+
+        if (!columns.length) {
+            return res.status(400).json({ error: 'No valid subscription fields to insert' });
+        }
+
+        const result = await query(
+            `INSERT INTO subscriptions (${columns.join(', ')})
+             VALUES (${values.join(', ')})
+             RETURNING *`,
+            params
+        );
+
+        return res.status(201).json({ success: true, subscription: result.rows[0] });
+    } catch (error) {
+        console.error('Create subscription error:', error);
+        return res.status(500).json({ error: 'Failed to create subscription' });
+    }
+};
+
 const cancelSubscription = async (req, res) => {
     try {
         const { id } = req.params;
@@ -1248,16 +1318,35 @@ const updateSystemSettings = async (req, res) => {
             try {
                 const normalizedValue = normalizeValue(value);
                 console.log(`Normalized value for ${key}:`, normalizedValue);
-                const result = await query(
-                    `INSERT INTO system_settings (key, value, updated_by, updated_at)
-                     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-                     ON CONFLICT (key) DO UPDATE
-                     SET value = EXCLUDED.value,
-                         updated_by = EXCLUDED.updated_by,
-                         updated_at = CURRENT_TIMESTAMP
-                     RETURNING *`,
-                    [String(key), normalizedValue, updatedBy]
-                );
+                let result;
+                try {
+                    result = await query(
+                        `INSERT INTO system_settings (key, value, updated_by, updated_at)
+                         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                         ON CONFLICT (key) DO UPDATE
+                         SET value = EXCLUDED.value,
+                             updated_by = EXCLUDED.updated_by,
+                             updated_at = CURRENT_TIMESTAMP
+                         RETURNING *`,
+                        [String(key), normalizedValue, updatedBy]
+                    );
+                } catch (innerError) {
+                    if (innerError?.code === '23503') {
+                        console.warn(`FK violation for ${key}; retrying without updated_by`);
+                        result = await query(
+                            `INSERT INTO system_settings (key, value, updated_by, updated_at)
+                             VALUES ($1, $2, NULL, CURRENT_TIMESTAMP)
+                             ON CONFLICT (key) DO UPDATE
+                             SET value = EXCLUDED.value,
+                                 updated_by = NULL,
+                                 updated_at = CURRENT_TIMESTAMP
+                             RETURNING *`,
+                            [String(key), normalizedValue]
+                        );
+                    } else {
+                        throw innerError;
+                    }
+                }
                 if (result.rows[0]) {
                     console.log(`Updated ${key} successfully`);
                     updates.push(result.rows[0]);
@@ -1309,6 +1398,108 @@ const updateSystemSettings = async (req, res) => {
             details: error?.message || null,
             stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
         });
+    }
+};
+
+const updateSubscription = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!await tableExists('subscriptions')) {
+            return res.status(404).json({ error: 'Subscription not found' });
+        }
+
+        const updates = [];
+        const params = [];
+        let idx = 1;
+
+        const trySet = async (field, column, value) => {
+            if (value === undefined) return;
+            if (!await columnExists('subscriptions', column)) return;
+            updates.push(`${column} = $${idx}`);
+            params.push(value);
+            idx++;
+        };
+
+        const planType = req.body.plan_type ?? req.body.planType;
+        const status = req.body.status;
+        const price = req.body.price;
+        const currencyCode = req.body.currency_code ?? req.body.currencyCode;
+        const currencySymbol = req.body.currency_symbol ?? req.body.currencySymbol;
+        const autoRenew = req.body.auto_renew ?? req.body.autoRenew;
+        const chatHours = req.body.chat_hours_per_day ?? req.body.chatHoursPerDay;
+        const videoCalls = req.body.video_calls_per_week ?? req.body.videoCallsPerWeek;
+        const leadsPerMonth = req.body.leads_per_month ?? req.body.leadsPerMonth;
+        const acceptsAssignments = req.body.accepts_assignments ?? req.body.acceptsAssignments;
+
+        if (planType !== undefined) {
+            await trySet('plan_type', 'plan_type', planType);
+            await trySet('plan', 'plan', planType);
+        }
+
+        await trySet('status', 'status', status);
+        await trySet('price', 'price', price);
+        await trySet('currency_code', 'currency_code', currencyCode);
+        await trySet('currency_symbol', 'currency_symbol', currencySymbol);
+        await trySet('auto_renew', 'auto_renew', autoRenew);
+        await trySet('chat_hours_per_day', 'chat_hours_per_day', chatHours);
+        await trySet('video_calls_per_week', 'video_calls_per_week', videoCalls);
+        await trySet('leads_per_month', 'leads_per_month', leadsPerMonth);
+        await trySet('accepts_assignments', 'accepts_assignments', acceptsAssignments);
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No valid subscription fields to update' });
+        }
+
+        if (await columnExists('subscriptions', 'updated_at')) {
+            updates.push('updated_at = CURRENT_TIMESTAMP');
+        }
+
+        params.push(id);
+        const result = await query(
+            `UPDATE subscriptions SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`,
+            params
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Subscription not found' });
+        }
+
+        res.json({ success: true, subscription: result.rows[0] });
+    } catch (error) {
+        console.error('Update subscription error:', error);
+        res.status(500).json({ error: 'Failed to update subscription' });
+    }
+};
+
+const exportSubscriptions = async (req, res) => {
+    try {
+        if (!await tableExists('subscriptions')) {
+            return res.status(404).json({ error: 'Subscriptions table not found' });
+        }
+        const result = await query(
+            `SELECT s.*, u.email as user_email, u.display_name as user_name
+             FROM subscriptions s JOIN users u ON s.user_id = u.id ORDER BY s.created_at DESC`
+        );
+        const rows = result.rows || [];
+        if (!rows.length) {
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', 'attachment; filename=subscriptions.csv');
+            return res.send('No data');
+        }
+        const header = Object.keys(rows[0]);
+        const csv = [
+            header.join(','),
+            ...rows.map((row) =>
+                header.map((key) => `"${String(row[key] ?? '').replace(/\"/g, '""')}"`).join(',')
+            )
+        ].join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=subscriptions.csv');
+        return res.send(csv);
+    } catch (error) {
+        console.error('Export subscriptions error:', error);
+        res.status(500).json({ error: 'Failed to export subscriptions' });
     }
 };
 
@@ -1818,7 +2009,10 @@ module.exports = {
     reviewRegistrationApplication,
     getSubscriptions,
     getSubscriptionDetails,
+    createSubscription,
     cancelSubscription,
+    updateSubscription,
+    exportSubscriptions,
     getPricingConfig,
     updatePricing,
     getCountryPricing,

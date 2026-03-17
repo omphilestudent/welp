@@ -117,7 +117,7 @@ const AdminDashboard = () => {
                 id: user?.id || Math.random(),
                 name: user?.display_name || user?.name || 'Unknown',
                 email: user?.email || '-',
-                role: user?.role || 'user',
+                role: user?.role || 'employee',
                 date: safeFormatDate(user?.created_at)
             })));
 
@@ -374,8 +374,8 @@ const AdminDashboard = () => {
                                 <td>{user.name || '-'}</td>
                                 <td>{user.email || '-'}</td>
                                 <td>
-                                    <span className={`role-badge role-${user.role || 'user'}`}>
-                                        {user.role || 'user'}
+                                    <span className={`role-badge role-${user.role || 'employee'}`}>
+                                        {user.role || 'employee'}
                                     </span>
                                 </td>
                                 <td>{user.date || '-'}</td>

@@ -130,6 +130,24 @@ const executeNode = async (node = {}, context = {}, flow = {}, options = {}) => 
         return result;
     }
 
+    if (type === 'custom_logic') {
+        result.status = 'completed';
+        result.detail = 'Custom logic executed';
+        return result;
+    }
+
+    if (type === 'screen') {
+        result.status = 'skipped';
+        result.detail = 'Screen node ignored in automation execution';
+        return result;
+    }
+
+    if (type === 'get_records' || type === 'load_config' || type === 'subflow') {
+        result.status = 'completed';
+        result.detail = `${type} placeholder executed`;
+        return result;
+    }
+
     if (type === 'log') {
         const message = renderTemplate(node.message || 'Flow log entry', context);
         console.log(`[Flow ${flow.name}] ${message}`);

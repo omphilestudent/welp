@@ -122,6 +122,22 @@
     stroke-width: 2;
 }
 
+.fb-edge-arrow {
+    fill: rgba(37, 99, 235, 0.8);
+}
+
+.fb-edge-add {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    font-weight: 800;
+    cursor: pointer;
+    z-index: 3;
+}
+
 .fb-node {
     width: 240px;
     position: absolute;
@@ -164,6 +180,7 @@
 .fb-node-head {
     padding: 0.65rem 0.75rem 0.55rem;
     border-bottom: 1px solid #f1f5f9;
+    position: relative;
 }
 
 .fb-node-type {
@@ -177,6 +194,19 @@
     margin-top: 0.15rem;
     font-weight: 800;
     color: #0f172a;
+}
+
+.fb-node-add {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    font-weight: 800;
+    cursor: pointer;
 }
 
 .fb-node-ports {
@@ -282,6 +312,92 @@
     font-weight: 700;
     border: 1px solid transparent;
     cursor: pointer;
+}
+
+.fb-add-menu {
+    position: fixed;
+    z-index: 20;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.75rem;
+    width: 240px;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
+}
+
+.fb-add-menu input {
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.45rem 0.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.fb-add-menu-list {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.fb-add-menu button {
+    text-align: left;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.fb-add-custom {
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+.fb-add-cancel {
+    background: #fff;
+}
+
+.fb-add-sublist {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.fb-logic-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+}
+
+.fb-logic-modal {
+    background: #fff;
+    padding: 1.2rem;
+    border-radius: 16px;
+    width: min(540px, 92vw);
+    display: grid;
+    gap: 0.75rem;
+}
+
+.fb-logic-modal label {
+    display: grid;
+    gap: 0.35rem;
+    font-weight: 800;
+}
+
+.fb-logic-modal textarea,
+.fb-logic-modal input {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.6rem;
+}
+
+.fb-logic-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
 }
 
 .primary {

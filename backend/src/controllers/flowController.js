@@ -40,6 +40,8 @@ const ensureJsonDefinition = (definition) => {
     }
 };
 
+const ALLOWED_FLOW_TYPES = new Set(['screen', 'trigger']);
+
 const hasEndNode = (definition) => {
     const nodes = Array.isArray(definition?.nodes) ? definition.nodes : [];
     if (!nodes.length) return true;
@@ -95,6 +97,9 @@ const createFlowController = async (req, res) => {
         if (!name || !type) {
             return res.status(400).json({ success: false, error: 'Name and type are required' });
         }
+        if (!ALLOWED_FLOW_TYPES.has(String(type).toLowerCase())) {
+            return res.status(400).json({ success: false, error: 'Invalid flow type' });
+        }
 
         const definition = ensureJsonDefinition(req.body.definition);
         if (!hasEndNode(definition)) {
@@ -103,7 +108,7 @@ const createFlowController = async (req, res) => {
         const flow = await createFlow({
             name: name.trim(),
             description: description?.trim() || null,
-            type,
+            type: String(type).toLowerCase(),
             definition,
             isActive: req.body.isActive !== false,
             userId: req.user?.id
@@ -123,6 +128,13 @@ const updateFlowController = async (req, res) => {
                 updates[key] = req.body[key];
             }
         });
+        if (updates.type !== undefined) {
+            const normalizedType = String(updates.type).toLowerCase();
+            if (!ALLOWED_FLOW_TYPES.has(normalizedType)) {
+                return res.status(400).json({ success: false, error: 'Invalid flow type' });
+            }
+            updates.type = normalizedType;
+        }
         if (req.body.definition !== undefined) {
             updates.definition = ensureJsonDefinition(req.body.definition);
             if (!hasEndNode(updates.definition)) {

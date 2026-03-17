@@ -21,7 +21,7 @@ const ReviewModeration = () => {
     const { user } = useAuth();
 
     const userRole = String(user?.role || '').toLowerCase().trim();
-    const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(userRole);
+    const isSuperAdmin = ['super_admin', 'superadmin'].includes(userRole);
 
     const fetchReviews = async (nextStatus = status) => {
         try {

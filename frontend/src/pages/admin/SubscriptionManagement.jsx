@@ -62,7 +62,9 @@ const SubscriptionManagement = () => {
     const [dateRange, setDateRange] = useState('30d');
     const [formData, setFormData] = useState({
         user_id: '',
+        role: 'employee',
         plan_type: 'premium',
+        status: 'active',
         country_code: 'US',
         auto_renew: true,
         chat_hours_per_day: 2,
@@ -75,12 +77,8 @@ const SubscriptionManagement = () => {
         country_code: 'US',
         country_name: 'United States',
         currency_symbol: '$',
-        currency_code: 'USD',
-        employee_premium_price: 29.99,
-        psychologist_premium_price: 49.99,
-        employee_free_chat_hours: 2,
-        employee_free_video_calls: 1,
-        psychologist_free_leads: 0
+        currency: 'USD',
+        multiplier: 1
     });
 
     const COLORS = ['#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#f687b3', '#fc8181'];
@@ -92,15 +90,22 @@ const SubscriptionManagement = () => {
     const fetchAllData = async () => {
         try {
             setLoading(true);
+            const period = dateRange === '7d' ? 'day' : dateRange === '30d' ? 'day' : dateRange === '90d' ? 'week' : 'month';
             const [subsRes, pricingRes, revenueRes, statsRes] = await Promise.all([
                 api.get('/admin/subscriptions', { params: { range: dateRange } }),
-                api.get('/admin/subscriptions/pricing'),
-                api.get('/admin/subscriptions/revenue', { params: { range: dateRange } }),
-                api.get('/admin/subscriptions/stats')
+                api.get('/admin/pricing/countries'),
+                api.get('/admin/analytics/revenue', { params: { period } }),
+                api.get('/admin/analytics/subscriptions')
             ]);
 
-            setSubscriptions(subsRes.data.subscriptions || []);
-            setPricingData(pricingRes.data.pricing || []);
+            const rawSubs = subsRes.data.subscriptions || subsRes.data || [];
+            const normalizedSubs = rawSubs.map((sub) => ({
+                ...sub,
+                plan_type: sub.plan_type || sub.plan || sub.plan_code || sub.planTier || sub.tier,
+                role: sub.role || sub.owner_type || sub.ownerType
+            }));
+            setSubscriptions(normalizedSubs);
+            setPricingData(pricingRes.data.pricing || pricingRes.data || []);
             setRevenueData(revenueRes.data || []);
             setStats(statsRes.data || {});
         } catch (err) {
@@ -189,17 +194,21 @@ const SubscriptionManagement = () => {
         if (!window.confirm('Are you sure you want to cancel this subscription?')) return;
 
         try {
-            await api.post(`/admin/subscriptions/${id}/cancel`);
+            await api.patch(`/admin/subscriptions/${id}/cancel`);
             await fetchAllData();
         } catch (err) {
             setError('Failed to cancel subscription');
         }
     };
 
-    // Handle pricing update
-    const handleUpdatePricing = async (countryCode, updates) => {
+    // Handle pricing create/update
+    const handleSavePricing = async () => {
         try {
-            await api.put(`/admin/subscriptions/pricing/${countryCode}`, updates);
+            if (editingPricing?.country_code) {
+                await api.put(`/admin/pricing/countries/${editingPricing.country_code}`, pricingForm);
+            } else {
+                await api.post('/admin/pricing/countries', pricingForm);
+            }
             await fetchAllData();
             setShowPricingModal(false);
             setEditingPricing(null);
@@ -392,7 +401,13 @@ const SubscriptionManagement = () => {
                                 <button
                                     onClick={() => {
                                         setEditingPricing(pricing);
-                                        setPricingForm(pricing);
+                                        setPricingForm({
+                                            country_code: pricing.country_code,
+                                            country_name: pricing.country_name,
+                                            currency_symbol: pricing.currency_symbol,
+                                            currency: pricing.currency || pricing.currency_code,
+                                            multiplier: pricing.multiplier ?? 1
+                                        });
                                         setShowPricingModal(true);
                                     }}
                                     style={styles.editButton}
@@ -401,10 +416,8 @@ const SubscriptionManagement = () => {
                                 </button>
                             </div>
                             <div style={styles.pricingDetails}>
-                                <p>Currency: {pricing.currency_symbol} ({pricing.currency_code})</p>
-                                <p>Employee Premium: {pricing.currency_symbol}{pricing.employee_premium_price}</p>
-                                <p>Psychologist Premium: {pricing.currency_symbol}{pricing.psychologist_premium_price}</p>
-                                <p>Free Plan: {pricing.employee_free_chat_hours}h chat, {pricing.employee_free_video_calls} video calls</p>
+                                <p>Currency: {pricing.currency_symbol} ({pricing.currency || pricing.currency_code})</p>
+                                <p>Multiplier: {pricing.multiplier ?? 'N/A'}</p>
                             </div>
                         </div>
                     ))}
@@ -589,10 +602,7 @@ const SubscriptionManagement = () => {
                     pricing={editingPricing}
                     formData={pricingForm}
                     setFormData={setPricingForm}
-                    onSave={() => handleUpdatePricing(
-                        editingPricing?.country_code || pricingForm.country_code,
-                        pricingForm
-                    )}
+                    onSave={handleSavePricing}
                     onClose={() => {
                         setShowPricingModal(false);
                         setEditingPricing(null);
@@ -826,62 +836,21 @@ const PricingModal = ({ pricing, formData, setFormData, onSave, onClose }) => (
                 <label>Currency Code</label>
                 <input
                     type="text"
-                    value={formData.currency_code}
-                    onChange={(e) => setFormData({ ...formData, currency_code: e.target.value.toUpperCase() })}
+                    value={formData.currency}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value.toUpperCase() })}
                     style={styles.input}
                     placeholder="USD"
                 />
             </div>
 
             <div style={styles.formGroup}>
-                <label>Employee Premium Price</label>
+                <label>Multiplier</label>
                 <input
                     type="number"
-                    value={formData.employee_premium_price}
-                    onChange={(e) => setFormData({ ...formData, employee_premium_price: parseFloat(e.target.value) })}
+                    value={formData.multiplier}
+                    onChange={(e) => setFormData({ ...formData, multiplier: parseFloat(e.target.value) })}
                     style={styles.input}
-                    step="0.01"
-                />
-            </div>
-
-            <div style={styles.formGroup}>
-                <label>Psychologist Premium Price</label>
-                <input
-                    type="number"
-                    value={formData.psychologist_premium_price}
-                    onChange={(e) => setFormData({ ...formData, psychologist_premium_price: parseFloat(e.target.value) })}
-                    style={styles.input}
-                    step="0.01"
-                />
-            </div>
-
-            <div style={styles.formGroup}>
-                <label>Employee Free Chat Hours</label>
-                <input
-                    type="number"
-                    value={formData.employee_free_chat_hours}
-                    onChange={(e) => setFormData({ ...formData, employee_free_chat_hours: parseInt(e.target.value) })}
-                    style={styles.input}
-                />
-            </div>
-
-            <div style={styles.formGroup}>
-                <label>Employee Free Video Calls</label>
-                <input
-                    type="number"
-                    value={formData.employee_free_video_calls}
-                    onChange={(e) => setFormData({ ...formData, employee_free_video_calls: parseInt(e.target.value) })}
-                    style={styles.input}
-                />
-            </div>
-
-            <div style={styles.formGroup}>
-                <label>Psychologist Free Leads</label>
-                <input
-                    type="number"
-                    value={formData.psychologist_free_leads}
-                    onChange={(e) => setFormData({ ...formData, psychologist_free_leads: parseInt(e.target.value) })}
-                    style={styles.input}
+                    step="0.001"
                 />
             </div>
 

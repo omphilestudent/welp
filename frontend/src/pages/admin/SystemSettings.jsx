@@ -8,7 +8,7 @@ const DEFAULT_SETTINGS = {
     siteUrl: 'https://welphub.onrender.com',
     maintenanceMode: false,
     registrationEnabled: true,
-    defaultUserRole: 'user',
+    defaultUserRole: 'employee',
     sessionTimeout: 30,
     inactivityTimeoutMinutes: 30,
     autoLogoutEnabled: false,
@@ -56,7 +56,7 @@ const ROLE_OPTIONS = [
     { value: 'employee', label: 'Employee' }
 ];
 
-const ADMIN_ROLE_SET = new Set(['admin', 'super_admin', 'hr_admin', 'system_admin']);
+const ADMIN_ROLE_SET = new Set(['admin', 'super_admin', 'hr_admin']);
 
 const TAB_OPTIONS = [
     { id: 'admins', label: 'Admin Management' },
@@ -111,9 +111,12 @@ const FIELD_GROUPS = {
             label: 'Default Role',
             type: 'select',
             options: [
-                { value: 'user', label: 'User' },
-                { value: 'editor', label: 'Editor' },
-                { value: 'admin', label: 'Admin' }
+                { value: 'employee', label: 'Employee' },
+                { value: 'psychologist', label: 'Psychologist' },
+                { value: 'business', label: 'Business' },
+                { value: 'admin', label: 'Admin' },
+                { value: 'super_admin', label: 'Super Admin' },
+                { value: 'hr_admin', label: 'HR Admin' }
             ]
         }
     ],
