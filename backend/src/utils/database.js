@@ -977,6 +977,27 @@ const runMigrations = async () => {
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';",
+            `DO $$
+             DECLARE
+                 con_name text;
+                 con_def  text;
+             BEGIN
+                 SELECT conname, pg_get_constraintdef(oid)
+                 INTO   con_name, con_def
+                 FROM   pg_constraint
+                 WHERE  conrelid = 'users'::regclass
+                   AND  contype  = 'c'
+                   AND  pg_get_constraintdef(oid) LIKE '%status%'
+                 LIMIT 1;
+
+                 IF con_name IS NOT NULL AND con_def NOT LIKE '%pending_review%' THEN
+                     EXECUTE 'ALTER TABLE users DROP CONSTRAINT ' || quote_ident(con_name);
+                     ALTER TABLE users
+                         ADD CONSTRAINT users_status_check
+                         CHECK (status IN ('active','inactive','pending','pending_review','under_verification','awaiting_information','rejected'));
+                     RAISE NOTICE 'users status constraint updated';
+                 END IF;
+             END $$;`,
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS public_id VARCHAR(20);",
             "ALTER TABLE users ALTER COLUMN public_id SET DEFAULT ('USR-' || substring(replace(uuid_generate_v4()::text, '-', ''), 1, 12));",
             "UPDATE users SET public_id = ('USR-' || substring(replace(uuid_generate_v4()::text, '-', ''), 1, 12)) WHERE public_id IS NULL;",

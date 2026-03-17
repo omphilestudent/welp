@@ -38,7 +38,7 @@ const authorizeAdmin = (requiredPermissions = []) => {
 
             if (adminResult.rows.length === 0) {
                 const normalizedUserRole = req.user.role?.toLowerCase();
-                const isLegacyAdminRole = ['admin', 'super_admin', 'system_admin'].includes(normalizedUserRole);
+                const isLegacyAdminRole = ['admin', 'super_admin', 'system_admin', 'hr_admin', 'hr'].includes(normalizedUserRole);
 
                 if (!isLegacyAdminRole) {
                     return res.status(403).json({ error: 'Admin access required' });

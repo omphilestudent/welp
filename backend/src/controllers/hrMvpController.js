@@ -26,6 +26,22 @@ const getEmployeeForUser = async (userId) => {
     return result.rows[0] || null;
 };
 
+const tableExists = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = $1
+            )`,
+            [tableName]
+        );
+        return result.rows[0]?.exists === true;
+    } catch (error) {
+        return false;
+    }
+};
+
 const buildEmployeeFilters = (queryParams = {}) => {
     const filters = [];
     const values = [];
@@ -173,6 +189,9 @@ const updateEmployee = async (req, res) => {
 
 const getLeaves = async (req, res) => {
     try {
+        if (!(await tableExists('leaves'))) {
+            return respond(res, { data: { leaves: [] } });
+        }
         let employeeId = req.query.employeeId;
 
         if (isEmployeeRole(req.user?.role)) {
@@ -266,6 +285,9 @@ const updateLeaveStatus = async (req, res, status) => {
 
 const getDocuments = async (req, res) => {
     try {
+        if (!(await tableExists('documents'))) {
+            return respond(res, { data: { documents: [] } });
+        }
         const { employeeId } = req.params;
         if (!employeeId) {
             return respond(res, { status: 400, success: false, error: 'employeeId is required' });
@@ -357,6 +379,9 @@ const deleteDocument = async (req, res) => {
 
 const getOnboardingTasks = async (req, res) => {
     try {
+        if (!(await tableExists('onboarding_tasks'))) {
+            return respond(res, { data: { tasks: [] } });
+        }
         const { employeeId } = req.params;
         if (!employeeId) {
             return respond(res, { status: 400, success: false, error: 'employeeId is required' });
