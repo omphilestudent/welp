@@ -770,11 +770,19 @@ const adminGetAdDetails = async (adId, options = {}) => {
 
     try {
         const placementsAlias = schema.hasPlacementsColumn ? 'placements_agg' : 'placements';
+        const reviewedBySelect = schema.hasReviewedBy ? 'c.reviewed_by' : 'NULL';
+        const reviewedAtSelect = schema.hasReviewedAt ? 'c.reviewed_at' : 'NULL';
+        const reviewNotesSelect = schema.hasReviewNotes ? 'c.review_notes' : 'NULL';
+        const reviewStatusSelect = schema.hasReviewStatus ? 'c.review_status' : `'approved'::text AS review_status`;
+        const spendMinorSelect = schema.hasSpendMinor ? 'COALESCE(c.spend_minor, 0)' : '0::bigint';
+        const bidRateMinorSelect = schema.hasBidRateMinor ? 'COALESCE(c.bid_rate_minor, 0)' : '0::bigint';
+        const overrideSelect = schema.hasOverride ? 'COALESCE(c.override_restrictions, false)' : 'false';
 
         const result = await query(
             `
                 SELECT
                     c.*,
+                    ${reviewStatusSelect},
                     ${context.businessNameExpr} AS business_name,
                     ${context.tierExpr} AS subscription_tier,
                     ${context.subscriptionExpiresExpr} AS subscription_expires,
@@ -789,9 +797,14 @@ const adminGetAdDetails = async (adId, options = {}) => {
                     ) AS ${placementsAlias},
                     COALESCE(c.impressions, 0) AS impressions,
                     COALESCE(c.clicks, 0) AS clicks,
-                    COALESCE(c.spend_minor, 0) AS spend_minor,
+                    ${spendMinorSelect} AS spend_minor,
+                    ${bidRateMinorSelect} AS bid_rate_minor,
+                    ${overrideSelect} AS override_restrictions,
+                    ${reviewedBySelect} AS reviewed_by,
+                    ${reviewedAtSelect} AS reviewed_at,
+                    ${reviewNotesSelect} AS review_notes,
                     CASE
-                        WHEN c.reviewed_by IS NOT NULL THEN (
+                        WHEN ${reviewedBySelect} IS NOT NULL THEN (
                             SELECT display_name FROM users WHERE id = c.reviewed_by
                         )
                         ELSE NULL
@@ -906,6 +919,7 @@ const adminGetAdAnalytics = async (adId, days = 30) => {
  */
 const adminApproveAd = async ({ adId, adminId, overrideRestrictions = false, notes = null }) => {
     try {
+        const schema = await ensureAdSchema();
         // Check if ad exists
         const ad = await adminGetAdDetails(adId);
 
@@ -913,25 +927,43 @@ const adminApproveAd = async ({ adId, adminId, overrideRestrictions = false, not
             throw new Error('Ad not found');
         }
 
-        // Update the ad
+        const sets = [];
+        const params = [adId];
+        let paramIndex = 2;
+
+        if (schema.hasReviewStatus) {
+            sets.push(`review_status = 'approved'`);
+        }
+
+        sets.push(`status = CASE WHEN status IN ('pending_review','pending') THEN 'active' ELSE status END`);
+
+        if (schema.hasReviewedAt) {
+            sets.push(`reviewed_at = NOW()`);
+        }
+
+        if (schema.hasReviewedBy) {
+            sets.push(`reviewed_by = $${paramIndex}`);
+            params.push(adminId);
+            paramIndex++;
+        }
+
+        if (schema.hasReviewNotes) {
+            sets.push(`review_notes = $${paramIndex}`);
+            params.push(notes);
+            paramIndex++;
+        }
+
+        if (schema.hasOverride) {
+            sets.push(`override_restrictions = $${paramIndex}`);
+            params.push(Boolean(overrideRestrictions));
+            paramIndex++;
+        }
+
+        sets.push('updated_at = NOW()');
+
         const result = await query(
-            `
-            UPDATE advertising_campaigns
-            SET 
-                review_status = 'approved',
-                status = CASE 
-                    WHEN status = 'pending_review' OR status = 'pending' THEN 'active'
-                    ELSE status
-                END,
-                reviewed_at = NOW(),
-                reviewed_by = $2,
-                review_notes = $3,
-                override_restrictions = $4,
-                updated_at = NOW()
-            WHERE id = $1
-            RETURNING *
-            `,
-            [adId, adminId, notes, overrideRestrictions]
+            `UPDATE advertising_campaigns SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
+            params
         );
 
         // Log the action
@@ -963,6 +995,7 @@ const adminApproveAd = async ({ adId, adminId, overrideRestrictions = false, not
  */
 const adminRejectAd = async ({ adId, adminId, reason, notes = null }) => {
     try {
+        const schema = await ensureAdSchema();
         // Check if ad exists
         const ad = await adminGetAdDetails(adId);
 
@@ -970,22 +1003,43 @@ const adminRejectAd = async ({ adId, adminId, reason, notes = null }) => {
             throw new Error('Ad not found');
         }
 
-        // Update the ad
+        const sets = [];
+        const params = [adId];
+        let paramIndex = 2;
+
+        if (schema.hasReviewStatus) {
+            sets.push(`review_status = 'rejected'`);
+        }
+
+        sets.push(`status = 'rejected'`);
+
+        if (schema.hasReviewedAt) {
+            sets.push(`reviewed_at = NOW()`);
+        }
+
+        if (schema.hasReviewedBy) {
+            sets.push(`reviewed_by = $${paramIndex}`);
+            params.push(adminId);
+            paramIndex++;
+        }
+
+        if (schema.hasReviewNotes) {
+            sets.push(`review_notes = $${paramIndex}`);
+            params.push(notes || reason);
+            paramIndex++;
+        }
+
+        if (schema.hasRejectionReason) {
+            sets.push(`rejection_reason = $${paramIndex}`);
+            params.push(reason);
+            paramIndex++;
+        }
+
+        sets.push('updated_at = NOW()');
+
         const result = await query(
-            `
-            UPDATE advertising_campaigns
-            SET 
-                review_status = 'rejected',
-                status = 'rejected',
-                reviewed_at = NOW(),
-                reviewed_by = $2,
-                review_notes = $3,
-                rejection_reason = $4,
-                updated_at = NOW()
-            WHERE id = $1
-            RETURNING *
-            `,
-            [adId, adminId, notes || reason, reason]
+            `UPDATE advertising_campaigns SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
+            params
         );
 
         // Log the action

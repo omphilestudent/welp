@@ -191,6 +191,214 @@
     color: white;
 }
 
+
+.add-page-guide {
+    background: #0f1c2b;
+    color: white;
+    padding: 18px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.guide-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.guide-label {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.75rem;
+    color: #7dd1ff;
+    margin: 0;
+}
+
+.add-page-guide h2 {
+    margin: 8px 0 4px;
+}
+
+.add-page-guide p {
+    margin: 0;
+    color: #c7d3e6;
+    max-width: 460px;
+}
+
+.guide-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 16, 24, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.modal-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    width: min(420px, 90%);
+    box-shadow: 0 12px 40px rgba(15, 20, 40, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.modal-card h3 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.modal-card p {
+    margin: 0;
+    color: #54698d;
+    font-size: 0.9rem;
+}
+
+.modal-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.modal-card label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1a2b3c;
+}
+
+.modal-card input {
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #d8dde6;
+    font-size: 0.9rem;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.panel-highlight-preview {
+    background: linear-gradient(180deg, #f7f9fc, #ffffff);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.panel-highlight-preview .panel-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.panel-highlight-preview .panel-actions button {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #d8dde6;
+    background: white;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.panel-highlight-preview .panel-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.panel-highlight-preview .panel-stats span {
+    padding: 4px 8px;
+    border-radius: 12px;
+    background: #e6f0ff;
+    color: #0b3b71;
+    font-size: 0.75rem;
+}
+
+.record-page-preview {
+    background: #f8f9fc;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.record-search {
+    display: flex;
+    gap: 6px;
+}
+
+.record-search input {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #d8dde6;
+}
+
+.record-search button {
+    padding: 6px 12px;
+    border-radius: 6px;
+}
+
+.record-details {
+    background: white;
+    border-radius: 6px;
+    padding: 8px;
+    border: 1px solid #e6e9f0;
+}
+
+.record-name {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+}
+
+.record-details p {
+    margin: 4px 0 0;
+    font-size: 0.8rem;
+    color: #54698d;
+}
+
+.record-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.record-filters span {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #e6e9f0;
+    font-size: 0.75rem;
+}
+
+.record-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.record-timeline-item {
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid #d8dde6;
+    font-size: 0.75rem;
+    color: #54698d;
+}
+
 /* Main Content Layout */
 .builder-content {
     display: flex;

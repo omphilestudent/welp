@@ -4,7 +4,7 @@ import Loading from '../../components/common/Loading';
 import { createKodiPage, listKCComponents, listKodiPages, updateKodiPage } from '../../services/kodiPageService';
 import './KodiBuilder.css';
 
-const DEFAULT_LAYOUT = {
+const createDefaultLayout = () => ({
     rows: [
         {
             id: `row-${Date.now()}`,
@@ -17,15 +17,46 @@ const DEFAULT_LAYOUT = {
             ]
         }
     ]
-};
+});
 
 const COMPONENT_CATEGORIES = {
     layout: ['Container', 'Grid', 'Tabs', 'Accordion'],
     data: ['Table', 'Chart', 'List', 'Card', 'Kanban'],
     input: ['Form', 'Input', 'Select', 'Checkbox', 'Radio', 'Button'],
     display: ['Text', 'Image', 'Icon', 'Badge', 'Alert', 'Modal'],
-    navigation: ['Menu', 'Breadcrumb', 'Pagination', 'Steps']
+    navigation: ['Menu', 'Breadcrumb', 'Pagination', 'Steps'],
+    kodi: ['PanelHighlight', 'RecordPage']
 };
+
+const BUILT_IN_COMPONENTS = [
+    {
+        id: 'panel-highlights',
+        component_name: 'Panel Highlights',
+        component_type: 'PanelHighlight',
+        description: 'Showcase quick actions with buttons and summary pills.',
+        version: '1.0',
+        preview: {
+            actions: ['Add Call', 'New Task', 'Send Update'],
+            stats: ['Leads: 8', 'Calls: 12', 'Open Tasks: 3']
+        }
+    },
+    {
+        id: 'record-page',
+        component_name: 'Record Page',
+        component_type: 'RecordPage',
+        description: 'Display client details, timeline, and quick search.',
+        version: '1.0',
+        preview: {
+            client: {
+                name: 'Jordan Smith',
+                account: 'AC-124',
+                phone: '+1 (555) 010-1010'
+            },
+            timeline: ['Last contact: Email - 8 mins ago', 'Next follow-up: Demo on Friday', 'Notes: Referral from Anna'],
+            quickFilters: ['Open', 'Prospect', 'VIP']
+        }
+    }
+];
 
 const KodiBuilder = () => {
     const [loading, setLoading] = useState(true);
@@ -43,8 +74,13 @@ const KodiBuilder = () => {
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [isDragging, setIsDragging] = useState(false);
+    const [showAddPageGuide, setShowAddPageGuide] = useState(true);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [newPageName, setNewPageName] = useState('');
+    const [creatingPage, setCreatingPage] = useState(false);
 
     const selectedPage = useMemo(() => pages.find((p) => p.id === selectedPageId) || null, [pages, selectedPageId]);
+    const mergedComponents = useMemo(() => [...BUILT_IN_COMPONENTS, ...components], [components]);
 
     // Load data
     const load = async () => {
@@ -60,7 +96,7 @@ const KodiBuilder = () => {
             if (pagesData.length > 0) {
                 const firstPage = pagesData[0];
                 setSelectedPageId(firstPage.id);
-                setLayout(firstPage.layout || DEFAULT_LAYOUT);
+                setLayout(firstPage.layout || createDefaultLayout());
             }
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to load Kodi builder data');
@@ -222,41 +258,113 @@ const KodiBuilder = () => {
         }
     };
 
-    // Create new page
-    const handleCreate = async () => {
-        const name = window.prompt('Enter page name:');
-        if (!name) return;
+    const openAddPageModal = () => {
+        setNewPageName('');
+        setIsAddModalOpen(true);
+    };
+
+    const submitNewPage = async (event) => {
+        event?.preventDefault();
+        const name = newPageName.trim();
+        if (!name) {
+            toast.error('Please give the page a name');
+            return;
+        }
 
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const layoutPayload = createDefaultLayout();
 
+        setCreatingPage(true);
         try {
             const res = await createKodiPage({
                 name,
                 slug,
-                layout: DEFAULT_LAYOUT
+                layout: layoutPayload
             });
             const created = res?.data;
             if (created?.id) {
                 setPages((prev) => [created, ...prev]);
                 setSelectedPageId(created.id);
-                setLayout(created.layout || DEFAULT_LAYOUT);
+                updateLayout(created.layout || layoutPayload);
                 toast.success('Page created');
+                setShowAddPageGuide(false);
+                setIsAddModalOpen(false);
             }
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to create page');
+        } finally {
+            setCreatingPage(false);
         }
     };
 
     // Filter components
     const filteredComponents = useMemo(() => {
-        return components.filter(comp => {
+        return mergedComponents.filter(comp => {
             const matchesSearch = comp.component_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.description?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesCategory = selectedCategory === 'all' ||
                 COMPONENT_CATEGORIES[selectedCategory]?.includes(comp.component_type);
             return matchesSearch && matchesCategory;
         });
-    }, [components, searchTerm, selectedCategory]);
+    }, [mergedComponents, searchTerm, selectedCategory]);
+
+    const renderPreviewContent = (comp) => {
+        if (comp.component_type === 'PanelHighlight') {
+            const actions = comp.preview?.actions || ['Add Call', 'New Task'];
+            const stats = comp.preview?.stats || ['Leads: 0', 'Calls: 0'];
+            return (
+                <div className="panel-highlight-preview">
+                    <div className="panel-actions">
+                        {actions.map((action) => (
+                            <button key={action} type="button">{action}</button>
+                        ))}
+                    </div>
+                    <div className="panel-stats">
+                        {stats.map((stat) => (
+                            <span key={stat}>{stat}</span>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        if (comp.component_type === 'RecordPage') {
+            const client = comp.preview?.client || { name: 'Client Name', account: 'AC-000', phone: '—' };
+            const timeline = comp.preview?.timeline || ['No recent activity'];
+            const filters = comp.preview?.quickFilters || ['Open', 'Active'];
+            return (
+                <div className="record-page-preview">
+                    <div className="record-search">
+                        <input type="text" placeholder="Search client records..." readOnly />
+                        <button type="button">Search</button>
+                    </div>
+                    <div className="record-details">
+                        <div className="record-name">
+                            <strong>{client.name}</strong>
+                            <span>{client.account}</span>
+                        </div>
+                        <p>Phone: {client.phone}</p>
+                    </div>
+                    <div className="record-filters">
+                        {filters.map((filter) => (
+                            <span key={filter}>{filter}</span>
+                        ))}
+                    </div>
+                    <div className="record-timeline">
+                        {timeline.map((item) => (
+                            <div key={item} className="record-timeline-item">{item}</div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="preview-placeholder">
+                {comp.component_type} Preview
+            </div>
+        );
+    };
 
     // Component card click
     const handleComponentClick = (component) => {
@@ -268,6 +376,46 @@ const KodiBuilder = () => {
 
     return (
         <div className="kodi-builder">
+            {showAddPageGuide && (
+                <section className="add-page-guide">
+                    <div className="guide-content">
+                        <div>
+                            <p className="guide-label">Step 1</p>
+                            <h2>Start by adding a Kodi page</h2>
+                            <p>Give your page a meaningful label, choose a slug, and then jump straight into building the experience.</p>
+                        </div>
+                        <div className="guide-actions">
+                            <button className="btn-primary" onClick={openAddPageModal}>Add a page</button>
+                            <button className="btn-secondary" onClick={() => setShowAddPageGuide(false)}>Not right now</button>
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {isAddModalOpen && (
+                <div className="modal-backdrop">
+                    <div className="modal-card">
+                        <h3>Label your Kodi page</h3>
+                        <p>Name the page so other teams instantly recognize it.</p>
+                        <form onSubmit={submitNewPage}>
+                            <label htmlFor="kodiPageName">Page Name</label>
+                            <input
+                                id="kodiPageName"
+                                value={newPageName}
+                                onChange={(e) => setNewPageName(e.target.value)}
+                                placeholder="e.g., Client Intake Dashboard"
+                                required
+                            />
+                            <div className="modal-actions">
+                                <button type="button" className="btn-secondary" onClick={() => setIsAddModalOpen(false)}>Cancel</button>
+                                <button type="submit" className="btn-primary" disabled={creatingPage}>
+                                    {creatingPage ? 'Creating...' : 'Create page'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
             {/* Header */}
             <header className="builder-header">
                 <div className="header-left">
@@ -281,7 +429,7 @@ const KodiBuilder = () => {
                             onChange={(e) => {
                                 const page = pages.find(p => p.id === e.target.value);
                                 setSelectedPageId(e.target.value);
-                                setLayout(page?.layout || DEFAULT_LAYOUT);
+                                setLayout(page?.layout || createDefaultLayout());
                             }}
                             className="page-select"
                         >
@@ -290,7 +438,7 @@ const KodiBuilder = () => {
                                 <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
                         </select>
-                        <button className="btn-icon" onClick={handleCreate} title="Create new page">
+                            <button className="btn-icon" onClick={openAddPageModal} title="Create new page">
                             <span>+</span>
                         </button>
                     </div>
@@ -407,7 +555,9 @@ const KodiBuilder = () => {
                                         {comp.component_type === 'Card' && '🃏'}
                                         {comp.component_type === 'Button' && '🔘'}
                                         {comp.component_type === 'Input' && '⌨️'}
-                                        {!['Table','Form','Chart','Card','Button','Input'].includes(comp.component_type) && '📦'}
+                                        {comp.component_type === 'PanelHighlight' && '✨'}
+                                        {comp.component_type === 'RecordPage' && '📋'}
+                                        {!['Table','Form','Chart','Card','Button','Input','PanelHighlight','RecordPage'].includes(comp.component_type) && '📦'}
                                     </div>
                                     <div className="component-info">
                                         <div className="component-name">{comp.component_name}</div>
@@ -435,7 +585,7 @@ const KodiBuilder = () => {
                                 <span className="empty-icon">📄</span>
                                 <h3>Select a page to start building</h3>
                                 <p>Choose a page from the dropdown or create a new one</p>
-                                <button className="btn-primary" onClick={handleCreate}>
+                                <button className="btn-primary" onClick={openAddPageModal}>
                                     Create New Page
                                 </button>
                             </div>
@@ -529,9 +679,7 @@ const KodiBuilder = () => {
                                                                             </button>
                                                                         </div>
                                                                         <div className="preview-content">
-                                                                            <div className="preview-placeholder">
-                                                                                {comp.component_type} Preview
-                                                                            </div>
+                                                                            {renderPreviewContent(comp)}
                                                                         </div>
                                                                     </div>
                                                                 ))
@@ -688,7 +836,7 @@ const KodiBuilder = () => {
                         Pages: {pages.length}
                     </span>
                     <span className="status-item">
-                        Components: {components.length}
+                        Components: {mergedComponents.length}
                     </span>
                 </div>
                 <div className="status-right">

@@ -3,20 +3,6 @@ import { recordClick, recordImpression } from '../../services/adService';
 import { usePlacementAds } from '../../hooks/usePlacementAds';
 import './SponsoredCard.css';
 
-const STATIC_REDIRECT_URL = 'https://welp.africa/static';
-const STATIC_AD = {
-    id: 'welp-care-static',
-    name: 'Because We Care',
-    advertiser: 'Welp Camping',
-    media_type: 'image',
-    asset_url: '/logo-1.png',
-    click_redirect_url: STATIC_REDIRECT_URL,
-    location: 'Johannesburg',
-    status: 'active',
-    daily_budget_minor: 0,
-    __static: true
-};
-
 const SponsoredCard = ({
     placement = 'recommended',
     location = '',
@@ -39,11 +25,10 @@ const SponsoredCard = ({
         return () => clearInterval(interval);
     }, [campaigns, rotateIntervalMs]);
 
-    const activeCampaigns = campaigns.length ? campaigns : [{ ...STATIC_AD }];
-    const campaign = activeCampaigns[activeIndex] || null;
+    const campaign = campaigns[activeIndex] || null;
 
     useEffect(() => {
-        if (!campaign || campaign.__static) return;
+        if (!campaign) return;
         const track = async () => {
             try {
                 await recordImpression(campaign.id);
@@ -56,12 +41,6 @@ const SponsoredCard = ({
 
     const handleClick = async () => {
         if (!campaign) return;
-        if (campaign.__static) {
-            if (campaign.click_redirect_url) {
-                window.open(campaign.click_redirect_url, '_blank', 'noopener');
-            }
-            return;
-        }
         try {
             const { data } = await recordClick(campaign.id);
             if (data.redirectUrl) {
@@ -96,7 +75,7 @@ const SponsoredCard = ({
         );
     }, [campaign]);
 
-    if (!campaign || loading) return null;
+    if (loading || !campaign) return null;
 
     return (
         <article className="sponsored-card" onClick={handleClick}>

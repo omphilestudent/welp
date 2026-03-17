@@ -8,7 +8,7 @@ const PLAN_LIMITS = {
     user_free: { tier: 'free', chatMinutes: 30, callMinutes: 0, displayName: 'Free', videoDiscount: 0, videoSessionsPerWeek: 1 },
     user_premium: { tier: 'premium', chatMinutes: 120, callMinutes: 90, displayName: 'Premium', videoDiscount: 20, videoSessionsPerWeek: 3 },
     psychologist_standard: { tier: 'premium', chatMinutes: 180, callMinutes: 120, displayName: 'Psychologist Partner' },
-    business_base: { tier: 'base', apiLimit: 1000, displayName: 'Business Base', ads: { maxActive: 1, analytics: 'limited' } },
+    business_base: { tier: 'base', apiLimit: 1000, displayName: 'Business Base', ads: { maxActive: 3, analytics: 'limited' } },
     business_enhanced: { tier: 'enhanced', apiLimit: 3000, displayName: 'Business Enhanced', ads: { maxActive: 5, analytics: 'standard' } },
     business_premium: { tier: 'premium', apiLimit: 10000, displayName: 'Business Premium', ads: { maxActive: null, analytics: 'advanced' } }
 };

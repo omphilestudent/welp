@@ -31,7 +31,31 @@ const UnknownComponent = ({ name }) => (
     </div>
 );
 
-const resolveComponentName = (slot) => {
+const buildRegistry = (components) => {
+    if (!Array.isArray(components)) return new Map();
+    const registry = new Map();
+
+    for (const entry of components) {
+        // Accept multiple shapes:
+        // - { id, component_name }
+        // - { id, name }
+        // - { component: { id, name } }
+        // - { componentId, componentName }
+        const id = entry?.id || entry?.component?.id || entry?.componentId || entry?.component_id;
+        const name = entry?.component_name
+            || entry?.componentName
+            || entry?.name
+            || entry?.component?.name
+            || entry?.component?.component_name
+            || null;
+
+        if (id && name) registry.set(String(id), name);
+    }
+
+    return registry;
+};
+
+const resolveComponentName = (slot, registry) => {
     if (!slot) return null;
     // Layout can store full component objects (builder), or a reference.
     return (
@@ -40,6 +64,8 @@ const resolveComponentName = (slot) => {
         || slot.name
         || slot.component?.name
         || slot.component?.component_name
+        || (slot.componentId != null ? registry?.get(String(slot.componentId)) : null)
+        || (slot.component_id != null ? registry?.get(String(slot.component_id)) : null)
         || null
     );
 };
@@ -55,9 +81,15 @@ export const renderComponent = ({ componentName, props, context, events }) => {
     return <Comp props={props} context={context} events={events} />;
 };
 
-const DynamicRenderer = ({ layout, context = {}, events = {} }) => {
+const DynamicRenderer = ({
+    layout,
+    components = null,
+    context = {},
+    events = {}
+}) => {
     const rows = layout?.rows || [];
     const normalized = useMemo(() => (Array.isArray(rows) ? rows : []), [rows]);
+    const registry = useMemo(() => buildRegistry(components), [components]);
 
     return (
         <div className="kodi-layout">
@@ -70,7 +102,7 @@ const DynamicRenderer = ({ layout, context = {}, events = {} }) => {
                             style={col.width ? { flex: `${col.width} 0 0` } : undefined}
                         >
                             {(col.components || []).map((slot, slotIndex) => {
-                                const componentName = resolveComponentName(slot);
+                                const componentName = resolveComponentName(slot, registry);
                                 if (!componentName) {
                                     return <UnknownComponent key={`slot-${slotIndex}`} name="(missing name)" />;
                                 }
@@ -90,4 +122,3 @@ const DynamicRenderer = ({ layout, context = {}, events = {} }) => {
 };
 
 export default DynamicRenderer;
-
