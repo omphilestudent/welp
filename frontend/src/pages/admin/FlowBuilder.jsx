@@ -32,12 +32,73 @@ const LIBRARY = [
                 help: 'When a subscription changes',
                 nodeType: 'trigger',
                 config: { eventName: 'subscription.changed', conditions: { match: {} } }
+            },
+            {
+                key: 'trigger-message',
+                label: 'Message Created',
+                help: 'When a new message is created',
+                nodeType: 'trigger',
+                config: { eventName: 'message.created', conditions: { match: {} } }
+            }
+        ]
+    },
+    {
+        title: 'Logic',
+        items: [
+            {
+                key: 'timer',
+                label: 'Timer / Schedule',
+                help: 'Run after a scheduled time',
+                nodeType: 'timer',
+                config: { delay: '5m' }
+            },
+            {
+                key: 'delay',
+                label: 'Delay / Wait',
+                help: 'Pause the flow for a period',
+                nodeType: 'delay',
+                config: { delay: '5m' }
+            },
+            {
+                key: 'decision',
+                label: 'Decision',
+                help: 'Route based on a condition',
+                nodeType: 'condition',
+                config: { field: 'role', value: 'business' }
+            },
+            {
+                key: 'loop',
+                label: 'Loop (Controlled)',
+                help: 'Allow a loop with iteration limits',
+                nodeType: 'loop',
+                config: { maxIterations: 3 }
             }
         ]
     },
     {
         title: 'Actions',
         items: [
+            {
+                key: 'create-record',
+                label: 'Create Record',
+                help: 'Create a record in a table',
+                nodeType: 'create_record',
+                config: { table: 'users', payload: {} }
+            },
+            {
+                key: 'update-record',
+                label: 'Update Record',
+                help: 'Update a record in a table',
+                nodeType: 'update_record',
+                config: { table: 'users', match: { id: '{{userId}}' }, payload: {} }
+            },
+            {
+                key: 'delete-record',
+                label: 'Delete Record',
+                help: 'Delete a record in a table',
+                nodeType: 'delete_record',
+                config: { table: 'users', match: { id: '{{userId}}' } }
+            },
             {
                 key: 'email',
                 label: 'Send Email',
@@ -47,24 +108,17 @@ const LIBRARY = [
             },
             {
                 key: 'notify',
-                label: 'Send Notification',
+                label: 'Notification',
                 help: 'Send an in-app notification',
                 nodeType: 'user_notification',
                 config: { message: 'Welcome, {{email}}!' }
             },
             {
                 key: 'callApi',
-                label: 'Call API',
+                label: 'API Call (Webhook)',
                 help: 'Call an API endpoint',
                 nodeType: 'call_api',
                 config: { baseUrl: '', path: '/api/health', method: 'GET', headers: {}, body: null }
-            },
-            {
-                key: 'condition',
-                label: 'Condition',
-                help: 'Route based on a condition',
-                nodeType: 'condition',
-                config: { field: 'role', value: 'business' }
             },
             {
                 key: 'end',
@@ -76,6 +130,14 @@ const LIBRARY = [
         ]
     }
 ];
+
+const NODE_KIND = {
+    start: 'start',
+    trigger: 'start',
+    condition: 'decision',
+    loop: 'decision',
+    end: 'end'
+};
 
 const fromDefinition = (definition = {}) => {
     const rawNodes = Array.isArray(definition.nodes) ? definition.nodes : [];
@@ -92,7 +154,13 @@ const fromDefinition = (definition = {}) => {
             ...(n.type === 'email' ? { to: n.to || '{{email}}', subject: n.subject || '', text: n.text || n.message || '' } : {}),
             ...(n.type === 'user_notification' ? { message: n.message || '' } : {}),
             ...(n.type === 'call_api' ? { baseUrl: n.baseUrl || '', path: n.path || n.url || '', method: n.method || 'GET', body: n.body ?? null } : {}),
-            ...(n.type === 'condition' ? { field: n.field || 'role', value: n.value || 'business' } : {})
+            ...(n.type === 'condition' ? { field: n.field || 'role', value: n.value || 'business' } : {}),
+            ...(n.type === 'timer' ? { delay: n.delay || '5m' } : {}),
+            ...(n.type === 'delay' ? { delay: n.delay || '5m' } : {}),
+            ...(n.type === 'loop' ? { maxIterations: n.maxIterations || 3 } : {}),
+            ...(n.type === 'create_record' ? { table: n.table || 'users', payload: n.payload || {} } : {}),
+            ...(n.type === 'update_record' ? { table: n.table || 'users', match: n.match || { id: '{{userId}}' }, payload: n.payload || {} } : {}),
+            ...(n.type === 'delete_record' ? { table: n.table || 'users', match: n.match || { id: '{{userId}}' } } : {})
         }
     }));
 
@@ -141,14 +209,50 @@ const toDefinition = ({ nodes, edges, positions, viewport, mode }) => {
         return payload;
     });
 
-    const startNodeId = nodes.find((n) => n.type === 'trigger')?.id || definitionNodes[0]?.id || null;
+    const startNodeId = nodes.find((n) => n.type === 'start')?.id
+        || nodes.find((n) => n.type === 'trigger')?.id
+        || definitionNodes[0]?.id
+        || null;
     return { version: 2, meta: { lifecycle: { mode } }, startNodeId, nodes: definitionNodes, ui: { nodes: positions, viewport } };
+};
+
+const detectCycle = (nodes, edges) => {
+    const adjacency = new Map();
+    edges.forEach((edge) => {
+        if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
+        adjacency.get(edge.from).push(edge.to);
+    });
+
+    const visiting = new Set();
+    const visited = new Set();
+
+    const dfs = (id, stack) => {
+        if (visiting.has(id)) return stack.slice(stack.indexOf(id));
+        if (visited.has(id)) return null;
+        visiting.add(id);
+        const nexts = adjacency.get(id) || [];
+        for (const next of nexts) {
+            const cycle = dfs(next, [...stack, next]);
+            if (cycle) return cycle;
+        }
+        visiting.delete(id);
+        visited.add(id);
+        return null;
+    };
+
+    for (const node of nodes) {
+        const cycle = dfs(node.id, [node.id]);
+        if (cycle) return cycle;
+    }
+    return null;
 };
 
 const validateFlow = ({ flowType, nodes, edges }) => {
     const errors = [];
     if (!nodes.length) return ['Add at least one step.'];
-    if (String(flowType).toLowerCase() === 'trigger') {
+    if (!nodes.some((n) => n.type === 'end')) errors.push('Flow must include an End node.');
+    const normalizedType = String(flowType).toLowerCase();
+    if (['trigger', 'event', 'event-based'].includes(normalizedType)) {
         const trigger = nodes.find((n) => n.type === 'trigger');
         if (!trigger) errors.push('Trigger flow needs a trigger step.');
         if (trigger && !trigger.config?.eventName) errors.push('Select a trigger event.');
@@ -162,7 +266,23 @@ const validateFlow = ({ flowType, nodes, edges }) => {
         if (n.type === 'end') return;
         const outs = outgoing.get(n.id) || [];
         if (!outs.length) errors.push('This flow has a step that is not connected.');
+        if (n.type === 'condition') {
+            const yes = outs.find((e) => e.handle === 'yes');
+            const no = outs.find((e) => e.handle === 'no');
+            if (!yes || !no) errors.push('Decision nodes must have Yes/No branches.');
+        }
+        if (n.type === 'start') {
+            const hasIncoming = edges.some((e) => e.to === n.id);
+            if (hasIncoming) errors.push('Start node cannot have incoming connections.');
+        }
     });
+    const cycle = detectCycle(nodes, edges);
+    if (cycle) {
+        const cycleHasLoop = cycle.some((id) => nodes.find((n) => n.id === id)?.type === 'loop');
+        if (!cycleHasLoop) {
+            errors.push('Cycles are not allowed unless a Loop node is part of the cycle.');
+        }
+    }
     return [...new Set(errors)];
 };
 
@@ -206,9 +326,39 @@ export default function FlowBuilder() {
                 setEvents(eventsRes?.events || []);
                 setTriggers(triggersRes?.data || []);
                 const parsed = fromDefinition(record?.definition || {});
-                setNodes(parsed.nodes);
-                setEdges(parsed.edges);
-                setPositions(parsed.positions);
+                let nextNodes = parsed.nodes;
+                let nextPositions = parsed.positions;
+                let nextEdges = parsed.edges;
+
+                if (!nextNodes.length) {
+                    const startId = makeId();
+                    const endId = makeId();
+                    nextNodes = [
+                        { id: startId, type: 'start', label: 'Start Flow', config: {} },
+                        { id: endId, type: 'end', label: 'End Flow', config: {} }
+                    ];
+                    nextPositions = {
+                        [startId]: { x: 200, y: 80 },
+                        [endId]: { x: 520, y: 80 }
+                    };
+                    nextEdges = [{ id: `${startId}-out-${endId}`, from: startId, to: endId, handle: 'out' }];
+                } else if (!nextNodes.some((n) => n.type === 'start')) {
+                    const startId = makeId();
+                    const startTarget = record?.definition?.startNodeId
+                        || record?.definition?.startNode
+                        || record?.definition?.start
+                        || nextNodes[0]?.id
+                        || null;
+                    nextNodes = [{ id: startId, type: 'start', label: 'Start Flow', config: {} }, ...nextNodes];
+                    nextPositions = { [startId]: { x: 200, y: 80 }, ...nextPositions };
+                    if (startTarget) {
+                        nextEdges = [...nextEdges, { id: `${startId}-out-${startTarget}`, from: startId, to: String(startTarget), handle: 'out' }];
+                    }
+                }
+
+                setNodes(nextNodes);
+                setEdges(nextEdges);
+                setPositions(nextPositions);
                 setViewport(parsed.viewport);
                 setMode(parsed.mode);
             } catch (e) {
@@ -226,16 +376,28 @@ export default function FlowBuilder() {
         return { x: (clientX - rect.left - viewport.x) / viewport.zoom, y: (clientY - rect.top - viewport.y) / viewport.zoom };
     };
 
+    const addNodeFromItem = (item, point, connectFromId = null) => {
+        const nodeId = makeId();
+        setNodes((prev) => [...prev, { id: nodeId, type: item.nodeType, label: item.help || item.label, config: item.config || {} }]);
+        setPositions((prev) => ({ ...prev, [nodeId]: { x: point.x, y: point.y } }));
+        if (connectFromId) {
+            const fromNode = nodes.find((n) => n.id === connectFromId);
+            if (fromNode?.type === 'end') {
+                toast.error('End nodes cannot connect forward.');
+            } else {
+                setEdges((prev) => [...prev, { id: `${connectFromId}-out-${nodeId}`, from: connectFromId, to: nodeId, handle: 'out' }]);
+            }
+        }
+        setSelectedId(nodeId);
+    };
+
     const onDrop = (e) => {
         e.preventDefault();
         const raw = e.dataTransfer.getData('application/flow-node');
         if (!raw) return;
         const item = JSON.parse(raw);
         const point = screenToCanvas(e.clientX, e.clientY);
-        const nodeId = makeId();
-        setNodes((prev) => [...prev, { id: nodeId, type: item.nodeType, label: item.help || item.label, config: item.config || {} }]);
-        setPositions((prev) => ({ ...prev, [nodeId]: { x: point.x, y: point.y } }));
-        setSelectedId(nodeId);
+        addNodeFromItem(item, point);
     };
 
     const onDragStart = (e, item) => {
@@ -255,6 +417,7 @@ export default function FlowBuilder() {
         const toNode = nodes.find((n) => n.id === to);
         if (!fromNode || !toNode) return;
         if (toNode.type === 'trigger') return toast.error('Triggers cannot have incoming connections.');
+        if (toNode.type === 'start') return toast.error('Start nodes cannot have incoming connections.');
         if (fromNode.type === 'end') return toast.error('End nodes cannot connect forward.');
         setEdges((prev) => {
             const filtered = prev.filter((e) => !(e.from === connecting.from && e.handle === connecting.handle));
@@ -382,7 +545,19 @@ export default function FlowBuilder() {
                             <div className="fb-group-title">{group.title}</div>
                             <div className="fb-items">
                                 {group.items.map((item) => (
-                                    <div key={item.key} className="fb-item" draggable onDragStart={(e) => onDragStart(e, item)} title={item.help}>
+                                    <div
+                                        key={item.key}
+                                        className="fb-item"
+                                        draggable
+                                        onDragStart={(e) => onDragStart(e, item)}
+                                        onClick={() => {
+                                            const point = selectedId
+                                                ? { x: (positions[selectedId]?.x || 200) + 260, y: positions[selectedId]?.y || 120 }
+                                                : { x: 240, y: 140 };
+                                            addNodeFromItem(item, point, selectedId);
+                                        }}
+                                        title={item.help}
+                                    >
                                         <div className="fb-item-label">{item.label}</div>
                                         <div className="fb-item-help">{item.help}</div>
                                     </div>
@@ -440,10 +615,11 @@ export default function FlowBuilder() {
                                 const pos = positions[node.id] || { x: 80, y: 80 };
                                 const active = node.id === selectedId;
                                 const running = node.id === run.activeId;
+                                const kind = NODE_KIND[node.type] || 'action';
                                 return (
                                     <div
                                         key={node.id}
-                                        className={`fb-node ${active ? 'active' : ''} ${running ? 'running' : ''}`}
+                                        className={`fb-node type-${kind} ${active ? 'active' : ''} ${running ? 'running' : ''}`}
                                         style={{ left: pos.x, top: pos.y }}
                                         onMouseDown={(e) => {
                                             if (e.button !== 0) return;
@@ -474,7 +650,9 @@ export default function FlowBuilder() {
                                             <div className="fb-node-label">{node.label}</div>
                                         </div>
                                         <div className="fb-node-ports">
-                                            {node.type !== 'trigger' && <button type="button" className="port in" title="Connect into this step" onClick={(e) => { e.stopPropagation(); connectTo(node.id); }} />}
+                                            {node.type !== 'trigger' && node.type !== 'start' && (
+                                                <button type="button" className="port in" title="Connect into this step" onClick={(e) => { e.stopPropagation(); connectTo(node.id); }} />
+                                            )}
                                             <div className="fb-out">
                                                 {node.type === 'condition' && (
                                                     <>
@@ -527,6 +705,10 @@ export default function FlowBuilder() {
                                 </>
                             )}
 
+                            {selected.type === 'start' && (
+                                <div className="hint">Start node routes into your flow.</div>
+                            )}
+
                             {selected.type === 'email' && (
                                 <>
                                     <label>Send to<input value={selected.config.to || ''} onChange={(e) => updateSelected({ to: e.target.value })} /></label>
@@ -551,6 +733,14 @@ export default function FlowBuilder() {
                                 </>
                             )}
 
+                            {selected.type === 'timer' && (
+                                <label>Delay<input value={selected.config.delay || ''} onChange={(e) => updateSelected({ delay: e.target.value })} placeholder="5m" /></label>
+                            )}
+
+                            {selected.type === 'delay' && (
+                                <label>Wait For<input value={selected.config.delay || ''} onChange={(e) => updateSelected({ delay: e.target.value })} placeholder="5m" /></label>
+                            )}
+
                             {selected.type === 'condition' && (
                                 <>
                                     <label>Field<select value={selected.config.field || 'role'} onChange={(e) => updateSelected({ field: e.target.value })}><option value="role">role</option><option value="status">status</option></select></label>
@@ -559,7 +749,51 @@ export default function FlowBuilder() {
                                 </>
                             )}
 
+                            {selected.type === 'loop' && (
+                                <label>Max Iterations<input type="number" min="1" max="50" value={selected.config.maxIterations || 3} onChange={(e) => updateSelected({ maxIterations: Number(e.target.value) || 1 })} /></label>
+                            )}
+
+                            {selected.type === 'create_record' && (
+                                <>
+                                    <label>Table<input value={selected.config.table || ''} onChange={(e) => updateSelected({ table: e.target.value })} /></label>
+                                    <label>Payload<textarea rows={5} value={typeof selected.config.payload === 'string' ? selected.config.payload : JSON.stringify(selected.config.payload ?? {}, null, 2)} onChange={(e) => {
+                                        const text = e.target.value;
+                                        try { updateSelected({ payload: text.trim() ? JSON.parse(text) : {} }); } catch { updateSelected({ payload: text }); }
+                                    }} /></label>
+                                </>
+                            )}
+
+                            {selected.type === 'update_record' && (
+                                <>
+                                    <label>Table<input value={selected.config.table || ''} onChange={(e) => updateSelected({ table: e.target.value })} /></label>
+                                    <label>Match<textarea rows={4} value={typeof selected.config.match === 'string' ? selected.config.match : JSON.stringify(selected.config.match ?? {}, null, 2)} onChange={(e) => {
+                                        const text = e.target.value;
+                                        try { updateSelected({ match: text.trim() ? JSON.parse(text) : {} }); } catch { updateSelected({ match: text }); }
+                                    }} /></label>
+                                    <label>Payload<textarea rows={5} value={typeof selected.config.payload === 'string' ? selected.config.payload : JSON.stringify(selected.config.payload ?? {}, null, 2)} onChange={(e) => {
+                                        const text = e.target.value;
+                                        try { updateSelected({ payload: text.trim() ? JSON.parse(text) : {} }); } catch { updateSelected({ payload: text }); }
+                                    }} /></label>
+                                </>
+                            )}
+
+                            {selected.type === 'delete_record' && (
+                                <>
+                                    <label>Table<input value={selected.config.table || ''} onChange={(e) => updateSelected({ table: e.target.value })} /></label>
+                                    <label>Match<textarea rows={4} value={typeof selected.config.match === 'string' ? selected.config.match : JSON.stringify(selected.config.match ?? {}, null, 2)} onChange={(e) => {
+                                        const text = e.target.value;
+                                        try { updateSelected({ match: text.trim() ? JSON.parse(text) : {} }); } catch { updateSelected({ match: text }); }
+                                    }} /></label>
+                                </>
+                            )}
+
+                            {selected.type === 'end' && <div className="hint">End nodes terminate the flow.</div>}
+
                             <button type="button" className="danger" onClick={() => {
+                                if (selected.type === 'start') {
+                                    toast.error('Start node cannot be removed.');
+                                    return;
+                                }
                                 if (!window.confirm(`Delete "${selected.label}"?`)) return;
                                 setNodes((prev) => prev.filter((n) => n.id !== selected.id));
                                 setEdges((prev) => prev.filter((e) => e.from !== selected.id && e.to !== selected.id));

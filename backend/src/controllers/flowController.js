@@ -40,6 +40,12 @@ const ensureJsonDefinition = (definition) => {
     }
 };
 
+const hasEndNode = (definition) => {
+    const nodes = Array.isArray(definition?.nodes) ? definition.nodes : [];
+    if (!nodes.length) return true;
+    return nodes.some((node) => node?.type === 'end');
+};
+
 const formatFlow = (flow) => {
     if (!flow) return null;
     return {
@@ -91,6 +97,9 @@ const createFlowController = async (req, res) => {
         }
 
         const definition = ensureJsonDefinition(req.body.definition);
+        if (!hasEndNode(definition)) {
+            return res.status(400).json({ success: false, error: 'Flow must include an End node' });
+        }
         const flow = await createFlow({
             name: name.trim(),
             description: description?.trim() || null,
@@ -116,6 +125,9 @@ const updateFlowController = async (req, res) => {
         });
         if (req.body.definition !== undefined) {
             updates.definition = ensureJsonDefinition(req.body.definition);
+            if (!hasEndNode(updates.definition)) {
+                return res.status(400).json({ success: false, error: 'Flow must include an End node' });
+            }
         }
         if (req.body.isActive !== undefined) {
             updates.isActive = parseBoolean(req.body.isActive);

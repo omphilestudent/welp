@@ -11,22 +11,35 @@ const MAX_MEDIA_MB = Math.max(1, Math.round(MAX_MEDIA_BYTES / (1024 * 1024)));
 const handleMediaUpload = (req, res, next) => {
     upload.single('media')(req, res, async (err) => {
         if (!err) return next();
-        const responseMessage =
-            err?.message === 'File too large'
-                ? `Media file exceeds the ${MAX_MEDIA_MB}MB limit`
-                : err?.message || 'Failed to process media upload';
+
+        let responseMessage = 'Failed to process media upload';
+
+        if (err?.message === 'File too large') {
+            responseMessage = `Media file exceeds the ${MAX_MEDIA_MB}MB limit`;
+        } else if (err?.code === 'LIMIT_UNEXPECTED_FILE') {
+            responseMessage = 'Unexpected field name. Expected "media"';
+        } else if (err?.message) {
+            responseMessage = err.message;
+        }
+
+        // Log failure if user is authenticated
         if (req.user?.id) {
             try {
                 await logAdFailure({
                     userId: req.user.id,
                     businessId: null,
                     errorMessage: responseMessage,
-                    details: { stage: 'upload', code: err?.code || null }
+                    details: {
+                        stage: 'upload',
+                        code: err?.code || null,
+                        field: err?.field || null
+                    }
                 });
             } catch (logError) {
                 console.warn('Unable to log upload failure:', logError.message);
             }
         }
+
         return res.status(400).json({
             success: false,
             error: responseMessage
@@ -47,7 +60,7 @@ router.get('/me', authorize('business'), adsController.listMyCampaigns);
 router.post('/', authorize('business'), handleMediaUpload, adsController.createCampaign);
 router.put('/:id', authorize('business'), handleMediaUpload, adsController.updateCampaign);
 router.delete('/:id', authorize('business'), adsController.deleteCampaign);
-router.get('/:id', adsController.getCampaign);
+router.get('/:id', authorize('business'), adsController.getCampaign);
 
 // ==================== ADMIN ROUTES ====================
 const adminAuth = [authenticate, authorize('admin', 'super_admin')];

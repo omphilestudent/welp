@@ -29,6 +29,21 @@ const { hasPremiumException } = require('../utils/premiumAccess');
 const AD_ASSET_FOLDER = path.join(__dirname, '../../uploads/ads');
 fs.mkdirSync(AD_ASSET_FOLDER, { recursive: true });
 
+const tableExists = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = $1
+            )`,
+            [tableName]
+        );
+        return result.rows[0]?.exists === true;
+    } catch {
+        return false;
+    }
+};
+
 const VALID_STATUSES = ['draft', 'active', 'paused', 'completed'];
 const VALID_BID_TYPES = ['cpc', 'cpm'];
 let adImpressionsTableReady = false;
@@ -824,6 +839,9 @@ const recordClick = async (req, res) => {
 
 const adminListCampaigns = async (req, res) => {
     try {
+        if (!await tableExists('advertising_campaigns')) {
+            return res.json({ success: true, campaigns: [] });
+        }
         const normalizeReviewStatus = (value) => {
             const raw = String(value || '').toLowerCase().trim();
             if (!raw) return undefined;

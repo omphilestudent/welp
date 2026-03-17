@@ -70,19 +70,76 @@ const getColumnType = async (tableName, columnName) => {
     }
 };
 
+const resolveUpdatedBy = async (userId) => {
+    if (!userId) return null;
+    try {
+        if (!await tableExists('users')) return null;
+        const result = await query('SELECT id FROM users WHERE id = $1', [userId]);
+        return result.rows.length ? userId : null;
+    } catch {
+        return null;
+    }
+};
+
 const ensureSystemSettingsTable = async () => {
     try {
+        console.log('Creating system_settings table...');
+        const exists = await tableExists('system_settings');
+        if (exists) {
+            console.log('system_settings table already exists');
+            return true;
+        }
+
         await query(
             `CREATE TABLE IF NOT EXISTS system_settings (
                 key VARCHAR(128) PRIMARY KEY,
                 value JSONB NOT NULL,
                 updated_by UUID,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )`
         );
+
+        console.log('system_settings table created successfully');
+
+        const defaultSettings = [
+            { key: 'site_name', value: JSON.stringify('Welp Hub') },
+            { key: 'site_url', value: JSON.stringify('https://welphub.onrender.com') },
+            { key: 'maintenance_mode', value: JSON.stringify(false) },
+            { key: 'registration_enabled', value: JSON.stringify(true) },
+            { key: 'default_user_role', value: JSON.stringify('user') },
+            { key: 'session_timeout', value: JSON.stringify(30) },
+            { key: 'inactivity_timeout_minutes', value: JSON.stringify(30) },
+            { key: 'auto_logout_enabled', value: JSON.stringify(false) },
+            { key: 'max_login_attempts', value: JSON.stringify(5) },
+            { key: 'two_factor_auth', value: JSON.stringify(false) },
+            { key: 'email_notifications', value: JSON.stringify(true) },
+            { key: 'backup_frequency', value: JSON.stringify('daily') },
+            { key: 'logs_retention', value: JSON.stringify('30 days') },
+            { key: 'system_email', value: JSON.stringify('') },
+            { key: 'company_name', value: JSON.stringify('') },
+            { key: 'timezone', value: JSON.stringify('UTC') },
+            { key: 'date_format', value: JSON.stringify('MM/DD/YYYY') }
+        ];
+
+        for (const setting of defaultSettings) {
+            try {
+                await query(
+                    `INSERT INTO system_settings (key, value, created_at, updated_at)
+                     VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                     ON CONFLICT (key) DO NOTHING`,
+                    [setting.key, setting.value]
+                );
+                console.log(`Inserted default setting: ${setting.key}`);
+            } catch (err) {
+                console.error(`Error inserting default setting ${setting.key}:`, err.message);
+            }
+        }
+
         return true;
     } catch (error) {
         console.error('Failed to ensure system_settings table:', error.message);
+        console.error('Error stack:', error.stack);
         return false;
     }
 };
@@ -1115,49 +1172,142 @@ const getSystemSettings = async (req, res) => {
 
 const updateSystemSettings = async (req, res) => {
     try {
-        if (!await tableExists('system_settings')) {
+        console.log('=== UPDATE SYSTEM SETTINGS CALLED ===');
+        console.log('Request body:', JSON.stringify(req.body, null, 2));
+        console.log('User:', req.user?.id, req.user?.role);
+
+        const tableExistsResult = await tableExists('system_settings');
+        console.log('system_settings table exists:', tableExistsResult);
+
+        if (!tableExistsResult) {
+            console.log('Creating system_settings table...');
             const created = await ensureSystemSettingsTable();
+            console.log('Table created:', created);
             if (!created) {
-                return res.status(500).json({ error: 'Table not found' });
+                return res.status(500).json({
+                    success: false,
+                    error: 'System settings table could not be created'
+                });
             }
         }
+
+        const updatedBy = await resolveUpdatedBy(req.user?.id);
+        console.log('Updated by:', updatedBy);
+
         const valueColumnType = await getColumnType('system_settings', 'value');
+        console.log('Value column type:', valueColumnType);
         const normalizeValue = (raw) => {
-            if (valueColumnType === 'jsonb' || valueColumnType === 'json') {
-                return JSON.stringify(raw ?? null);
-            }
             if (raw === null || raw === undefined) return null;
+            if (valueColumnType === 'jsonb' || valueColumnType === 'json') {
+                return JSON.stringify(raw);
+            }
             if (typeof raw === 'string') return raw;
             return JSON.stringify(raw);
         };
 
-        const entries = Array.isArray(req.body)
-            ? req.body
-            : (Array.isArray(req.body.entries) ? req.body.entries : [req.body]);
+        let entries = [];
+        if (Array.isArray(req.body)) {
+            console.log('Request body is array');
+            entries = req.body;
+        } else if (req.body.entries && Array.isArray(req.body.entries)) {
+            console.log('Request body has entries array');
+            entries = req.body.entries;
+        } else if (typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+            console.log('Request body is object');
+            if (req.body.key !== undefined) {
+                console.log('Request body has key');
+                entries = [req.body];
+            } else {
+                console.log('Converting object to entries');
+                entries = Object.entries(req.body).map(([key, value]) => ({
+                    key,
+                    value
+                }));
+            }
+        }
+
+        console.log('Processing entries count:', entries.length);
+        console.log('Entries:', JSON.stringify(entries, null, 2));
+
+        if (entries.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No valid settings provided'
+            });
+        }
 
         const updates = [];
         for (const entry of entries) {
             const key = entry?.key;
             if (!key) {
-                return res.status(400).json({ error: 'Key is required' });
+                console.warn('Skipping entry without key:', entry);
+                continue;
             }
             const value = entry?.value;
-            const result = await query(
-                `INSERT INTO system_settings (key, value, updated_by) VALUES ($1,$2,$3)
-                 ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_by=EXCLUDED.updated_by, updated_at=CURRENT_TIMESTAMP RETURNING *`,
-                [String(key), normalizeValue(value), req.user.id]
-            );
-            if (result.rows[0]) {
-                updates.push(result.rows[0]);
+            console.log(`Processing setting: ${key} =`, value);
+            try {
+                const normalizedValue = normalizeValue(value);
+                console.log(`Normalized value for ${key}:`, normalizedValue);
+                const result = await query(
+                    `INSERT INTO system_settings (key, value, updated_by, updated_at)
+                     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                     ON CONFLICT (key) DO UPDATE
+                     SET value = EXCLUDED.value,
+                         updated_by = EXCLUDED.updated_by,
+                         updated_at = CURRENT_TIMESTAMP
+                     RETURNING *`,
+                    [String(key), normalizedValue, updatedBy]
+                );
+                if (result.rows[0]) {
+                    console.log(`Updated ${key} successfully`);
+                    updates.push(result.rows[0]);
+                }
+            } catch (err) {
+                console.error(`Error updating setting ${key}:`, err);
+                console.error('Error details:', err.message, err.stack);
             }
         }
 
-        res.json(updates.length === 1 ? updates[0] : { success: true, updates });
+        console.log(`Updated ${updates.length} settings`);
+
+        const allSettings = await query('SELECT * FROM system_settings ORDER BY key');
+        console.log('Fetched all settings count:', allSettings.rows.length);
+
+        const settingsObj = {};
+        allSettings.rows.forEach(item => {
+            try {
+                if (typeof item.value === 'string') {
+                    try {
+                        settingsObj[item.key] = JSON.parse(item.value);
+                    } catch {
+                        settingsObj[item.key] = item.value;
+                    }
+                } else {
+                    settingsObj[item.key] = item.value;
+                }
+            } catch {
+                settingsObj[item.key] = item.value;
+            }
+        });
+
+        console.log('Returning settings:', Object.keys(settingsObj));
+
+        return res.json({
+            success: true,
+            message: `${updates.length} setting(s) updated successfully`,
+            settings: settingsObj,
+            updates: updates.length === 1 ? updates[0] : updates
+        });
     } catch (error) {
-        console.error('Update system settings error:', error);
-        res.status(500).json({
+        console.error('=== UPDATE SYSTEM SETTINGS ERROR ===');
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        console.error('Error details:', error);
+        return res.status(500).json({
+            success: false,
             error: 'Failed to update settings',
-            details: error?.message || null
+            details: error?.message || null,
+            stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
         });
     }
 };
@@ -1198,7 +1348,8 @@ const updateSessionSettings = async (req, res) => {
         if (!Object.keys(updates).length) {
             return res.status(400).json({ error: 'No session settings provided' });
         }
-        const settings = await persistSessionSettings(updates, req.user?.id || null);
+        const updatedBy = await resolveUpdatedBy(req.user?.id);
+        const settings = await persistSessionSettings(updates, updatedBy);
         return res.json({
             success: true,
             inactivityTimeout: settings.inactivityTimeoutMinutes,

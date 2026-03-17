@@ -30,6 +30,7 @@ const ensureAdSchema = async () => {
     if (cachedAdSchema && cachedAdSchema.expiresAt > Date.now()) {
         return cachedAdSchema;
     }
+
     try {
         const { rows } = await query(
             `SELECT column_name
@@ -37,7 +38,9 @@ const ensureAdSchema = async () => {
              WHERE table_schema = 'public'
                AND table_name = 'advertising_campaigns'`
         );
+
         const columns = rows.map((row) => row.column_name);
+
         cachedAdSchema = {
             hasReviewStatus: columns.includes('review_status'),
             hasSpendMinor: columns.includes('spend_minor'),
@@ -54,6 +57,7 @@ const ensureAdSchema = async () => {
         };
     } catch (error) {
         console.warn('Ad schema introspection failed:', error.message);
+
         cachedAdSchema = {
             hasReviewStatus: false,
             hasSpendMinor: false,
@@ -69,34 +73,43 @@ const ensureAdSchema = async () => {
             expiresAt: Date.now() + AD_SCHEMA_TTL_MS
         };
     }
+
     return cachedAdSchema;
 };
 
 const buildAdQueryContext = (tables) => {
     const joins = [];
+
     if (tables.businesses) {
         joins.push('LEFT JOIN businesses b ON b.id = c.business_id');
     }
+
     if (tables.companies) {
         joins.push('LEFT JOIN companies comp ON comp.id = c.business_id');
     }
 
     const ownerSources = [];
+
     if (tables.businesses && tables.businessCols?.ownerUserId) {
         ownerSources.push('b.owner_user_id');
     }
+
     if (tables.companies) {
         if (tables.companyCols?.claimedBy) ownerSources.push('comp.claimed_by');
         if (tables.companyCols?.createdByUserId) ownerSources.push('comp.created_by_user_id');
     }
+
     const ownerExpr = ownerSources.length ? `COALESCE(${ownerSources.join(', ')})` : null;
+
     if (ownerExpr) {
         joins.push(`LEFT JOIN users owner ON owner.id = ${ownerExpr}`);
     }
 
     const businessNames = [];
+
     if (tables.businesses && tables.businessCols?.name) businessNames.push('b.name');
     if (tables.companies && tables.companyCols?.name) businessNames.push('comp.name');
+
     const businessNameExpr = businessNames.length
         ? `COALESCE(${businessNames.join(', ')})`
         : `'Unknown Business'`;
@@ -105,10 +118,12 @@ const buildAdQueryContext = (tables) => {
         tables.businesses && tables.businessCols?.subscriptionTier
             ? `COALESCE(b.subscription_tier, 'base')`
             : `'base'`;
+
     const subscriptionExpiresExpr =
         tables.businesses && tables.businessCols?.subscriptionExpires
             ? 'b.subscription_expires'
             : 'NULL';
+
     const ownerEmailExpr = ownerExpr ? 'owner.email' : 'NULL';
     const ownerNameExpr = ownerExpr ? 'owner.display_name' : 'NULL';
     const ownerPhoneExpr = ownerExpr ? 'owner.phone' : 'NULL';
@@ -129,41 +144,43 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
     if (!forceRefresh && adTableMetadata.checked) {
         return adTableMetadata;
     }
+
     try {
         const { rows } = await query(
-            `SELECT 
-                to_regclass('public.businesses') IS NOT NULL AS has_businesses,
-                to_regclass('public.companies') IS NOT NULL AS has_companies,
-                to_regclass('public.ad_placements') IS NOT NULL AS has_ad_placements,
-                EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'name'
-                ) AS businesses_has_name,
-                EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'owner_user_id'
-                ) AS businesses_has_owner_user_id,
-                EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'subscription_tier'
-                ) AS businesses_has_subscription_tier,
-                EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'subscription_expires'
-                ) AS businesses_has_subscription_expires,
-                EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'name'
-                ) AS companies_has_name,
-                EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'claimed_by'
-                ) AS companies_has_claimed_by,
-                EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'created_by_user_id'
-                ) AS companies_has_created_by_user_id`
+            `SELECT
+                 to_regclass('public.businesses') IS NOT NULL AS has_businesses,
+                 to_regclass('public.companies') IS NOT NULL AS has_companies,
+                 to_regclass('public.ad_placements') IS NOT NULL AS has_ad_placements,
+                 EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'name'
+                 ) AS businesses_has_name,
+                 EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'owner_user_id'
+                 ) AS businesses_has_owner_user_id,
+                 EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'subscription_tier'
+                 ) AS businesses_has_subscription_tier,
+                 EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'subscription_expires'
+                 ) AS businesses_has_subscription_expires,
+                 EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'name'
+                 ) AS companies_has_name,
+                 EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'claimed_by'
+                 ) AS companies_has_claimed_by,
+                 EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'created_by_user_id'
+                 ) AS companies_has_created_by_user_id`
         );
+
         adTableMetadata = {
             checked: true,
             businesses: rows[0]?.has_businesses === true,
@@ -183,6 +200,7 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
         };
     } catch (error) {
         console.warn('Ad table metadata detection failed:', error.message);
+
         adTableMetadata = {
             checked: true,
             businesses: false,
@@ -201,29 +219,54 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
             }
         };
     }
+
     return adTableMetadata;
 };
 
-
 const getBusinessIdForUser = async (userId) => {
     if (!userId) return null;
-    const companyResult = await query(
-        `SELECT id
-         FROM companies
-         WHERE claimed_by = $1
-            OR created_by_user_id = $1
-         ORDER BY updated_at DESC
-         LIMIT 1`,
-        [userId]
-    );
-    if (companyResult.rows[0]?.id) {
-        return companyResult.rows[0].id;
+
+    try {
+        // First try companies table
+        const companyResult = await query(
+            `SELECT id
+             FROM companies
+             WHERE claimed_by = $1
+                OR created_by_user_id = $1
+             ORDER BY updated_at DESC
+             LIMIT 1`,
+            [userId]
+        );
+
+        if (companyResult.rows[0]?.id) {
+            return companyResult.rows[0].id;
+        }
+
+        // Then try businesses table
+        const businessResult = await query(
+            `SELECT id
+             FROM businesses
+             WHERE owner_user_id = $1
+             ORDER BY updated_at DESC
+             LIMIT 1`,
+            [userId]
+        );
+
+        if (businessResult.rows[0]?.id) {
+            return businessResult.rows[0].id;
+        }
+
+        // Finally, bootstrap if nothing found
+        return bootstrapBusinessProfile(userId);
+    } catch (error) {
+        console.warn('Error getting business ID for user:', error.message);
+        return null;
     }
-    return bootstrapBusinessProfile(userId);
 };
 
 const bootstrapBusinessProfile = async (userId) => {
     if (!userId) return null;
+
     try {
         const [ownerResult, workspaceResult] = await Promise.all([
             query(
@@ -239,7 +282,7 @@ const bootstrapBusinessProfile = async (userId) => {
                  ORDER BY updated_at DESC
                  LIMIT 1`,
                 [userId]
-            )
+            ).catch(() => ({ rows: [] })) // Handle if businesses table doesn't exist
         ]);
 
         const baseName =
@@ -247,24 +290,35 @@ const bootstrapBusinessProfile = async (userId) => {
             (ownerResult.rows[0]?.display_name
                 ? `${ownerResult.rows[0].display_name}'s Workspace`
                 : 'My Business Workspace');
+
         const slug = String(userId).replace(/[^a-z0-9]/gi, '').slice(0, 6) || Date.now().toString(36);
         const uniqueName = `${baseName} ${slug}`.trim().slice(0, 240);
 
+        // Check if companies table exists
+        const tableCheck = await query(
+            `SELECT to_regclass('public.companies') IS NOT NULL AS exists`
+        );
+
+        if (!tableCheck.rows[0]?.exists) {
+            console.warn('Companies table does not exist, cannot bootstrap');
+            return null;
+        }
+
         const insertResult = await query(
             `INSERT INTO companies (
-                 name,
-                 industry,
-                 website,
-                 created_by_user_id,
-                 claimed_by,
-                 is_claimed,
-                 status
-             ) VALUES ($1, $2, $3, $4, $4, true, 'active')
-             ON CONFLICT (name) DO UPDATE
-                 SET claimed_by = EXCLUDED.claimed_by,
-                     created_by_user_id = EXCLUDED.created_by_user_id,
-                     updated_at = CURRENT_TIMESTAMP
-             RETURNING id`,
+                name,
+                industry,
+                website,
+                created_by_user_id,
+                claimed_by,
+                is_claimed,
+                status
+            ) VALUES ($1, $2, $3, $4, $4, true, 'active')
+                 ON CONFLICT (name) DO UPDATE
+                                           SET claimed_by = EXCLUDED.claimed_by,
+                                           created_by_user_id = EXCLUDED.created_by_user_id,
+                                           updated_at = CURRENT_TIMESTAMP
+                                           RETURNING id`,
             [
                 uniqueName,
                 workspaceResult.rows[0]?.industry || null,
@@ -282,13 +336,16 @@ const bootstrapBusinessProfile = async (userId) => {
 
 const upsertPlacements = async (campaignId, placements = []) => {
     const tables = await ensureAdTableMetadata();
+
     if (!tables.placements) return;
 
     await query('DELETE FROM ad_placements WHERE campaign_id = $1', [campaignId]);
+
     if (!placements.length) return;
 
     const values = [];
     const params = [];
+
     placements.forEach((placement) => {
         const weight = Number(placement.weight ?? 1);
         params.push(campaignId, placement.placement, weight);
@@ -313,6 +370,7 @@ const validateMediaType = (filename, mediaType) => {
 
 const buildPlacementFilter = (filters, params, placement) => {
     if (!placement) return;
+
     params.push(placement);
     filters.push(`EXISTS (
         SELECT 1 FROM ad_placements ap
@@ -322,12 +380,14 @@ const buildPlacementFilter = (filters, params, placement) => {
 
 const buildArrayFilter = (filters, params, value, column) => {
     if (!value) return;
+
     params.push(value);
     filters.push(`(${column} IS NULL OR array_length(${column}, 1) = 0 OR $${params.length} = ANY(${column}))`);
 };
 
 const buildBehaviorFilter = (filters, params, behaviors = []) => {
     if (!behaviors.length) return;
+
     params.push(behaviors);
     filters.push(`(
         target_behaviors IS NULL OR
@@ -339,10 +399,13 @@ const buildBehaviorFilter = (filters, params, behaviors = []) => {
 const fetchPlacementCampaigns = async ({ placement, location, industry, behaviors = [] }) => {
     const schema = await ensureAdSchema();
     const tables = await ensureAdTableMetadata();
+
     const filters = ["c.status = 'active'"];
+
     if (schema.hasReviewStatus) {
         filters.push("c.review_status = 'approved'");
     }
+
     const params = [];
 
     buildPlacementFilter(filters, params, placement);
@@ -351,11 +414,14 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
     buildBehaviorFilter(filters, params, behaviors);
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
     const reviewColumn = schema.hasReviewStatus ? '' : ", 'approved'::text AS review_status";
     const spendColumn = schema.hasSpendMinor ? '' : ', 0::bigint AS spend_minor';
     const bidRateColumn = schema.hasBidRateMinor ? '' : ', 0::bigint AS bid_rate_minor';
     const overrideColumn = schema.hasOverride ? '' : ', false AS override_restrictions';
+
     const placementsAlias = schema.hasPlacementsColumn ? 'placements_agg' : 'placements';
+
     const placementsColumn = tables.placements
         ? `,
             (
@@ -364,71 +430,85 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
                 WHERE ap.campaign_id = c.id
             ) AS ${placementsAlias}`
         : `, '[]'::jsonb AS ${placementsAlias}`;
+
     const placementsOrderBy = tables.placements
         ? `(SELECT COALESCE(MAX(ap.weight), 0) FROM ad_placements ap WHERE ap.campaign_id = c.id) DESC,`
         : '';
 
-    const result = await query(
-        `
-        SELECT
-            c.*${reviewColumn}${spendColumn}${bidRateColumn}${overrideColumn}${placementsColumn}
-        FROM advertising_campaigns c
-        ${whereClause}
-        ORDER BY ${placementsOrderBy}
-                 c.daily_budget_minor DESC,
-                 c.impressions ASC
-        LIMIT 10
-        `,
-        params
-    );
+    try {
+        const result = await query(
+            `
+            SELECT
+                c.*${reviewColumn}${spendColumn}${bidRateColumn}${overrideColumn}${placementsColumn}
+            FROM advertising_campaigns c
+            ${whereClause}
+            ORDER BY ${placementsOrderBy}
+                     c.daily_budget_minor DESC,
+                     c.impressions ASC
+            LIMIT 10
+            `,
+            params
+        );
 
-    return result.rows.map((row) => ({
-        ...row,
-        placements: row.placements ?? row.placements_agg ?? []
-    }));
+        return result.rows.map((row) => ({
+            ...row,
+            placements: row.placements ?? row.placements_agg ?? []
+        }));
+    } catch (error) {
+        console.error('Error fetching placement campaigns:', error);
+        return [];
+    }
 };
 
 const getBusinessOwner = async (businessId) => {
     const tables = await ensureAdTableMetadata();
-    if (tables.businesses) {
-        const result = await query(
-            `SELECT b.id,
-                    b.name,
-                    b.subscription_tier,
-                    b.subscription_expires,
-                    u.id   AS owner_user_id,
-                    u.email,
-                    u.display_name
-             FROM businesses b
-             LEFT JOIN users u ON u.id = b.owner_user_id
-             WHERE b.id = $1`,
-            [businessId]
-        );
-        if (result.rows[0]) {
-            return result.rows[0];
-        }
-    }
 
-    if (tables.companies) {
-        const legacy = await query(
-            `SELECT c.id,
-                    c.name,
-                    'base' AS subscription_tier,
-                    NULL::timestamptz               AS subscription_expires,
-                    owner.id                        AS owner_user_id,
-                    owner.email,
-                    owner.display_name
-             FROM companies c
-             LEFT JOIN users owner ON owner.id = COALESCE(c.claimed_by, c.created_by_user_id)
-             WHERE c.id = $1`,
-            [businessId]
-        );
-        if (legacy.rows[0]) {
-            return legacy.rows[0];
-        }
-    }
+    try {
+        if (tables.businesses) {
+            const result = await query(
+                `SELECT b.id,
+                        b.name,
+                        b.subscription_tier,
+                        b.subscription_expires,
+                        u.id   AS owner_user_id,
+                        u.email,
+                        u.display_name
+                 FROM businesses b
+                 LEFT JOIN users u ON u.id = b.owner_user_id
+                 WHERE b.id = $1`,
+                [businessId]
+            );
 
-    return null;
+            if (result.rows[0]) {
+                return result.rows[0];
+            }
+        }
+
+        if (tables.companies) {
+            const legacy = await query(
+                `SELECT c.id,
+                        c.name,
+                        'base' AS subscription_tier,
+                        NULL::timestamptz AS subscription_expires,
+                        owner.id AS owner_user_id,
+                        owner.email,
+                        owner.display_name
+                 FROM companies c
+                 LEFT JOIN users owner ON owner.id = COALESCE(c.claimed_by, c.created_by_user_id)
+                 WHERE c.id = $1`,
+                [businessId]
+            );
+
+            if (legacy.rows[0]) {
+                return legacy.rows[0];
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error getting business owner:', error);
+        return null;
+    }
 };
 
 const getBusinessAdCapabilities = async ({ userId, email }) => {
@@ -437,6 +517,7 @@ const getBusinessAdCapabilities = async ({ userId, email }) => {
     }
 
     const premiumOverride = hasPremiumException(email);
+
     if (premiumOverride) {
         return {
             tier: 'premium',
@@ -446,32 +527,50 @@ const getBusinessAdCapabilities = async ({ userId, email }) => {
         };
     }
 
-    const record = await getActiveSubscription('business', userId);
-    const planCode = record?.plan_code || 'business_base';
-    const snapshot = record?.limit_snapshot?.ads || {};
-    const planDefaults = (PLAN_LIMITS[planCode] || PLAN_LIMITS.business_base || {}).ads || {};
-    const rawMax = snapshot.maxActive ?? planDefaults.maxActive;
-    const analyticsMode = snapshot.analytics || planDefaults.analytics || 'limited';
+    try {
+        const record = await getActiveSubscription('business', userId);
+        const planCode = record?.plan_code || 'business_base';
+        const snapshot = record?.limit_snapshot?.ads || {};
+        const planDefaults = (PLAN_LIMITS[planCode] || PLAN_LIMITS.business_base || {}).ads || {};
 
-    return {
-        tier: PLAN_LIMITS[planCode]?.tier || 'base',
-        maxActive: rawMax === null || rawMax === undefined ? Infinity : Number(rawMax),
-        analyticsMode,
-        premiumException: false
-    };
+        const rawMax = snapshot.maxActive ?? planDefaults.maxActive;
+        const analyticsMode = snapshot.analytics || planDefaults.analytics || 'limited';
+
+        return {
+            tier: PLAN_LIMITS[planCode]?.tier || 'base',
+            maxActive: rawMax === null || rawMax === undefined ? Infinity : Number(rawMax),
+            analyticsMode,
+            premiumException: false
+        };
+    } catch (error) {
+        console.error('Error getting business ad capabilities:', error);
+
+        return {
+            tier: 'base',
+            maxActive: 5, // Default to 5 active campaigns
+            analyticsMode: 'limited',
+            premiumException: false
+        };
+    }
 };
 
 const countActiveCampaigns = async (businessId) => {
-    const result = await query(
-        `SELECT COUNT(*)::int AS total
-         FROM advertising_campaigns
-         WHERE business_id = $1
-           AND status IN ('pending_review','active')
-           AND review_status IN ('pending','approved')
-           AND override_restrictions = false`,
-        [businessId]
-    );
-    return Number(result.rows[0]?.total || 0);
+    try {
+        const result = await query(
+            `SELECT COUNT(*)::int AS total
+             FROM advertising_campaigns
+             WHERE business_id = $1
+               AND status IN ('pending_review','active')
+               AND review_status IN ('pending','approved')
+               AND COALESCE(override_restrictions, false) = false`,
+            [businessId]
+        );
+
+        return Number(result.rows[0]?.total || 0);
+    } catch (error) {
+        console.error('Error counting active campaigns:', error);
+        return 0;
+    }
 };
 
 const formatAnalyticsForTier = (campaign, analyticsMode = 'limited') => {
@@ -484,13 +583,13 @@ const formatAnalyticsForTier = (campaign, analyticsMode = 'limited') => {
         name: campaign.name,
         status: campaign.status,
         review_status: campaign.review_status,
-        impressions: campaign.impressions,
-        clicks: campaign.clicks,
-        placements: campaign.placements,
+        impressions: campaign.impressions || 0,
+        clicks: campaign.clicks || 0,
+        placements: campaign.placements || [],
         submitted_at: campaign.submitted_at,
         reviewed_at: campaign.reviewed_at,
         review_notes: campaign.review_notes,
-        override_restrictions: campaign.override_restrictions,
+        override_restrictions: campaign.override_restrictions || false,
         media_type: campaign.media_type
     };
 
@@ -504,13 +603,9 @@ const formatAnalyticsForTier = (campaign, analyticsMode = 'limited') => {
     };
 
     if (analyticsMode === 'advanced') {
-        enriched.daily_budget_minor = campaign.daily_budget_minor;
-        enriched.bid_rate_minor = campaign.bid_rate_minor;
-        enriched.spend_minor = campaign.spend_minor;
-    }
-
-    if (analyticsMode !== 'advanced') {
-        return enriched;
+        enriched.daily_budget_minor = campaign.daily_budget_minor || 0;
+        enriched.bid_rate_minor = campaign.bid_rate_minor || 0;
+        enriched.spend_minor = campaign.spend_minor || 0;
     }
 
     return enriched;
@@ -525,12 +620,14 @@ const adminListAds = async (filters = {}, options = {}) => {
     const schema = await ensureAdSchema();
     const tables = await ensureAdTableMetadata(options.forceRefresh === true);
     const context = buildAdQueryContext(tables);
+
     const normalizedReviewStatus = (() => {
         const raw = String(filters.reviewStatus || '').toLowerCase().trim();
         if (!raw) return '';
         if (raw === 'pending_review') return 'pending';
         return raw;
     })();
+
     if (normalizedReviewStatus) {
         filters.reviewStatus = normalizedReviewStatus;
     }
@@ -544,7 +641,7 @@ const adminListAds = async (filters = {}, options = {}) => {
         : `'[]'::jsonb`;
 
     let queryStr = `
-        SELECT 
+        SELECT
             c.*,
             ${context.businessNameExpr} AS business_name,
             ${context.tierExpr} AS subscription_tier,
@@ -552,7 +649,7 @@ const adminListAds = async (filters = {}, options = {}) => {
             ${context.ownerNameExpr} AS owner_name,
             ${placementsSelect} AS ${schema.hasPlacementsColumn ? 'placements_agg' : 'placements'}
         FROM advertising_campaigns c
-        ${context.joins}
+            ${context.joins}
         WHERE 1=1
     `;
 
@@ -617,9 +714,11 @@ const adminListAds = async (filters = {}, options = {}) => {
 
     try {
         const result = await query(queryStr, params);
+
         return result.rows.map((row) => {
             const derivedReviewStatus = (() => {
-                if (schema.hasReviewStatus && row.review_status !== undefined) return row.review_status;
+                if (schema.hasReviewStatus && row.review_status !== undefined && row.review_status !== null)
+                    return row.review_status;
                 if (row.status === 'rejected') return 'rejected';
                 if (row.status === 'pending_review' || row.status === 'pending') return 'pending';
                 return 'approved';
@@ -647,12 +746,14 @@ const adminListAds = async (filters = {}, options = {}) => {
             await ensureAdTableMetadata(true);
             return adminListAds(filters, { forceRefresh: true });
         }
+
         console.error('[adminListAds] query failed', {
             error: error?.message,
             code: error?.code,
             filters,
             sql: queryStr
         });
+
         throw error;
     }
 };
@@ -667,40 +768,43 @@ const adminGetAdDetails = async (adId, options = {}) => {
 
     try {
         const placementsAlias = schema.hasPlacementsColumn ? 'placements_agg' : 'placements';
+
         const result = await query(
             `
-            SELECT 
-                c.*,
-                ${context.businessNameExpr} AS business_name,
-                ${context.tierExpr} AS subscription_tier,
-                ${context.subscriptionExpiresExpr} AS subscription_expires,
-                ${context.hasOwner ? 'owner.id' : 'NULL'} AS owner_user_id,
-                ${context.ownerEmailExpr} AS owner_email,
-                ${context.ownerNameExpr} AS owner_name,
-                ${context.ownerPhoneExpr} AS owner_phone,
-                (
-                    SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
-                    FROM ad_placements ap
-                    WHERE ap.campaign_id = c.id
-                ) AS ${placementsAlias},
-                COALESCE(c.impressions, 0) AS impressions,
-                COALESCE(c.clicks, 0) AS clicks,
-                COALESCE(c.spend_minor, 0) AS spend_minor,
-                CASE 
-                    WHEN c.reviewed_by IS NOT NULL THEN (
-                        SELECT display_name FROM users WHERE id = c.reviewed_by
-                    )
-                    ELSE NULL
-                END AS reviewed_by_name
-            FROM advertising_campaigns c
-            ${context.joins}
-            WHERE c.id = $1
+                SELECT
+                    c.*,
+                    ${context.businessNameExpr} AS business_name,
+                    ${context.tierExpr} AS subscription_tier,
+                    ${context.subscriptionExpiresExpr} AS subscription_expires,
+                    ${context.hasOwner ? 'owner.id' : 'NULL'} AS owner_user_id,
+                    ${context.ownerEmailExpr} AS owner_email,
+                    ${context.ownerNameExpr} AS owner_name,
+                    ${context.ownerPhoneExpr} AS owner_phone,
+                    (
+                        SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
+                        FROM ad_placements ap
+                        WHERE ap.campaign_id = c.id
+                    ) AS ${placementsAlias},
+                    COALESCE(c.impressions, 0) AS impressions,
+                    COALESCE(c.clicks, 0) AS clicks,
+                    COALESCE(c.spend_minor, 0) AS spend_minor,
+                    CASE
+                        WHEN c.reviewed_by IS NOT NULL THEN (
+                            SELECT display_name FROM users WHERE id = c.reviewed_by
+                        )
+                        ELSE NULL
+                        END AS reviewed_by_name
+                FROM advertising_campaigns c
+                    ${context.joins}
+                WHERE c.id = $1
             `,
             [adId]
         );
 
         const row = result.rows[0];
+
         if (!row) return null;
+
         return {
             ...row,
             placements: row.placements ?? row.placements_agg ?? []
@@ -710,6 +814,8 @@ const adminGetAdDetails = async (adId, options = {}) => {
             await ensureAdTableMetadata(true);
             return adminGetAdDetails(adId, { forceRefresh: true });
         }
+
+        console.error('Error getting ad details:', error);
         throw error;
     }
 };
@@ -718,148 +824,191 @@ const adminGetAdDetails = async (adId, options = {}) => {
  * Get ad analytics over time
  */
 const adminGetAdAnalytics = async (adId, days = 30) => {
-    const result = await query(
-        `
-        WITH daily_stats AS (
-            SELECT 
-                date_trunc('day', created_at) as date,
-                COUNT(*) as impressions,
-                SUM(CASE WHEN clicked THEN 1 ELSE 0 END) as clicks,
-                SUM(spend_minor) as daily_spend
-            FROM ad_impressions
-            WHERE campaign_id = $1
-                AND created_at >= NOW() - ($2 || ' days')::interval
-            GROUP BY date_trunc('day', created_at)
-            ORDER BY date DESC
-        )
-        SELECT 
-            COALESCE(SUM(impressions), 0)::int as total_impressions,
-            COALESCE(SUM(clicks), 0)::int as total_clicks,
-            COALESCE(SUM(daily_spend), 0)::bigint as total_spend_minor,
-            CASE 
-                WHEN SUM(impressions) > 0 
-                THEN ROUND((SUM(clicks)::numeric / SUM(impressions)::numeric * 100), 2)
-                ELSE 0 
-            END as ctr,
-            jsonb_agg(
-                jsonb_build_object(
-                    'date', date,
-                    'impressions', impressions,
-                    'clicks', clicks,
-                    'spend', daily_spend
-                ) ORDER BY date DESC
-            ) as daily_stats
-        FROM daily_stats
-        `,
-        [adId, days]
-    );
+    try {
+        // Check if ad_impressions table exists
+        const tableCheck = await query(
+            `SELECT to_regclass('public.ad_impressions') IS NOT NULL AS exists`
+        );
 
-    return result.rows[0] || {
-        total_impressions: 0,
-        total_clicks: 0,
-        total_spend_minor: 0,
-        ctr: 0,
-        daily_stats: []
-    };
+        if (!tableCheck.rows[0]?.exists) {
+            return {
+                total_impressions: 0,
+                total_clicks: 0,
+                total_spend_minor: 0,
+                ctr: 0,
+                daily_stats: []
+            };
+        }
+
+        const result = await query(
+            `
+            WITH daily_stats AS (
+                SELECT 
+                    date_trunc('day', created_at) as date,
+                    COUNT(*) as impressions,
+                    SUM(CASE WHEN clicked THEN 1 ELSE 0 END) as clicks,
+                    SUM(spend_minor) as daily_spend
+                FROM ad_impressions
+                WHERE campaign_id = $1
+                    AND created_at >= NOW() - ($2 || ' days')::interval
+                GROUP BY date_trunc('day', created_at)
+                ORDER BY date DESC
+            )
+            SELECT 
+                COALESCE(SUM(impressions), 0)::int as total_impressions,
+                COALESCE(SUM(clicks), 0)::int as total_clicks,
+                COALESCE(SUM(daily_spend), 0)::bigint as total_spend_minor,
+                CASE 
+                    WHEN SUM(impressions) > 0 
+                    THEN ROUND((SUM(clicks)::numeric / SUM(impressions)::numeric * 100), 2)
+                    ELSE 0 
+                END as ctr,
+                COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'date', date,
+                            'impressions', impressions,
+                            'clicks', clicks,
+                            'spend', daily_spend
+                        ) ORDER BY date DESC
+                    ),
+                    '[]'::jsonb
+                ) as daily_stats
+            FROM daily_stats
+            `,
+            [adId, days]
+        );
+
+        return result.rows[0] || {
+            total_impressions: 0,
+            total_clicks: 0,
+            total_spend_minor: 0,
+            ctr: 0,
+            daily_stats: []
+        };
+    } catch (error) {
+        console.error('Error getting ad analytics:', error);
+
+        return {
+            total_impressions: 0,
+            total_clicks: 0,
+            total_spend_minor: 0,
+            ctr: 0,
+            daily_stats: []
+        };
+    }
 };
 
 /**
  * Approve an ad
  */
 const adminApproveAd = async ({ adId, adminId, overrideRestrictions = false, notes = null }) => {
-    const schema = await ensureAdSchema();
+    try {
+        // Check if ad exists
+        const ad = await adminGetAdDetails(adId);
 
-    // Check if ad exists
-    const ad = await adminGetAdDetails(adId);
-    if (!ad) {
-        throw new Error('Ad not found');
+        if (!ad) {
+            throw new Error('Ad not found');
+        }
+
+        // Update the ad
+        const result = await query(
+            `
+            UPDATE advertising_campaigns
+            SET 
+                review_status = 'approved',
+                status = CASE 
+                    WHEN status = 'pending_review' OR status = 'pending' THEN 'active'
+                    ELSE status
+                END,
+                reviewed_at = NOW(),
+                reviewed_by = $2,
+                review_notes = $3,
+                override_restrictions = $4,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [adId, adminId, notes, overrideRestrictions]
+        );
+
+        // Log the action
+        await logAdminAction({
+            adminId,
+            action: 'APPROVE_AD',
+            targetId: adId,
+            targetType: 'ad',
+            details: { overrideRestrictions, notes }
+        });
+
+        // Notify the business owner
+        if (ad.business_id) {
+            await notifyBusinessOwner(ad.business_id, 'ad_approved', {
+                adName: ad.name,
+                notes
+            });
+        }
+
+        return result.rows[0];
+    } catch (error) {
+        console.error('Error approving ad:', error);
+        throw error;
     }
-
-    // Update the ad
-    const result = await query(
-        `
-        UPDATE advertising_campaigns
-        SET 
-            review_status = 'approved',
-            status = CASE 
-                WHEN status = 'pending_review' THEN 'active'
-                ELSE status
-            END,
-            reviewed_at = NOW(),
-            reviewed_by = $2,
-            review_notes = $3,
-            override_restrictions = $4,
-            updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-        `,
-        [adId, adminId, notes, overrideRestrictions]
-    );
-
-    // Log the action
-    await logAdminAction({
-        adminId,
-        action: 'APPROVE_AD',
-        targetId: adId,
-        targetType: 'ad',
-        details: { overrideRestrictions, notes }
-    });
-
-    // Notify the business owner
-    await notifyBusinessOwner(ad.business_id, 'ad_approved', {
-        adName: ad.name,
-        notes
-    });
-
-    return result.rows[0];
 };
 
 /**
  * Reject an ad
  */
 const adminRejectAd = async ({ adId, adminId, reason, notes = null }) => {
-    const schema = await ensureAdSchema();
+    try {
+        // Check if ad exists
+        const ad = await adminGetAdDetails(adId);
 
-    // Check if ad exists
-    const ad = await adminGetAdDetails(adId);
-    if (!ad) {
-        throw new Error('Ad not found');
+        if (!ad) {
+            throw new Error('Ad not found');
+        }
+
+        // Update the ad
+        const result = await query(
+            `
+            UPDATE advertising_campaigns
+            SET 
+                review_status = 'rejected',
+                status = 'rejected',
+                reviewed_at = NOW(),
+                reviewed_by = $2,
+                review_notes = $3,
+                rejection_reason = $4,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [adId, adminId, notes || reason, reason]
+        );
+
+        // Log the action
+        await logAdminAction({
+            adminId,
+            action: 'REJECT_AD',
+            targetId: adId,
+            targetType: 'ad',
+            details: { reason, notes }
+        });
+
+        // Notify the business owner
+        if (ad.business_id) {
+            await notifyBusinessOwner(ad.business_id, 'ad_rejected', {
+                adName: ad.name,
+                reason,
+                notes
+            });
+        }
+
+        return result.rows[0];
+    } catch (error) {
+        console.error('Error rejecting ad:', error);
+        throw error;
     }
-
-    // Update the ad
-    let updateQuery = `
-        UPDATE advertising_campaigns
-        SET 
-            review_status = 'rejected',
-            status = 'rejected',
-            reviewed_at = NOW(),
-            reviewed_by = $2,
-            review_notes = $3,
-            rejection_reason = $4,
-            updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-    `;
-
-    const result = await query(updateQuery, [adId, adminId, notes || reason, reason]);
-
-    // Log the action
-    await logAdminAction({
-        adminId,
-        action: 'REJECT_AD',
-        targetId: adId,
-        targetType: 'ad',
-        details: { reason, notes }
-    });
-
-    // Notify the business owner
-    await notifyBusinessOwner(ad.business_id, 'ad_rejected', {
-        adName: ad.name,
-        reason,
-        notes
-    });
-
-    return result.rows[0];
 };
 
 /**
@@ -924,125 +1073,174 @@ const adminBulkRejectAds = async ({ adIds, adminId, reason }) => {
  * Pause an active ad
  */
 const adminPauseAd = async (adId, adminId) => {
-    const ad = await adminGetAdDetails(adId);
-    if (!ad) {
-        throw new Error('Ad not found');
+    try {
+        const ad = await adminGetAdDetails(adId);
+
+        if (!ad) {
+            throw new Error('Ad not found');
+        }
+
+        if (ad.status !== 'active') {
+            throw new Error('Can only pause active ads');
+        }
+
+        const result = await query(
+            `
+            UPDATE advertising_campaigns
+            SET 
+                status = 'paused',
+                updated_at = NOW(),
+                paused_by = $2,
+                paused_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [adId, adminId]
+        );
+
+        // Log the action
+        await logAdminAction({
+            adminId,
+            action: 'PAUSE_AD',
+            targetId: adId,
+            targetType: 'ad'
+        });
+
+        // Notify the business owner
+        if (ad.business_id) {
+            await notifyBusinessOwner(ad.business_id, 'ad_paused', {
+                adName: ad.name
+            });
+        }
+
+        return result.rows[0];
+    } catch (error) {
+        console.error('Error pausing ad:', error);
+        throw error;
     }
-
-    if (ad.status !== 'active') {
-        throw new Error('Can only pause active ads');
-    }
-
-    const result = await query(
-        `
-        UPDATE advertising_campaigns
-        SET 
-            status = 'paused',
-            updated_at = NOW(),
-            paused_by = $2,
-            paused_at = NOW()
-        WHERE id = $1
-        RETURNING *
-        `,
-        [adId, adminId]
-    );
-
-    // Log the action
-    await logAdminAction({
-        adminId,
-        action: 'PAUSE_AD',
-        targetId: adId,
-        targetType: 'ad'
-    });
-
-    return result.rows[0];
 };
 
 /**
  * Resume a paused ad
  */
 const adminResumeAd = async (adId, adminId) => {
-    const ad = await adminGetAdDetails(adId);
-    if (!ad) {
-        throw new Error('Ad not found');
+    try {
+        const ad = await adminGetAdDetails(adId);
+
+        if (!ad) {
+            throw new Error('Ad not found');
+        }
+
+        if (ad.status !== 'paused') {
+            throw new Error('Can only resume paused ads');
+        }
+
+        const result = await query(
+            `
+            UPDATE advertising_campaigns
+            SET 
+                status = 'active',
+                updated_at = NOW(),
+                resumed_by = $2,
+                resumed_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [adId, adminId]
+        );
+
+        // Log the action
+        await logAdminAction({
+            adminId,
+            action: 'RESUME_AD',
+            targetId: adId,
+            targetType: 'ad'
+        });
+
+        // Notify the business owner
+        if (ad.business_id) {
+            await notifyBusinessOwner(ad.business_id, 'ad_resumed', {
+                adName: ad.name
+            });
+        }
+
+        return result.rows[0];
+    } catch (error) {
+        console.error('Error resuming ad:', error);
+        throw error;
     }
-
-    if (ad.status !== 'paused') {
-        throw new Error('Can only resume paused ads');
-    }
-
-    const result = await query(
-        `
-        UPDATE advertising_campaigns
-        SET 
-            status = 'active',
-            updated_at = NOW(),
-            resumed_by = $2,
-            resumed_at = NOW()
-        WHERE id = $1
-        RETURNING *
-        `,
-        [adId, adminId]
-    );
-
-    // Log the action
-    await logAdminAction({
-        adminId,
-        action: 'RESUME_AD',
-        targetId: adId,
-        targetType: 'ad'
-    });
-
-    return result.rows[0];
 };
 
 /**
  * Get ad review statistics
  */
 const adminGetAdStats = async (days = 30) => {
-    const result = await query(
-        `
-        SELECT 
-            COUNT(*) as total_ads,
-            COUNT(CASE WHEN review_status = 'pending' THEN 1 END) as pending_review,
-            COUNT(CASE WHEN review_status = 'approved' THEN 1 END) as approved,
-            COUNT(CASE WHEN review_status = 'rejected' THEN 1 END) as rejected,
-            COALESCE(SUM(spend_minor), 0) as total_spend_minor,
-            COALESCE(SUM(impressions), 0) as total_impressions,
-            COALESCE(SUM(clicks), 0) as total_clicks,
-            AVG(CASE WHEN impressions > 0 THEN clicks::float / impressions ELSE 0 END) * 100 as avg_ctr,
-            COUNT(DISTINCT business_id) as unique_businesses
-        FROM advertising_campaigns
-        WHERE created_at >= NOW() - ($1 || ' days')::interval
-        `,
-        [days]
-    );
+    try {
+        const result = await query(
+            `
+            SELECT 
+                COUNT(*) as total_ads,
+                COUNT(CASE WHEN review_status = 'pending' THEN 1 END) as pending_review,
+                COUNT(CASE WHEN review_status = 'approved' THEN 1 END) as approved,
+                COUNT(CASE WHEN review_status = 'rejected' THEN 1 END) as rejected,
+                COALESCE(SUM(spend_minor), 0) as total_spend_minor,
+                COALESCE(SUM(impressions), 0) as total_impressions,
+                COALESCE(SUM(clicks), 0) as total_clicks,
+                CASE 
+                    WHEN SUM(impressions) > 0 
+                    THEN ROUND((SUM(clicks)::numeric / SUM(impressions)::numeric * 100), 2)
+                    ELSE 0 
+                END as avg_ctr,
+                COUNT(DISTINCT business_id) as unique_businesses
+            FROM advertising_campaigns
+            WHERE created_at >= NOW() - ($1 || ' days')::interval
+            `,
+            [days]
+        );
 
-    // Get daily trend
-    const dailyTrend = await query(
-        `
-        SELECT 
-            date_trunc('day', created_at) as date,
-            COUNT(*) as submissions,
-            COUNT(CASE WHEN review_status = 'approved' THEN 1 END) as approved,
-            COUNT(CASE WHEN review_status = 'rejected' THEN 1 END) as rejected,
-            AVG(CASE 
-                WHEN reviewed_at IS NOT NULL 
-                THEN EXTRACT(EPOCH FROM (reviewed_at - created_at))/3600
-                ELSE NULL 
-            END)::numeric(10,2) as avg_review_hours
-        FROM advertising_campaigns
-        WHERE created_at >= NOW() - ($1 || ' days')::interval
-        GROUP BY date_trunc('day', created_at)
-        ORDER BY date DESC
-        `,
-        [days]
-    );
+        // Get daily trend
+        const dailyTrend = await query(
+            `
+            SELECT 
+                date_trunc('day', created_at) as date,
+                COUNT(*) as submissions,
+                COUNT(CASE WHEN review_status = 'approved' THEN 1 END) as approved,
+                COUNT(CASE WHEN review_status = 'rejected' THEN 1 END) as rejected,
+                AVG(CASE 
+                    WHEN reviewed_at IS NOT NULL 
+                    THEN EXTRACT(EPOCH FROM (reviewed_at - created_at))/3600
+                    ELSE NULL 
+                END)::numeric(10,2) as avg_review_hours
+            FROM advertising_campaigns
+            WHERE created_at >= NOW() - ($1 || ' days')::interval
+            GROUP BY date_trunc('day', created_at)
+            ORDER BY date DESC
+            `,
+            [days]
+        );
 
-    return {
-        summary: result.rows[0] || {},
-        dailyTrend: dailyTrend.rows
-    };
+        return {
+            summary: result.rows[0] || {},
+            dailyTrend: dailyTrend.rows
+        };
+    } catch (error) {
+        console.error('Error getting ad stats:', error);
+
+        return {
+            summary: {
+                total_ads: 0,
+                pending_review: 0,
+                approved: 0,
+                rejected: 0,
+                total_spend_minor: 0,
+                total_impressions: 0,
+                total_clicks: 0,
+                avg_ctr: 0,
+                unique_businesses: 0
+            },
+            dailyTrend: []
+        };
+    }
 };
 
 /**
@@ -1050,27 +1248,33 @@ const adminGetAdStats = async (days = 30) => {
  */
 const logAdminAction = async ({ adminId, action, targetId, targetType, details = {} }) => {
     try {
+        // Check if admin_audit_log table exists
+        const tableCheck = await query(
+            `SELECT to_regclass('public.admin_audit_log') IS NOT NULL AS exists`
+        );
+
+        if (!tableCheck.rows[0]?.exists) {
+            console.warn('admin_audit_log table does not exist, skipping audit log');
+            return;
+        }
+
         await query(
             `
-            INSERT INTO admin_audit_log (
-                admin_id,
-                action,
-                target_id,
-                target_type,
-                details,
-                ip_address,
-                user_agent,
-                created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                INSERT INTO admin_audit_log (
+                    admin_id,
+                    action,
+                    target_id,
+                    target_type,
+                    details,
+                    created_at
+                ) VALUES ($1, $2, $3, $4, $5, NOW())
             `,
             [
                 adminId,
                 action,
                 targetId,
                 targetType,
-                JSON.stringify(details),
-                null, // IP address would come from request
-                null  // User agent would come from request
+                JSON.stringify(details)
             ]
         );
     } catch (error) {
@@ -1084,10 +1288,21 @@ const logAdminAction = async ({ adminId, action, targetId, targetType, details =
  */
 const notifyBusinessOwner = async (businessId, notificationType, data = {}) => {
     try {
+        // Check if notifications table exists
+        const tableCheck = await query(
+            `SELECT to_regclass('public.notifications') IS NOT NULL AS exists`
+        );
+
+        if (!tableCheck.rows[0]?.exists) {
+            console.warn('notifications table does not exist, skipping notification');
+            return;
+        }
+
         // Get business owner's email
         const business = await getBusinessOwner(businessId);
-        if (!business || !business.email) {
-            console.warn(`No email found for business ${businessId}`);
+
+        if (!business || !business.owner_user_id) {
+            console.warn(`No owner found for business ${businessId}`);
             return;
         }
 
@@ -1111,9 +1326,6 @@ const notifyBusinessOwner = async (businessId, notificationType, data = {}) => {
                 JSON.stringify(data)
             ]
         );
-
-        // TODO: Send email notification
-        // await sendEmail(business.email, notificationType, data);
     } catch (error) {
         console.error('Failed to notify business owner:', error);
     }
@@ -1141,6 +1353,17 @@ const getNotificationMessage = (type, data) => {
 
 const logAdFailure = async ({ userId, businessId, errorMessage, details = {} }) => {
     try {
+        // Check if ad_campaign_failures table exists
+        const tableCheck = await query(
+            `SELECT to_regclass('public.ad_campaign_failures') IS NOT NULL AS exists`
+        );
+
+        if (!tableCheck.rows[0]?.exists) {
+            console.warn('ad_campaign_failures table does not exist, skipping failure log');
+            console.error('Ad failure:', { userId, businessId, errorMessage, details });
+            return;
+        }
+
         await query(
             `INSERT INTO ad_campaign_failures (
                 user_id,
@@ -1157,19 +1380,36 @@ const logAdFailure = async ({ userId, businessId, errorMessage, details = {} }) 
 };
 
 const listAdFailures = async ({ limit = 50 } = {}) => {
-    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-    const result = await query(
-        `SELECT f.*,
-                c.name AS business_name,
-                u.email AS user_email
-         FROM ad_campaign_failures f
-         LEFT JOIN companies c ON c.id = f.business_id
-         LEFT JOIN users u ON u.id = f.user_id
-         ORDER BY f.created_at DESC
-         LIMIT $1`,
-        [safeLimit]
-    );
-    return result.rows;
+    try {
+        // Check if ad_campaign_failures table exists
+        const tableCheck = await query(
+            `SELECT to_regclass('public.ad_campaign_failures') IS NOT NULL AS exists`
+        );
+
+        if (!tableCheck.rows[0]?.exists) {
+            console.warn('ad_campaign_failures table does not exist');
+            return [];
+        }
+
+        const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+
+        const result = await query(
+            `SELECT f.*,
+                    c.name AS business_name,
+                    u.email AS user_email
+             FROM ad_campaign_failures f
+             LEFT JOIN companies c ON c.id = f.business_id
+             LEFT JOIN users u ON u.id = f.user_id
+             ORDER BY f.created_at DESC
+             LIMIT $1`,
+            [safeLimit]
+        );
+
+        return result.rows;
+    } catch (error) {
+        console.error('Error listing ad failures:', error);
+        return [];
+    }
 };
 
 module.exports = {

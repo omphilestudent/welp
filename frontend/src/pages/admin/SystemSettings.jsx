@@ -56,6 +56,8 @@ const ROLE_OPTIONS = [
     { value: 'employee', label: 'Employee' }
 ];
 
+const ADMIN_ROLE_SET = new Set(['admin', 'super_admin', 'hr_admin', 'system_admin']);
+
 const TAB_OPTIONS = [
     { id: 'admins', label: 'Admin Management' },
     { id: 'general', label: 'General' },
@@ -193,6 +195,15 @@ const safeParseValue = (value) => {
 
 const normalizeSettingsPayload = (raw = {}) => {
     const normalized = { ...DEFAULT_SETTINGS };
+    if (Array.isArray(raw)) {
+        raw.forEach((item) => {
+            if (!item || item.key === undefined) return;
+            const uiKey = REVERSE_KEY_MAP[item.key] || item.key;
+            if (!uiKey || !(uiKey in normalized)) return;
+            normalized[uiKey] = safeParseValue(item.value);
+        });
+        return normalized;
+    }
     Object.entries(raw).forEach(([backendKey, storedValue]) => {
         const uiKey = REVERSE_KEY_MAP[backendKey] || backendKey;
         if (!uiKey || !(uiKey in normalized)) return;
@@ -273,10 +284,11 @@ const SystemSettings = () => {
         setLoading('admins', true);
         try {
             const { data } = await api.get('/admin/users', {
-                params: { role: 'admin', limit: 50 }
+                params: { limit: 50 }
             });
             const users = data?.data?.users || data?.users || [];
-            setAdmins(users);
+            const filtered = users.filter((user) => ADMIN_ROLE_SET.has(String(user.role || '').toLowerCase()));
+            setAdmins(filtered);
         } catch (error) {
             console.error('Admins fetch failed', error);
             showError(error?.response?.data?.error || 'Failed to load admins');
@@ -319,7 +331,19 @@ const SystemSettings = () => {
 
     const persistSettings = async (entries) => {
         if (!entries.length) return;
-        await api.patch('/admin/settings', { entries });
+        const requestBody = { entries };
+        console.log('Sending settings update:', JSON.stringify(requestBody, null, 2));
+        try {
+            const { data } = await api.patch('/admin/settings', requestBody);
+            console.log('Settings update response:', data);
+            return data;
+        } catch (error) {
+            console.error('Settings update API error:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            console.error('Error headers:', error.response?.headers);
+            throw error;
+        }
     };
     const handleSaveSettings = async () => {
         if (settingsDiff.length === 0) {
@@ -328,8 +352,15 @@ const SystemSettings = () => {
         }
         setLoading('action', true);
         try {
-            await persistSettings(settingsDiff);
-            setSavedSettings(settings);
+            const response = await persistSettings(settingsDiff);
+            const payload = response?.settings || response?.data?.settings || null;
+            if (payload) {
+                const normalized = normalizeSettingsPayload(payload);
+                setSavedSettings(normalized);
+                setSettings(normalized);
+            } else {
+                setSavedSettings(settings);
+            }
             showSuccess('Settings updated');
         } catch (error) {
             console.error('Settings save failed', error);
@@ -425,10 +456,45 @@ const SystemSettings = () => {
                     role: adminForm.role,
                     isActive: adminForm.isActive
                 };
-                const { data } = await api.post('/admin/users', payload);
-                const created = data?.data || data;
-                setAdmins((prev) => [created, ...prev]);
-                showSuccess('Admin created successfully');
+                try {
+                    const { data } = await api.post('/admin/users', payload);
+                    const created = data?.data || data;
+                    setAdmins((prev) => [created, ...prev]);
+                    showSuccess('Admin created successfully');
+                } catch (error) {
+                    const apiError = error?.response?.data?.error || '';
+                    if (apiError !== 'Email already exists') {
+                        throw error;
+                    }
+                    const { data: searchData } = await api.get('/admin/users', {
+                        params: { search: adminForm.email, limit: 5 }
+                    });
+                    const candidates = searchData?.data?.users || searchData?.users || [];
+                    const existing = candidates.find(
+                        (user) => String(user.email || '').toLowerCase() === adminForm.email.toLowerCase()
+                    );
+                    if (!existing) {
+                        throw error;
+                    }
+                    const updatePayload = {
+                        displayName: adminForm.displayName || existing.display_name,
+                        role: adminForm.role,
+                        isActive: adminForm.isActive
+                    };
+                    if (adminForm.password) {
+                        updatePayload.password = adminForm.password;
+                    }
+                    const { data: updatedData } = await api.patch(`/admin/users/${existing.id}`, updatePayload);
+                    const updated = updatedData?.data || updatedData;
+                    setAdmins((prev) => {
+                        const next = prev.filter((admin) => admin.id !== updated.id);
+                        if (ADMIN_ROLE_SET.has(String(updated.role || '').toLowerCase())) {
+                            return [updated, ...next];
+                        }
+                        return next;
+                    });
+                    showSuccess('Admin updated successfully');
+                }
             }
             closeModal();
         } catch (error) {

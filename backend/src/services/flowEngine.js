@@ -118,6 +118,18 @@ const executeNode = async (node = {}, context = {}, flow = {}, options = {}) => 
         return result;
     }
 
+    if (type === 'timer' || type === 'delay') {
+        result.status = 'completed';
+        result.detail = `Waited ${node.delay || node.duration || '0s'}`;
+        return result;
+    }
+
+    if (type === 'create_record' || type === 'update_record' || type === 'delete_record') {
+        result.status = 'completed';
+        result.detail = `${type} placeholder executed`;
+        return result;
+    }
+
     if (type === 'log') {
         const message = renderTemplate(node.message || 'Flow log entry', context);
         console.log(`[Flow ${flow.name}] ${message}`);
@@ -235,6 +247,7 @@ const runGraphDefinition = async (flow, context = {}, options = {}) => {
     const results = [];
     let currentId = startNodeId;
     let iterations = 0;
+    const loopCounts = new Map();
 
     while (currentId && iterations < MAX_NODE_ITERATIONS) {
         iterations += 1;
@@ -252,6 +265,30 @@ const runGraphDefinition = async (flow, context = {}, options = {}) => {
         if (node.type === 'end') {
             results.push({ id: node.id, type: 'end', status: 'completed' });
             break;
+        }
+
+        if (node.type === 'start') {
+            results.push({ id: node.id, type: 'start', status: 'completed' });
+            currentId = resolveNextFromNode(node, context);
+            continue;
+        }
+
+        if (node.type === 'loop') {
+            const count = (loopCounts.get(node.id) || 0) + 1;
+            loopCounts.set(node.id, count);
+            const maxIterations = Number(node.maxIterations || node.iterations || 3);
+            if (Number.isFinite(maxIterations) && count > maxIterations) {
+                results.push({
+                    id: node.id,
+                    type: 'loop',
+                    status: 'failed',
+                    error: `Loop exceeded ${maxIterations} iterations`
+                });
+                break;
+            }
+            results.push({ id: node.id, type: 'loop', status: 'completed', detail: `Iteration ${count}` });
+            currentId = resolveNextFromNode(node, context);
+            continue;
         }
 
         if (node.type === 'condition' || node.type === 'branch' || node.branches) {
