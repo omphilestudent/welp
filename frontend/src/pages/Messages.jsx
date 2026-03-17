@@ -15,7 +15,7 @@ import SponsoredCard from '../components/ads/SponsoredCard';
 import { getPlanKey, hasAccess } from '../utils/subscriptionAccess';
 
 const Messages = () => {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { user } = useAuth();
     const [conversations, setConversations] = useState([]);
     const [activeConversation, setActiveConversation] = useState(null);
@@ -29,6 +29,7 @@ const Messages = () => {
     const [employeeResults, setEmployeeResults] = useState([]);
     const [psychPermissions, setPsychPermissions] = useState(null);
     const [availablePsychologists, setAvailablePsychologists] = useState([]);
+    const [employeeFavorites, setEmployeeFavorites] = useState([]);
     const [subscription, setSubscription] = useState(null);
     const [chatUsage, setChatUsage] = useState(null);
     const [allocationModal, setAllocationModal] = useState({ open: false, psychologist: null, loading: false });
@@ -83,6 +84,12 @@ const Messages = () => {
         return [...prioritizedConversations, ...archivedConversations];
     }, [prioritizedConversations, archivedConversations]);
     const featuredPsychologist = availablePsychologists[0];
+    const favoritePsychologistIds = useMemo(() => (
+        new Set((employeeFavorites || []).map((fav) => fav.psychologist_id || fav.id))
+    ), [employeeFavorites]);
+    const isFeaturedFavorited = featuredPsychologist
+        ? favoritePsychologistIds.has(featuredPsychologist.id)
+        : false;
     const featuredSpecialization = formatList(
         featuredPsychologist?.specialization ||
         featuredPsychologist?.specializations
@@ -194,6 +201,15 @@ const Messages = () => {
         }
     };
 
+    const fetchEmployeeFavorites = async () => {
+        try {
+            const { data } = await api.get('/messages/favorites/psychologists');
+            setEmployeeFavorites(data?.favorites || []);
+        } catch (err) {
+            console.error('Failed to load psychologist favorites', err);
+        }
+    };
+
     const fetchMessages = useCallback(async (conversationId) => {
         try {
             const { data } = await api.get(`/messages/conversations/${conversationId}/messages`);
@@ -202,6 +218,20 @@ const Messages = () => {
             console.error('Failed to fetch messages:', error);
         }
     }, []);
+
+    const createConversationFromEmployee = useCallback(async (employeeId) => {
+        if (!employeeId || user?.role !== 'psychologist') return null;
+        try {
+            const { data } = await api.post('/messages/conversations/request', {
+                employeeId,
+                initialMessage: 'Hello, I read your review and wanted to offer private support.'
+            });
+            return data?.id || data?.conversation?.id || null;
+        } catch (error) {
+            console.error('Failed to create conversation from employee:', error);
+            return null;
+        }
+    }, [user?.role]);
 
     const ensureConversationActive = useCallback((conversationId) => {
         if (!conversationId) return;
@@ -233,6 +263,7 @@ const Messages = () => {
         if (userRole === 'employee' && userId) {
             fetchSubscription();
             fetchAvailablePsychologists();
+            fetchEmployeeFavorites();
             loadChatUsage();
         }
     }, [userId, userRole, loadChatUsage]);
@@ -247,6 +278,17 @@ const Messages = () => {
             }
         }
     }, [searchParams, visibleConversations, fetchMessages]);
+
+    useEffect(() => {
+        const employeeId = searchParams.get('employee');
+        if (!employeeId || user?.role !== 'psychologist') return;
+        createConversationFromEmployee(employeeId).then((conversationId) => {
+            if (conversationId) {
+                setSearchParams({ conversation: conversationId });
+                fetchConversations();
+            }
+        });
+    }, [searchParams, user?.role, createConversationFromEmployee, setSearchParams]);
 
     useEffect(() => {
         if (visibleConversations.length === 0) {
@@ -447,6 +489,30 @@ const Messages = () => {
             psychologist,
             loading: false
         });
+    };
+
+    const handleFavoritePsychologist = async (psychologist) => {
+        if (!psychologist) return;
+        try {
+            await api.post('/messages/favorites/psychologists', {
+                psychologistId: psychologist.id
+            });
+            await fetchEmployeeFavorites();
+            toast.success('Saved to favorites');
+        } catch (err) {
+            toast.error(err?.response?.data?.error || 'Failed to save favorite');
+        }
+    };
+
+    const handleUnfavoritePsychologist = async (psychologistId) => {
+        if (!psychologistId) return;
+        try {
+            await api.delete(`/messages/favorites/psychologists/${psychologistId}`);
+            setEmployeeFavorites((prev) => prev.filter((fav) => fav.psychologist_id !== psychologistId));
+            toast.success('Removed from favorites');
+        } catch (err) {
+            toast.error(err?.response?.data?.error || 'Failed to remove favorite');
+        }
     };
 
     const handleConfirmAllocation = async (minutes) => {
@@ -1062,6 +1128,20 @@ const Messages = () => {
                                         disabled={!canRequestSupport || allocationModal.loading || !featuredPsychologist}
                                     >
                                         {allocationModal.loading ? 'Requesting...' : 'Request private support'}
+                                    </button>
+                                    <button
+                                        className="btn btn-outline btn-small"
+                                        onClick={() => {
+                                            if (!featuredPsychologist) return;
+                                            if (isFeaturedFavorited) {
+                                                handleUnfavoritePsychologist(featuredPsychologist.id);
+                                            } else {
+                                                handleFavoritePsychologist(featuredPsychologist);
+                                            }
+                                        }}
+                                        disabled={!featuredPsychologist}
+                                    >
+                                        <FaStar /> {isFeaturedFavorited ? 'Remove favorite' : 'Save favorite'}
                                     </button>
                                     {featuredPsychologist?.website && (
                                         <a

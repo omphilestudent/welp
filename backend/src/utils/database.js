@@ -495,6 +495,15 @@ const createTables = async () => {
                 UNIQUE(psychologist_id, employee_id)
             );
 
+            -- Employee saved psychologists
+            CREATE TABLE IF NOT EXISTS employee_psychologist_favorites (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                employee_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(employee_id, psychologist_id)
+            );
+
             -- Claim requests table
             CREATE TABLE IF NOT EXISTS claim_requests (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -771,6 +780,8 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_psych_leads_status               ON psychologist_leads(status);
             CREATE UNIQUE INDEX IF NOT EXISTS ux_psych_leads_source_review ON psychologist_leads(psychologist_id, source_review_id) WHERE source_review_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_psych_favorites_psychologist     ON psychologist_favorites(psychologist_id);
+            CREATE INDEX IF NOT EXISTS idx_employee_favorites_employee     ON employee_psychologist_favorites(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_employee_favorites_psychologist ON employee_psychologist_favorites(psychologist_id);
         `;
 
         await pool.query(queries);
@@ -1150,6 +1161,15 @@ const runMigrations = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`,
+            `CREATE TABLE IF NOT EXISTS employee_psychologist_favorites (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                employee_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(employee_id, psychologist_id)
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_employee_favorites_employee ON employee_psychologist_favorites(employee_id);",
+            "CREATE INDEX IF NOT EXISTS idx_employee_favorites_psychologist ON employee_psychologist_favorites(psychologist_id);",
             `CREATE TABLE IF NOT EXISTS psychologist_leads (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -61,6 +61,27 @@ router.get('/available-psychologists',
     messageController.getAvailablePsychologists
 );
 
+router.get('/favorites/psychologists',
+    authenticate,
+    authorize('employee'),
+    messageController.getPsychologistFavorites
+);
+
+router.post('/favorites/psychologists',
+    authenticate,
+    authorize('employee'),
+    validate([
+        body('psychologistId').isUUID()
+    ]),
+    messageController.addPsychologistFavorite
+);
+
+router.delete('/favorites/psychologists/:psychologistId',
+    authenticate,
+    authorize('employee'),
+    messageController.removePsychologistFavorite
+);
+
 
 router.get('/conversations',
     authenticate,

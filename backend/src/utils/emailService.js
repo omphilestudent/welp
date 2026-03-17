@@ -738,6 +738,42 @@ The status of your ${typeLabel} is now ${normalizedStatus}. ${statusMessage} ${n
     }
 };
 
+async function sendMessageNotificationEmail({ senderName, receiverName, receiverEmail, conversationId }) {
+    if (!receiverEmail) return { success: false, reason: 'missing-email' };
+    const greeting = receiverName ? `Hi ${receiverName}` : 'Hi there';
+    const subject = `New message from ${senderName || 'a Welp user'}`;
+    const baseUrl = process.env.FRONTEND_URL || process.env.SITE_URL || 'https://welphub.onrender.com';
+    const redirectPath = `/messages?conversation=${conversationId}`;
+    const loginUrl = `${baseUrl}/login?redirect=${encodeURIComponent(redirectPath)}`;
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <p>${greeting},</p>
+            <p>You have received a new message from <strong>${senderName || 'a Welp user'}</strong>.</p>
+            <p style="margin: 20px 0;">
+              <a href="${loginUrl}" style="display: inline-block; background: #4f46e5; color: #ffffff; padding: 10px 18px; border-radius: 999px; text-decoration: none;">
+                Login &amp; continue the chat
+              </a>
+            </p>
+            <p>If you did not expect this, you can safely ignore this message.</p>
+            <p style="margin-top: 24px;">— The Welp Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+    const text = `${greeting},
+
+You have received a new message from ${senderName || 'a Welp user'}.
+
+Login to continue the chat: ${loginUrl}
+
+— The Welp Team`;
+
+    return sendEmail({ to: receiverEmail, subject, html, text });
+}
+
 module.exports = {
     sendClaimInvitation,
     sendVerificationEmail,
@@ -748,5 +784,6 @@ module.exports = {
     sendMarketingEmail,
     sendSubscriptionCancellationEmail,
     sendApplicationStatusEmail,
-    sendReviewNotificationEmail
+    sendReviewNotificationEmail,
+    sendMessageNotificationEmail
 };

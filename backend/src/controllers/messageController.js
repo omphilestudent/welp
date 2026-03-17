@@ -1,6 +1,7 @@
 
 const { query } = require('../utils/database');
 const { createUserNotification } = require('../utils/userNotifications');
+const { sendMessageNotificationEmail } = require('../utils/emailService');
 const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaService');
 const { PLAN_LIMITS } = require('../services/subscriptionService');
 const { emitFlowEvent } = require('../services/flowEngine');
@@ -131,6 +132,38 @@ const expireConversationById = async (conversationId) => {
     );
 };
 
+const shouldSendChatEmail = (senderRole, receiverRole) => {
+    const sender = String(senderRole || '').toLowerCase();
+    const receiver = String(receiverRole || '').toLowerCase();
+    return (sender === 'employee' && receiver === 'psychologist')
+        || (sender === 'psychologist' && receiver === 'employee');
+};
+
+const notifyChatEmail = async ({ senderId, recipientId, conversationId }) => {
+    if (!senderId || !recipientId || !conversationId) return;
+    try {
+        const userRows = await query(
+            `SELECT id, email, display_name, role
+             FROM users
+             WHERE id = ANY($1::uuid[])`,
+            [[senderId, recipientId]]
+        );
+        const sender = userRows.rows.find((row) => row.id === senderId);
+        const recipient = userRows.rows.find((row) => row.id === recipientId);
+        if (!sender || !recipient || !recipient.email) return;
+        if (!shouldSendChatEmail(sender.role, recipient.role)) return;
+
+        await sendMessageNotificationEmail({
+            senderName: sender.display_name || sender.email,
+            receiverName: recipient.display_name || recipient.email,
+            receiverEmail: recipient.email,
+            conversationId
+        });
+    } catch (error) {
+        console.warn('Message notification email failed:', error?.message || error);
+    }
+};
+
 const requestChatWithPsychologist = async (req, res) => {
     try {
         const { psychologistId, initialMessage } = req.body;
@@ -141,8 +174,18 @@ const requestChatWithPsychologist = async (req, res) => {
             : Math.min(planCap, 10);
         await ensureChatQuota(req.user, sessionMinutes);
 
+        const hasCanUseProfile = await columnExists('users', 'can_use_profile');
+        const hasKycStatus = await columnExists('users', 'kyc_status');
+        const hasIsActive = await columnExists('users', 'is_active');
         const psychologist = await query(
-            'SELECT id, role, is_verified FROM users WHERE id = $1 AND role = $2',
+            `SELECT id,
+                    role,
+                    is_verified,
+                    ${hasCanUseProfile ? 'can_use_profile' : 'NULL as can_use_profile'},
+                    ${hasKycStatus ? 'kyc_status' : 'NULL as kyc_status'},
+                    ${hasIsActive ? 'is_active' : 'true as is_active'}
+             FROM users
+             WHERE id = $1 AND role = $2`,
             [psychologistId, 'psychologist']
         );
 
@@ -150,18 +193,55 @@ const requestChatWithPsychologist = async (req, res) => {
             return res.status(404).json({ error: 'Psychologist not found' });
         }
 
-        if (!psychologist.rows[0].is_verified) {
+        const psychRow = psychologist.rows[0];
+        if (psychRow.is_active === false) {
+            return res.status(400).json({ error: 'Psychologist is not available right now' });
+        }
+        const isApproved = psychRow.is_verified
+            || psychRow.can_use_profile === true
+            || String(psychRow.kyc_status || '').toLowerCase() === 'approved';
+        if (!isApproved) {
             return res.status(400).json({ error: 'Psychologist is not yet verified' });
         }
 
 
         const existing = await query(
-            'SELECT id FROM conversations WHERE employee_id = $1 AND psychologist_id = $2',
+            'SELECT * FROM conversations WHERE employee_id = $1 AND psychologist_id = $2 ORDER BY created_at DESC LIMIT 1',
             [req.user.id, psychologistId]
         );
 
         if (existing.rows.length > 0) {
-            return res.status(400).json({ error: 'Chat request already sent' });
+            const current = existing.rows[0];
+            const terminalStatuses = new Set(['ended', 'rejected', 'blocked']);
+            if (!terminalStatuses.has(String(current.status || '').toLowerCase())) {
+                return res.status(400).json({ error: 'Chat request already sent' });
+            }
+            const reopened = await query(
+                `UPDATE conversations
+                 SET status = 'pending',
+                     ended_at = NULL,
+                     rejected_reason = NULL,
+                     started_at = NULL,
+                     expires_at = NULL,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1
+                 RETURNING *`,
+                [current.id]
+            );
+            if (initialMessage && initialMessage.trim()) {
+                await query(
+                    `INSERT INTO messages (conversation_id, sender_id, content)
+                     VALUES ($1, $2, $3)`,
+                    [current.id, req.user.id, initialMessage.trim()]
+                );
+            }
+            return res.status(201).json({
+                message: 'Chat request sent successfully',
+                conversation: reopened.rows[0],
+                allocation: {
+                    minutes: sessionMinutes
+                }
+            });
         }
 
 
@@ -178,6 +258,11 @@ const requestChatWithPsychologist = async (req, res) => {
              VALUES ($1, $2, $3)`,
             [conversation.rows[0].id, req.user.id, initialMessage || 'Hello, I would like to chat with you.']
         );
+        await notifyChatEmail({
+            senderId: req.user.id,
+            recipientId: psychologistId,
+            conversationId: conversation.rows[0].id
+        });
 
         const sender = await query(
             'SELECT display_name FROM users WHERE id = $1',
@@ -218,6 +303,19 @@ const requestChatWithPsychologist = async (req, res) => {
 const getAvailablePsychologists = async (req, res) => {
     try {
         const limit = Number(process.env.PSYCHOLOGIST_VISIBLE_LIMIT || 6);
+        const hasCanUseProfile = await columnExists('users', 'can_use_profile');
+        const hasKycStatus = await columnExists('users', 'kyc_status');
+        const hasIsActive = await columnExists('users', 'is_active');
+        const approvalClauses = [
+            'is_verified = true',
+            hasCanUseProfile ? 'can_use_profile = true' : null,
+            hasKycStatus ? "kyc_status = 'approved'" : null
+        ].filter(Boolean);
+        const availabilityClauses = [
+            "role = 'psychologist'",
+            hasIsActive ? 'is_active = true' : null,
+            approvalClauses.length ? `(${approvalClauses.join(' OR ')})` : null
+        ].filter(Boolean);
         const { rows } = await query(
             `SELECT
                  id,
@@ -228,9 +326,11 @@ const getAvailablePsychologists = async (req, res) => {
                  years_of_experience,
                  consultation_modes,
                  languages,
-                 biography
+                 biography,
+                 ${hasCanUseProfile ? 'can_use_profile' : 'NULL as can_use_profile'},
+                 ${hasKycStatus ? 'kyc_status' : 'NULL as kyc_status'}
              FROM users
-             WHERE role = 'psychologist' AND is_verified = true
+             WHERE ${availabilityClauses.join(' AND ')}
              ORDER BY RANDOM()
              LIMIT 25`
         );
@@ -271,6 +371,10 @@ const getAvailablePsychologists = async (req, res) => {
             );
         }
 
+        if (selected.length === 0) {
+            return res.json(rows.slice(0, Math.min(limit, rows.length)));
+        }
+
         res.json(selected);
     } catch (error) {
         console.error('Get psychologists error:', error);
@@ -295,12 +399,41 @@ const sendMessageRequest = async (req, res) => {
 
 
         const existing = await query(
-            'SELECT * FROM conversations WHERE employee_id = $1 AND psychologist_id = $2 LIMIT 1',
+            'SELECT * FROM conversations WHERE employee_id = $1 AND psychologist_id = $2 ORDER BY created_at DESC LIMIT 1',
             [employeeId, req.user.id]
         );
 
         if (existing.rows.length > 0) {
-            return res.status(200).json(existing.rows[0]);
+            const current = existing.rows[0];
+            const terminalStatuses = new Set(['ended', 'rejected', 'blocked']);
+            if (!terminalStatuses.has(String(current.status || '').toLowerCase())) {
+                return res.status(200).json(current);
+            }
+            const reopened = await query(
+                `UPDATE conversations
+                 SET status = 'pending',
+                     ended_at = NULL,
+                     rejected_reason = NULL,
+                     started_at = NULL,
+                     expires_at = NULL,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1
+                 RETURNING *`,
+                [current.id]
+            );
+            if (initialMessage && initialMessage.trim()) {
+                await query(
+                    `INSERT INTO messages (conversation_id, sender_id, content)
+                     VALUES ($1, $2, $3)`,
+                    [current.id, req.user.id, initialMessage.trim()]
+                );
+            }
+            await notifyChatEmail({
+                senderId: req.user.id,
+                recipientId: employeeId,
+                conversationId: current.id
+            });
+            return res.status(201).json(reopened.rows[0]);
         }
 
 
@@ -318,6 +451,11 @@ const sendMessageRequest = async (req, res) => {
                  VALUES ($1, $2, $3)`,
                 [conversation.rows[0].id, req.user.id, initialMessage.trim()]
             );
+            await notifyChatEmail({
+                senderId: req.user.id,
+                recipientId: employeeId,
+                conversationId: conversation.rows[0].id
+            });
         }
 
         const sender = await query(
@@ -836,6 +974,14 @@ const sendMessage = async (req, res) => {
             io.to(`user-${recipientId}`).emit('notification', notification);
         }
 
+        notifyChatEmail({
+            senderId: req.user.id,
+            recipientId,
+            conversationId
+        }).catch((emailError) => {
+            console.warn('Message email notify failed:', emailError?.message || emailError);
+        });
+
         emitFlowEvent('message.created', {
             conversationId,
             messageId: result.rows[0]?.id,
@@ -1025,6 +1171,84 @@ const getChatUsageSummary = async (req, res) => {
     }
 };
 
+const getPsychologistFavorites = async (req, res) => {
+    try {
+        const result = await query(
+            `SELECT
+                f.id,
+                f.psychologist_id,
+                f.created_at,
+                u.display_name,
+                u.avatar_url,
+                u.specialization,
+                u.years_of_experience
+             FROM employee_psychologist_favorites f
+             JOIN users u ON f.psychologist_id = u.id
+             WHERE f.employee_id = $1
+             ORDER BY f.created_at DESC`,
+            [req.user.id]
+        );
+        return res.json({ success: true, favorites: result.rows });
+    } catch (error) {
+        console.error('Get psychologist favorites error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load favorites' });
+    }
+};
+
+const addPsychologistFavorite = async (req, res) => {
+    try {
+        const { psychologistId } = req.body;
+        if (!psychologistId) {
+            return res.status(400).json({ success: false, error: 'psychologistId is required' });
+        }
+        const psychologist = await query(
+            `SELECT id, role, is_verified, can_use_profile, kyc_status, is_active
+             FROM users
+             WHERE id = $1 AND role = 'psychologist'`,
+            [psychologistId]
+        );
+        if (psychologist.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Psychologist not found' });
+        }
+        const row = psychologist.rows[0];
+        if (row.is_active === false) {
+            return res.status(400).json({ success: false, error: 'Psychologist is not available' });
+        }
+        const approved = row.is_verified || row.can_use_profile === true || String(row.kyc_status || '').toLowerCase() === 'approved';
+        if (!approved) {
+            return res.status(400).json({ success: false, error: 'Psychologist is not yet verified' });
+        }
+
+        const result = await query(
+            `INSERT INTO employee_psychologist_favorites (employee_id, psychologist_id)
+             VALUES ($1, $2)
+             ON CONFLICT (employee_id, psychologist_id)
+             DO NOTHING
+             RETURNING *`,
+            [req.user.id, psychologistId]
+        );
+        return res.status(201).json({ success: true, favorite: result.rows[0] || null });
+    } catch (error) {
+        console.error('Add psychologist favorite error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to add favorite' });
+    }
+};
+
+const removePsychologistFavorite = async (req, res) => {
+    try {
+        const { psychologistId } = req.params;
+        await query(
+            `DELETE FROM employee_psychologist_favorites
+             WHERE employee_id = $1 AND psychologist_id = $2`,
+            [req.user.id, psychologistId]
+        );
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Remove psychologist favorite error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to remove favorite' });
+    }
+};
+
 module.exports = {
 
     requestChatWithPsychologist,
@@ -1042,5 +1266,8 @@ module.exports = {
     blockConversation,
     deleteConversation,
     startVideoSession,
-    getChatUsageSummary
+    getChatUsageSummary,
+    getPsychologistFavorites,
+    addPsychologistFavorite,
+    removePsychologistFavorite
 };

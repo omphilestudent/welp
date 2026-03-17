@@ -98,8 +98,11 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
                 initialMessage: 'Hello, I read your review and wanted to offer private support.'
             });
             toast.success('Private message request sent');
-            if (data?.id) {
-                navigate(`/messages?conversation=${data.id}`);
+            const conversationId = data?.id || data?.conversation?.id;
+            if (conversationId) {
+                navigate(`/messages?conversation=${conversationId}`);
+            } else {
+                navigate(`/messages?employee=${authorId}`);
             }
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to send private message');
