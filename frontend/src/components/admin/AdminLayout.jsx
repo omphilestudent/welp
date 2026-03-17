@@ -12,6 +12,7 @@ import {
     FaStar,
     FaCog,
     FaClipboardList,
+    FaBriefcase,
     FaFileAlt,
     FaCalendarAlt,
     FaShieldAlt,
@@ -226,6 +227,45 @@ const AdminLayout = () => {
         }
     ];
 
+    const hrAdminNavItems = [
+        {
+            path: '/hr/dashboard',
+            icon: <FaTachometerAlt />,
+            label: 'HR Dashboard',
+            color: '#4299e1'
+        },
+        {
+            path: '/hr/jobs',
+            icon: <FaBriefcase />,
+            label: 'Job Postings',
+            color: '#16a34a'
+        },
+        {
+            path: '/hr/applications',
+            icon: <FaFileAlt />,
+            label: 'Applications',
+            color: '#0ea5e9'
+        },
+        {
+            path: '/hr/interviews',
+            icon: <FaCalendarAlt />,
+            label: 'Interviews',
+            color: '#8b5cf6'
+        },
+        {
+            path: '/hr/employee-relations',
+            icon: <FaUsers />,
+            label: 'Employee Relations',
+            color: '#ec4899'
+        },
+        {
+            path: '/hr/departments',
+            icon: <FaBuilding />,
+            label: 'Departments',
+            color: '#f97316'
+        }
+    ];
+
     const unreadCount = notifications.filter(n => !n.read).length;
 
     return (
@@ -310,6 +350,19 @@ const AdminLayout = () => {
                         <div className="nav-section">
                             <h3>Human Resources</h3>
                             {hrNavItems.map(item => (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    className={({ isActive }) =>
+                                        `nav-link ${isActive ? 'active' : ''}`
+                                    }
+                                    style={{ '--item-color': item.color }}
+                                >
+                                    <span className="nav-icon">{item.icon}</span>
+                                    {sidebarOpen && <span className="nav-label">{item.label}</span>}
+                                </NavLink>
+                            ))}
+                            {isHrAdmin && hrAdminNavItems.map(item => (
                                 <NavLink
                                     key={item.path}
                                     to={item.path}

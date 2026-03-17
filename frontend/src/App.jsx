@@ -62,6 +62,14 @@ import Leaves from './pages/hr/Leaves';
 import Documents from './pages/hr/Documents';
 import Onboarding from './pages/hr/Onboarding';
 import HRSettings from './pages/hr/HRSettings';
+import HRDashboard from './pages/hr/HRDashboard';
+import JobPostings from './pages/hr/JobPostings';
+import JobCreate from './pages/hr/JobCreate';
+import JobDetailsHR from './pages/hr/JobDetails';
+import Applications from './pages/hr/Applications';
+import Interviews from './pages/hr/Interviews';
+import EmployeeRelations from './pages/hr/EmployeeRelations';
+import Departments from './pages/hr/Departments';
 
 import './styles/global.css';
 import './styles/theme.css';
@@ -209,6 +217,17 @@ function App() {
                                     <Route path="documents" element={<Documents />} />
                                     <Route path="onboarding" element={<Onboarding />} />
                                     <Route path="settings" element={<HRSettings />} />
+                                    <Route path="dashboard" element={<AdminRoute requiredRole="hr"><HRDashboard /></AdminRoute>} />
+                                    <Route path="jobs" element={<AdminRoute requiredRole="hr"><JobPostings /></AdminRoute>} />
+                                    <Route path="jobs/create" element={<AdminRoute requiredRole="hr"><JobCreate /></AdminRoute>} />
+                                    <Route path="jobs/new" element={<AdminRoute requiredRole="hr"><JobCreate /></AdminRoute>} />
+                                    <Route path="jobs/:id" element={<AdminRoute requiredRole="hr"><JobDetailsHR /></AdminRoute>} />
+                                    <Route path="jobs/:id/edit" element={<AdminRoute requiredRole="hr"><JobCreate /></AdminRoute>} />
+                                    <Route path="jobs/:id/applications" element={<AdminRoute requiredRole="hr"><Applications /></AdminRoute>} />
+                                    <Route path="applications" element={<AdminRoute requiredRole="hr"><Applications /></AdminRoute>} />
+                                    <Route path="interviews" element={<AdminRoute requiredRole="hr"><Interviews /></AdminRoute>} />
+                                    <Route path="employee-relations" element={<AdminRoute requiredRole="hr"><EmployeeRelations /></AdminRoute>} />
+                                    <Route path="departments" element={<AdminRoute requiredRole="hr"><Departments /></AdminRoute>} />
                                     <Route path="*" element={<Navigate to="/hr/employees" replace />} />
                                 </Route>
                                 </Routes>
