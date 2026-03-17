@@ -275,7 +275,7 @@ const BusinessRegister = () => {
                             Our team will review your information and reach out to <strong>{form.email}</strong>{' '}
                             within <strong>1–2 business days</strong>.
                         </p>
-                        <button className="reg-submit-btn" style={{ background: '#d97706' }} onClick={() => navigate('/')}>
+                        <button className="reg-submit-btn reg-submit-btn--amber" onClick={() => navigate('/')}>
                             Back to homepage
                         </button>
                     </div>
@@ -296,7 +296,7 @@ const BusinessRegister = () => {
                 <Link to="/register" className="reg-back-btn">← Back to role selection</Link>
 
                 <div className="reg-header">
-                    <span className="reg-role-badge" style={{ background: '#fffbeb', color: '#d97706' }}>
+                    <span className="reg-role-badge reg-role-badge--business">
                         🏢 Business application
                     </span>
                     <h1>Register your company</h1>
@@ -330,19 +330,17 @@ const BusinessRegister = () => {
                 </div>
 
                 {/* Step indicator */}
-                <div className="reg-steps">
+                <div className="reg-steps reg-steps--amber">
                     {STEPS.map((label, i) => (
                         <React.Fragment key={i}>
-                            <div className={`reg-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}
-                                 style={{ '--active-color': '#d97706' }}>
-                                <div className="reg-step-dot" style={i === step ? { background: '#d97706', borderColor: '#d97706', boxShadow: '0 0 0 4px rgba(217,119,6,0.15)' } : {}}>
+                            <div className={`reg-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
+                                <div className="reg-step-dot">
                                     {i < step ? '✓' : i + 1}
                                 </div>
-                                <span className="reg-step-label" style={i === step ? { color: '#d97706' } : {}}>{label}</span>
+                                <span className="reg-step-label">{label}</span>
                             </div>
                             {i < STEPS.length - 1 && (
-                                <div className={`reg-step-line ${i < step ? 'done' : ''}`}
-                                     style={i < step ? { background: '#22c55e' } : {}} />
+                                <div className={`reg-step-line ${i < step ? 'done' : ''}`} />
                             )}
                         </React.Fragment>
                     ))}
@@ -437,11 +435,11 @@ const BusinessRegister = () => {
                                         </label>
                                         {form.claimExistingProfile && (
                                             <div className="reg-claim-section">
-                                                <p style={{ marginBottom: '0.75rem', color: '#475569' }}>
+                                                <p className="reg-claim-helper">
                                                     We’ll match your account with an unclaimed company. Search by name or keyword and select the correct result before you submit.
                                                 </p>
-                                                <div className="reg-row-2" style={{ gap: '0.5rem', alignItems: 'flex-end' }}>
-                                                    <div className="reg-field" style={{ flex: 1, marginBottom: 0 }}>
+                                                <div className="reg-row-2 reg-row-compact">
+                                                    <div className="reg-field reg-field-inline">
                                                         <label>Company search</label>
                                                         <input
                                                             type="text"
@@ -454,16 +452,15 @@ const BusinessRegister = () => {
                                                     <button
                                                         type="button"
                                                         className="reg-btn-ghost"
-                                                        style={{ flexShrink: 0 }}
                                                         onClick={searchUnclaimedCompanies}
                                                         disabled={claimLoading}
                                                     >
                                                         {claimLoading ? 'Searching…' : 'Search'}
                                                     </button>
                                                 </div>
-                                                {claimError && <p className="reg-field-hint" style={{ color: '#ef4444' }}>{claimError}</p>}
+                                                {claimError && <p className="reg-field-hint reg-claim-error">{claimError}</p>}
                                                 {claimResults.length > 0 && (
-                                                    <div className="reg-claim-results" style={{ marginTop: '0.5rem' }}>
+                                                    <div className="reg-claim-results reg-claim-results--spaced">
                                                         {claimResults.map(company => (
                                                             <button
                                                                 type="button"
@@ -483,7 +480,7 @@ const BusinessRegister = () => {
                                                                 }}
                                                             >
                                                                 <strong>{company.name}</strong>
-                                                                <span style={{ fontSize: '0.75rem', color: '#475569' }}>
+                                                                <span className="reg-claim-item-subtitle">
                                                                     {company.industry || 'General'} · {company.country || 'Unknown region'}
                                                                 </span>
                                                                 <div className="reg-claim-item__meta">
@@ -502,13 +499,12 @@ const BusinessRegister = () => {
                                                     </div>
                                                 )}
                                                 {form.claimCompanyId && (
-                                                    <div className="reg-field-hint" style={{ marginTop: '0.75rem' }}>
+                                                    <div className="reg-field-hint">
                                                         Selected profile: <strong>{form.companyName}</strong>
                                                         <button
                                                             type="button"
-                                                            className="reg-claim-clear"
+                                                            className="reg-claim-change"
                                                             onClick={clearClaimSelection}
-                                                            style={{ marginLeft: '0.5rem', background: 'none', border: 'none', color: '#d97706', cursor: 'pointer' }}
                                                         >
                                                             Change
                                                         </button>
@@ -516,7 +512,7 @@ const BusinessRegister = () => {
                                                 )}
                                                 {selectedClaimCompany && (
                                                     <div className="reg-claim-selected">
-                                                        <p style={{ marginBottom: '0.25rem' }}>We'll use the details below to match your ownership:</p>
+                                                        <p className="reg-claim-selected-note">We'll use the details below to match your ownership:</p>
                                                         <ul>
                                                             {selectedClaimCompany.email && <li>Email: {selectedClaimCompany.email}</li>}
                                                             {selectedClaimCompany.phone && <li>Phone: {selectedClaimCompany.phone}</li>}
@@ -559,34 +555,27 @@ const BusinessRegister = () => {
                                     <div className="reg-field">
                                         <label>Verification documents *</label>
                                         <p className="reg-field-hint">Upload supporting documents to verify your business.</p>
-                                        <div
-                                            style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
-                                        >
+                                        <div className="reg-doc-grid">
                                             {BUSINESS_REQUIRED_DOCUMENTS.map((doc) => {
                                                 const current = documents[doc.type];
                                                 return (
-                                                    <div
-                                                        key={doc.type}
-                                                        style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: '#fff' }}
-                                                    >
-                                                        <strong style={{ display: 'block', marginBottom: '0.35rem' }}>{doc.label}</strong>
+                                                    <div key={doc.type} className="reg-doc-card">
+                                                        <strong className="reg-doc-card-title">{doc.label}</strong>
                                                         {current ? (
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                            <div className="reg-doc-body">
                                                                 <span className="reg-field-hint">{current.filename || 'Uploaded document'}</span>
-                                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                <div className="reg-doc-actions">
                                                                     <a
                                                                         href={resolveMediaUrl(current.url)}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
-                                                                        className="reg-btn-ghost"
-                                                                        style={{ padding: '0.35rem 0.65rem', borderRadius: '999px' }}
+                                                                        className="reg-btn-ghost reg-btn-pill"
                                                                     >
                                                                         Preview
                                                                     </a>
                                                                     <button
                                                                         type="button"
-                                                                        className="reg-btn-ghost"
-                                                                        style={{ padding: '0.35rem 0.65rem', borderRadius: '999px' }}
+                                                                        className="reg-btn-ghost reg-btn-pill"
                                                                         onClick={() => removeDocument(doc.type)}
                                                                     >
                                                                         Replace
@@ -595,22 +584,14 @@ const BusinessRegister = () => {
                                                             </div>
                                                         ) : (
                                                             <label
-                                                                className="reg-btn-ghost"
-                                                                style={{
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '0.4rem',
-                                                                    padding: '0.4rem 0.75rem',
-                                                                    borderRadius: '999px',
-                                                                    cursor: 'pointer'
-                                                                }}
+                                                                className="reg-btn-ghost reg-upload-btn"
                                                             >
                                                                 <input
                                                                     type="file"
                                                                     accept=".pdf,.png,.jpg,.jpeg"
                                                                     onChange={onDocumentInputChange(doc.type)}
                                                                     disabled={!!docUploading[doc.type]}
-                                                                    style={{ display: 'none' }}
+                                                                    className="reg-upload-input"
                                                                 />
                                                                     {docUploading[doc.type] ? 'Uploading…' : 'Upload file'}
                                                             </label>
@@ -660,9 +641,9 @@ const BusinessRegister = () => {
                                     <ReviewRow label="Company size"  value={`${form.companySize} employees`} />
                                     <ReviewRow label="Country"       value={form.country} />
                                     <ReviewRow label="Claiming profile" value={form.claimExistingProfile ? 'Yes' : 'No'} />
-                                    <div className="reg-field" style={{ marginTop: '1rem' }}>
+                                    <div className="reg-field reg-field--spaced">
                                         <label>Documents</label>
-                                        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem', color: '#475569', fontSize: '0.9rem' }}>
+                                        <ul className="reg-doc-list">
                                             {BUSINESS_REQUIRED_DOCUMENTS.map((doc) => (
                                                 <li key={doc.type}>
                                                     {documents[doc.type] ? '✔' : '•'} {doc.label}
@@ -683,11 +664,11 @@ const BusinessRegister = () => {
                             </button>
                         )}
                         {step < STEPS.length - 1 ? (
-                            <button className="reg-submit-btn" style={{ flex: 1, background: '#d97706' }} onClick={next}>
+                            <button className="reg-submit-btn reg-submit-btn--amber reg-submit-btn--stretch" onClick={next}>
                                 Continue →
                             </button>
                         ) : (
-                            <button className="reg-submit-btn" style={{ flex: 1, background: '#d97706' }} onClick={handleSubmit} disabled={loading}>
+                            <button className="reg-submit-btn reg-submit-btn--amber reg-submit-btn--stretch" onClick={handleSubmit} disabled={loading}>
                                 {loading ? <span className="reg-spinner" /> : 'Submit Application'}
                             </button>
                         )}
@@ -703,9 +684,9 @@ const BusinessRegister = () => {
 };
 
 const ReviewRow = ({ label, value }) => (
-    <div style={{ display: 'flex', gap: '1rem', padding: '0.5rem 0', borderBottom: '1px solid #f3f4f6', fontSize: '0.875rem' }}>
-        <span style={{ width: 130, color: '#9ca3af', fontWeight: 600, flexShrink: 0 }}>{label}</span>
-        <span style={{ color: '#111827' }}>{value}</span>
+    <div className="reg-review-row">
+        <span className="reg-review-label">{label}</span>
+        <span className="reg-review-value">{value}</span>
     </div>
 );
 

@@ -2,6 +2,59 @@
 const { query } = require('../utils/database');
 const { sendApplicationConfirmation } = require('../utils/emailService');
 
+const tableExists = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = $1
+            )`,
+            [tableName]
+        );
+        return result.rows[0]?.exists === true;
+    } catch {
+        return false;
+    }
+};
+
+const columnExists = async (tableName, columnName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+            )`,
+            [tableName, columnName]
+        );
+        return result.rows[0]?.exists === true;
+    } catch {
+        return false;
+    }
+};
+
+const getColumnType = async (tableName, columnName) => {
+    try {
+        const result = await query(
+            `SELECT data_type
+             FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+             LIMIT 1`,
+            [tableName, columnName]
+        );
+        return result.rows[0]?.data_type || null;
+    } catch {
+        return null;
+    }
+};
+
+const normalizeArray = (value) => {
+    if (!value) return null;
+    if (Array.isArray(value)) return value;
+    return String(value)
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+};
 
 const applyAsPsychologist = async (req, res) => {
     try {
@@ -31,64 +84,79 @@ const applyAsPsychologist = async (req, res) => {
         }
 
 
-        const existingUser = await query(
-            'SELECT id FROM users WHERE email = $1',
-            [email]
-        );
-
-
-        await query(`
-      CREATE TABLE IF NOT EXISTS psychologist_applications (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        full_name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        license_number VARCHAR(100) NOT NULL,
-        license_issuing_body VARCHAR(255) NOT NULL,
-        years_of_experience INT NOT NULL,
-        specialization TEXT[],
-        qualifications TEXT[],
-        biography TEXT,
-        phone_number VARCHAR(50),
-        address TEXT,
-        website VARCHAR(255),
-        linkedin VARCHAR(255),
-        consultation_modes TEXT[],
-        languages TEXT[],
-        accepted_age_groups TEXT[],
-        emergency_contact JSONB,
-        avatar_url TEXT,
-        status VARCHAR(50) DEFAULT 'pending',
-        admin_notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-
-        const existing = await query(
-            'SELECT * FROM psychologist_applications WHERE email = $1',
-            [email]
-        );
-
-        if (existing.rows.length > 0) {
-            return res.status(400).json({ error: 'Application already submitted' });
+        const tableAvailable = await tableExists('psychologist_applications');
+        if (!tableAvailable) {
+            return res.status(500).json({ error: 'Application storage is not available. Please try again later.' });
         }
 
+        const hasEmail = await columnExists('psychologist_applications', 'email');
+        if (hasEmail) {
+            const existing = await query(
+                'SELECT id FROM psychologist_applications WHERE email = $1 LIMIT 1',
+                [email]
+            );
+            if (existing.rows.length > 0) {
+                return res.status(400).json({ error: 'Application already submitted' });
+            }
+        }
+
+        const columnValues = {
+            full_name: fullName,
+            email,
+            license_number: licenseNumber,
+            license_issuing_body: licenseIssuingBody,
+            license_body: licenseIssuingBody,
+            years_of_experience: yearsOfExperience,
+            years_experience: yearsOfExperience,
+            specialization: normalizeArray(specialization),
+            specialisations: normalizeArray(specialization),
+            qualifications: normalizeArray(qualifications),
+            biography,
+            bio: biography,
+            phone_number: phoneNumber,
+            address,
+            website,
+            linkedin,
+            consultation_modes: normalizeArray(consultationModes),
+            therapy_types: normalizeArray(consultationModes),
+            languages: normalizeArray(languages),
+            accepted_age_groups: normalizeArray(acceptedAgeGroups),
+            emergency_contact: emergencyContact || null,
+            avatar_url: avatarUrl,
+            status: 'pending_review'
+        };
+
+        const cols = [];
+        const placeholders = [];
+        const params = [];
+        let idx = 1;
+
+        for (const [column, value] of Object.entries(columnValues)) {
+            if (value === null || value === undefined) continue;
+            const exists = await columnExists('psychologist_applications', column);
+            if (!exists) continue;
+
+            const columnType = await getColumnType('psychologist_applications', column);
+            cols.push(column);
+            if (columnType === 'jsonb' || columnType === 'json') {
+                placeholders.push(`$${idx}::jsonb`);
+                params.push(JSON.stringify(value));
+            } else {
+                placeholders.push(`$${idx}`);
+                params.push(value);
+            }
+            idx += 1;
+        }
+
+        if (!cols.length) {
+            return res.status(500).json({ error: 'Application schema is unavailable. Please contact support.' });
+        }
 
         const result = await query(
-            `INSERT INTO psychologist_applications (
-        full_name, email, license_number, license_issuing_body,
-        years_of_experience, specialization, qualifications, biography,
-        phone_number, address, website, linkedin, consultation_modes,
-        languages, accepted_age_groups, emergency_contact, avatar_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-      RETURNING *`,
-            [
-                fullName, email, licenseNumber, licenseIssuingBody,
-                yearsOfExperience, specialization || [], qualifications || [], biography,
-                phoneNumber, address, website, linkedin, consultationModes || [],
-                languages || [], acceptedAgeGroups || [], emergencyContact || {}, avatarUrl
-            ]
+            `INSERT INTO psychologist_applications (${cols.join(', ')})
+             VALUES (${placeholders.join(', ')})
+             RETURNING *`,
+            params
         );
 
 
@@ -113,12 +181,22 @@ const getApplicationStatus = async (req, res) => {
     try {
         const { email } = req.params;
 
+        const tableAvailable = await tableExists('psychologist_applications');
+        if (!tableAvailable) {
+            return res.status(404).json({ error: 'Application not found' });
+        }
+
+        const hasEmail = await columnExists('psychologist_applications', 'email');
+        if (!hasEmail) {
+            return res.status(404).json({ error: 'Application not found' });
+        }
+
         const result = await query(
             `SELECT id, status, created_at, reviewed_at, admin_notes
-       FROM psychologist_applications
-       WHERE email = $1
-       ORDER BY created_at DESC
-       LIMIT 1`,
+             FROM psychologist_applications
+             WHERE email = $1
+             ORDER BY created_at DESC
+             LIMIT 1`,
             [email]
         );
 

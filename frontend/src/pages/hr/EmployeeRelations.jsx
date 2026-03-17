@@ -5,6 +5,7 @@ import {
     FaUser, FaCalendarAlt, FaFlag, FaCheckCircle, FaTimesCircle,
     FaClock, FaComment, FaPaperclip, FaBell, FaHistory
 } from 'react-icons/fa';
+import api from '../../services/api';
 import './EmployeeRelations.css'
 
 const EmployeeRelations = () => {
@@ -60,16 +61,33 @@ const EmployeeRelations = () => {
         fetchCases();
     }, []);
 
+    const normalizeCase = (item = {}) => ({
+        id: item.id,
+        caseId: item.case_id || item.id,
+        employeeName: item.employee_name || item.employeeName || '',
+        employeeId: item.employee_id || item.employeeId || '',
+        issueType: item.issue_type || item.issueType || '',
+        priority: item.priority || 'medium',
+        status: item.status || 'open',
+        description: item.description || '',
+        dateReported: item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '',
+        reportedBy: item.hr_name || '',
+        department: item.department || '',
+        resolution: item.resolution || '',
+        resolutionDate: item.resolved_at ? new Date(item.resolved_at).toISOString().split('T')[0] : '',
+        attachments: item.attachments || [],
+        notes: item.notes || '',
+        followUpDate: item.follow_up_date || '',
+        tags: item.tags || [],
+        confidentialityLevel: item.confidentiality_level || 'internal'
+    });
+
     const fetchCases = async () => {
         try {
             setLoading(true);
-            // Replace with your actual API endpoint
-            const response = await fetch('/api/employee-relations/cases');
-            if (!response.ok) {
-                throw new Error('Failed to fetch cases');
-            }
-            const data = await response.json();
-            setCases(data);
+            const { data } = await api.get('/hr/employee-relations');
+            const rows = Array.isArray(data) ? data : data?.data || [];
+            setCases(rows.map(normalizeCase));
             setError(null);
         } catch (err) {
             setError(err.message);
@@ -88,24 +106,15 @@ const EmployeeRelations = () => {
     // Add ml-services case
     const addCase = async (caseData) => {
         try {
-            const response = await fetch('/api/employee-relations/cases', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ...caseData,
-                    caseId: `ER-${Date.now()}`,
-                    createdAt: new Date().toISOString()
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to add case');
-            }
-
-            const newCase = await response.json();
-            setCases([newCase, ...cases]);
+            const payload = {
+                employee_id: caseData.employeeId,
+                issue_type: caseData.issueType,
+                priority: caseData.priority || 'medium',
+                subject: caseData.subject || caseData.issueType || 'Employee relation case',
+                description: caseData.description
+            };
+            const { data } = await api.post('/hr/employee-relations', payload);
+            setCases([normalizeCase(data), ...cases]);
             setShowModal(false);
             resetForm();
             showToast('Case created successfully', 'success');
@@ -117,20 +126,13 @@ const EmployeeRelations = () => {
     // Update case
     const updateCase = async (id, caseData) => {
         try {
-            const response = await fetch(`/api/employee-relations/cases/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(caseData)
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update case');
-            }
-
-            const updatedCase = await response.json();
-            setCases(cases.map(c => c.id === id ? updatedCase : c));
+            const payload = {
+                status: caseData.status || 'open',
+                resolution: caseData.resolution || null
+            };
+            const { data } = await api.patch(`/hr/employee-relations/${id}`, payload);
+            const normalized = normalizeCase(data);
+            setCases(cases.map(c => c.id === id ? normalized : c));
             setShowModal(false);
             resetForm();
             showToast('Case updated successfully', 'success');
@@ -144,18 +146,15 @@ const EmployeeRelations = () => {
         if (!caseToDelete) return;
 
         try {
-            const response = await fetch(`/api/employee-relations/cases/${caseToDelete.id}`, {
-                method: 'DELETE'
+            const { data } = await api.patch(`/hr/employee-relations/${caseToDelete.id}`, {
+                status: 'closed',
+                resolution: caseToDelete.resolution || null
             });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete case');
-            }
-
-            setCases(cases.filter(c => c.id !== caseToDelete.id));
+            const normalized = normalizeCase(data);
+            setCases(cases.map(c => c.id === caseToDelete.id ? normalized : c));
             setShowDeleteConfirm(false);
             setCaseToDelete(null);
-            showToast('Case deleted successfully', 'success');
+            showToast('Case closed successfully', 'success');
         } catch (err) {
             showToast(err.message, 'error');
         }

@@ -216,7 +216,7 @@ const PsychologistRegister = () => {
                 <Link to="/register" className="reg-back-btn">← Back to role selection</Link>
 
                 <div className="reg-header">
-                    <span className="reg-role-badge" style={{ background: '#ecfeff', color: '#0891b2' }}>
+                    <span className="reg-role-badge reg-role-badge--psychologist">
                         🧠 Psychologist application
                     </span>
                     <h1>Join our network</h1>
@@ -315,36 +315,27 @@ const PsychologistRegister = () => {
                                     <div className="reg-field">
                                         <label>Verification documents *</label>
                                         <p className="reg-field-hint">Upload clear scans or PDFs for each required document.</p>
-                                        <div
-                                            className="reg-doc-grid"
-                                            style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
-                                        >
+                                        <div className="reg-doc-grid">
                                             {PSY_REQUIRED_DOCUMENTS.map((doc) => {
                                                 const current = documents[doc.type];
                                                 return (
-                                                    <div
-                                                        key={doc.type}
-                                                        className="reg-doc-card"
-                                                        style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: '#fff' }}
-                                                    >
-                                                        <strong style={{ display: 'block', marginBottom: '0.35rem' }}>{doc.label}</strong>
+                                                    <div key={doc.type} className="reg-doc-card">
+                                                        <strong className="reg-doc-card-title">{doc.label}</strong>
                                                         {current ? (
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                            <div className="reg-doc-body">
                                                                 <span className="reg-field-hint">{current.filename || 'Uploaded document'}</span>
-                                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                <div className="reg-doc-actions">
                                                                     <a
                                                                         href={resolveMediaUrl(current.url)}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
-                                                                        className="reg-btn-ghost"
-                                                                        style={{ padding: '0.35rem 0.65rem', borderRadius: '999px' }}
+                                                                        className="reg-btn-ghost reg-btn-pill"
                                                                     >
                                                                         Preview
                                                                     </a>
                                                                     <button
                                                                         type="button"
-                                                                        className="reg-btn-ghost"
-                                                                        style={{ padding: '0.35rem 0.65rem', borderRadius: '999px' }}
+                                                                        className="reg-btn-ghost reg-btn-pill"
                                                                         onClick={() => removeDocument(doc.type)}
                                                                     >
                                                                         Replace
@@ -353,22 +344,14 @@ const PsychologistRegister = () => {
                                                             </div>
                                                         ) : (
                                                             <label
-                                                                className="reg-btn-ghost"
-                                                                style={{
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '0.4rem',
-                                                                    padding: '0.4rem 0.75rem',
-                                                                    borderRadius: '999px',
-                                                                    cursor: 'pointer'
-                                                                }}
+                                                                className="reg-btn-ghost reg-upload-btn"
                                                             >
                                                                 <input
                                                                     type="file"
                                                                     accept=".pdf,.png,.jpg,.jpeg"
                                                                     onChange={onDocumentInputChange(doc.type)}
                                                                     disabled={!!docUploading[doc.type]}
-                                                                    style={{ display: 'none' }}
+                                                                    className="reg-upload-input"
                                                                 />
                                                                 {docUploading[doc.type] ? 'Uploading…' : 'Upload file'}
                                                             </label>
@@ -417,9 +400,9 @@ const PsychologistRegister = () => {
                                     <div className="reg-row-2">
                                         <div className="reg-field">
                                             <label>Session formats</label>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.2rem' }}>
+                                            <div className="reg-checkbox-list">
                                                 {['In-person','Video','Phone'].map(f => (
-                                                    <label key={f} className="reg-checkbox" style={{ fontSize: '0.875rem' }}>
+                                                    <label key={f} className="reg-checkbox reg-checkbox--small">
                                                         <input type="checkbox" checked={form.sessionFormats.includes(f)} onChange={() => toggleArr('sessionFormats', f)} />
                                                         <span>{f}</span>
                                                     </label>
@@ -476,9 +459,9 @@ const PsychologistRegister = () => {
                                     <ReviewRow label="Session formats" value={form.sessionFormats.join(', ') || '—'} />
                                     <ReviewRow label="Languages"     value={form.languages} />
                                     <ReviewRow label="Location"      value={form.practiceLocation || '—'} />
-                                    <div className="reg-field" style={{ marginTop: '1rem' }}>
+                                    <div className="reg-field reg-field--spaced">
                                         <label>Documents</label>
-                                        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem', color: '#475569', fontSize: '0.9rem' }}>
+                                        <ul className="reg-doc-list">
                                             {PSY_REQUIRED_DOCUMENTS.map((doc) => (
                                                 <li key={doc.type}>
                                                     {documents[doc.type] ? '✔' : '•'} {doc.label}
@@ -499,11 +482,11 @@ const PsychologistRegister = () => {
                             </button>
                         )}
                         {step < STEPS.length - 1 ? (
-                            <button className="reg-submit-btn" style={{ flex: 1 }} onClick={next}>
+                            <button className="reg-submit-btn reg-submit-btn--stretch" onClick={next}>
                                 Continue →
                             </button>
                         ) : (
-                            <button className="reg-submit-btn" style={{ flex: 1 }} onClick={handleSubmit} disabled={loading}>
+                            <button className="reg-submit-btn reg-submit-btn--stretch" onClick={handleSubmit} disabled={loading}>
                                 {loading ? <span className="reg-spinner" /> : 'Submit Application'}
                             </button>
                         )}
@@ -519,9 +502,9 @@ const PsychologistRegister = () => {
 };
 
 const ReviewRow = ({ label, value }) => (
-    <div style={{ display: 'flex', gap: '1rem', padding: '0.5rem 0', borderBottom: '1px solid #f3f4f6', fontSize: '0.875rem' }}>
-        <span style={{ width: 130, color: '#9ca3af', fontWeight: 600, flexShrink: 0 }}>{label}</span>
-        <span style={{ color: '#111827' }}>{value}</span>
+    <div className="reg-review-row">
+        <span className="reg-review-label">{label}</span>
+        <span className="reg-review-value">{value}</span>
     </div>
 );
 

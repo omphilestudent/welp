@@ -172,6 +172,8 @@ const fromDefinition = (definition = {}) => {
     const rawNodes = Array.isArray(definition.nodes) ? definition.nodes : [];
     const viewport = definition.ui?.viewport || { x: 0, y: 0, zoom: 1 };
     const positions = definition.ui?.nodes || {};
+    const uiEdges = Array.isArray(definition.ui?.edges) ? definition.ui.edges : [];
+    const uiEdgeMap = new Map(uiEdges.map((edge) => [`${edge.from}-${edge.to}-${edge.handle || 'out'}`, edge]));
     const mode = definition.meta?.lifecycle?.mode === 'published' ? 'published' : 'draft';
     const customLogic = Array.isArray(definition.customLogic) ? definition.customLogic : [];
 
@@ -184,7 +186,13 @@ const fromDefinition = (definition = {}) => {
             ...(n.type === 'email' ? { to: n.to || '{{email}}', subject: n.subject || '', text: n.text || n.message || '' } : {}),
             ...(n.type === 'user_notification' ? { message: n.message || '' } : {}),
             ...(n.type === 'call_api' ? { baseUrl: n.baseUrl || '', path: n.path || n.url || '', method: n.method || 'GET', body: n.body ?? null } : {}),
-            ...(n.type === 'condition' ? { field: n.field || n.condition?.field || 'role', operator: n.operator || n.condition?.operator || '=', value: n.value || n.condition?.value || 'business' } : {}),
+            ...(n.type === 'condition' ? {
+                field: n.field || n.condition?.field || 'role',
+                operator: n.operator || n.condition?.operator || '=',
+                value: n.value || n.condition?.value || 'business',
+                trueLabel: n.trueLabel || 'True',
+                falseLabel: n.falseLabel || 'False'
+            } : {}),
             ...(n.type === 'timer' ? { delay: n.delay || '5m' } : {}),
             ...(n.type === 'delay' ? { delay: n.delay || '5m' } : {}),
             ...(n.type === 'loop' ? { maxIterations: n.maxIterations || 3 } : {}),
@@ -204,11 +212,38 @@ const fromDefinition = (definition = {}) => {
         if (!n?.id) return;
         if (n.type === 'condition' && n.next && typeof n.next === 'object') {
             const yes = Array.isArray(n.next.branches) ? n.next.branches[0]?.next : null;
-            if (yes) edges.push({ id: `${n.id}-yes-${yes}`, from: String(n.id), to: String(yes), handle: 'yes' });
-            if (n.next.default) edges.push({ id: `${n.id}-no-${n.next.default}`, from: String(n.id), to: String(n.next.default), handle: 'no' });
+            if (yes) {
+                const uiEdge = uiEdgeMap.get(`${n.id}-${yes}-yes`);
+                edges.push({
+                    id: `${n.id}-yes-${yes}`,
+                    from: String(n.id),
+                    to: String(yes),
+                    handle: 'yes',
+                    label: uiEdge?.label || n.trueLabel || 'TRUE'
+                });
+            }
+            if (n.next.default) {
+                const uiEdge = uiEdgeMap.get(`${n.id}-${n.next.default}-no`);
+                edges.push({
+                    id: `${n.id}-no-${n.next.default}`,
+                    from: String(n.id),
+                    to: String(n.next.default),
+                    handle: 'no',
+                    label: uiEdge?.label || n.falseLabel || 'FALSE'
+                });
+            }
             return;
         }
-        if (typeof n.next === 'string') edges.push({ id: `${n.id}-${n.next}`, from: String(n.id), to: String(n.next), handle: 'out' });
+        if (typeof n.next === 'string') {
+            const uiEdge = uiEdgeMap.get(`${n.id}-${n.next}-out`);
+            edges.push({
+                id: `${n.id}-${n.next}`,
+                from: String(n.id),
+                to: String(n.next),
+                handle: 'out',
+                label: uiEdge?.label || 'NEXT'
+            });
+        }
     });
 
     const pos = {};
@@ -257,7 +292,17 @@ const toDefinition = ({ nodes, edges, positions, viewport, mode, customLogic }) 
         startNodeId,
         nodes: definitionNodes,
         customLogic: Array.isArray(customLogic) ? customLogic : [],
-        ui: { nodes: positions, viewport }
+        ui: {
+            nodes: positions,
+            viewport,
+            edges: edges.map((edge) => ({
+                id: edge.id,
+                from: edge.from,
+                to: edge.to,
+                handle: edge.handle,
+                label: edge.label || 'NEXT'
+            }))
+        }
     };
 };
 
@@ -431,10 +476,10 @@ export default function FlowBuilder() {
                         { id: endId, type: 'end', label: 'End Flow', config: {} }
                     ];
                     nextPositions = {
-                        [startId]: { x: 200, y: 80 },
-                        [endId]: { x: 520, y: 80 }
+                        [startId]: { x: 280, y: 80 },
+                        [endId]: { x: 280, y: 240 }
                     };
-                    nextEdges = [{ id: `${startId}-out-${endId}`, from: startId, to: endId, handle: 'out' }];
+                    nextEdges = [{ id: `${startId}-out-${endId}`, from: startId, to: endId, handle: 'out', label: 'NEXT' }];
                 } else if (!nextNodes.some((n) => n.type === 'start')) {
                     const startId = makeId();
                     const startTarget = record?.definition?.startNodeId
@@ -443,15 +488,16 @@ export default function FlowBuilder() {
                         || nextNodes[0]?.id
                         || null;
                     nextNodes = [{ id: startId, type: 'start', label: 'Start Flow', config: {} }, ...nextNodes];
-                    nextPositions = { [startId]: { x: 200, y: 80 }, ...nextPositions };
+                    const targetPos = startTarget ? nextPositions?.[startTarget] : null;
+                    nextPositions = { [startId]: { x: targetPos?.x ?? 280, y: (targetPos?.y ?? 240) - 160 }, ...nextPositions };
                     if (startTarget) {
-                        nextEdges = [...nextEdges, { id: `${startId}-out-${startTarget}`, from: startId, to: String(startTarget), handle: 'out' }];
+                        nextEdges = [...nextEdges, { id: `${startId}-out-${startTarget}`, from: startId, to: String(startTarget), handle: 'out', label: 'NEXT' }];
                     }
                 } else if (!nextEdges.some((e) => nextNodes.find((n) => n.id === e.from)?.type === 'start')) {
                     const startNode = nextNodes.find((n) => n.type === 'start');
                     const endNode = nextNodes.find((n) => n.type === 'end');
                     if (startNode && endNode) {
-                        nextEdges = [...nextEdges, { id: `${startNode.id}-out-${endNode.id}`, from: startNode.id, to: endNode.id, handle: 'out' }];
+                        nextEdges = [...nextEdges, { id: `${startNode.id}-out-${endNode.id}`, from: startNode.id, to: endNode.id, handle: 'out', label: 'NEXT' }];
                     }
                 }
 
@@ -514,7 +560,32 @@ export default function FlowBuilder() {
         const verticalSpacing = 160;
         const nextPos = {
             x: anchorPos.x,
-            y: edgeContext ? (anchorPos.y + (positions[edgeContext.to]?.y || anchorPos.y + verticalSpacing)) / 2 : anchorPos.y + verticalSpacing
+            y: anchorPos.y + verticalSpacing
+        };
+
+        const shiftNodesDown = (ids, deltaY) => {
+            if (!ids.length) return;
+            setPositions((prev) => {
+                const next = { ...prev };
+                ids.forEach((id) => {
+                    if (!next[id]) return;
+                    next[id] = { ...next[id], y: (next[id].y || 0) + deltaY };
+                });
+                return next;
+            });
+        };
+
+        const shiftNodesBelowY = (startY, deltaY) => {
+            if (startY === undefined || startY === null) return;
+            setPositions((prev) => {
+                const next = { ...prev };
+                Object.keys(next).forEach((id) => {
+                    if ((next[id]?.y ?? 0) >= startY) {
+                        next[id] = { ...next[id], y: (next[id].y || 0) + deltaY };
+                    }
+                });
+                return next;
+            });
         };
 
         setNodes((prev) => [...prev, { id: nodeId, type: item.nodeType, label: item.help || item.label, config: item.config || {} }]);
@@ -523,7 +594,13 @@ export default function FlowBuilder() {
             setEdges((prev) => {
                 const filtered = prev.filter((e) => e.id !== edgeContext.id);
                 const chainEdges = [
-                    { id: `${edgeContext.from}-${edgeContext.handle}-mid-${nodeId}`, from: edgeContext.from, to: nodeId, handle: edgeContext.handle || 'out', label: edgeContext.label }
+                    {
+                        id: `${edgeContext.from}-${edgeContext.handle}-mid-${nodeId}`,
+                        from: edgeContext.from,
+                        to: nodeId,
+                        handle: edgeContext.handle || 'out',
+                        label: edgeContext.label || 'NEXT'
+                    }
                 ];
                 if (item.nodeType === 'condition') {
                     const endNode = nodes.find((n) => n.type === 'end');
@@ -534,19 +611,22 @@ export default function FlowBuilder() {
                         { id: `${nodeId}-no-${noTarget}`, from: nodeId, to: noTarget, handle: 'no', label: 'FALSE' }
                     );
                 } else {
-                    chainEdges.push({ id: `${nodeId}-out-${edgeContext.to}`, from: nodeId, to: edgeContext.to, handle: 'out' });
+                    chainEdges.push({ id: `${nodeId}-out-${edgeContext.to}`, from: nodeId, to: edgeContext.to, handle: 'out', label: 'NEXT' });
                 }
                 return [...filtered, ...chainEdges];
             });
+            const targetY = positions[edgeContext.to]?.y ?? anchorPos.y + verticalSpacing;
+            shiftNodesBelowY(targetY, verticalSpacing);
         } else if (connectFromId || anchorNode) {
             const baseFromId = connectFromId || anchorNode?.id;
             const fromNode = nodes.find((n) => n.id === baseFromId);
             if (fromNode?.type === 'end') {
                 toast.error('End nodes cannot connect forward.');
             } else {
+                const wasDirectToEnd = !!(endNode && edges.some((e) => e.from === baseFromId && e.to === endNode.id));
                 setEdges((prev) => {
                     const base = prev.filter((e) => !(endNode && e.from === baseFromId && e.to === endNode.id && e.handle === 'out'));
-                    base.push({ id: `${baseFromId}-out-${nodeId}`, from: baseFromId, to: nodeId, handle: 'out' });
+                    base.push({ id: `${baseFromId}-out-${nodeId}`, from: baseFromId, to: nodeId, handle: 'out', label: 'NEXT' });
                     if (item.nodeType === 'condition') {
                         const endNode = nodes.find((n) => n.type === 'end');
                         const endId = endNode?.id || null;
@@ -558,10 +638,14 @@ export default function FlowBuilder() {
                         }
                     }
                     if (endNode?.id && item.nodeType !== 'condition') {
-                        base.push({ id: `${nodeId}-out-${endNode.id}`, from: nodeId, to: endNode.id, handle: 'out' });
+                        base.push({ id: `${nodeId}-out-${endNode.id}`, from: nodeId, to: endNode.id, handle: 'out', label: 'NEXT' });
                     }
                     return base;
                 });
+                if (wasDirectToEnd && endNode?.id) {
+                    const targetY = positions[endNode.id]?.y ?? anchorPos.y + verticalSpacing;
+                    shiftNodesBelowY(targetY, verticalSpacing);
+                }
             }
         }
         setSelectedId(nodeId);
@@ -600,7 +684,7 @@ export default function FlowBuilder() {
             const fromNode = nodes.find((n) => n.id === connecting.from);
             const label = fromNode?.type === 'condition'
                 ? (connecting.handle === 'yes' ? (fromNode.config?.trueLabel || 'TRUE') : (fromNode.config?.falseLabel || 'FALSE'))
-                : undefined;
+                : 'NEXT';
             return [...filtered, { id: `${connecting.from}-${connecting.handle}-${to}`, from: connecting.from, to, handle: connecting.handle, label }];
         });
         setConnecting(null);

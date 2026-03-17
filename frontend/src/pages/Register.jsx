@@ -78,8 +78,7 @@ const Register = () => {
                             {ROLES.map((role, i) => (
                                 <motion.button
                                     key={role.key}
-                                    className="reg-role-card"
-                                    style={{ '--role-color': role.color, '--role-accent': role.accent, '--role-bg': role.bg }}
+                                    className={`reg-role-card reg-role-card--${role.key}`}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: i * 0.08, duration: 0.35 }}

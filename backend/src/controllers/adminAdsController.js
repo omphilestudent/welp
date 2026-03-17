@@ -5,6 +5,21 @@ const { hasPremiumException } = require('../utils/premiumAccess');
 
 const ADMIN_STATUS_WHITELIST = new Set(['active', 'paused', 'completed']);
 
+const tableExists = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = $1
+            )`,
+            [tableName]
+        );
+        return result.rows[0]?.exists === true;
+    } catch {
+        return false;
+    }
+};
+
 const fetchAdWithBusiness = async (adId) => {
     const result = await query(
         `SELECT c.*,
@@ -24,6 +39,15 @@ const fetchAdWithBusiness = async (adId) => {
 
 const listAds = async (req, res) => {
     try {
+        const hasCampaigns = await tableExists('advertising_campaigns');
+        const hasBusinesses = await tableExists('businesses');
+        if (!hasCampaigns || !hasBusinesses) {
+            return res.json({
+                ads: [],
+                pagination: { page: 1, limit: 0, total: 0 }
+            });
+        }
+
         const limit = Math.min(Number(req.query.limit) || 25, 100);
         const page = Math.max(Number(req.query.page) || 1, 1);
         const offset = (page - 1) * limit;

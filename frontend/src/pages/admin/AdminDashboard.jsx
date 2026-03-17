@@ -413,7 +413,7 @@ const AdminDashboard = () => {
                                         {'☆'.repeat(5 - review.rating)}
                                     </div>
                                 </td>
-                                <td>{safeTruncate(review.content, 30)}</td> {/* FIXED: Line 186 is here */}
+                                <td>{safeTruncate(review.content, 30)}</td>
                                 <td>{review.date}</td>
                             </tr>
                         )) : (

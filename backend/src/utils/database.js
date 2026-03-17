@@ -621,6 +621,19 @@ const createTables = async () => {
             ALTER TABLE business_applications ADD COLUMN IF NOT EXISTS claim_company_id UUID REFERENCES companies(id);
 
             ALTER TABLE psychologist_applications
+                ADD COLUMN IF NOT EXISTS email VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS full_name VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS license_issuing_body VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS years_of_experience INTEGER,
+                ADD COLUMN IF NOT EXISTS specialization TEXT[],
+                ADD COLUMN IF NOT EXISTS biography TEXT,
+                ADD COLUMN IF NOT EXISTS phone_number VARCHAR(50),
+                ADD COLUMN IF NOT EXISTS address TEXT,
+                ADD COLUMN IF NOT EXISTS linkedin VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS consultation_modes TEXT[],
+                ADD COLUMN IF NOT EXISTS accepted_age_groups TEXT[],
+                ADD COLUMN IF NOT EXISTS emergency_contact JSONB,
+                ADD COLUMN IF NOT EXISTS avatar_url TEXT,
                 ADD COLUMN IF NOT EXISTS documents JSONB,
                 ADD COLUMN IF NOT EXISTS document_verified BOOLEAN DEFAULT false,
                 ADD COLUMN IF NOT EXISTS document_verified_at TIMESTAMP,
@@ -1204,7 +1217,7 @@ const runMigrations = async () => {
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 name VARCHAR(150) NOT NULL,
                 description TEXT,
-                type VARCHAR(20) NOT NULL CHECK (type IN ('screen','trigger')),
+                type VARCHAR(20) NOT NULL CHECK (type IN ('screen','trigger','automation','scheduled','event')),
                 definition JSONB NOT NULL DEFAULT '{}'::jsonb,
                 is_active BOOLEAN DEFAULT true,
                 created_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -1212,6 +1225,8 @@ const runMigrations = async () => {
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             );`,
+            "ALTER TABLE flows DROP CONSTRAINT IF EXISTS flows_type_check;",
+            "ALTER TABLE flows ADD CONSTRAINT flows_type_check CHECK (type IN ('screen','trigger','automation','scheduled','event'));",
             "CREATE INDEX IF NOT EXISTS idx_flows_type ON flows(type);",
             "CREATE INDEX IF NOT EXISTS idx_flows_active ON flows(is_active);",
             `CREATE TABLE IF NOT EXISTS flow_triggers (

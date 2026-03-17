@@ -210,6 +210,7 @@ function App() {
                                     {/* Job Management Routes - FIXED: Added all missing routes */}
                                     <Route path="jobs" element={<JobPostings />} />
                                     <Route path="jobs/create" element={<JobCreate />} />
+                                    <Route path="jobs/new" element={<JobCreate />} />
                                     <Route path="jobs/:id" element={<JobDetailsHR />} />
                                     <Route path="jobs/:id/edit" element={<JobCreate />} />
                                     <Route path="jobs/:id/applications" element={<Applications />} />

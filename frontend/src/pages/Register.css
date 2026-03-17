@@ -174,6 +174,16 @@
     margin-bottom: 0.5rem;
 }
 
+.reg-role-badge--business {
+    background: #fffbeb;
+    color: #d97706;
+}
+
+.reg-role-badge--psychologist {
+    background: #ecfeff;
+    color: #0891b2;
+}
+
 /* ── Role selection cards ────────────────────────────────────────────────── */
 .reg-role-grid {
     display: grid;
@@ -253,10 +263,20 @@
     margin-bottom: 1.5rem;
 }
 
+.reg-form-note {
+    margin-bottom: 0.75rem;
+    color: #475569;
+    font-size: 0.9rem;
+}
+
 .reg-field {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
+}
+
+.reg-field--spaced {
+    margin-top: 1rem;
 }
 
 .reg-field label {
@@ -298,6 +318,24 @@
     min-height: 90px;
 }
 
+.reg-role-card--employee {
+    --role-color: #4f46e5;
+    --role-accent: #a5b4fc;
+    --role-bg: #eef2ff;
+}
+
+.reg-role-card--business {
+    --role-color: #d97706;
+    --role-accent: #fdba74;
+    --role-bg: #fffbeb;
+}
+
+.reg-role-card--psychologist {
+    --role-color: #0891b2;
+    --role-accent: #67e8f9;
+    --role-bg: #ecfeff;
+}
+
 .reg-field select {
     cursor: pointer;
 }
@@ -314,6 +352,41 @@
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 0.85rem;
     margin-top: 0.5rem;
+}
+
+.reg-doc-card-title {
+    display: block;
+    margin-bottom: 0.35rem;
+}
+
+.reg-doc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.reg-doc-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.reg-btn-pill {
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+}
+
+.reg-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.reg-upload-input {
+    display: none;
 }
 
 .reg-doc-card {
@@ -401,11 +474,25 @@
     margin-top: 1.5rem;
 }
 
+.reg-submit-btn--stretch {
+    flex: 1;
+}
+
 /* ── Two-column row ─────────────────────────────────────────────────────── */
 .reg-row-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
+}
+
+.reg-row-2.reg-row-compact {
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.reg-field.reg-field-inline {
+    flex: 1;
+    margin-bottom: 0;
 }
 
 /* ── Password input wrapper ─────────────────────────────────────────────── */
@@ -489,6 +576,17 @@
 
 .reg-checkbox--required { /* slightly more prominent */ }
 
+.reg-checkbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.2rem;
+}
+
+.reg-checkbox.reg-checkbox--small {
+    font-size: 0.875rem;
+}
+
 /* ── Submit button ───────────────────────────────────────────────────────── */
 .reg-submit-btn {
     width: 100%;
@@ -518,6 +616,14 @@
 .reg-submit-btn:disabled {
     opacity: 0.65;
     cursor: not-allowed;
+}
+
+.reg-submit-btn--amber {
+    background: #d97706;
+}
+
+.reg-submit-btn--amber:hover:not(:disabled) {
+    background: #b45309;
 }
 
 /* ── Spinner ────────────────────────────────────────────────────────────── */
@@ -673,10 +779,10 @@
 }
 
 .reg-step.active .reg-step-dot {
-    background: #4f46e5;
-    border-color: #4f46e5;
+    background: var(--active-color, #4f46e5);
+    border-color: var(--active-color, #4f46e5);
     color: white;
-    box-shadow: 0 0 0 4px rgba(79,70,229,0.15);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--active-color, #4f46e5) 20%, transparent);
 }
 
 .reg-step.done .reg-step-dot {
@@ -692,7 +798,7 @@
     white-space: nowrap;
 }
 
-.reg-step.active .reg-step-label { color: #4f46e5; font-weight: 600; }
+.reg-step.active .reg-step-label { color: var(--active-color, #4f46e5); font-weight: 600; }
 
 .reg-step-line {
     width: 60px;
@@ -704,6 +810,10 @@
 
 .reg-step-line.done { background: #22c55e; }
 
+.reg-steps--amber {
+    --active-color: #d97706;
+}
+
 .reg-claim-section {
     border: 1px solid #e5e7eb;
     border-radius: 12px;
@@ -712,6 +822,34 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+}
+
+.reg-claim-helper {
+    margin-bottom: 0.75rem;
+    color: #475569;
+}
+
+.reg-claim-search {
+    margin-top: 0.5rem;
+}
+
+.reg-claim-search-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.reg-claim-error {
+    color: #ef4444;
+}
+
+.reg-claim-results--spaced {
+    margin-top: 0.5rem;
+}
+
+.reg-claim-item-subtitle {
+    font-size: 0.75rem;
+    color: #475569;
 }
 
 .reg-claim-results {
@@ -757,6 +895,14 @@
     border-bottom: 1px solid currentColor;
 }
 
+.reg-claim-change {
+    margin-left: 0.5rem;
+    background: none;
+    border: none;
+    color: #d97706;
+    cursor: pointer;
+}
+
 .reg-claim-selected {
     background: #fff7ed;
     border: 1px solid #fed7aa;
@@ -769,6 +915,36 @@
 .reg-claim-selected ul {
     margin: 0.4rem 0 0;
     padding-left: 1.1rem;
+}
+
+.reg-claim-selected-note {
+    margin-bottom: 0.25rem;
+}
+
+.reg-doc-list {
+    margin: 0.5rem 0 0;
+    padding-left: 1.2rem;
+    color: #475569;
+    font-size: 0.9rem;
+}
+
+.reg-review-row {
+    display: flex;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.875rem;
+}
+
+.reg-review-label {
+    width: 130px;
+    color: #9ca3af;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.reg-review-value {
+    color: #111827;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */

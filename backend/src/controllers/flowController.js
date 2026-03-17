@@ -40,12 +40,157 @@ const ensureJsonDefinition = (definition) => {
     }
 };
 
-const ALLOWED_FLOW_TYPES = new Set(['screen', 'trigger']);
+const CANONICAL_FLOW_TYPES = new Set(['screen', 'trigger', 'automation', 'scheduled', 'event']);
+
+const normalizeFlowType = (value) => {
+    if (!value) return null;
+    const normalized = String(value).toLowerCase().trim();
+    if (CANONICAL_FLOW_TYPES.has(normalized)) return normalized;
+    if (['auto', 'automation_flow'].includes(normalized)) return 'automation';
+    if (['schedule', 'scheduled_flow'].includes(normalized)) return 'scheduled';
+    if (['event_flow'].includes(normalized)) return 'event';
+    return null;
+};
 
 const hasEndNode = (definition) => {
     const nodes = Array.isArray(definition?.nodes) ? definition.nodes : [];
     if (!nodes.length) return true;
     return nodes.some((node) => node?.type === 'end');
+};
+
+const hasStartNode = (definition) => {
+    const nodes = Array.isArray(definition?.nodes) ? definition.nodes : [];
+    if (!nodes.length) return true;
+    return nodes.some((node) => node?.type === 'start' || node?.id === 'start' || node?.id === 'root');
+};
+
+const buildGraphFromDefinition = (definition) => {
+    const nodes = Array.isArray(definition?.nodes) ? definition.nodes : [];
+    const nodeMap = new Map(nodes.map((node) => [String(node.id), node]));
+    const edges = [];
+
+    nodes.forEach((node) => {
+        if (!node?.id) return;
+        if (node.type === 'condition' && node.next && typeof node.next === 'object') {
+            const branches = Array.isArray(node.next.branches) ? node.next.branches : [];
+            branches.forEach((branch) => {
+                if (branch?.next) {
+                    edges.push({ from: String(node.id), to: String(branch.next), handle: 'yes' });
+                }
+            });
+            if (node.next.default) {
+                edges.push({ from: String(node.id), to: String(node.next.default), handle: 'no' });
+            }
+            return;
+        }
+        if (typeof node.next === 'string') {
+            edges.push({ from: String(node.id), to: String(node.next), handle: 'out' });
+        }
+    });
+
+    return { nodes, nodeMap, edges };
+};
+
+const validateFlowDefinition = (definition) => {
+    const errors = [];
+    const { nodes, nodeMap, edges } = buildGraphFromDefinition(definition);
+    if (!nodes.length) return errors;
+
+    const startNode = nodes.find((node) => node.type === 'start' || node.id === 'start' || node.id === 'root');
+    const endNode = nodes.find((node) => node.type === 'end');
+    if (!startNode) errors.push('Flow must include a Start node.');
+    if (!endNode) errors.push('Flow must include an End node.');
+
+    const outgoing = new Map();
+    edges.forEach((edge) => {
+        if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
+        outgoing.get(edge.from).push(edge);
+    });
+
+    nodes.forEach((node) => {
+        if (node.type === 'end') return;
+        const outs = outgoing.get(String(node.id)) || [];
+        if (!outs.length) errors.push('All steps must connect to another step.');
+        if (node.type === 'condition') {
+            const branches = Array.isArray(node.next?.branches) ? node.next.branches : [];
+            const branchTargets = branches.map((branch) => branch?.next).filter(Boolean);
+            const defaultTarget = node.next?.default || null;
+            if (!branchTargets.length || !defaultTarget) {
+                errors.push('Decision nodes must have True/False branches.');
+            }
+        }
+    });
+
+    const startId = startNode ? String(startNode.id) : null;
+    const reachable = new Set();
+    if (startId) {
+        const stack = [startId];
+        while (stack.length) {
+            const current = stack.pop();
+            if (!current || reachable.has(current)) continue;
+            reachable.add(current);
+            (outgoing.get(current) || []).forEach((edge) => stack.push(edge.to));
+        }
+    }
+
+    const canReachEndMemo = new Map();
+    const canReachEnd = (id, path = new Set()) => {
+        if (!id) return false;
+        if (canReachEndMemo.has(id)) return canReachEndMemo.get(id);
+        if (path.has(id)) return false;
+        const node = nodeMap.get(String(id));
+        if (!node) return false;
+        if (node.type === 'end') {
+            canReachEndMemo.set(id, true);
+            return true;
+        }
+        path.add(id);
+        const outs = outgoing.get(String(id)) || [];
+        for (const edge of outs) {
+            if (canReachEnd(edge.to, new Set(path))) {
+                canReachEndMemo.set(id, true);
+                return true;
+            }
+        }
+        canReachEndMemo.set(id, false);
+        return false;
+    };
+
+    reachable.forEach((id) => {
+        const node = nodeMap.get(String(id));
+        if (!node || node.type === 'end') return;
+        if (!canReachEnd(id)) {
+            errors.push('All branches must reach an End node.');
+        }
+    });
+
+    const visiting = new Set();
+    const visited = new Set();
+    const cycles = [];
+
+    const dfs = (id, stack) => {
+        if (visiting.has(id)) {
+            cycles.push(stack.slice(stack.indexOf(id)));
+            return;
+        }
+        if (visited.has(id)) return;
+        visiting.add(id);
+        const outs = outgoing.get(id) || [];
+        outs.forEach((edge) => dfs(edge.to, [...stack, edge.to]));
+        visiting.delete(id);
+        visited.add(id);
+    };
+
+    if (startId) dfs(startId, [startId]);
+
+    cycles.forEach((cycle) => {
+        const hasLoop = cycle.some((cycleId) => nodeMap.get(String(cycleId))?.type === 'loop');
+        if (!hasLoop) {
+            errors.push('Cycles are not allowed unless a Loop node is part of the cycle.');
+        }
+    });
+
+    return [...new Set(errors)];
 };
 
 const formatFlow = (flow) => {
@@ -97,18 +242,26 @@ const createFlowController = async (req, res) => {
         if (!name || !type) {
             return res.status(400).json({ success: false, error: 'Name and type are required' });
         }
-        if (!ALLOWED_FLOW_TYPES.has(String(type).toLowerCase())) {
+        const normalizedType = normalizeFlowType(type);
+        if (!normalizedType) {
             return res.status(400).json({ success: false, error: 'Invalid flow type' });
         }
 
         const definition = ensureJsonDefinition(req.body.definition);
+        if (!hasStartNode(definition)) {
+            return res.status(400).json({ success: false, error: 'Flow must include a Start node' });
+        }
         if (!hasEndNode(definition)) {
             return res.status(400).json({ success: false, error: 'Flow must include an End node' });
+        }
+        const validationErrors = validateFlowDefinition(definition);
+        if (validationErrors.length) {
+            return res.status(400).json({ success: false, error: 'Invalid flow definition', details: validationErrors });
         }
         const flow = await createFlow({
             name: name.trim(),
             description: description?.trim() || null,
-            type: String(type).toLowerCase(),
+            type: normalizedType,
             definition,
             isActive: req.body.isActive !== false,
             userId: req.user?.id
@@ -129,16 +282,23 @@ const updateFlowController = async (req, res) => {
             }
         });
         if (updates.type !== undefined) {
-            const normalizedType = String(updates.type).toLowerCase();
-            if (!ALLOWED_FLOW_TYPES.has(normalizedType)) {
+            const normalizedType = normalizeFlowType(updates.type);
+            if (!normalizedType) {
                 return res.status(400).json({ success: false, error: 'Invalid flow type' });
             }
             updates.type = normalizedType;
         }
         if (req.body.definition !== undefined) {
             updates.definition = ensureJsonDefinition(req.body.definition);
+            if (!hasStartNode(updates.definition)) {
+                return res.status(400).json({ success: false, error: 'Flow must include a Start node' });
+            }
             if (!hasEndNode(updates.definition)) {
                 return res.status(400).json({ success: false, error: 'Flow must include an End node' });
+            }
+            const validationErrors = validateFlowDefinition(updates.definition);
+            if (validationErrors.length) {
+                return res.status(400).json({ success: false, error: 'Invalid flow definition', details: validationErrors });
             }
         }
         if (req.body.isActive !== undefined) {

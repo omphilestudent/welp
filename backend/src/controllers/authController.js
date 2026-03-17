@@ -358,6 +358,15 @@ const registerPsychologist = async (req, res) => {
             documents
         } = req.body;
 
+        console.log('[registerPsychologist] payload:', {
+            email,
+            hasPassword: Boolean(password),
+            displayName,
+            licenseNumber,
+            licenseBody,
+            hasDocuments: Array.isArray(documents) ? documents.length : Boolean(documents)
+        });
+
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
         }
@@ -410,17 +419,32 @@ const registerPsychologist = async (req, res) => {
             idx += 1;
         }
 
-        const userResult = await query(
-            `INSERT INTO users (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id, email, display_name, role`,
-            params
-        );
+        let userResult;
+        try {
+            userResult = await query(
+                `INSERT INTO users (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id, email, display_name, role`,
+                params
+            );
+        } catch (insertError) {
+            console.error('[registerPsychologist] failed inserting user');
+            console.error('User columns:', cols);
+            console.error('User params:', params);
+            console.error('Error:', insertError.message);
+            throw insertError;
+        }
         const user = userResult.rows[0];
 
         const appTableAvailable = await tableExists('psychologist_applications');
+        console.log('[registerPsychologist] psychologist_applications table exists:', appTableAvailable);
         if (appTableAvailable) {
             const hasUserIdColumn = await columnExists('psychologist_applications', 'user_id');
             const hasEmailColumn = await columnExists('psychologist_applications', 'email');
             const hasFullNameColumn = await columnExists('psychologist_applications', 'full_name');
+            console.log('[registerPsychologist] app columns:', {
+                hasUserIdColumn,
+                hasEmailColumn,
+                hasFullNameColumn
+            });
 
             if (hasUserIdColumn) {
                 const appCols = ['user_id', 'status', 'license_number', 'license_body'];
@@ -463,10 +487,18 @@ const registerPsychologist = async (req, res) => {
                     appIdx += 1;
                 }
 
-                await query(
-                    `INSERT INTO psychologist_applications (${appCols.join(', ')}) VALUES (${appPlaceholders.join(', ')})`,
-                    appParams
-                );
+                try {
+                    await query(
+                        `INSERT INTO psychologist_applications (${appCols.join(', ')}) VALUES (${appPlaceholders.join(', ')})`,
+                        appParams
+                    );
+                } catch (insertError) {
+                    console.error('[registerPsychologist] failed inserting into psychologist_applications (user_id schema)');
+                    console.error('Columns:', appCols);
+                    console.error('Params:', appParams);
+                    console.error('Error:', insertError.message);
+                    throw insertError;
+                }
             } else if (hasEmailColumn || hasFullNameColumn) {
                 const normalizeList = (value) => {
                     if (!value) return null;
@@ -548,10 +580,18 @@ const registerPsychologist = async (req, res) => {
                 }
 
                 if (legacyCols.length > 0) {
-                    await query(
-                        `INSERT INTO psychologist_applications (${legacyCols.join(', ')}) VALUES (${legacyPlaceholders.join(', ')})`,
-                        legacyParams
-                    );
+                    try {
+                        await query(
+                            `INSERT INTO psychologist_applications (${legacyCols.join(', ')}) VALUES (${legacyPlaceholders.join(', ')})`,
+                            legacyParams
+                        );
+                    } catch (insertError) {
+                        console.error('[registerPsychologist] failed inserting into psychologist_applications (legacy schema)');
+                        console.error('Columns:', legacyCols);
+                        console.error('Params:', legacyParams);
+                        console.error('Error:', insertError.message);
+                        throw insertError;
+                    }
                 }
             }
         } else {
@@ -633,6 +673,13 @@ const registerPsychologist = async (req, res) => {
         console.error('Register psychologist error:', error);
         if (error.code === '23505') {
             return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+        const exposeDetails = process.env.NODE_ENV === 'development' || process.env.EXPOSE_REGISTRATION_ERRORS === 'true';
+        if (exposeDetails) {
+            return res.status(500).json({
+                error: 'Application submission failed. Please try again.',
+                details: error?.message || null
+            });
         }
         return res.status(500).json({ error: 'Application submission failed. Please try again.' });
     }
