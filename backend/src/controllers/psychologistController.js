@@ -56,6 +56,47 @@ const normalizeArray = (value) => {
         .filter(Boolean);
 };
 
+const normalizeDocumentEntry = (doc, fallbackType, defaultKey) => {
+    if (!doc) return null;
+    if (typeof doc === 'string') {
+        return normalizeDocumentEntry({ url: doc }, fallbackType, defaultKey);
+    }
+    const url = doc.url || doc.href || doc.path || doc.location || null;
+    if (!url) return null;
+    const type = doc.type || doc.documentType || doc.id || fallbackType || defaultKey;
+    return {
+        id: doc.id || `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type,
+        label: doc.label || doc.name || doc.filename || doc.originalName || type,
+        url,
+        filename: doc.filename || doc.originalName || null,
+        uploadedAt: doc.uploadedAt || doc.uploaded_at || new Date().toISOString()
+    };
+};
+
+const parseApplicationDocuments = (rawDocuments, defaultKey) => {
+    if (!rawDocuments) return [];
+    let source = rawDocuments;
+    if (typeof rawDocuments === 'string') {
+        try {
+            source = JSON.parse(rawDocuments);
+        } catch {
+            return [];
+        }
+    }
+    if (Array.isArray(source)) {
+        return source
+            .map((doc, index) => normalizeDocumentEntry(doc, `doc_${index}`, defaultKey))
+            .filter(Boolean);
+    }
+    if (typeof source === 'object') {
+        return Object.entries(source)
+            .map(([key, value]) => normalizeDocumentEntry({ ...value, type: value?.type || key }, key, defaultKey))
+            .filter(Boolean);
+    }
+    return [];
+};
+
 const applyAsPsychologist = async (req, res) => {
     try {
         const {
@@ -75,7 +116,8 @@ const applyAsPsychologist = async (req, res) => {
             languages,
             acceptedAgeGroups,
             emergencyContact,
-            avatarUrl
+            avatarUrl,
+            skipDocuments
         } = req.body;
 
 
@@ -123,7 +165,10 @@ const applyAsPsychologist = async (req, res) => {
             accepted_age_groups: normalizeArray(acceptedAgeGroups),
             emergency_contact: emergencyContact || null,
             avatar_url: avatarUrl,
-            status: 'pending_review'
+            status: 'pending_review',
+            kyc_status: skipDocuments ? 'not_submitted' : 'not_submitted',
+            documents_submitted: false,
+            can_use_profile: false
         };
 
         const cols = [];
@@ -244,8 +289,92 @@ const uploadLicenseDocument = async (req, res) => {
     }
 };
 
+const uploadPsychologistDocuments = async (req, res) => {
+    try {
+        const documents = parseApplicationDocuments(req.body?.documents || req.body?.document, 'psychologist_document');
+        if (!documents.length) {
+            return res.status(400).json({ error: 'No documents provided' });
+        }
+
+        const tableAvailable = await tableExists('psychologist_applications');
+        if (!tableAvailable) {
+            return res.status(500).json({ error: 'Application storage is not available. Please try again later.' });
+        }
+
+        const hasUserId = await columnExists('psychologist_applications', 'user_id');
+        const hasEmail = await columnExists('psychologist_applications', 'email');
+        let applicationRow = null;
+
+        if (hasUserId) {
+            const result = await query(
+                `SELECT id FROM psychologist_applications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+                [req.user.id]
+            );
+            applicationRow = result.rows[0] || null;
+        } else if (hasEmail) {
+            const result = await query(
+                `SELECT id FROM psychologist_applications WHERE email = $1 ORDER BY created_at DESC LIMIT 1`,
+                [req.user.email]
+            );
+            applicationRow = result.rows[0] || null;
+        }
+
+        if (!applicationRow) {
+            return res.status(404).json({ error: 'Application not found for this user' });
+        }
+
+        const updates = [];
+        const params = [];
+        let idx = 1;
+        const pushUpdate = (column, value, json = false) => {
+            updates.push(`${column} = $${idx}${json ? '::jsonb' : ''}`);
+            params.push(json ? JSON.stringify(value) : value);
+            idx += 1;
+        };
+
+        if (await columnExists('psychologist_applications', 'documents')) {
+            pushUpdate('documents', documents, true);
+        }
+        if (await columnExists('psychologist_applications', 'documents_submitted')) {
+            pushUpdate('documents_submitted', true);
+        }
+        if (await columnExists('psychologist_applications', 'kyc_status')) {
+            pushUpdate('kyc_status', 'pending');
+        }
+        if (await columnExists('psychologist_applications', 'can_use_profile')) {
+            pushUpdate('can_use_profile', false);
+        }
+
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        const sql = `
+            UPDATE psychologist_applications
+            SET ${updates.join(', ')}
+            WHERE id = $${idx}
+            RETURNING id
+        `;
+        params.push(applicationRow.id);
+        await query(sql, params);
+
+        await query(
+            `UPDATE users
+             SET documents_submitted = true,
+                 kyc_status = 'pending',
+                 can_use_profile = false,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [req.user.id]
+        );
+
+        return res.json({ message: 'Documents submitted. Your verification is now pending.' });
+    } catch (error) {
+        console.error('Upload psychologist documents error:', error);
+        return res.status(500).json({ error: 'Failed to upload documents' });
+    }
+};
+
 module.exports = {
     applyAsPsychologist,
     getApplicationStatus,
-    uploadLicenseDocument
+    uploadLicenseDocument,
+    uploadPsychologistDocuments
 };

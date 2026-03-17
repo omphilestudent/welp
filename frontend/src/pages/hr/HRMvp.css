@@ -1,0 +1,142 @@
+.hr-mvp {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.hr-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.hr-header h2 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.hr-subtitle {
+    margin: 4px 0 0;
+    color: #6b7280;
+}
+
+.hr-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.hr-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.hr-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.hr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hr-field label {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.hr-field input,
+.hr-field select,
+.hr-field textarea {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+.hr-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.hr-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.hr-table th,
+.hr-table td {
+    text-align: left;
+    padding: 10px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 14px;
+}
+
+.hr-status {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+}
+
+.hr-status.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+.hr-status.pending {
+    background: rgba(234, 179, 8, 0.12);
+    color: #b45309;
+}
+
+.hr-status.attention {
+    background: rgba(239, 68, 68, 0.12);
+    color: #dc2626;
+}
+
+.hr-empty {
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.hr-pill {
+    background: #f3f4f6;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.hr-link {
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.hr-inline {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.hr-banner {
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: #fef3c7;
+    color: #92400e;
+    font-weight: 500;
+}

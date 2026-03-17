@@ -692,6 +692,16 @@ const PORT = process.env.PORT || 5000;
 const MAX_DB_RETRIES = 5;
 const DB_RETRY_INTERVAL = 5000; // 5 seconds
 
+const formatDbError = (error) => {
+    if (!error) return 'Unknown database error';
+    const details = [
+        error.message,
+        error.code ? `code=${error.code}` : null,
+        error.name ? `name=${error.name}` : null
+    ].filter(Boolean);
+    return details.length ? details.join(' | ') : String(error);
+};
+
 const connectWithRetry = async (retries = MAX_DB_RETRIES) => {
     if (!sequelize) {
         console.warn('⚠️ Sequelize not available - running without database');
@@ -710,7 +720,7 @@ const connectWithRetry = async (retries = MAX_DB_RETRIES) => {
             }
             return true;
         } catch (error) {
-            console.log(`⚠️ Database connection attempt ${i + 1}/${retries} failed:`, error.message);
+            console.log(`⚠️ Database connection attempt ${i + 1}/${retries} failed:`, formatDbError(error));
             if (i < retries - 1) {
                 console.log(`⏳ Waiting ${DB_RETRY_INTERVAL/1000} seconds before retry...`);
                 await new Promise(resolve => setTimeout(resolve, DB_RETRY_INTERVAL));
@@ -800,3 +810,4 @@ process.on('unhandledRejection', (reason, promise) => {
 startServer();
 
 module.exports = { app, httpServer, io };
+

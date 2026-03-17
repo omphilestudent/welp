@@ -131,7 +131,10 @@ const authenticate = async (req, res, next) => {
                  subscription_expires,
                  daily_chat_quota_mins,
                  used_chat_minutes,
-                 last_chat_reset
+                 last_chat_reset,
+                 kyc_status,
+                 documents_submitted,
+                 can_use_profile
              FROM users
              WHERE id = $1`,
             [decoded.userId]

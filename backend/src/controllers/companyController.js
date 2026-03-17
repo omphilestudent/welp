@@ -10,6 +10,17 @@ const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin
 const OWNER_ACCESS_ROLES = new Set(['business', ...ADMIN_ROLES]);
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const columnExists = async (tableName, columnName) => {
+    const result = await query(
+        `SELECT 1
+         FROM information_schema.columns
+         WHERE table_name = $1 AND column_name = $2
+         LIMIT 1`,
+        [tableName, columnName]
+    );
+    return result.rows.length > 0;
+};
+
 const resolveCompanyIdParam = (params = {}) => params.id || params.companyId;
 
 const formatCompanyRow = (company = {}) => ({
@@ -90,11 +101,16 @@ const ensureReviewCompanyColumn = async () => {
         console.warn('reviews.company_id ensure skipped:', error.message);
     }
     try {
-        await query(`
-            UPDATE reviews
-            SET company_id = COALESCE(company_id, business_id)
-            WHERE company_id IS NULL AND business_id IS NOT NULL
-        `);
+        const hasBusinessId = await columnExists('reviews', 'business_id');
+        if (!hasBusinessId) {
+            console.warn('reviews company_id backfill skipped: reviews.business_id column does not exist');
+            return;
+        }
+        await query(
+            `UPDATE reviews
+             SET company_id = COALESCE(company_id, business_id)
+             WHERE company_id IS NULL AND business_id IS NOT NULL`
+        );
     } catch (error) {
         console.warn('reviews company_id backfill skipped:', error.message);
     }

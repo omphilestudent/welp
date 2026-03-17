@@ -618,6 +618,58 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS languages TEXT[];
             ALTER TABLE users ADD COLUMN IF NOT EXISTS biography TEXT;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10,2);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_status VARCHAR(32) DEFAULT 'not_submitted';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS documents_submitted BOOLEAN DEFAULT false;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS can_use_profile BOOLEAN DEFAULT true;
+
+            -- HR MVP tables
+            CREATE TABLE IF NOT EXISTS employees (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                first_name VARCHAR(100) NOT NULL,
+                last_name VARCHAR(100) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                phone VARCHAR(50),
+                department VARCHAR(100),
+                job_title VARCHAR(100),
+                status VARCHAR(20) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS leaves (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+                type VARCHAR(20) DEFAULT 'other',
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                reason TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS documents (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                file_url TEXT NOT NULL,
+                type VARCHAR(20) DEFAULT 'other',
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS onboarding_tasks (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+                task_name VARCHAR(255) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                due_date DATE
+            );
+
+            CREATE TABLE IF NOT EXISTS hr_settings (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                leave_types JSONB DEFAULT '["annual","sick","other"]'::jsonb,
+                approval_rules JSONB DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             ALTER TABLE business_applications ADD COLUMN IF NOT EXISTS claim_company_id UUID REFERENCES companies(id);
 
             ALTER TABLE psychologist_applications
@@ -648,6 +700,9 @@ const createTables = async () => {
                 ADD COLUMN IF NOT EXISTS experience_verified_by UUID REFERENCES users(id),
                 ADD COLUMN IF NOT EXISTS experience_notes TEXT,
                 ADD COLUMN IF NOT EXISTS experience_details JSONB,
+                ADD COLUMN IF NOT EXISTS kyc_status VARCHAR(32) DEFAULT 'not_submitted',
+                ADD COLUMN IF NOT EXISTS documents_submitted BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS can_use_profile BOOLEAN DEFAULT false,
                 ALTER COLUMN status SET DEFAULT 'pending_review';
 
             ALTER TABLE business_applications
@@ -699,6 +754,12 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_job_applications_status          ON job_applications(status);
             CREATE INDEX IF NOT EXISTS idx_interviews_application_id        ON interviews(application_id);
             CREATE INDEX IF NOT EXISTS idx_interviews_scheduled_at          ON interviews(scheduled_at);
+            CREATE INDEX IF NOT EXISTS idx_employees_user_id                ON employees(user_id);
+            CREATE INDEX IF NOT EXISTS idx_employees_status                 ON employees(status);
+            CREATE INDEX IF NOT EXISTS idx_leaves_employee_id               ON leaves(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_leaves_status                    ON leaves(status);
+            CREATE INDEX IF NOT EXISTS idx_documents_employee_id            ON documents(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_onboarding_employee_id           ON onboarding_tasks(employee_id);
             CREATE INDEX IF NOT EXISTS idx_employee_relations_employee_id   ON employee_relations(employee_id);
             CREATE INDEX IF NOT EXISTS idx_employee_relations_status        ON employee_relations(status);
             CREATE INDEX IF NOT EXISTS idx_employee_documents_employee_id   ON employee_documents(employee_id);

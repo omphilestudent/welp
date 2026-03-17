@@ -53,6 +53,8 @@ const PsychologistRegister = () => {
     const [showPw, setShowPw]       = useState(false);
     const [documents, setDocuments] = useState({});
     const [docUploading, setDocUploading] = useState({});
+    const [skipDocuments, setSkipDocuments] = useState(false);
+    const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
     const set = (field) => (e) => {
         const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -87,6 +89,7 @@ const PsychologistRegister = () => {
                     uploadedAt: new Date().toISOString()
                 }
             }));
+            setSkipDocuments(false);
             toast.success(`${PSY_DOCUMENT_LABELS[type]} uploaded`);
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to upload document');
@@ -122,8 +125,10 @@ const PsychologistRegister = () => {
             if (!form.licenseNumber) return 'License / registration number is required';
             if (!form.licenseBody)   return 'Licensing body is required';
             if (!form.yearsExperience) return 'Years of experience is required';
-            const missingDoc = PSY_REQUIRED_DOCUMENTS.find((doc) => !documents[doc.type]);
-            if (missingDoc) return `Please upload ${missingDoc.label}`;
+            if (!skipDocuments) {
+                const missingDoc = PSY_REQUIRED_DOCUMENTS.find((doc) => !documents[doc.type]);
+                if (missingDoc) return `Please upload ${missingDoc.label}`;
+            }
         }
         if (step === 2) {
             if (form.specialisations.length === 0) return 'Select at least one specialisation';
@@ -165,7 +170,8 @@ const PsychologistRegister = () => {
                 practiceLocation: form.practiceLocation,
                 bio:             form.bio,
                 website:         form.website,
-                documents:       Object.values(documents)
+                documents:       Object.values(documents),
+                skipDocuments
             });
 
             setSubmitted(true);
@@ -360,6 +366,20 @@ const PsychologistRegister = () => {
                                                 );
                                             })}
                                         </div>
+                                        <div className="reg-inline-actions">
+                                            <button
+                                                type="button"
+                                                className="reg-btn-ghost"
+                                                onClick={() => setShowSkipConfirm(true)}
+                                            >
+                                                Skip for now
+                                            </button>
+                                            {skipDocuments && (
+                                                <span className="reg-field-hint">
+                                                    You chose to skip documents. Your profile will remain restricted until approved.
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -459,14 +479,18 @@ const PsychologistRegister = () => {
                                     <ReviewRow label="Session formats" value={form.sessionFormats.join(', ') || '—'} />
                                     <ReviewRow label="Languages"     value={form.languages} />
                                     <ReviewRow label="Location"      value={form.practiceLocation || '—'} />
-                                    <div className="reg-field reg-field--spaced">
+                                                                        <div className="reg-field reg-field--spaced">
                                         <label>Documents</label>
                                         <ul className="reg-doc-list">
-                                            {PSY_REQUIRED_DOCUMENTS.map((doc) => (
-                                                <li key={doc.type}>
-                                                    {documents[doc.type] ? '✔' : '•'} {doc.label}
-                                                </li>
-                                            ))}
+                                            {skipDocuments ? (
+                                                <li>Skipped for now</li>
+                                            ) : (
+                                                PSY_REQUIRED_DOCUMENTS.map((doc) => (
+                                                    <li key={doc.type}>
+                                                        {documents[doc.type] ? '???' : '???'} {doc.label}
+                                                    </li>
+                                                ))
+                                            )}
                                         </ul>
                                     </div>
                                 </div>
@@ -497,6 +521,33 @@ const PsychologistRegister = () => {
                     Already have an account? <Link to="/login">Sign in</Link>
                 </p>
             </motion.div>
+            {showSkipConfirm && (
+                <div className="reg-modal-backdrop">
+                    <div className="reg-modal">
+                        <h3>Skip documents for now?</h3>
+                        <p>You can complete verification later, but your account will remain restricted until approved.</p>
+                        <div className="reg-modal-actions">
+                            <button
+                                type="button"
+                                className="reg-btn-ghost"
+                                onClick={() => setShowSkipConfirm(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="reg-submit-btn"
+                                onClick={() => {
+                                    setSkipDocuments(true);
+                                    setShowSkipConfirm(false);
+                                }}
+                            >
+                                Skip for now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

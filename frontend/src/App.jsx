@@ -56,14 +56,12 @@ import FlowAdmin from './pages/admin/FlowAdmin';
 import FlowBuilder from './pages/admin/FlowBuilder';
 
 // HR Pages
-import HRDashboard from './pages/hr/HRDashboard';
-import JobPostings from './pages/hr/JobPostings';
-import JobCreate from './pages/hr/JobCreate'; // Add this import
-import JobDetailsHR from './pages/hr/JobDetails'; // Add this import (you might want to rename to avoid conflict with public JobDetails)
-import Applications from './pages/hr/Applications';
-import Interviews from './pages/hr/Interviews';
-import EmployeeRelations from './pages/hr/EmployeeRelations';
-import Departments from './pages/hr/Departments';
+import Employees from './pages/hr/Employees';
+import EmployeeProfile from './pages/hr/EmployeeProfile';
+import Leaves from './pages/hr/Leaves';
+import Documents from './pages/hr/Documents';
+import Onboarding from './pages/hr/Onboarding';
+import HRSettings from './pages/hr/HRSettings';
 
 import './styles/global.css';
 import './styles/theme.css';
@@ -198,30 +196,20 @@ function App() {
                                 <Route
                                     path="/hr"
                                     element={
-                                        <AdminRoute requiredRole="hr">
+                                        <PrivateRoute>
                                             <AdminLayout />
-                                        </AdminRoute>
+                                        </PrivateRoute>
                                     }
                                 >
-                                    <Route index element={<HRDashboard />} />
-                                    <Route path="dashboard" element={<HRDashboard />} />
-                                    <Route path="UserManagement" element={<Navigate to="/hr/dashboard" replace />} />
-
-                                    {/* Job Management Routes - FIXED: Added all missing routes */}
-                                    <Route path="jobs" element={<JobPostings />} />
-                                    <Route path="jobs/create" element={<JobCreate />} />
-                                    <Route path="jobs/new" element={<JobCreate />} />
-                                    <Route path="jobs/:id" element={<JobDetailsHR />} />
-                                    <Route path="jobs/:id/edit" element={<JobCreate />} />
-                                    <Route path="jobs/:id/applications" element={<Applications />} />
-
-                                    {/* Other HR Routes */}
-                                    <Route path="applications" element={<Applications />} />
-                                    <Route path="interviews" element={<Interviews />} />
-                                    <Route path="employees" element={<EmployeeRelations />} />
-                                    <Route path="departments" element={<Departments />} />
-                                    <Route path="Departments" element={<Navigate to="/hr/departments" replace />} />
-                                    <Route path="*" element={<Navigate to="/hr/dashboard" replace />} />
+                                    <Route index element={<Navigate to="/hr/employees" replace />} />
+                                    <Route path="dashboard" element={<Navigate to="/hr/employees" replace />} />
+                                    <Route path="employees" element={<Employees />} />
+                                    <Route path="employees/:id" element={<EmployeeProfile />} />
+                                    <Route path="leaves" element={<Leaves />} />
+                                    <Route path="documents" element={<Documents />} />
+                                    <Route path="onboarding" element={<Onboarding />} />
+                                    <Route path="settings" element={<HRSettings />} />
+                                    <Route path="*" element={<Navigate to="/hr/employees" replace />} />
                                 </Route>
                                 </Routes>
                             </main>

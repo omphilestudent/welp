@@ -19,6 +19,9 @@ const getProfile = async (req, res) => {
                  u.website,
                  u.occupation,
                  u.workplace_id,
+                 u.kyc_status,
+                 u.documents_submitted,
+                 u.can_use_profile,
                  json_build_object(
                          'id', c.id,
                          'name', c.name,

@@ -7,6 +7,7 @@ const { messageLimiter, apiLimiter } = require('../middleware/rateLimiter');
 const { validate, messageValidation } = require('../middleware/validation');
 const messageController = require('../controllers/messageController');
 const { applyTierLimits } = require('../middleware/applyTierLimits');
+const { restrictUnverifiedPsychologist } = require('../middleware/restrictUnverifiedPsychologist');
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.post('/conversations/request',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('message_request'),
+    restrictUnverifiedPsychologist,
     validate([
         body('employeeId').isUUID(),
         body('initialMessage').optional().trim().isLength({ max: 2000 })
@@ -27,6 +29,7 @@ router.get('/conversations/pending',
     authenticate,
     authorize('employee', 'psychologist'),
     checkRoleFlag('conversation_approval'),
+    restrictUnverifiedPsychologist,
     messageController.getPendingRequests
 );
 
@@ -34,6 +37,7 @@ router.patch('/conversations/:conversationId/status',
     authenticate,
     authorize('employee', 'psychologist'),
     checkRoleFlag('conversation_approval'),
+    restrictUnverifiedPsychologist,
     messageController.updateConversationStatus
 );
 
@@ -77,6 +81,7 @@ router.get('/conversations/:conversationId/messages',
 router.post('/conversations/:conversationId/messages',
     authenticate,
     messageLimiter,
+    restrictUnverifiedPsychologist,
     validate(messageValidation),
     messageController.sendMessage
 );
@@ -84,6 +89,7 @@ router.post('/conversations/:conversationId/messages',
 router.post('/conversations/:conversationId/video/start',
     authenticate,
     applyTierLimits({ feature: 'video' }),
+    restrictUnverifiedPsychologist,
     messageController.startVideoSession
 );
 

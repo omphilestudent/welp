@@ -2,6 +2,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
+const { restrictUnverifiedPsychologist } = require('../middleware/restrictUnverifiedPsychologist');
 const { apiLimiter, accountSecurityLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
 const userController = require('../controllers/userController');
@@ -47,7 +48,7 @@ const upload = multer({
 
 
 router.get('/profile', authenticate, apiLimiter, userController.getProfile);
-router.patch('/profile', authenticate, apiLimiter, userController.updateProfile);
+router.patch('/profile', authenticate, apiLimiter, restrictUnverifiedPsychologist, userController.updateProfile);
 
 router.get('/public/:id', authenticate, apiLimiter, userController.getPublicProfile);
 
@@ -108,6 +109,7 @@ router.patch('/settings', authenticate, apiLimiter, userController.updateSetting
 router.post('/add-psychologist-profile',
     authenticate,
     apiLimiter,
+    restrictUnverifiedPsychologist,
     validate([
         body('licenseNumber').notEmpty().withMessage('License number is required'),
         body('licenseIssuingBody').notEmpty().withMessage('License issuing body is required'),

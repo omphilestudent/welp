@@ -7,6 +7,7 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
 const psychologistController = require('../controllers/psychologistController');
 const psychologistDashboardController = require('../controllers/psychologistDashboardController');
+const { restrictUnverifiedPsychologist } = require('../middleware/restrictUnverifiedPsychologist');
 
 const router = express.Router();
 
@@ -50,6 +51,13 @@ router.post('/upload-license/:applicationId',
     psychologistController.uploadLicenseDocument
 );
 
+router.post('/documents',
+    authenticate,
+    authorize('psychologist'),
+    apiLimiter,
+    psychologistController.uploadPsychologistDocuments
+);
+
 // Psychologist dashboard (stub endpoints)
 router.get('/dashboard/permissions',
     authenticate,
@@ -76,6 +84,7 @@ router.post('/dashboard/schedule',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('schedule'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.addScheduleItem
 );
 
@@ -90,6 +99,7 @@ router.delete('/dashboard/schedule/:itemId',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('schedule'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.removeScheduleItem
 );
 
@@ -97,6 +107,7 @@ router.patch('/dashboard/schedule/:itemId',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('schedule'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.updateScheduleItem
 );
 
@@ -111,6 +122,7 @@ router.post('/dashboard/leads/:leadId/message',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('leads'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.sendLeadMessage
 );
 
@@ -118,6 +130,7 @@ router.patch('/dashboard/leads/:leadId/archive',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('leads'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.archiveLead
 );
 
@@ -132,6 +145,7 @@ router.post('/dashboard/favorites',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('favorites'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.addFavorite
 );
 
@@ -139,6 +153,7 @@ router.delete('/dashboard/favorites/:favoriteId',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('favorites'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.removeFavorite
 );
 
@@ -160,6 +175,7 @@ router.post('/dashboard/calendar-integrations',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('schedule'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.addCalendarIntegration
 );
 
@@ -167,6 +183,7 @@ router.delete('/dashboard/calendar-integrations/:integrationId',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('schedule'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.removeCalendarIntegration
 );
 
@@ -174,6 +191,7 @@ router.post('/dashboard/calendar-integrations/:integrationId/sync',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('schedule'),
+    restrictUnverifiedPsychologist,
     psychologistDashboardController.syncCalendarIntegration
 );
 

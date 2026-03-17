@@ -4,6 +4,7 @@ const { authorizeHR } = require('../middleware/adminAuth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate, jobPostingValidation, jobApplicationValidation, interviewValidation, departmentValidation } = require('../middleware/validation');
 const hrController = require('../controllers/hrController');
+const hrMvpController = require('../controllers/hrMvpController');
 const { body, param } = require('express-validator');
 const { query: dbQuery } = require('../utils/database');
 
@@ -28,6 +29,29 @@ router.post('/public/jobs/:id/apply',
 
 // ── All routes below require authentication + HR role ─────────────────────────
 router.use(authenticate);
+
+// â”€â”€ HR MVP endpoints (employee + HR access) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+router.get('/employees', hrMvpController.getEmployees);
+router.get('/employees/:id', hrMvpController.getEmployeeById);
+router.post('/employees', hrMvpController.createEmployee);
+router.put('/employees/:id', hrMvpController.updateEmployee);
+
+router.get('/leaves', hrMvpController.getLeaves);
+router.post('/leaves', hrMvpController.createLeave);
+router.put('/leaves/:id/approve', hrMvpController.approveLeave);
+router.put('/leaves/:id/reject', hrMvpController.rejectLeave);
+
+router.get('/documents/:employeeId', hrMvpController.getDocuments);
+router.post('/documents/upload', hrMvpController.uploadDocument);
+router.delete('/documents/:id', hrMvpController.deleteDocument);
+
+router.get('/onboarding/:employeeId', hrMvpController.getOnboardingTasks);
+router.post('/onboarding/tasks', hrMvpController.createOnboardingTask);
+router.put('/onboarding/tasks/:id', hrMvpController.updateOnboardingTask);
+
+router.get('/settings', hrMvpController.getSettings);
+router.put('/settings', hrMvpController.updateSettings);
+
 router.use(authorizeHR());
 
 // ── HR Profile & Dashboard ────────────────────────────────────────────────────

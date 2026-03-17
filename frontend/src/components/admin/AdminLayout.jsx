@@ -12,10 +12,8 @@ import {
     FaStar,
     FaCog,
     FaClipboardList,
-    FaBriefcase,
     FaFileAlt,
     FaCalendarAlt,
-    FaChartLine,
     FaShieldAlt,
     FaBars,
     FaTimes,
@@ -45,12 +43,16 @@ const AdminLayout = () => {
 
     const userRole = String(user?.role || adminInfo?.role_name || '').toLowerCase().trim();
     const isSuperAdmin = ['super_admin', 'superadmin', 'system_admin'].includes(userRole);
+    const isAdminAccess = ['admin', 'super_admin', 'superadmin', 'system_admin'].includes(userRole);
     const isHrAdmin = userRole === 'hr_admin';
+    const isHrAccess = isHrAdmin || isAdminAccess || userRole === 'employee';
 
     useEffect(() => {
-        fetchAdminInfo();
-        fetchNotifications();
-    }, []);
+        if (isAdminAccess || isHrAdmin) {
+            fetchAdminInfo();
+            fetchNotifications();
+        }
+    }, [isAdminAccess, isHrAdmin]);
 
     const fetchAdminInfo = async () => {
         try {
@@ -193,40 +195,34 @@ const AdminLayout = () => {
 
     const hrNavItems = [
         {
-            path: '/hr/dashboard',
-            icon: <FaChartLine />,
-            label: 'HR Dashboard',
-            color: '#4299e1'
-        },
-        {
-            path: '/hr/jobs',
-            icon: <FaBriefcase />,
-            label: 'Job Postings',
-            color: '#48bb78'
-        },
-        {
-            path: '/hr/applications',
-            icon: <FaFileAlt />,
-            label: 'Applications',
-            color: '#ed8936'
-        },
-        {
-            path: '/hr/interviews',
-            icon: <FaCalendarAlt />,
-            label: 'Interviews',
-            color: '#9f7aea'
-        },
-        {
             path: '/hr/employees',
             icon: <FaUsers />,
-            label: 'Employee Relations',
-            color: '#f687b3'
+            label: 'Employees',
+            color: '#4c51bf'
         },
         {
-            path: '/hr/departments',
-            icon: <FaBuilding />,
-            label: 'Departments',
-            color: '#fc8181'
+            path: '/hr/leaves',
+            icon: <FaCalendarAlt />,
+            label: 'Leaves',
+            color: '#d97706'
+        },
+        {
+            path: '/hr/documents',
+            icon: <FaFileAlt />,
+            label: 'Documents',
+            color: '#0f766e'
+        },
+        {
+            path: '/hr/onboarding',
+            icon: <FaClipboardList />,
+            label: 'Onboarding',
+            color: '#2563eb'
+        },
+        {
+            path: '/hr/settings',
+            icon: <FaCog />,
+            label: 'HR Settings',
+            color: '#6b7280'
         }
     ];
 
@@ -272,7 +268,7 @@ const AdminLayout = () => {
                 </div>
 
                 <nav className="sidebar-nav">
-                    {!isHrAdmin && (
+                    {isAdminAccess && (
                         <div className="nav-section">
                             <h3>Administration</h3>
                             {navItems.map(item => (
@@ -291,7 +287,7 @@ const AdminLayout = () => {
                         </div>
                     )}
 
-                    {isSuperAdmin && !isHrAdmin && (
+                    {isSuperAdmin && (
                         <div className="nav-section">
                             <h3>Super Admin</h3>
                             {superAdminNavItems.map(item => (
@@ -310,7 +306,7 @@ const AdminLayout = () => {
                         </div>
                     )}
 
-                    {isHrAdmin && (
+                    {isHrAccess && (
                         <div className="nav-section">
                             <h3>Human Resources</h3>
                             {hrNavItems.map(item => (

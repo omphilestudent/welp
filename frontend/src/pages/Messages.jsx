@@ -221,6 +221,7 @@ const Messages = () => {
 
     const userId = user?.id;
     const userRole = user?.role;
+    const isPsychRestricted = userRole === 'psychologist' && user?.can_use_profile === false;
 
     useEffect(() => {
         if (userRole === 'psychologist' && userId) {
@@ -750,6 +751,10 @@ const Messages = () => {
 
     const handleSendMessage = async (content) => {
         if (!activeConversation) return;
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
 
         setSendingMessage(true);
         try {
@@ -795,6 +800,10 @@ const Messages = () => {
     };
 
     const handleStartConversation = async (employeeId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             await api.post('/messages/conversations/request', {
                 employeeId,
@@ -807,6 +816,10 @@ const Messages = () => {
     };
 
     const handleLeadMessage = async (leadId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             await api.post(`/psychologists/dashboard/leads/${leadId}/message`, {
                 message: 'Hello, I noticed you may need support. Let me know if you would like to talk.'
@@ -818,6 +831,10 @@ const Messages = () => {
     };
 
     const handleLeadArchive = async (leadId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             await api.patch(`/psychologists/dashboard/leads/${leadId}/archive`);
             setPsychLeads((prev) => prev.filter((lead) => lead.id !== leadId));
@@ -828,6 +845,10 @@ const Messages = () => {
     };
 
     const handleFavoriteAdd = async (employee) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             const { data } = await api.post('/psychologists/dashboard/favorites', {
                 employeeId: employee.id,
@@ -842,6 +863,10 @@ const Messages = () => {
     };
 
     const handleFavoriteRemove = async (favoriteId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             await api.delete(`/psychologists/dashboard/favorites/${favoriteId}`);
             setPsychFavorites((prev) => prev.filter((item) => item.id !== favoriteId));
@@ -855,6 +880,11 @@ const Messages = () => {
     return (
         <div className="messages-page">
             {error && <div className="alert alert-error">{error}</div>}
+            {isPsychRestricted && (
+                <div className="alert alert-warning">
+                    Your account is restricted until KYC is completed and approved.
+                </div>
+            )}
             <div className="messages-container">
                 <div className={`messages-sidebar ${isSidebarOpen ? 'open' : ''}`}>
                     <div className="sidebar-header">

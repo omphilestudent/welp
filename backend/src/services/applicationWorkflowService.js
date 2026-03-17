@@ -212,6 +212,9 @@ const mapApplicationRow = (row, type) => {
         applicant_name: row.user_name || row.full_name || row.company_name || row.applicant_name || null,
         applicant_email: row.user_email || row.email || row.business_email || null,
         profile_type: config.profileLabel,
+        kyc_status: row.kyc_status || null,
+        documents_submitted: row.documents_submitted ?? null,
+        can_use_profile: row.can_use_profile ?? null,
         status,
         statusLabel: STATUS_LABELS[status] || status,
         submittedAt: row.created_at,
@@ -389,12 +392,20 @@ const applyApplicationAction = async ({
             if (notes !== undefined) {
                 setColumn('admin_notes', notes || null);
             }
+            if (type === 'psychologist') {
+                setColumn('kyc_status', 'approved');
+                setColumn('can_use_profile', true);
+            }
             break;
         case 'reject':
             nextStatus = 'rejected';
             updates.push('reviewed_at = CURRENT_TIMESTAMP');
             setColumn('reviewed_by', adminId);
             setColumn('admin_notes', notes || 'Application rejected');
+            if (type === 'psychologist') {
+                setColumn('kyc_status', 'rejected');
+                setColumn('can_use_profile', false);
+            }
             break;
         default:
             break;
@@ -416,6 +427,28 @@ const applyApplicationAction = async ({
     const updateResult = await query(updateSql, params);
     if (!updateResult.rows.length) {
         return null;
+    }
+
+    if (type === 'psychologist' && current.user_id) {
+        try {
+            const nextKyc = action === 'approve'
+                ? 'approved'
+                : action === 'reject'
+                    ? 'rejected'
+                    : null;
+            if (nextKyc) {
+                await query(
+                    `UPDATE users
+                     SET kyc_status = $1,
+                         can_use_profile = $2,
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE id = $3`,
+                    [nextKyc, action === 'approve', current.user_id]
+                );
+            }
+        } catch (error) {
+            console.warn('Failed to update psychologist KYC flags:', error.message);
+        }
     }
 
     const updatedRow = await selectApplicationRowById(type, id);

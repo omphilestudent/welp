@@ -227,10 +227,16 @@ const getUserByEmailForLogin = async (email) => {
 const getUserByIdForProfile = async (userId) => {
     const hasIsAnonymous = await columnExists('users', 'is_anonymous');
     const hasIsActive = await columnExists('users', 'is_active');
+    const hasKycStatus = await columnExists('users', 'kyc_status');
+    const hasDocsSubmitted = await columnExists('users', 'documents_submitted');
+    const hasCanUseProfile = await columnExists('users', 'can_use_profile');
 
     let selectPart = `SELECT id, email, role, display_name, created_at, avatar_url`;
         selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
         selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
+        selectPart += hasKycStatus ? `, kyc_status` : `, 'not_submitted'::text as kyc_status`;
+        selectPart += hasDocsSubmitted ? `, documents_submitted` : `, false as documents_submitted`;
+        selectPart += hasCanUseProfile ? `, can_use_profile` : `, true as can_use_profile`;
         selectPart += `, subscription_tier, subscription_expires, daily_chat_quota_mins, used_chat_minutes, last_chat_reset`;
 
     return query(
@@ -262,7 +268,10 @@ const createUserAccount = async ({
     isVerified,
     status,
     isAnonymous,
-    jobTitle
+    jobTitle,
+    kycStatus,
+    documentsSubmitted,
+    canUseProfile
 }) => {
     const normalizedEmail = validateRegistrationCredentials(email, password);
 
@@ -280,6 +289,9 @@ const createUserAccount = async ({
     const hasStatus = await columnExists('users', 'status');
     const hasIsAnonymous = await columnExists('users', 'is_anonymous');
     const hasJobTitle = await columnExists('users', 'job_title');
+    const hasKycStatus = await columnExists('users', 'kyc_status');
+    const hasDocumentsSubmitted = await columnExists('users', 'documents_submitted');
+    const hasCanUseProfile = await columnExists('users', 'can_use_profile');
 
     const cols = ['email', 'password_hash', 'role', 'display_name'];
     const placeholders = ['$1', '$2', '$3', '$4'];
@@ -319,6 +331,24 @@ const createUserAccount = async ({
         cols.push('job_title');
         placeholders.push(`$${idx}`);
         params.push(jobTitle);
+        idx += 1;
+    }
+    if (hasKycStatus && kycStatus) {
+        cols.push('kyc_status');
+        placeholders.push(`$${idx}`);
+        params.push(kycStatus);
+        idx += 1;
+    }
+    if (hasDocumentsSubmitted && documentsSubmitted !== undefined) {
+        cols.push('documents_submitted');
+        placeholders.push(`$${idx}`);
+        params.push(Boolean(documentsSubmitted));
+        idx += 1;
+    }
+    if (hasCanUseProfile && canUseProfile !== undefined) {
+        cols.push('can_use_profile');
+        placeholders.push(`$${idx}`);
+        params.push(Boolean(canUseProfile));
         idx += 1;
     }
 
@@ -409,7 +439,8 @@ const registerPsychologist = async (req, res) => {
             practiceLocation,
             bio,
             website,
-            documents
+            documents,
+            skipDocuments
         } = req.body;
 
         console.log('[registerPsychologist] payload:', {
@@ -426,11 +457,14 @@ const registerPsychologist = async (req, res) => {
         }
 
         const documentPayload = parseApplicationDocuments(documents, 'psychologist_document');
-        try {
-            ensureRequiredDocuments(documentPayload, APPLICATION_DOCUMENT_REQUIREMENTS.psychologist);
-        } catch (error) {
-            return res.status(error.statusCode || 400).json({ error: error.message });
-        }
+        const hasDocuments = Array.isArray(documentPayload) && documentPayload.length > 0;
+        const shouldSkipDocuments = Boolean(skipDocuments);
+        const kycStatus = shouldSkipDocuments
+            ? 'not_submitted'
+            : hasDocuments
+                ? 'pending'
+                : 'not_submitted';
+        const documentsSubmitted = !shouldSkipDocuments && hasDocuments;
 
         const user = await createUserAccount({
             email,
@@ -439,7 +473,10 @@ const registerPsychologist = async (req, res) => {
             displayName,
             isActive: false,
             isVerified: false,
-            status: 'pending_review'
+            status: 'pending_review',
+            kycStatus,
+            documentsSubmitted,
+            canUseProfile: false
         });
 
         const appTableAvailable = await tableExists('psychologist_applications');
@@ -493,6 +530,24 @@ const registerPsychologist = async (req, res) => {
                     appPlaceholders.push(`$${appIdx}::jsonb`);
                     appParams.push(JSON.stringify(documentPayload));
                     appIdx += 1;
+                }
+                const hasKycStatus = await columnExists('psychologist_applications', 'kyc_status');
+                if (hasKycStatus) {
+                    appCols.push('kyc_status');
+                    appPlaceholders.push(`$${appIdx++}`);
+                    appParams.push(kycStatus);
+                }
+                const hasDocumentsSubmitted = await columnExists('psychologist_applications', 'documents_submitted');
+                if (hasDocumentsSubmitted) {
+                    appCols.push('documents_submitted');
+                    appPlaceholders.push(`$${appIdx++}`);
+                    appParams.push(documentsSubmitted);
+                }
+                const hasCanUseProfile = await columnExists('psychologist_applications', 'can_use_profile');
+                if (hasCanUseProfile) {
+                    appCols.push('can_use_profile');
+                    appPlaceholders.push(`$${appIdx++}`);
+                    appParams.push(false);
                 }
 
                 try {
@@ -585,6 +640,24 @@ const registerPsychologist = async (req, res) => {
                     legacyCols.push('status');
                     legacyPlaceholders.push(`$${legacyIdx++}`);
                     legacyParams.push('pending_review');
+                }
+                const hasLegacyKycStatus = await columnExists('psychologist_applications', 'kyc_status');
+                if (hasLegacyKycStatus) {
+                    legacyCols.push('kyc_status');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push(kycStatus);
+                }
+                const hasLegacyDocsSubmitted = await columnExists('psychologist_applications', 'documents_submitted');
+                if (hasLegacyDocsSubmitted) {
+                    legacyCols.push('documents_submitted');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push(documentsSubmitted);
+                }
+                const hasLegacyCanUseProfile = await columnExists('psychologist_applications', 'can_use_profile');
+                if (hasLegacyCanUseProfile) {
+                    legacyCols.push('can_use_profile');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push(false);
                 }
 
                 if (legacyCols.length > 0) {
@@ -1072,6 +1145,9 @@ const getMe = async (req, res) => {
                 createdAt: user.created_at,
                 avatarUrl: user.avatar_url,
                 avatar_url: user.avatar_url,
+                kyc_status: user.kyc_status,
+                documents_submitted: user.documents_submitted,
+                can_use_profile: user.can_use_profile,
                 subscription: subscriptionPayload,
                 applicationStatus
             }

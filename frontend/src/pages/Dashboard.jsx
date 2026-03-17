@@ -33,6 +33,12 @@ const VERIFICATION_STEP_LABELS = {
     experience: 'Experience verification'
 };
 
+const PSY_KYC_DOCUMENTS = [
+    { type: 'license', label: 'Professional license or certification' },
+    { type: 'government_id', label: 'Government-issued identification' },
+    { type: 'qualification', label: 'Proof of qualifications' }
+];
+
 /* ─────────────────────────────────────────────
    Star Rating Display
 ───────────────────────────────────────────── */
@@ -408,6 +414,10 @@ const Dashboard = () => {
     const [calendarView, setCalendarView] = useState('month');
     const [calendarDate, setCalendarDate] = useState(new Date());
     const [psychCardCollapse, setPsychCardCollapse] = useState({ schedule: false, leads: false, calls: false });
+    const [kycDocuments, setKycDocuments] = useState({});
+    const [kycUploading, setKycUploading] = useState({});
+    const [showKycModal, setShowKycModal] = useState(false);
+    const [kycSubmitting, setKycSubmitting] = useState(false);
     const userKey = user ? `${user.id}:${user.role}` : null;
 
     const dashboardLoadKeyRef = useRef(null);
@@ -862,6 +872,10 @@ const Dashboard = () => {
     /* ── Psychologist schedule handlers ── */
     const handleScheduleSubmit = async (e) => {
         e.preventDefault();
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         if (!scheduleDraft.title || !scheduleDraft.date || !scheduleDraft.time) {
             toast.error('Please complete title, date, and time.'); return;
         }
@@ -878,6 +892,10 @@ const Dashboard = () => {
     };
 
     const handleScheduleRemove = async (itemId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             await api.delete(`/psychologists/dashboard/schedule/${itemId}`);
             setPsychSchedule((prev) => prev.filter((item) => item.id !== itemId));
@@ -886,6 +904,10 @@ const Dashboard = () => {
     };
 
     const handleLeadMessage = async (leadId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             await api.post(`/psychologists/dashboard/leads/${leadId}/message`, {
                 message: 'Hello, I am here to support you whenever you are ready to talk.'
@@ -895,6 +917,10 @@ const Dashboard = () => {
     };
 
     const handleLeadArchive = async (leadId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             await api.patch(`/psychologists/dashboard/leads/${leadId}/archive`);
             setPsychLeads((prev) => prev.filter((lead) => lead.id !== leadId));
@@ -904,6 +930,10 @@ const Dashboard = () => {
 
     const handleAddCalendarIntegration = async (e) => {
         e.preventDefault();
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         if (!calendarIntegrationDraft.icalUrl) { toast.error('Please add an iCal URL'); return; }
         try {
             const { data } = await api.post('/psychologists/dashboard/calendar-integrations', {
@@ -919,6 +949,10 @@ const Dashboard = () => {
     };
 
     const handleRemoveCalendarIntegration = async (integrationId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             await api.delete(`/psychologists/dashboard/calendar-integrations/${integrationId}`);
             setCalendarIntegrations((prev) => prev.filter((item) => item.id !== integrationId));
@@ -928,6 +962,10 @@ const Dashboard = () => {
     };
 
     const handleSyncCalendarIntegration = async (integrationId) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
         try {
             const { data } = await api.post(`/psychologists/dashboard/calendar-integrations/${integrationId}/sync`);
             const events = (data.events || []).map((event) => ({ ...event, integration_id: integrationId }));
@@ -999,6 +1037,56 @@ const Dashboard = () => {
     const handleCalendarNext = () => setCalendarDate((prev) => (calendarView === 'month' ? addMonths(prev, 1) : addWeeks(prev, 1)));
     const handleCalendarToday = () => setCalendarDate(new Date());
     const togglePsychCard = (key) => setPsychCardCollapse((prev) => ({ ...prev, [key]: !prev[key] }));
+    const isPsychRestricted = userRole === 'psychologist' && user?.can_use_profile === false;
+    const kycStatus = user?.kyc_status || applicationStatus?.kyc_status || (user?.documents_submitted ? 'pending' : 'not_submitted');
+
+    const handleKycUpload = async (type, file) => {
+        if (!file) return;
+        setKycUploading((prev) => ({ ...prev, [type]: true }));
+        try {
+            const formData = new FormData();
+            formData.append('document', file);
+            const { data } = await api.post('/applications/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setKycDocuments((prev) => ({
+                ...prev,
+                [type]: {
+                    type,
+                    label: PSY_KYC_DOCUMENTS.find((doc) => doc.type === type)?.label || type,
+                    url: data.url,
+                    filename: file.name,
+                    uploadedAt: new Date().toISOString()
+                }
+            }));
+            toast.success('Document uploaded');
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to upload document');
+        } finally {
+            setKycUploading((prev) => ({ ...prev, [type]: false }));
+        }
+    };
+
+    const handleKycSubmit = async () => {
+        if (!Object.keys(kycDocuments).length) {
+            toast.error('Upload at least one document');
+            return;
+        }
+        setKycSubmitting(true);
+        try {
+            await api.post('/psychologists/documents', {
+                documents: Object.values(kycDocuments)
+            });
+            toast.success('Documents submitted for review');
+            setShowKycModal(false);
+            setKycDocuments({});
+            await refreshUser();
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to submit documents');
+        } finally {
+            setKycSubmitting(false);
+        }
+    };
 
     if (loading) return <Loading />;
 
@@ -1032,6 +1120,7 @@ const Dashboard = () => {
         : '—';
 
     return (
+        <>
         <div className="dashboard-page">
             <div className="container">
                 {/* Header */}
@@ -1043,6 +1132,11 @@ const Dashboard = () => {
                 </div>
 
                 {error && <div className="alert alert-error">{error}</div>}
+                {isPsychRestricted && (
+                    <div className="alert alert-warning">
+                        Your account is restricted until KYC documents are completed and approved.
+                    </div>
+                )}
                 {shouldShowApplicationBanner && applicationStatus && (
                     <div
                         className="application-status-card"
@@ -1101,6 +1195,35 @@ const Dashboard = () => {
                                 Last update: {lastTimelineEvent.label} on {lastTimelineEvent.at ? format(new Date(lastTimelineEvent.at), 'MMM d, yyyy HH:mm') : '—'}
                             </p>
                         )}
+                    </div>
+                )}
+                {userRole === 'psychologist' && (
+                    <div
+                        className="application-status-card"
+                        style={{
+                            marginBottom: '1.5rem',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '1.25rem',
+                            background: '#fff'
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div>
+                                <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>KYC status</p>
+                                <h3 style={{ margin: '0.25rem 0' }}>{kycStatus || 'not_submitted'}</h3>
+                                <p style={{ margin: 0, color: '#475569' }}>
+                                    Documents {user?.documents_submitted ? 'submitted' : 'not submitted'} â€¢ Profile {user?.can_use_profile ? 'active' : 'restricted'}
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                {(kycStatus === 'not_submitted' || kycStatus === 'rejected') && (
+                                    <button className="btn btn-primary" onClick={() => setShowKycModal(true)}>
+                                        Upload Documents
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -1758,7 +1881,7 @@ const Dashboard = () => {
                                                 <option value="note">Note</option>
                                             </select>
                                             <input type="text" placeholder="Location / link" value={scheduleDraft.location} onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })} />
-                                            <button type="submit" className="btn btn-primary btn-small">Add</button>
+                                            <button type="submit" className="btn btn-primary btn-small" disabled={isPsychRestricted}>Add</button>
                                         </form>
                                         <div className={`psych-calendar psych-calendar--${calendarView}`}>
                                             <div className="psych-calendar-weekdays">
@@ -1810,7 +1933,7 @@ const Dashboard = () => {
                                                                 <span>{format(item.scheduledDate, 'p')}</span>
                                                                 {item.location && <span>{item.location}</span>}
                                                             </div>
-                                                            <button type="button" className="btn btn-secondary btn-small" onClick={() => handleScheduleRemove(item.id)}>Remove</button>
+                                                            <button type="button" className="btn btn-secondary btn-small" onClick={() => handleScheduleRemove(item.id)} disabled={isPsychRestricted}>Remove</button>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -1855,7 +1978,7 @@ const Dashboard = () => {
                                                 </select>
                                                 <input type="text" placeholder="Calendar name" value={calendarIntegrationDraft.name} onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, name: e.target.value })} />
                                                 <input type="url" placeholder="Public iCal URL" value={calendarIntegrationDraft.icalUrl} onChange={(e) => setCalendarIntegrationDraft({ ...calendarIntegrationDraft, icalUrl: e.target.value })} />
-                                                <button type="submit" className="btn btn-primary btn-small">Connect</button>
+                                                <button type="submit" className="btn btn-primary btn-small" disabled={isPsychRestricted}>Connect</button>
                                             </form>
                                             {calendarIntegrations.length > 0 ? (
                                                 <div className="psych-schedule-list__items">
@@ -1866,8 +1989,8 @@ const Dashboard = () => {
                                                                 <span>{integration.provider}</span>
                                                             </div>
                                                             <div className="psych-calendar-actions">
-                                                                <button type="button" className="btn btn-outline btn-small" onClick={() => handleSyncCalendarIntegration(integration.id)}>Sync</button>
-                                                                <button type="button" className="btn btn-secondary btn-small" onClick={() => handleRemoveCalendarIntegration(integration.id)}>Remove</button>
+                                                                <button type="button" className="btn btn-outline btn-small" onClick={() => handleSyncCalendarIntegration(integration.id)} disabled={isPsychRestricted}>Sync</button>
+                                                                <button type="button" className="btn btn-secondary btn-small" onClick={() => handleRemoveCalendarIntegration(integration.id)} disabled={isPsychRestricted}>Remove</button>
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1902,8 +2025,8 @@ const Dashboard = () => {
                                                         <p>{lead.summary}</p>
                                                         <span className={`lead-badge lead-${lead.risk_level}`}>{lead.risk_level} risk</span>
                                                     </div>
-                                                    <button type="button" className="btn btn-secondary btn-small" onClick={() => handleLeadMessage(lead.id)}>Send message</button>
-                                                    <button type="button" className="btn btn-outline btn-small" onClick={() => handleLeadArchive(lead.id)}>Remove</button>
+                                                    <button type="button" className="btn btn-secondary btn-small" onClick={() => handleLeadMessage(lead.id)} disabled={isPsychRestricted}>Send message</button>
+                                                    <button type="button" className="btn btn-outline btn-small" onClick={() => handleLeadArchive(lead.id)} disabled={isPsychRestricted}>Remove</button>
                                                 </div>
                                             )) : (
                                                 <p className="empty-message">No new leads right now.</p>
@@ -1948,6 +2071,72 @@ const Dashboard = () => {
                 </div>
             </div>
         </div>
+                                    
+
+            {showKycModal && (
+                <div className="reg-modal-backdrop">
+                    <div className="reg-modal">
+                        <h3>Upload verification documents</h3>
+                        <p>Complete KYC to unlock psychologist actions.</p>
+                        <div className="reg-doc-grid">
+                            {PSY_KYC_DOCUMENTS.map((doc) => {
+                                const current = kycDocuments[doc.type];
+                                return (
+                                    <div key={doc.type} className="reg-doc-card">
+                                        <strong className="reg-doc-card-title">{doc.label}</strong>
+                                        {current ? (
+                                            <div className="reg-doc-body">
+                                                <span className="reg-field-hint">{current.filename || 'Uploaded document'}</span>
+                                                <div className="reg-doc-actions">
+                                                    <a
+                                                        href={resolveMediaUrl(current.url)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="reg-btn-ghost reg-btn-pill"
+                                                    >
+                                                        Preview
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        className="reg-btn-ghost reg-btn-pill"
+                                                        onClick={() => setKycDocuments((prev) => ({ ...prev, [doc.type]: undefined }))}
+                                                    >
+                                                        Replace
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <label className="reg-btn-ghost reg-upload-btn">
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,.png,.jpg,.jpeg"
+                                                    onChange={(event) => {
+                                                        const file = event.target.files?.[0];
+                                                        if (file) handleKycUpload(doc.type, file);
+                                                        event.target.value = '';
+                                                    }}
+                                                    disabled={!!kycUploading[doc.type]}
+                                                    className="reg-upload-input"
+                                                />
+                                                {kycUploading[doc.type] ? 'Uploading…' : 'Upload file'}
+                                            </label>
+                                        )}
+</div>
+                                );
+                            })}
+                        </div>
+                        <div className="reg-modal-actions">
+                            <button type="button" className="reg-btn-ghost" onClick={() => setShowKycModal(false)}>
+                                Cancel
+                            </button>
+                            <button type="button" className="reg-submit-btn" onClick={handleKycSubmit} disabled={kycSubmitting}>
+                                {kycSubmitting ? 'Submitting…' : 'Submit documents'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 };
 
