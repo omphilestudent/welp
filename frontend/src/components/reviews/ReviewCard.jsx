@@ -73,7 +73,12 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
 
     const handlePrivateMessage = async () => {
         const authorId = review.author?.id || review.author_id;
+        const authorRole = String(review.author?.role || review.author_role || '').toLowerCase();
         if (!authorId) {
+            toast.error('This reviewer cannot be messaged.');
+            return;
+        }
+        if (authorRole && authorRole !== 'employee') {
             toast.error('This reviewer cannot be messaged.');
             return;
         }

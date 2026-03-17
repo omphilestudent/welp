@@ -154,6 +154,7 @@ const createReview = async (req, res) => {
             `SELECT
                 u.id,
                 u.display_name,
+                u.role,
                 u.is_anonymous,
                 u.occupation,
                 u.avatar_url,
@@ -238,12 +239,13 @@ const getCompanyReviews = async (req, res) => {
             `SELECT
                  r.*,
                  json_build_object(
-                         'id', u.id,
-                         'displayName', u.display_name,
-                         'isAnonymous', COALESCE(r.is_anonymous, u.is_anonymous),
-                         'occupation', r.author_occupation,
-                         'avatarUrl', u.avatar_url,
-                         'workplace', CASE
+                          'id', u.id,
+                          'displayName', u.display_name,
+                          'role', u.role,
+                          'isAnonymous', COALESCE(r.is_anonymous, u.is_anonymous),
+                          'occupation', r.author_occupation,
+                          'avatarUrl', u.avatar_url,
+                          'workplace', CASE
                                           WHEN r.author_workplace_id IS NOT NULL THEN
                                               json_build_object(
                                                       'id', c.id,
