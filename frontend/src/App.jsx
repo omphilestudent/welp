@@ -22,6 +22,9 @@ import PsychologistRegister from './pages/PsychologistRegister';
 import ApplicationSuccess from './pages/ApplicationSuccess';
 import Pricing from './pages/Pricing';
 import FAQ from './pages/FAQ';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import PsychologistCode from './pages/PsychologistCode';
 import Careers from './pages/Careers';
 import JobDetails from './pages/JobDetails';
 import ApplyJob from './pages/ApplyJob';
@@ -94,6 +97,9 @@ function App() {
                                 <Route path="/companies/:id" element={<CompanyPage />} />
                                 <Route path="/pricing" element={<Pricing />} />
                                 <Route path="/faq" element={<FAQ />} />
+                                <Route path="/terms" element={<Terms />} />
+                                <Route path="/privacy" element={<Privacy />} />
+                                <Route path="/psychologist-code" element={<PsychologistCode />} />
                                 <Route path="/register/psychologist" element={<PsychologistRegister />} />
                                 <Route path="/register/business" element={<BusinessRegister />} />
                                 <Route path="/application-success" element={<ApplicationSuccess />} />

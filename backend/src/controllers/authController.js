@@ -418,50 +418,142 @@ const registerPsychologist = async (req, res) => {
 
         const appTableAvailable = await tableExists('psychologist_applications');
         if (appTableAvailable) {
-            const appCols = ['user_id', 'status', 'license_number', 'license_body'];
-            const appPlaceholders = ['$1', '$2', '$3', '$4'];
-            const appParams = [user.id, 'pending_review', licenseNumber, licenseBody];
-            let appIdx = 5;
+            const hasUserIdColumn = await columnExists('psychologist_applications', 'user_id');
+            const hasEmailColumn = await columnExists('psychologist_applications', 'email');
+            const hasFullNameColumn = await columnExists('psychologist_applications', 'full_name');
 
-            const optionalFields = {
-                license_expiry: licenseExpiry || null,
-                years_experience: yearsExperience || null,
-                qualifications: qualifications || null,
-                specialisations: specialisations ? JSON.stringify(specialisations) : null,
-                therapy_types: therapyTypes ? JSON.stringify(therapyTypes) : null,
-                session_formats: sessionFormats ? JSON.stringify(sessionFormats) : null,
-                languages: languages || null,
-                practice_location: practiceLocation || null,
-                bio: bio || null,
-                website: website || null
-            };
+            if (hasUserIdColumn) {
+                const appCols = ['user_id', 'status', 'license_number', 'license_body'];
+                const appPlaceholders = ['$1', '$2', '$3', '$4'];
+                const appParams = [user.id, 'pending_review', licenseNumber, licenseBody];
+                let appIdx = 5;
 
-            for (const [column, value] of Object.entries(optionalFields)) {
-                if (value === null) {
-                    continue;
+                const optionalFields = {
+                    license_expiry: licenseExpiry || null,
+                    years_experience: yearsExperience || null,
+                    qualifications: qualifications || null,
+                    specialisations: specialisations ? JSON.stringify(specialisations) : null,
+                    therapy_types: therapyTypes ? JSON.stringify(therapyTypes) : null,
+                    session_formats: sessionFormats ? JSON.stringify(sessionFormats) : null,
+                    languages: languages || null,
+                    practice_location: practiceLocation || null,
+                    bio: bio || null,
+                    website: website || null
+                };
+
+                for (const [column, value] of Object.entries(optionalFields)) {
+                    if (value === null) {
+                        continue;
+                    }
+                    const exists = await columnExists('psychologist_applications', column);
+                    if (exists) {
+                        appCols.push(column);
+                        const jsonColumns = ['specialisations', 'therapy_types', 'session_formats'];
+                        appPlaceholders.push(jsonColumns.includes(column) ? `$${appIdx}::jsonb` : `$${appIdx}`);
+                        appParams.push(value);
+                        appIdx += 1;
+                    }
                 }
-                const exists = await columnExists('psychologist_applications', column);
-                if (exists) {
-                    appCols.push(column);
-                    const jsonColumns = ['specialisations', 'therapy_types', 'session_formats'];
-                    appPlaceholders.push(jsonColumns.includes(column) ? `$${appIdx}::jsonb` : `$${appIdx}`);
-                    appParams.push(value);
+
+                const hasDocColumn = await columnExists('psychologist_applications', 'documents');
+                if (hasDocColumn) {
+                    appCols.push('documents');
+                    appPlaceholders.push(`$${appIdx}::jsonb`);
+                    appParams.push(JSON.stringify(documentPayload));
                     appIdx += 1;
                 }
-            }
 
-            const hasDocColumn = await columnExists('psychologist_applications', 'documents');
-            if (hasDocColumn) {
-                appCols.push('documents');
-                appPlaceholders.push(`$${appIdx}::jsonb`);
-                appParams.push(JSON.stringify(documentPayload));
-                appIdx += 1;
-            }
+                await query(
+                    `INSERT INTO psychologist_applications (${appCols.join(', ')}) VALUES (${appPlaceholders.join(', ')})`,
+                    appParams
+                );
+            } else if (hasEmailColumn || hasFullNameColumn) {
+                const normalizeList = (value) => {
+                    if (!value) return null;
+                    if (Array.isArray(value)) return value;
+                    return String(value)
+                        .split(',')
+                        .map((item) => item.trim())
+                        .filter(Boolean);
+                };
 
-            await query(
-                `INSERT INTO psychologist_applications (${appCols.join(', ')}) VALUES (${appPlaceholders.join(', ')})`,
-                appParams
-            );
+                const legacyCols = [];
+                const legacyPlaceholders = [];
+                const legacyParams = [];
+                let legacyIdx = 1;
+
+                if (hasFullNameColumn) {
+                    legacyCols.push('full_name');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push(displayName || email.split('@')[0]);
+                }
+                if (hasEmailColumn) {
+                    legacyCols.push('email');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push(email.toLowerCase());
+                }
+
+                const hasLicenseNumber = await columnExists('psychologist_applications', 'license_number');
+                if (hasLicenseNumber) {
+                    legacyCols.push('license_number');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push(licenseNumber);
+                }
+
+                const hasIssuingBody = await columnExists('psychologist_applications', 'license_issuing_body');
+                const hasLicenseBody = await columnExists('psychologist_applications', 'license_body');
+                if (hasIssuingBody || hasLicenseBody) {
+                    legacyCols.push(hasIssuingBody ? 'license_issuing_body' : 'license_body');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push(licenseBody);
+                }
+
+                const hasYearsOfExperience = await columnExists('psychologist_applications', 'years_of_experience');
+                const hasYearsExperience = await columnExists('psychologist_applications', 'years_experience');
+                if (hasYearsOfExperience || hasYearsExperience) {
+                    legacyCols.push(hasYearsOfExperience ? 'years_of_experience' : 'years_experience');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push(yearsExperience || null);
+                }
+
+                const legacyOptionalMap = [
+                    { column: 'specialization', value: specialisations },
+                    { column: 'specialisations', value: specialisations },
+                    { column: 'qualifications', value: normalizeList(qualifications) },
+                    { column: 'biography', value: bio || null },
+                    { column: 'practice_location', value: practiceLocation || null },
+                    { column: 'website', value: website || null },
+                    { column: 'languages', value: normalizeList(languages) },
+                    { column: 'consultation_modes', value: normalizeList(therapyTypes) },
+                    { column: 'session_formats', value: normalizeList(sessionFormats) }
+                ];
+
+                for (const entry of legacyOptionalMap) {
+                    if (entry.value == null) {
+                        continue;
+                    }
+                    const exists = await columnExists('psychologist_applications', entry.column);
+                    if (exists) {
+                        legacyCols.push(entry.column);
+                        legacyPlaceholders.push(`$${legacyIdx++}`);
+                        legacyParams.push(entry.value);
+                    }
+                }
+
+                const hasLegacyStatus = await columnExists('psychologist_applications', 'status');
+                if (hasLegacyStatus) {
+                    legacyCols.push('status');
+                    legacyPlaceholders.push(`$${legacyIdx++}`);
+                    legacyParams.push('pending_review');
+                }
+
+                if (legacyCols.length > 0) {
+                    await query(
+                        `INSERT INTO psychologist_applications (${legacyCols.join(', ')}) VALUES (${legacyPlaceholders.join(', ')})`,
+                        legacyParams
+                    );
+                }
+            }
         } else {
             const hasMetadata = await columnExists('users', 'metadata');
             if (hasMetadata) {
@@ -488,23 +580,37 @@ const registerPsychologist = async (req, res) => {
             console.warn('psychologist_applications table not found, application data stored in user metadata.');
         }
 
-        await createAdminNotification({
-            type: 'psychologist_application',
-            message: `New psychologist application from ${email}`,
-            entityType: 'psychologist_application',
-            entityId: user.id
-        });
+        try {
+            await createAdminNotification({
+                type: 'psychologist_application',
+                message: `New psychologist application from ${email}`,
+                entityType: 'psychologist_application',
+                entityId: user.id
+            });
+        } catch (error) {
+            console.warn('Admin notification failed:', error.message);
+        }
 
         enqueueMarketingForUser(user.id).catch((error) => {
             console.warn('Marketing enqueue failed:', error.message);
         });
 
-        await assignStarterSubscription(user.id, user.role);
+        let psychSubscriptionData = null;
+        try {
+            await assignStarterSubscription(user.id, user.role);
+            const psychOwnerType = ROLE_TO_OWNER[String(user.role || 'employee').toLowerCase()] || 'user';
+            const psychSubscriptionRecord = await getActiveSubscription(psychOwnerType, user.id);
+            psychSubscriptionData = await getPlanPayload(psychSubscriptionRecord, psychOwnerType);
+        } catch (error) {
+            console.warn('Starter subscription failed:', error.message);
+        }
 
-        const psychOwnerType = ROLE_TO_OWNER[String(user.role || 'employee').toLowerCase()] || 'user';
-        const psychSubscriptionRecord = await getActiveSubscription(psychOwnerType, user.id);
-        const psychSubscriptionData = await getPlanPayload(psychSubscriptionRecord, psychOwnerType);
-        const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
+        let applicationStatus = null;
+        try {
+            applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
+        } catch (error) {
+            console.warn('Application status lookup failed:', error.message);
+        }
 
         emitFlowEvent('user.signup', {
             userId: user.id,
