@@ -26,8 +26,11 @@ const marketingRoutes = require('./routes/marketingRoutes');
 const emailMarketingRoutes = require('./routes/admin/emailMarketingRoutes');
 const adminPricingRoutes = require('./routes/admin/pricingRoutes');
 const adminFlowRoutes = require('./routes/admin/flowRoutes');
+const adminTicketRoutes = require('./routes/admin/ticketRoutes');
 const flowRuntimeRoutes = require('./routes/flowRuntimeRoutes');
 const adsRoutes = require('./routes/adsRoutes');
+const ticketRoutes = require('./routes/ticketRoutes');
+const kodiRoutes = require('./routes/kodiRoutes');
 const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
 const { initEmailMarketingTables, startEmailCampaignScheduler } = require('./services/emailMarketingService');
 const { query } = require('./utils/database');
@@ -164,6 +167,7 @@ app.use('/api/pricing', pricingRoutes);
 app.use('/api/resources', resourcesRoutes);
 app.use('/api/admin/pricing', adminPricingRoutes);
 app.use('/api/admin/flows', adminFlowRoutes);
+app.use('/api/admin/tickets', adminTicketRoutes);
 app.use('/api/flows', flowRuntimeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/applications', applicationRoutes);
@@ -174,6 +178,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/marketing', marketingRoutes);
 app.use('/api/admin/emailCampaigns', emailMarketingRoutes);
 app.use('/api/ads', adsRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/kodi', kodiRoutes);
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {

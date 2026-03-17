@@ -774,6 +774,45 @@ Login to continue the chat: ${loginUrl}
     return sendEmail({ to: receiverEmail, subject, html, text });
 }
 
+async function sendTicketNotificationEmail({ receiverEmail, receiverName, ticketNumber, ticketTitle, ticketStatus, ticketId }) {
+    if (!receiverEmail) return { success: false, reason: 'missing-email' };
+    const greeting = receiverName ? `Hi ${receiverName}` : 'Hi there';
+    const subject = `Ticket ${ticketNumber}: ${ticketTitle}`;
+    const baseUrl = process.env.FRONTEND_URL || process.env.SITE_URL || 'https://welphub.onrender.com';
+    const redirectPath = `/tickets?ticket=${ticketId}`;
+    const loginUrl = `${baseUrl}/login?redirect=${encodeURIComponent(redirectPath)}`;
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <p>${greeting},</p>
+            <p>Your ticket <strong>${ticketNumber}</strong> is now <strong>${ticketStatus}</strong>.</p>
+            <p><strong>${ticketTitle}</strong></p>
+            <p style="margin: 20px 0;">
+              <a href="${loginUrl}" style="display: inline-block; background: #0ea5e9; color: #ffffff; padding: 10px 18px; border-radius: 999px; text-decoration: none;">
+                View ticket
+              </a>
+            </p>
+            <p>Need to add more details? Reply inside your ticket thread.</p>
+            <p style="margin-top: 24px;">— The Welp Support Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+    const text = `${greeting},
+
+Your ticket ${ticketNumber} is now ${ticketStatus}.
+
+${ticketTitle}
+
+View ticket: ${loginUrl}
+
+— The Welp Support Team`;
+
+    return sendEmail({ to: receiverEmail, subject, html, text });
+}
+
 module.exports = {
     sendClaimInvitation,
     sendVerificationEmail,
@@ -785,5 +824,6 @@ module.exports = {
     sendSubscriptionCancellationEmail,
     sendApplicationStatusEmail,
     sendReviewNotificationEmail,
-    sendMessageNotificationEmail
+    sendMessageNotificationEmail,
+    sendTicketNotificationEmail
 };

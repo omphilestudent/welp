@@ -788,10 +788,12 @@ const getConversations = async (req, res) => {
             : 'NULL as last_message';
 
         const orderColumn = hasUpdatedAt ? 'c.updated_at' : (hasCreatedAt ? 'c.created_at' : 'c.id');
+        // conversations.psychologist_id is stored as users.id (see requestChatWithPsychologist insert).
+        // Some environments also have a psychologists table; if present, it links via psychologists.user_id.
         const hasPsychologistsTable = await tableExists('psychologists');
         const hasPsychUserId = hasPsychologistsTable ? await columnExists('psychologists', 'user_id') : false;
         const psychologistJoin = hasPsychologistsTable && hasPsychUserId
-            ? 'JOIN psychologists p ON c.psychologist_id = p.id JOIN users psychologist ON p.user_id = psychologist.id'
+            ? 'JOIN users psychologist ON c.psychologist_id = psychologist.id LEFT JOIN psychologists p ON p.user_id = psychologist.id'
             : 'JOIN users psychologist ON c.psychologist_id = psychologist.id';
         const result = await query(
             `SELECT

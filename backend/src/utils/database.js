@@ -519,6 +519,90 @@ const createTables = async () => {
                 UNIQUE(company_id, user_id)
             );
 
+            -- Ticketing system
+            CREATE TABLE IF NOT EXISTS tickets (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                ticket_number VARCHAR(40) UNIQUE NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                description TEXT NOT NULL,
+                created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                assigned_to_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open','in_progress','resolved','closed')),
+                priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low','medium','high')),
+                category VARCHAR(120),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS ticket_history (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+                action VARCHAR(32) NOT NULL CHECK (action IN ('created','updated','assigned','status_changed','comment_added','email_failed')),
+                performed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS ticket_access (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(ticket_id, user_id)
+            );
+
+            -- KP/KC Kodi core tables
+            CREATE TABLE IF NOT EXISTS kodi_client_applications (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                client_name VARCHAR(255) NOT NULL,
+                submitted_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                documents JSONB DEFAULT '[]'::jsonb,
+                approval_status VARCHAR(20) DEFAULT 'pending' CHECK (approval_status IN ('pending','approved','rejected')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_cases (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                client_application_id UUID REFERENCES kodi_client_applications(id) ON DELETE SET NULL,
+                status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open','escalated','resolved')),
+                priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low','medium','high')),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_ads (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                submitted_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','reviewed','approved','rejected')),
+                content JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_components (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                component_name VARCHAR(120) UNIQUE NOT NULL,
+                component_type VARCHAR(20) NOT NULL CHECK (component_type IN ('custom_page','custom_widget','custom_email')),
+                code TEXT NOT NULL,
+                created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                version INT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_audit_logs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                entity_type VARCHAR(50) NOT NULL,
+                entity_id UUID,
+                action VARCHAR(50) NOT NULL,
+                performed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             -- Email verifications table
             CREATE TABLE IF NOT EXISTS email_verifications (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -782,6 +866,17 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_psych_favorites_psychologist     ON psychologist_favorites(psychologist_id);
             CREATE INDEX IF NOT EXISTS idx_employee_favorites_employee     ON employee_psychologist_favorites(employee_id);
             CREATE INDEX IF NOT EXISTS idx_employee_favorites_psychologist ON employee_psychologist_favorites(psychologist_id);
+            CREATE INDEX IF NOT EXISTS idx_tickets_status                  ON tickets(status);
+            CREATE INDEX IF NOT EXISTS idx_tickets_priority                ON tickets(priority);
+            CREATE INDEX IF NOT EXISTS idx_tickets_created_by              ON tickets(created_by_user_id);
+            CREATE INDEX IF NOT EXISTS idx_tickets_assigned_to             ON tickets(assigned_to_user_id);
+            CREATE INDEX IF NOT EXISTS idx_ticket_history_ticket           ON ticket_history(ticket_id);
+            CREATE INDEX IF NOT EXISTS idx_kodi_apps_status                ON kodi_client_applications(approval_status);
+            CREATE INDEX IF NOT EXISTS idx_kodi_cases_status               ON kodi_cases(status);
+            CREATE INDEX IF NOT EXISTS idx_kodi_cases_priority             ON kodi_cases(priority);
+            CREATE INDEX IF NOT EXISTS idx_kodi_ads_status                 ON kodi_ads(status);
+            CREATE INDEX IF NOT EXISTS idx_kodi_components_type            ON kodi_components(component_type);
+            CREATE INDEX IF NOT EXISTS idx_kodi_audit_entity               ON kodi_audit_logs(entity_type, entity_id);
         `;
 
         await pool.query(queries);
@@ -1170,6 +1265,91 @@ const runMigrations = async () => {
             );`,
             "CREATE INDEX IF NOT EXISTS idx_employee_favorites_employee ON employee_psychologist_favorites(employee_id);",
             "CREATE INDEX IF NOT EXISTS idx_employee_favorites_psychologist ON employee_psychologist_favorites(psychologist_id);",
+            `CREATE TABLE IF NOT EXISTS tickets (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                ticket_number VARCHAR(40) UNIQUE NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                description TEXT NOT NULL,
+                created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                assigned_to_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open','in_progress','resolved','closed')),
+                priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low','medium','high')),
+                category VARCHAR(120),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS ticket_history (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+                action VARCHAR(32) NOT NULL CHECK (action IN ('created','updated','assigned','status_changed','comment_added','email_failed')),
+                performed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS ticket_access (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(ticket_id, user_id)
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_created_by ON tickets(created_by_user_id);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_assigned_to ON tickets(assigned_to_user_id);",
+            "CREATE INDEX IF NOT EXISTS idx_ticket_history_ticket ON ticket_history(ticket_id);",
+            `CREATE TABLE IF NOT EXISTS kodi_client_applications (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                client_name VARCHAR(255) NOT NULL,
+                submitted_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                documents JSONB DEFAULT '[]'::jsonb,
+                approval_status VARCHAR(20) DEFAULT 'pending' CHECK (approval_status IN ('pending','approved','rejected')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS kodi_cases (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                client_application_id UUID REFERENCES kodi_client_applications(id) ON DELETE SET NULL,
+                status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open','escalated','resolved')),
+                priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low','medium','high')),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS kodi_ads (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                submitted_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','reviewed','approved','rejected')),
+                content JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS kodi_components (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                component_name VARCHAR(120) UNIQUE NOT NULL,
+                component_type VARCHAR(20) NOT NULL CHECK (component_type IN ('custom_page','custom_widget','custom_email')),
+                code TEXT NOT NULL,
+                created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                version INT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS kodi_audit_logs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                entity_type VARCHAR(50) NOT NULL,
+                entity_id UUID,
+                action VARCHAR(50) NOT NULL,
+                performed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            "CREATE INDEX IF NOT EXISTS idx_kodi_apps_status ON kodi_client_applications(approval_status);",
+            "CREATE INDEX IF NOT EXISTS idx_kodi_cases_status ON kodi_cases(status);",
+            "CREATE INDEX IF NOT EXISTS idx_kodi_cases_priority ON kodi_cases(priority);",
+            "CREATE INDEX IF NOT EXISTS idx_kodi_ads_status ON kodi_ads(status);",
+            "CREATE INDEX IF NOT EXISTS idx_kodi_components_type ON kodi_components(component_type);",
+            "CREATE INDEX IF NOT EXISTS idx_kodi_audit_entity ON kodi_audit_logs(entity_type, entity_id);",
             `CREATE TABLE IF NOT EXISTS psychologist_leads (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 psychologist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

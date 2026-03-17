@@ -160,6 +160,12 @@ const AdminLayout = () => {
             color: '#14b8a6'
         },
         {
+            path: '/kodi',
+            icon: <FaProjectDiagram />,
+            label: 'Kodi Portal',
+            color: '#7c3aed'
+        },
+        {
             path: '/admin/subscriptions',
             icon: <FaClipboardList />,
             label: 'Subscriptions',
@@ -170,6 +176,12 @@ const AdminLayout = () => {
             icon: <FaBullhorn />,
             label: 'Ad Approvals',
             color: '#dd6b20'
+        },
+        {
+            path: '/admin/tickets',
+            icon: <FaClipboardList />,
+            label: 'Support Tickets',
+            color: '#0ea5e9'
         },
         {
             path: '/admin/calendar',

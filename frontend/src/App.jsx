@@ -16,6 +16,7 @@ import SearchPage from './pages/SearchPage';
 import Dashboard from './pages/Dashboard';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
+import Tickets from './pages/Tickets';
 import ClaimBusiness from './pages/ClaimBusiness';
 import BusinessRegister from './pages/BusinessRegister';
 import PsychologistRegister from './pages/PsychologistRegister';
@@ -54,6 +55,11 @@ import AdApprovals from './pages/admin/AdApprovals';
 import FlowManagement from './pages/admin/FlowManagement';
 import FlowAdmin from './pages/admin/FlowAdmin';
 import FlowBuilder from './pages/admin/FlowBuilder';
+import AdminTickets from './pages/admin/AdminTickets';
+import KodiDashboard from './pages/kodi/KodiDashboard';
+import KodiLogin from './pages/kodi/KodiLogin';
+import KodiPage from './pages/kodi/KodiPage';
+import KodiBuilder from './pages/kodi/KodiBuilder';
 
 // HR Pages
 import Employees from './pages/hr/Employees';
@@ -168,6 +174,26 @@ function App() {
                                         </PrivateRoute>
                                     }
                                 />
+                                <Route
+                                    path="/tickets"
+                                    element={
+                                        <PrivateRoute>
+                                            <Tickets />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/kodi"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiDashboard />
+                                        </PrivateRoute>
+                                    }
+                                />
+
+                                {/* Public Kodi Record Pages */}
+                                <Route path="/kodi/page/:slug/login" element={<KodiLogin />} />
+                                <Route path="/kodi/page/:slug" element={<KodiPage />} />
 
                                 {/* Admin Routes */}
                                 <Route
@@ -190,9 +216,11 @@ function App() {
                                     <Route path="claims" element={<ClaimRequests />} />
                                     <Route path="marketing" element={<MarketingEmails />} />
                                     <Route path="ads" element={<AdApprovals />} />
+                                    <Route path="tickets" element={<AdminTickets />} />
                                     <Route path="flows" element={<FlowAdmin />} />
                                     <Route path="flows/advanced" element={<FlowManagement />} />
                                     <Route path="flows/:id/builder" element={<FlowBuilder />} />
+                                    <Route path="kodi/builder" element={<KodiBuilder />} />
                                     <Route path="calendar" element={<CalendarTroubleshoot />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />
