@@ -42,9 +42,33 @@ const renderTemplate = (template, context = {}) => {
     });
 };
 
+const renderTemplateObject = (value, context = {}) => {
+    if (value === null || value === undefined) return value;
+    if (typeof value === 'string') return renderTemplate(value, context);
+    if (Array.isArray(value)) return value.map((item) => renderTemplateObject(item, context));
+    if (typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value).map(([key, val]) => [key, renderTemplateObject(val, context)])
+        );
+    }
+    return value;
+};
+
 const matchesConditions = (conditions = {}, payload = {}) => {
     if (!conditions || typeof conditions !== 'object') return true;
-    const { match = {}, exclude = {} } = conditions;
+
+    const hasExplicitBlocks = Object.prototype.hasOwnProperty.call(conditions, 'match')
+        || Object.prototype.hasOwnProperty.call(conditions, 'exclude');
+
+    const extraMatch = hasExplicitBlocks
+        ? Object.fromEntries(
+            Object.entries(conditions).filter(([key]) => !['match', 'exclude'].includes(key))
+        )
+        : conditions;
+
+    const { match: rawMatch = {}, exclude: rawExclude = {} } = hasExplicitBlocks ? conditions : { match: {}, exclude: {} };
+    const match = { ...extraMatch, ...(rawMatch || {}) };
+    const exclude = rawExclude || {};
 
     const passesMatch = Object.entries(match).every(([key, expected]) => {
         const value = getNestedValue(payload, key);
@@ -85,6 +109,12 @@ const executeNode = async (node = {}, context = {}, flow = {}, options = {}) => 
 
     if (!type) {
         result.error = 'Missing action type';
+        return result;
+    }
+
+    if (type === 'trigger') {
+        result.status = 'completed';
+        result.detail = 'Trigger evaluated';
         return result;
     }
 
@@ -131,7 +161,7 @@ const executeNode = async (node = {}, context = {}, flow = {}, options = {}) => 
             return result;
         }
         await sendEmail({
-            to: recipients,
+            to: renderTemplate(recipients, context),
             subject: renderTemplate(node.subject || `Update from ${flow.name}`, context),
             text: renderTemplate(node.text || node.message || '', context),
             html: node.html ? renderTemplate(node.html, context) : undefined
@@ -140,13 +170,125 @@ const executeNode = async (node = {}, context = {}, flow = {}, options = {}) => 
         return result;
     }
 
+    if (type === 'call_api') {
+        const baseUrl = node.baseUrl || process.env.INTERNAL_API_BASE_URL || '';
+        const path = renderTemplate(node.path || node.url || '', context);
+        const url = path.startsWith('http://') || path.startsWith('https://')
+            ? path
+            : `${String(baseUrl).replace(/\/$/, '')}${path.startsWith('/') ? '' : '/'}${path}`;
+
+        if (!url || url === baseUrl) {
+            result.status = 'skipped';
+            result.detail = 'No URL provided';
+            return result;
+        }
+
+        const method = String(node.method || 'GET').toUpperCase();
+        const headers = renderTemplateObject(node.headers || {}, context);
+        const bodyTemplate = node.body ?? node.payload ?? null;
+        const bodyObject = renderTemplateObject(bodyTemplate, context);
+
+        const requestInit = {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                ...headers
+            }
+        };
+
+        if (!['GET', 'HEAD'].includes(method) && bodyObject !== null && bodyObject !== undefined && bodyObject !== '') {
+            requestInit.body = typeof bodyObject === 'string' ? bodyObject : JSON.stringify(bodyObject);
+        }
+
+        try {
+            const response = await fetch(url, requestInit);
+            const contentType = response.headers.get('content-type') || '';
+            const responseBody = contentType.includes('application/json')
+                ? await response.json().catch(() => null)
+                : await response.text().catch(() => null);
+
+            result.status = response.ok ? 'completed' : 'failed';
+            result.detail = `HTTP ${response.status}`;
+            result.http = {
+                url,
+                status: response.status,
+                ok: response.ok,
+                body: responseBody
+            };
+        } catch (error) {
+            result.status = 'failed';
+            result.error = error?.message || 'Call API failed';
+        }
+        return result;
+    }
+
     result.status = 'skipped';
     result.detail = `Unsupported action type ${type}`;
     return result;
 };
 
+const runGraphDefinition = async (flow, context = {}, options = {}) => {
+    const { nodes, lookup } = getNodeMap(flow.definition || {});
+    const startNodeId = getStartNodeId(flow.definition || {}, nodes);
+    if (!startNodeId) return [];
+
+    const results = [];
+    let currentId = startNodeId;
+    let iterations = 0;
+
+    while (currentId && iterations < MAX_NODE_ITERATIONS) {
+        iterations += 1;
+        const node = lookup.get(String(currentId));
+        if (!node) {
+            results.push({
+                id: String(currentId),
+                type: 'missing',
+                status: 'failed',
+                error: `Missing node ${currentId}`
+            });
+            break;
+        }
+
+        if (node.type === 'end') {
+            results.push({ id: node.id, type: 'end', status: 'completed' });
+            break;
+        }
+
+        if (node.type === 'condition' || node.type === 'branch' || node.branches) {
+            results.push({ id: node.id, type: node.type || 'condition', status: 'completed' });
+            currentId = resolveNextFromNode(node, context);
+            continue;
+        }
+
+        if (node.type === 'screen') {
+            results.push({ id: node.id, type: 'screen', status: 'skipped', detail: 'Screen node ignored in automation execution' });
+            currentId = resolveNextFromNode(node, context);
+            continue;
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        const actionResult = await executeNode(node, context, flow, options);
+        results.push(actionResult);
+        currentId = resolveNextFromNode(node, context);
+    }
+
+    if (iterations >= MAX_NODE_ITERATIONS) {
+        results.push({
+            id: 'flow.max_iterations',
+            type: 'guard',
+            status: 'failed',
+            error: 'Flow exceeded maximum depth'
+        });
+    }
+
+    return results;
+};
+
 const runFlowDefinition = async (flow, context = {}, options = {}) => {
     const definition = flow.definition || {};
+    if (Array.isArray(definition.nodes) || Array.isArray(definition.steps)) {
+        return runGraphDefinition(flow, context, options);
+    }
     const steps = Array.isArray(definition.actions)
         ? definition.actions
         : Array.isArray(definition.nodes)

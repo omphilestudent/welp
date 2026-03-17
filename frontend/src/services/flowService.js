@@ -3,6 +3,7 @@ import api from './api';
 const basePath = '/admin/flows';
 
 export const fetchFlows = (params = {}) => api.get(basePath, { params });
+export const fetchFlowById = (id) => api.get(`${basePath}/${id}`);
 export const createFlow = (payload) => api.post(basePath, payload);
 export const updateFlow = (id, payload) => api.put(`${basePath}/${id}`, payload);
 export const deleteFlow = (id) => api.delete(`${basePath}/${id}`);

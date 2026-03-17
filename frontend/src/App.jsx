@@ -46,6 +46,8 @@ import ClaimRequests from './pages/admin/ClaimRequests';
 import MarketingEmails from './pages/admin/MarketingEmails';
 import AdApprovals from './pages/admin/AdApprovals';
 import FlowManagement from './pages/admin/FlowManagement';
+import FlowAdmin from './pages/admin/FlowAdmin';
+import FlowBuilder from './pages/admin/FlowBuilder';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
@@ -170,7 +172,9 @@ function App() {
                                     <Route path="claims" element={<ClaimRequests />} />
                                     <Route path="marketing" element={<MarketingEmails />} />
                                     <Route path="ads" element={<AdApprovals />} />
-                                    <Route path="flows" element={<FlowManagement />} />
+                                    <Route path="flows" element={<FlowAdmin />} />
+                                    <Route path="flows/advanced" element={<FlowManagement />} />
+                                    <Route path="flows/:id/builder" element={<FlowBuilder />} />
                                     <Route path="calendar" element={<CalendarTroubleshoot />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />

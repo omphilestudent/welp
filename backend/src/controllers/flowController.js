@@ -49,6 +49,8 @@ const formatFlow = (flow) => {
         type: flow.type,
         definition: flow.definition || {},
         isActive: flow.isActive !== false && flow.is_active !== false,
+        createdBy: flow.createdBy || flow.created_by || null,
+        updatedBy: flow.updatedBy || flow.updated_by || null,
         createdAt: flow.created_at || flow.createdAt,
         updatedAt: flow.updated_at || flow.updatedAt
     };
