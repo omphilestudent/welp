@@ -1,3 +1,4 @@
+const { query } = require('../utils/database');
 const {
     getActiveSubscription,
     getPlanDetails,
@@ -27,6 +28,52 @@ const DEFAULT_PLAN_CODES = {
 };
 
 const LARGE_QUOTA = 1_000_000;
+
+const fetchUserSnapshot = async (userId, subscriptionPayload) => {
+    if (!userId) return null;
+    try {
+        const result = await query(
+            `SELECT id, email, role, display_name, avatar_url
+             FROM users
+             WHERE id = $1
+             LIMIT 1`,
+            [userId]
+        );
+        if (!result.rows.length) return null;
+        const user = result.rows[0];
+        return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            displayName: user.display_name,
+            display_name: user.display_name,
+            avatarUrl: user.avatar_url,
+            avatar_url: user.avatar_url,
+            subscription: subscriptionPayload
+        };
+    } catch (error) {
+        console.warn('Failed to load user snapshot after subscription update:', error.message);
+        return null;
+    }
+};
+
+const updateBusinessSubscriptionTier = async (userId, tier, expiresAt) => {
+    if (!userId) return;
+    try {
+        const { rows } = await query(`SELECT to_regclass('public.businesses') AS table_name`);
+        if (!rows[0]?.table_name) return;
+        await query(
+            `UPDATE businesses
+             SET subscription_tier = $1,
+                 subscription_expires = $2,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE owner_user_id = $3`,
+            [tier, expiresAt, userId]
+        );
+    } catch (error) {
+        console.warn('Failed to update business subscription tier:', error.message);
+    }
+};
 
 const buildPremiumSubscriptionPayload = (ownerType) => ({
     planCode: 'business_premium',
@@ -80,10 +127,13 @@ const subscribePlan = async (req, res) => {
 
         if (ownerType === 'user') {
             await updateUserSubscriptionTier(req.user.id, plan.tier, plan.chatMinutes, endsAt);
+        } else if (ownerType === 'business') {
+            await updateBusinessSubscriptionTier(req.user.id, plan.tier, endsAt);
         }
 
         const latestRecord = await getActiveSubscription(ownerType, req.user.id);
         const subscriptionPayload = await getPlanPayload(latestRecord, ownerType);
+        const userSnapshot = await fetchUserSnapshot(req.user.id, subscriptionPayload);
 
         await recordAuditLog({
             userId: req.user.id,
@@ -120,7 +170,8 @@ const subscribePlan = async (req, res) => {
                 ...subscriptionPayload,
                 ownerType,
                 expiresAt: latestRecord?.ends_at?.toISOString() || endsAt?.toISOString()
-            }
+            },
+            user: userSnapshot
         });
     } catch (error) {
         console.error('Subscribe plan error:', error);
@@ -171,9 +222,12 @@ const cancelSubscription = async (req, res) => {
         if (ownerType === 'user') {
             const limits = PLAN_LIMITS.user_free ?? { chatMinutes: 30 };
             await updateUserSubscriptionTier(req.user.id, 'free', limits.chatMinutes);
+        } else if (ownerType === 'business') {
+            await updateBusinessSubscriptionTier(req.user.id, 'base', null);
         }
 
         const fallbackPayload = await getPlanPayload(null, ownerType);
+        const userSnapshot = await fetchUserSnapshot(req.user.id, fallbackPayload);
 
         await recordAuditLog({
             userId: req.user.id,
@@ -217,7 +271,8 @@ const cancelSubscription = async (req, res) => {
                 ...fallbackPayload,
                 ownerType,
                 expiresAt: null
-            }
+            },
+            user: userSnapshot
         });
     } catch (error) {
         console.error('Cancel subscription error:', error);

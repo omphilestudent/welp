@@ -824,8 +824,14 @@ const recordClick = async (req, res) => {
 
 const adminListCampaigns = async (req, res) => {
     try {
+        const normalizeReviewStatus = (value) => {
+            const raw = String(value || '').toLowerCase().trim();
+            if (!raw) return undefined;
+            if (raw === 'pending_review') return 'pending';
+            return raw;
+        };
         const filters = {
-            reviewStatus: req.query.reviewStatus,
+            reviewStatus: normalizeReviewStatus(req.query.reviewStatus),
             status: req.query.status,
             tier: req.query.tier,
             search: req.query.search,

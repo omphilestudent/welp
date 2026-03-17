@@ -8,6 +8,8 @@ import Loading from '../components/common/Loading';
 import { FaBuilding } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
 import SponsoredCard from '../components/ads/SponsoredCard';
+import CompactSponsoredCard from '../components/ads/CompactSponsoredCard';
+import { usePlacementAds } from '../hooks/usePlacementAds';
 
 const SearchPage = () => {
     const [searchParams] = useSearchParams();
@@ -44,6 +46,7 @@ const SearchPage = () => {
     const canSuggestCompany = user && ['employee', 'business', ...adminRoles].includes(normalizedRole);
     const isAdminRole = adminRoles.has(normalizedRole);
     const canShowAddCompany = true;
+    const { campaigns: placementAds } = usePlacementAds({ placement: 'search_results' });
 
     useEffect(() => {
         searchCompanies(1);
@@ -185,15 +188,29 @@ const SearchPage = () => {
                     <Loading />
                 ) : (
                     <div className="companies-grid">
-                        {companies.map(company => (
-                            <div key={company.id} className="company-card-wrapper">
-                                <CompanyCard
-                                    company={company}
-                                    showClaimAction
-                                    onClaim={handleClaimRedirect}
-                                />
-                            </div>
-                        ))}
+                        {companies.map((company, index) => {
+                            const items = [];
+                            items.push(
+                                <div key={company.id} className="company-card-wrapper">
+                                    <CompanyCard
+                                        company={company}
+                                        showClaimAction
+                                        onClaim={handleClaimRedirect}
+                                    />
+                                </div>
+                            );
+                            const shouldInsertAd = (index + 1) % 3 === 0;
+                            const adIndex = Math.floor(index / 3);
+                            const adCampaign = placementAds[adIndex];
+                            if (shouldInsertAd && adCampaign) {
+                                items.push(
+                                    <div key={`ad-${adCampaign.id}-${adIndex}`} className="company-card-wrapper">
+                                        <CompactSponsoredCard campaign={adCampaign} />
+                                    </div>
+                                );
+                            }
+                            return items;
+                        })}
                     </div>
                 )}
 
@@ -203,11 +220,6 @@ const SearchPage = () => {
                             <SponsoredCard
                                 placement="search_results"
                                 rotateIntervalMs={48000}
-                            />
-                            <SponsoredCard
-                                placement="category"
-                                rotateIntervalMs={60000}
-                                behaviors={[query].filter(Boolean)}
                             />
                         </div>
                     </section>

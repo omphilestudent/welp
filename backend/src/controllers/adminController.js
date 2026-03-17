@@ -54,6 +54,39 @@ const getTableColumns = async (tableName) => {
     }
 };
 
+const getColumnType = async (tableName, columnName) => {
+    try {
+        const result = await query(
+            `SELECT data_type
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = $1
+               AND column_name = $2`,
+            [tableName, columnName]
+        );
+        return result.rows[0]?.data_type || null;
+    } catch {
+        return null;
+    }
+};
+
+const ensureSystemSettingsTable = async () => {
+    try {
+        await query(
+            `CREATE TABLE IF NOT EXISTS system_settings (
+                key VARCHAR(128) PRIMARY KEY,
+                value JSONB NOT NULL,
+                updated_by UUID,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`
+        );
+        return true;
+    } catch (error) {
+        console.error('Failed to ensure system_settings table:', error.message);
+        return false;
+    }
+};
+
 const APPLICATION_STATUS_ALIASES = {
     pending: 'pending_review',
     pending_review: 'pending_review',
@@ -1082,15 +1115,51 @@ const getSystemSettings = async (req, res) => {
 
 const updateSystemSettings = async (req, res) => {
     try {
-        const { key, value } = req.body;
-        if (!await tableExists('system_settings')) return res.status(500).json({ error: 'Table not found' });
-        const result = await query(
-            `INSERT INTO system_settings (key, value, updated_by) VALUES ($1,$2,$3)
-             ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_by=EXCLUDED.updated_by, updated_at=CURRENT_TIMESTAMP RETURNING *`,
-            [key, JSON.stringify(value), req.user.id]
-        );
-        res.json(result.rows[0]);
-    } catch (error) { res.status(500).json({ error: 'Failed to update settings' }); }
+        if (!await tableExists('system_settings')) {
+            const created = await ensureSystemSettingsTable();
+            if (!created) {
+                return res.status(500).json({ error: 'Table not found' });
+            }
+        }
+        const valueColumnType = await getColumnType('system_settings', 'value');
+        const normalizeValue = (raw) => {
+            if (valueColumnType === 'jsonb' || valueColumnType === 'json') {
+                return JSON.stringify(raw ?? null);
+            }
+            if (raw === null || raw === undefined) return null;
+            if (typeof raw === 'string') return raw;
+            return JSON.stringify(raw);
+        };
+
+        const entries = Array.isArray(req.body)
+            ? req.body
+            : (Array.isArray(req.body.entries) ? req.body.entries : [req.body]);
+
+        const updates = [];
+        for (const entry of entries) {
+            const key = entry?.key;
+            if (!key) {
+                return res.status(400).json({ error: 'Key is required' });
+            }
+            const value = entry?.value;
+            const result = await query(
+                `INSERT INTO system_settings (key, value, updated_by) VALUES ($1,$2,$3)
+                 ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_by=EXCLUDED.updated_by, updated_at=CURRENT_TIMESTAMP RETURNING *`,
+                [String(key), normalizeValue(value), req.user.id]
+            );
+            if (result.rows[0]) {
+                updates.push(result.rows[0]);
+            }
+        }
+
+        res.json(updates.length === 1 ? updates[0] : { success: true, updates });
+    } catch (error) {
+        console.error('Update system settings error:', error);
+        res.status(500).json({
+            error: 'Failed to update settings',
+            details: error?.message || null
+        });
+    }
 };
 
 const getSessionSettings = async (req, res) => {

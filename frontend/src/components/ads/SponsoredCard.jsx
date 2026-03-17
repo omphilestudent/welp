@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { recordClick, recordImpression, fetchPlacementAds } from '../../services/adService';
+import { recordClick, recordImpression } from '../../services/adService';
+import { usePlacementAds } from '../../hooks/usePlacementAds';
 import './SponsoredCard.css';
 
 const STATIC_REDIRECT_URL = 'https://welp.africa/static';
@@ -23,37 +24,12 @@ const SponsoredCard = ({
     behaviors = [],
     rotateIntervalMs = 45000
 }) => {
-    const [campaigns, setCampaigns] = useState([]);
     const [activeIndex, setActiveIndex] = useState(0);
-    const [loading, setLoading] = useState(false);
+    const { campaigns, loading } = usePlacementAds({ placement, location, industry, behaviors });
 
     useEffect(() => {
-        let isMounted = true;
-        const load = async () => {
-            setLoading(true);
-            try {
-                const { data } = await fetchPlacementAds({ placement, location, industry, behaviors });
-                if (!isMounted) return;
-                const available = Array.isArray(data?.campaigns) && data.campaigns.length
-                    ? data.campaigns
-                    : [{ ...STATIC_AD }];
-                setCampaigns(available);
-                setActiveIndex(0);
-            } catch (error) {
-                console.error('Failed to load ads', error);
-                if (isMounted) {
-                    setCampaigns([{ ...STATIC_AD }]);
-                    setActiveIndex(0);
-                }
-            } finally {
-                if (isMounted) setLoading(false);
-            }
-        };
-        load();
-        return () => {
-            isMounted = false;
-        };
-    }, [placement, location, industry, behaviors]);
+        setActiveIndex(0);
+    }, [campaigns]);
 
     useEffect(() => {
         if (campaigns.length <= 1) return undefined;
@@ -63,7 +39,8 @@ const SponsoredCard = ({
         return () => clearInterval(interval);
     }, [campaigns, rotateIntervalMs]);
 
-    const campaign = campaigns[activeIndex] || null;
+    const activeCampaigns = campaigns.length ? campaigns : [{ ...STATIC_AD }];
+    const campaign = activeCampaigns[activeIndex] || null;
 
     useEffect(() => {
         if (!campaign || campaign.__static) return;

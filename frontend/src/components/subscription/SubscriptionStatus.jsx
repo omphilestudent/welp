@@ -206,11 +206,14 @@ const resolveAdsAuthMessage = (error) => {
 };
 
 const SubscriptionStatus = () => {
-    const { user, updateUser, isAuthenticated } = useAuth();
+    const { user, updateUser, isAuthenticated, refreshUser } = useAuth();
     const [subscription, setSubscription] = useState(() => normalizeSubscriptionPayload(user?.subscription) ?? null);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [adsCapability, setAdsCapability] = useState(null);
+    const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+    const [businessPlans, setBusinessPlans] = useState([]);
+    const [businessPlansLoading, setBusinessPlansLoading] = useState(false);
     const subscriptionLoadKeyRef = useRef(null);
     const pricingKeyRef = useRef('');
     const lastSubscriptionFetchRef = useRef(0);
@@ -242,6 +245,20 @@ const SubscriptionStatus = () => {
         updateUser?.({ subscription: normalized });
         return normalized;
     }, [updateUser]);
+
+    const syncUserProfile = useCallback(async (payloadUser) => {
+        if (payloadUser) {
+            updateUser?.(payloadUser);
+            return;
+        }
+        if (refreshUser) {
+            try {
+                await refreshUser();
+            } catch (error) {
+                console.warn('Unable to refresh profile after subscription update:', error?.message || error);
+            }
+        }
+    }, [refreshUser, updateUser]);
 
     const loadAdsCapability = useCallback(async ({ force = false } = {}) => {
         if (normalizedUserRole !== 'business') {
@@ -377,6 +394,41 @@ const SubscriptionStatus = () => {
         }
     }, [countryCode, countryPreference, preferredCurrency]);
 
+    const loadBusinessPlans = useCallback(async () => {
+        if (!isBusinessUser) {
+            setBusinessPlans([]);
+            return;
+        }
+        setBusinessPlansLoading(true);
+        try {
+            const requestParams = { audience: 'business', country: countryCode };
+            const currencyOverride = countryPreference?.currency || null;
+            if (currencyOverride) {
+                requestParams.currency = currencyOverride;
+            }
+            const { data } = await fetchPricingForAudience(requestParams);
+            const plans = Array.isArray(data?.plans) ? data.plans : [];
+            const normalizedPlans = plans
+                .map((plan) => ({
+                    ...plan,
+                    planCode: plan.planCode || plan.plan_code || plan.code,
+                    planTier: plan.planTier || plan.plan_tier || plan.tier
+                }))
+                .filter((plan) => {
+                    const code = toLowerSafe(plan.planCode);
+                    const tier = toLowerSafe(plan.planTier);
+                    return code.startsWith('business_') || ['base', 'enhanced', 'premium'].includes(tier);
+                })
+                .sort((a, b) => (a.amountMinor ?? 0) - (b.amountMinor ?? 0));
+            setBusinessPlans(normalizedPlans);
+        } catch (error) {
+            console.warn('Unable to load business plans:', error?.message || error);
+            setBusinessPlans([]);
+        } finally {
+            setBusinessPlansLoading(false);
+        }
+    }, [countryCode, countryPreference, isBusinessUser]);
+
     const loadSubscription = useCallback(async ({ force = false } = {}) => {
         if (!isAuthenticated || !userId) {
             subscriptionLoadKeyRef.current = null;
@@ -449,22 +501,25 @@ const SubscriptionStatus = () => {
         loadLocalizedPlan(planIdentifier, audienceKey, planTierHintValue);
     }, [planIdentifier, audienceKey, planTierHintValue, loadLocalizedPlan]);
 
-    const handleUpgrade = async () => {
+    const handleUpgrade = async ({ planCode, currency } = {}) => {
         if (actionLoading) return;
         setActionLoading(true);
         const fallbackPlanCode = subscription?.upgradePlanCode
             || subscription?.recommendedPlanCode
             || defaultPlanCodeByRole[normalizedUserRole]
             || 'user_premium';
-        const upgradeCurrency = localizedPlan?.currencyCode || subscription?.currencyCode || preferredCurrency.code;
+        const resolvedPlanCode = planCode || fallbackPlanCode;
+        const upgradeCurrency = currency || localizedPlan?.currencyCode || subscription?.currencyCode || preferredCurrency.code;
         try {
             const { data } = await upgradeSubscription({
-                planCode: fallbackPlanCode,
+                planCode: resolvedPlanCode,
                 currency: upgradeCurrency
             });
             applySubscriptionSnapshot(data.subscription);
+            await syncUserProfile(data?.user);
             toast.success('Upgraded successfully');
             await loadSubscription({ force: true });
+            setUpgradeModalOpen(false);
         } catch (error) {
             const message = error.response?.data?.error || 'Upgrade failed';
             toast.error(message);
@@ -479,6 +534,7 @@ const SubscriptionStatus = () => {
         try {
             const { data } = await cancelSubscription();
             applySubscriptionSnapshot(data.subscription);
+            await syncUserProfile(data?.user);
             toast.success('Reverted to Free tier');
             await loadSubscription({ force: true });
         } catch (error) {
@@ -518,6 +574,7 @@ const SubscriptionStatus = () => {
     const isPremiumPlan = planTierNormalized === 'premium' || planCodeNormalized?.includes('premium');
     const canCancel = paidStatus && isPremiumPlan && effectiveSubscription.cancellable !== false;
     const showUpgrade = !canCancel;
+    const shouldShowPlanSelector = isBusinessUser;
 
     const businessPlanProfile = isBusinessUser
         ? BUSINESS_PLAN_ENTITLEMENTS[planTierNormalized] || BUSINESS_PLAN_ENTITLEMENTS.base
@@ -712,14 +769,27 @@ const SubscriptionStatus = () => {
             )}
 
             <div className="subscription-card__actions">
-                {showUpgrade && (
+                {showUpgrade && !shouldShowPlanSelector && (
                     <button
                         type="button"
                         className="subscription-card__primary"
-                        onClick={handleUpgrade}
+                        onClick={() => handleUpgrade()}
                         disabled={actionLoading}
                     >
                         Upgrade to Premium
+                    </button>
+                )}
+                {shouldShowPlanSelector && (
+                    <button
+                        type="button"
+                        className="subscription-card__primary"
+                        onClick={() => {
+                            setUpgradeModalOpen(true);
+                            loadBusinessPlans();
+                        }}
+                        disabled={actionLoading}
+                    >
+                        Upgrade Plan
                     </button>
                 )}
                 {canCancel && (
@@ -735,6 +805,67 @@ const SubscriptionStatus = () => {
             </div>
 
             {loading && <p className="subscription-card__loading">Fetching latest status…</p>}
+
+            {upgradeModalOpen && (
+                <div className="subscription-upgrade-modal__backdrop" onClick={() => setUpgradeModalOpen(false)}>
+                    <div
+                        className="subscription-upgrade-modal"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <header className="subscription-upgrade-modal__header">
+                            <div>
+                                <p>Select a Plan</p>
+                                <h3>Upgrade your business tier</h3>
+                            </div>
+                            <button type="button" onClick={() => setUpgradeModalOpen(false)}>
+                                Cancel
+                            </button>
+                        </header>
+                        <section className="subscription-upgrade-modal__body">
+                            {businessPlansLoading && <p>Loading plans…</p>}
+                            {!businessPlansLoading && businessPlans.length === 0 && (
+                                <p>No business plans available right now.</p>
+                            )}
+                            {!businessPlansLoading && businessPlans.length > 0 && (
+                                <div className="subscription-upgrade-modal__grid">
+                                    {businessPlans.map((plan) => {
+                                        const planLabel = plan.metadata?.displayName
+                                            || formatPlanDisplayName(plan.planCode);
+                                        const amountMinor = plan.amountMinor ?? plan.amount_minor ?? null;
+                                        const currencyCode = plan.currencyCode || plan.currency_code || preferredCurrency.code;
+                                        const currencySymbol = plan.currencySymbol
+                                            || plan.currency_symbol
+                                            || preferredCurrency.symbol;
+                                        const priceText = Number.isFinite(amountMinor)
+                                            ? formatAmountMinor(amountMinor, currencyCode, currencySymbol)
+                                            : `${currencySymbol}0.00`;
+                                        const isCurrent = planCodeNormalized === toLowerSafe(plan.planCode)
+                                            || planTierNormalized === toLowerSafe(plan.planTier);
+                                        return (
+                                            <button
+                                                key={plan.planCode || plan.plan_code || plan.code || plan.planTier}
+                                                type="button"
+                                                className={`subscription-upgrade-modal__plan ${isCurrent ? 'is-current' : ''}`}
+                                                onClick={() => handleUpgrade({
+                                                    planCode: plan.planCode,
+                                                    currency: currencyCode
+                                                })}
+                                                disabled={actionLoading}
+                                            >
+                                                <div>
+                                                    <h4>{planLabel}</h4>
+                                                    <span>{priceText} / {plan.billingPeriod || 'monthly'}</span>
+                                                </div>
+                                                {isCurrent ? <span className="current-pill">Current</span> : <span>Select</span>}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+                    </div>
+                </div>
+            )}
         </section>
     );
 };

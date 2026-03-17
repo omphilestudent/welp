@@ -1,0 +1,49 @@
+.compact-ad {
+  width: 100%;
+  max-width: 260px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0f172a;
+  color: #e2e8f0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  cursor: pointer;
+  display: grid;
+  grid-template-rows: 90px auto;
+}
+
+.compact-ad__media {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  display: block;
+}
+
+.compact-ad__content {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compact-ad__badge {
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #facc15;
+}
+
+.compact-ad__title {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .compact-ad {
+    max-width: 100%;
+    grid-template-rows: 70px auto;
+  }
+
+  .compact-ad__media {
+    height: 70px;
+  }
+}

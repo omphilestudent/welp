@@ -22,7 +22,7 @@ const normalizeSettings = (payload = {}) => {
 };
 
 const InactivityManager = () => {
-    const { isAuthenticated, logout } = useAuth();
+    const { isAuthenticated, logout, user } = useAuth();
     const [settings, setSettings] = useState({ inactivityTimeoutMinutes: 30, autoLogoutEnabled: false });
     const [warningOpen, setWarningOpen] = useState(false);
     const timersRef = useRef({ warning: null, logout: null });
@@ -109,6 +109,21 @@ const InactivityManager = () => {
                     setSettings(normalizeSettings(data));
                 }
             } catch (error) {
+                if (error?.response?.status === 404) {
+                    const role = String(user?.role || '').toLowerCase();
+                    const isAdmin = ['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'].includes(role);
+                    if (isAdmin) {
+                        try {
+                            const { data } = await api.get('/admin/session-settings');
+                            if (!cancelled) {
+                                setSettings(normalizeSettings(data));
+                                return;
+                            }
+                        } catch {
+                            // ignore fallback failures
+                        }
+                    }
+                }
                 if (!cancelled) {
                     setSettings((prev) => ({ ...prev, autoLogoutEnabled: false }));
                 }

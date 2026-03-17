@@ -14,7 +14,7 @@ import { currencyForCountry, deriveCountryCode } from '../../utils/currency';
 const PREMIUM_EMAIL = 'omphilemohlala@welp.com';
 
 const PricingPage = () => {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, refreshUser, updateUser } = useAuth();
     const derivedCountry = useMemo(() => deriveCountryCode(user || {}), [user]);
     const derivedCurrency = useMemo(() => currencyForCountry(derivedCountry), [derivedCountry]);
     const [searchParams, setSearchParams] = useSearchParams();
@@ -133,10 +133,15 @@ const PricingPage = () => {
         if (!plan) return;
         setUpgradePending(true);
         try {
-            await upgradeSubscription({
+            const { data } = await upgradeSubscription({
                 planCode: plan.planCode,
                 currency: plan.currencyCode || pricing?.currency?.code || currency || derivedCurrency.code
             });
+            if (data?.user) {
+                updateUser?.(data.user);
+            } else if (refreshUser) {
+                await refreshUser();
+            }
             toast.success(`Upgraded to ${plan.metadata?.displayName || plan.planCode}`);
             await loadSubscription();
             setUpgradePlan(null);

@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import CompanyCard from './CompanyCard';
+import CompactSponsoredCard from '../ads/CompactSponsoredCard';
 import Loading from '../common/Loading';
+import { usePlacementAds } from '../../hooks/usePlacementAds';
 import './CompanyList.css';
 
 
@@ -14,6 +16,7 @@ const CompanyList = ({
                          emptyMessage = 'No companies found',
                          className = ''
                      }) => {
+    const { campaigns: placementAds } = usePlacementAds({ placement: 'search_results' });
 
 
     const validCompanies = useMemo(() => {
@@ -120,13 +123,28 @@ const CompanyList = ({
 
             
             <div className="company-list-container" role="feed" aria-busy={loading}>
-                {validCompanies.map((company, index) => (
-                    <CompanyCard
-                        key={company.id}
-                        company={company}
-                        priority={index < 4}
-                    />
-                ))}
+                {validCompanies.map((company, index) => {
+                    const items = [];
+                    items.push(
+                        <CompanyCard
+                            key={company.id}
+                            company={company}
+                            priority={index < 4}
+                        />
+                    );
+                    const shouldInsertAd = (index + 1) % 3 === 0;
+                    const adIndex = Math.floor(index / 3);
+                    const adCampaign = placementAds[adIndex];
+                    if (shouldInsertAd && adCampaign) {
+                        items.push(
+                            <CompactSponsoredCard
+                                key={`ad-${adCampaign.id}-${adIndex}`}
+                                campaign={adCampaign}
+                            />
+                        );
+                    }
+                    return items;
+                })}
             </div>
 
             

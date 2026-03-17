@@ -4,12 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import CompanyCard from '../components/companies/CompanyCard';
 import api from '../services/api';
 import SponsoredCard from '../components/ads/SponsoredCard';
+import CompactSponsoredCard from '../components/ads/CompactSponsoredCard';
+import { usePlacementAds } from '../hooks/usePlacementAds';
 
 const Home = () => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { campaigns: placementAds } = usePlacementAds({ placement: 'search_results' });
 
 
     useEffect(() => {
@@ -95,8 +98,7 @@ const Home = () => {
 
             <section className="ads-rail">
                 <div className="container ads-rail__grid">
-                    <SponsoredCard placement="recommended" rotateIntervalMs={40000} />
-                    <SponsoredCard placement="search_results" rotateIntervalMs={52000} />
+                    <SponsoredCard placement="recommended" rotateIntervalMs={4000} />
                 </div>
             </section>
 
@@ -106,12 +108,27 @@ const Home = () => {
                     <h2 className="section-title">Featured Companies</h2>
 
                     <div className="companies-grid">
-                        {companies.map(company => (
-                            <CompanyCard
-                                key={company.id}
-                                company={company}
-                            />
-                        ))}
+                        {companies.map((company, index) => {
+                            const items = [];
+                            items.push(
+                                <CompanyCard
+                                    key={company.id}
+                                    company={company}
+                                />
+                            );
+                            const shouldInsertAd = (index + 1) % 3 === 0;
+                            const adIndex = Math.floor(index / 3);
+                            const adCampaign = placementAds[adIndex];
+                            if (shouldInsertAd && adCampaign) {
+                                items.push(
+                                    <CompactSponsoredCard
+                                        key={`ad-${adCampaign.id}-${adIndex}`}
+                                        campaign={adCampaign}
+                                    />
+                                );
+                            }
+                            return items;
+                        })}
                     </div>
 
                     <div className="view-all-container">

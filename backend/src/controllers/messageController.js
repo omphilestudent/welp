@@ -5,6 +5,21 @@ const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaServi
 const { PLAN_LIMITS } = require('../services/subscriptionService');
 const { emitFlowEvent } = require('../services/flowEngine');
 
+const tableExists = async (tableName) => {
+    try {
+        const result = await query(
+            `SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = $1
+            )`,
+            [tableName]
+        );
+        return result.rows[0]?.exists === true;
+    } catch {
+        return false;
+    }
+};
+
 const columnExists = async (tableName, columnName) => {
     try {
         const result = await query(
@@ -17,6 +32,23 @@ const columnExists = async (tableName, columnName) => {
         return result.rows[0]?.exists === true;
     } catch {
         return false;
+    }
+};
+
+const getColumnType = async (tableName, columnName) => {
+    try {
+        const result = await query(
+            `SELECT data_type, udt_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = $1
+               AND column_name = $2`,
+            [tableName, columnName]
+        );
+        if (!result.rows.length) return null;
+        return result.rows[0];
+    } catch {
+        return null;
     }
 };
 
@@ -56,6 +88,10 @@ const getPerSessionCapForUser = (user = {}) => {
 };
 
 const expireConversations = async () => {
+    const hasConversations = await tableExists('conversations');
+    if (!hasConversations) {
+        return;
+    }
     const hasExpiresAt = await columnExists('conversations', 'expires_at');
     if (!hasExpiresAt) {
         return;
@@ -485,49 +521,142 @@ const updateConversationStatus = async (req, res) => {
 
 const getConversations = async (req, res) => {
     try {
+        const userId = req.user?.id;
+        if (!userId) {
+            console.warn('Get conversations blocked: missing user id');
+            return res.status(401).json({ success: false, error: 'Authentication required' });
+        }
+
+        console.log('Fetching conversations for user:', userId);
+
+        const hasConversations = await tableExists('conversations');
+        if (!hasConversations) {
+            console.log(`User ${userId} has 0 conversations (table missing)`);
+            return res.status(200).json({ success: true, conversations: [] });
+        }
         await expireConversations();
 
         const [
             hasUserAnonymous,
             hasAvatar,
             hasSpecialization,
+            hasMessages,
             hasMessageRead,
-            hasSystemMessage
+            hasSystemMessage,
+            hasChatMessages,
+            hasChatRead,
+            hasChatSystem,
+            hasMessageCreatedAt,
+            hasChatCreatedAt,
+            hasChatDeliveredAt
         ] = await Promise.all([
             columnExists('users', 'is_anonymous'),
             columnExists('users', 'avatar_url'),
             columnExists('users', 'specialization'),
+            tableExists('messages'),
             columnExists('messages', 'is_read'),
-            columnExists('messages', 'is_system_message')
+            columnExists('messages', 'is_system_message'),
+            tableExists('chat_messages'),
+            columnExists('chat_messages', 'read_at'),
+            columnExists('chat_messages', 'is_system_message'),
+            columnExists('messages', 'created_at'),
+            columnExists('chat_messages', 'created_at'),
+            columnExists('chat_messages', 'delivered_at')
+        ]);
+        const hasUsers = await tableExists('users');
+        if (!hasUsers) {
+            console.log(`User ${userId} has 0 conversations (users table missing)`);
+            return res.status(200).json({ success: true, conversations: [] });
+        }
+
+        const [hasStatus, hasUpdatedAt, hasCreatedAt, hasEmployeeId, hasPsychologistId, hasUserId] = await Promise.all([
+            columnExists('conversations', 'status'),
+            columnExists('conversations', 'updated_at'),
+            columnExists('conversations', 'created_at'),
+            columnExists('conversations', 'employee_id'),
+            columnExists('conversations', 'psychologist_id'),
+            columnExists('conversations', 'user_id')
         ]);
 
+        if ((!hasEmployeeId && !hasUserId) || !hasPsychologistId) {
+            console.log(`User ${userId} has 0 conversations (missing participant columns)`);
+            return res.status(200).json({ success: true, conversations: [] });
+        }
+
         const statusFilter = ['pending', 'accepted', 'rejected', 'blocked', 'ended'];
+        const statusType = hasStatus ? await getColumnType('conversations', 'status') : null;
+        const statusTypeName = statusType?.udt_name && /^[a-zA-Z0-9_]+$/.test(statusType.udt_name)
+            ? statusType.udt_name
+            : null;
+        const statusFilterClause = hasStatus && statusTypeName
+            ? `c.status = ANY($2::${statusTypeName}[])`
+            : hasStatus
+                ? 'c.status = ANY($2::text[])'
+                : '';
+        const employeeIdColumn = hasEmployeeId ? 'employee_id' : 'user_id';
+
         let whereClause = '';
         if (req.user.role === 'employee') {
-            whereClause = 'c.employee_id = $1 AND c.status = ANY($2::text[])';
+            whereClause = hasStatus
+                ? `c.${employeeIdColumn} = $1 AND ${statusFilterClause}`
+                : `c.${employeeIdColumn} = $1`;
         } else if (req.user.role === 'psychologist') {
-            whereClause = 'c.psychologist_id = $1 AND c.status = ANY($2::text[])';
+            whereClause = hasStatus
+                ? `c.psychologist_id = $1 AND ${statusFilterClause}`
+                : 'c.psychologist_id = $1';
         } else {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const params = [req.user.id, statusFilter];
+        const params = hasStatus ? [req.user.id, statusFilter] : [req.user.id];
 
         const employeeAvatar = hasAvatar ? 'employee.avatar_url' : 'NULL';
         const employeeAnon = hasUserAnonymous ? 'employee.is_anonymous' : 'false';
         const psychologistAvatar = hasAvatar ? 'psychologist.avatar_url' : 'NULL';
         const psychologistSpec = hasSpecialization ? 'psychologist.specialization' : 'NULL';
-        const systemMessageValue = hasSystemMessage ? 'is_system_message' : 'false';
-        const unreadCountSelect = hasMessageRead
+        const messageTable = hasMessages ? 'messages' : (hasChatMessages ? 'chat_messages' : null);
+        const messageReadColumn = hasMessages
+            ? (hasMessageRead ? 'is_read' : null)
+            : (hasChatMessages && hasChatRead ? 'read_at' : null);
+        const messageSystemColumn = hasMessages
+            ? (hasSystemMessage ? 'is_system_message' : null)
+            : (hasChatMessages && hasChatSystem ? 'is_system_message' : null);
+        const messageCreatedColumn = hasMessages
+            ? (hasMessageCreatedAt ? 'created_at' : null)
+            : (hasChatMessages
+                ? (hasChatCreatedAt ? 'created_at' : (hasChatDeliveredAt ? 'delivered_at' : null))
+                : null);
+        const systemMessageValue = messageTable && messageSystemColumn ? messageSystemColumn : 'false';
+        const unreadCountSelect = messageTable && messageReadColumn
             ? `(
           SELECT COUNT(*)
-          FROM messages
+          FROM ${messageTable}
           WHERE conversation_id = c.id
             AND sender_id != $1
-            AND is_read = false
+            AND ${messageReadColumn === 'is_read' ? 'is_read = false' : 'read_at IS NULL'}
         ) as unread_count`
             : '0 as unread_count';
+        const lastMessageSelect = messageTable && messageCreatedColumn
+            ? `(
+          SELECT json_build_object(
+            'content', content,
+            'createdAt', ${messageCreatedColumn},
+            'senderId', sender_id,
+            'isSystemMessage', ${systemMessageValue}
+          )
+          FROM ${messageTable}
+          WHERE conversation_id = c.id
+          ORDER BY ${messageCreatedColumn} DESC
+          LIMIT 1
+        ) as last_message`
+            : 'NULL as last_message';
 
+        const orderColumn = hasUpdatedAt ? 'c.updated_at' : (hasCreatedAt ? 'c.created_at' : 'c.id');
+        const hasPsychologistsTable = await tableExists('psychologists');
+        const hasPsychUserId = hasPsychologistsTable ? await columnExists('psychologists', 'user_id') : false;
+        const psychologistJoin = hasPsychologistsTable && hasPsychUserId
+            ? 'JOIN psychologists p ON c.psychologist_id = p.id JOIN users psychologist ON p.user_id = psychologist.id'
+            : 'JOIN users psychologist ON c.psychologist_id = psychologist.id';
         const result = await query(
             `SELECT
         c.*,
@@ -543,31 +672,24 @@ const getConversations = async (req, res) => {
           'avatar_url', ${psychologistAvatar},
           'specialization', ${psychologistSpec}
         ) as psychologist,
-        (
-          SELECT json_build_object(
-            'content', content,
-            'createdAt', created_at,
-            'senderId', sender_id,
-            'isSystemMessage', ${systemMessageValue}
-          )
-          FROM messages
-          WHERE conversation_id = c.id
-          ORDER BY created_at DESC
-          LIMIT 1
-        ) as last_message,
+        ${lastMessageSelect},
         ${unreadCountSelect}
        FROM conversations c
-       JOIN users employee ON c.employee_id = employee.id
-       JOIN users psychologist ON c.psychologist_id = psychologist.id
+       JOIN users employee ON c.${employeeIdColumn} = employee.id
+       ${psychologistJoin}
        WHERE ${whereClause}
-       ORDER BY c.updated_at DESC`,
+       ORDER BY ${orderColumn} DESC`,
             params
         );
 
-        res.json(result.rows);
+        console.log(`User ${userId} has ${result.rows.length} conversations`);
+        return res.status(200).json({ success: true, conversations: result.rows });
     } catch (error) {
-        console.error('Get conversations error:', error);
-        res.status(500).json({ error: 'Failed to fetch conversations' });
+        console.error('Get conversations error:', error?.stack || error);
+        return res.status(500).json({
+            success: false,
+            error: error?.message || 'Failed to fetch conversations'
+        });
     }
 };
 

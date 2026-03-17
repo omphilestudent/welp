@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { FaSearch, FaStar, FaUserPlus, FaVideo, FaHistory, FaClock, FaExclamationTriangle, FaLock } from 'react-icons/fa';
 import { fetchChatUsage } from '../services/chatUsageService';
 import SponsoredCard from '../components/ads/SponsoredCard';
+import { getPlanKey, hasAccess } from '../utils/subscriptionAccess';
 
 const Messages = () => {
     const [searchParams] = useSearchParams();
@@ -39,6 +40,7 @@ const Messages = () => {
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [callStartedAt, setCallStartedAt] = useState(null);
     const [callDurationSec, setCallDurationSec] = useState(0);
+    const hasFetchedConversations = React.useRef(false);
     const localVideoRef = React.useRef(null);
     const remoteVideoRef = React.useRef(null);
     const peerRef = React.useRef(null);
@@ -52,17 +54,14 @@ const Messages = () => {
         }
         return String(value);
     };
-    const resolvedPlan =
-        subscription?.planTier ||
-        subscription?.plan_tier ||
-        subscription?.tier ||
-        subscription?.plan_type ||
-        subscription?.planCode ||
-        subscription?.plan_code ||
-        'free';
-    const subscriptionPlan = String(resolvedPlan).toLowerCase();
+    const userWithSubscription = useMemo(() => ({
+        ...(user || {}),
+        subscription: subscription || user?.subscription
+    }), [user, subscription]);
+    const subscriptionPlan = getPlanKey(userWithSubscription);
     const callRestrictionCopy = 'Upgrade to a paid plan to initiate calls.';
-    const isFreeEmployee = user?.role === 'employee' && subscriptionPlan === 'free';
+    const canUseVideoCall = hasAccess(userWithSubscription, 'videoCall');
+    const isFreeEmployee = user?.role === 'employee' && !canUseVideoCall;
 
     const sortedConversations = useMemo(() => {
         return [...conversations].sort((a, b) => {
@@ -131,14 +130,22 @@ const Messages = () => {
         && !!featuredPsychologist
         && (chatUsage?.remaining ?? 1) > 0;
     const canStartVideoCall = Boolean(activeConversation) && !isConversationExpired;
+    const isPaidTier = subscriptionPlan !== 'free';
 
     const fetchConversations = async () => {
         try {
             const { data } = await api.get('/messages/conversations');
-            setConversations(data || []);
+            if (data?.success) {
+                setConversations(data.conversations || []);
+            } else if (Array.isArray(data)) {
+                setConversations(data);
+            } else {
+                setConversations([]);
+            }
         } catch (error) {
             setError('Failed to load conversations');
             console.error('Failed to fetch conversations:', error);
+            setConversations([]);
         } finally {
             setLoading(false);
         }
@@ -207,6 +214,8 @@ const Messages = () => {
     }, [activeConversation, visibleConversations, fetchMessages]);
 
     useEffect(() => {
+        if (hasFetchedConversations.current) return;
+        hasFetchedConversations.current = true;
         fetchConversations();
     }, []);
 
@@ -958,6 +967,12 @@ const Messages = () => {
                 </div>
 
                 <div className="messages-main">
+                    {!activeConversation && visibleConversations.length === 0 && (
+                        <div className="empty-state">
+                            <p>No conversations yet</p>
+                            <span>Start a chat to see it here.</span>
+                        </div>
+                    )}
                     {user?.role === 'employee' && (
                         <div className="employee-support-panel">
                             {chatUsage && (
@@ -980,7 +995,7 @@ const Messages = () => {
                                 <div className="available-psych-card__header">
                                     <span>Available psychologist</span>
                                     <span className="available-psych-card__tier">
-                                        {subscriptionPlan.includes('premium') ? 'Premium access' : 'Free tier'}
+                                        {isPaidTier ? 'Premium access' : 'Free tier'}
                                     </span>
                                 </div>
                                 {featuredPsychologist ? (
@@ -1099,13 +1114,7 @@ const Messages = () => {
                             </section>
 
                             <section className="messages-sponsored-slot">
-                                <SponsoredCard
-                                    placement="search_results"
-                                    location={user?.city || availablePsychologists[0]?.location || ''}
-                                    industry={featuredSpecialization || user?.industry || ''}
-                                    rotateIntervalMs={50000}
-                                />
-                                <SponsoredCard
+                                   <SponsoredCard
                                     placement="category"
                                     behaviors={[userRole, featuredSpecialization].filter(Boolean)}
                                     rotateIntervalMs={65000}

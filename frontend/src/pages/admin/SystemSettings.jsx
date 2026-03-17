@@ -318,11 +318,8 @@ const SystemSettings = () => {
     }, [settings, savedSettings]);
 
     const persistSettings = async (entries) => {
-        await Promise.all(
-            entries.map((entry) =>
-                api.patch('/admin/settings', entry)
-            )
-        );
+        if (!entries.length) return;
+        await api.patch('/admin/settings', { entries });
     };
     const handleSaveSettings = async () => {
         if (settingsDiff.length === 0) {

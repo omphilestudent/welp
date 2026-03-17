@@ -525,6 +525,15 @@ const adminListAds = async (filters = {}, options = {}) => {
     const schema = await ensureAdSchema();
     const tables = await ensureAdTableMetadata(options.forceRefresh === true);
     const context = buildAdQueryContext(tables);
+    const normalizedReviewStatus = (() => {
+        const raw = String(filters.reviewStatus || '').toLowerCase().trim();
+        if (!raw) return '';
+        if (raw === 'pending_review') return 'pending';
+        return raw;
+    })();
+    if (normalizedReviewStatus) {
+        filters.reviewStatus = normalizedReviewStatus;
+    }
 
     const placementsSelect = tables.placements
         ? `(
@@ -553,7 +562,7 @@ const adminListAds = async (filters = {}, options = {}) => {
     // Apply filters
     if (filters.reviewStatus) {
         if (schema.hasReviewStatus) {
-            if (filters.reviewStatus === 'pending') {
+            if (normalizedReviewStatus === 'pending') {
                 queryStr += ` AND (
                     c.review_status = $${paramIndex}
                     OR c.review_status IS NULL
@@ -563,7 +572,7 @@ const adminListAds = async (filters = {}, options = {}) => {
             } else {
                 queryStr += ` AND c.review_status = $${paramIndex}`;
             }
-            params.push(filters.reviewStatus);
+            params.push(normalizedReviewStatus || filters.reviewStatus);
             paramIndex++;
         } else if (filters.reviewStatus === 'pending') {
             queryStr += ` AND c.status IN ('pending_review','pending')`;

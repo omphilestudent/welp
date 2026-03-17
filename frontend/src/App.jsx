@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
+import { AdProvider } from './contexts/AdContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
@@ -71,19 +72,20 @@ function App() {
     return (
         <ThemeProvider>
             <AuthProvider>
-                <Toaster position="top-right" />
-                <SystemNotificationBootstrapper />
-                <InactivityManager />
-                <Router
-                    future={{
-                        v7_startTransition: true,
-                        v7_relativeSplatPath: true
-                    }}
-                >
-                    <div className="app">
-                        <Navbar />
-                        <main className="main-content">
-                            <Routes>
+                <AdProvider>
+                    <Toaster position="top-right" />
+                    <SystemNotificationBootstrapper />
+                    <InactivityManager />
+                    <Router
+                        future={{
+                            v7_startTransition: true,
+                            v7_relativeSplatPath: true
+                        }}
+                    >
+                        <div className="app">
+                            <Navbar />
+                            <main className="main-content">
+                                <Routes>
                                 {/* Public Routes */}
                                 <Route path="/" element={<Home />} />
                                 <Route path="/login" element={<Login />} />
@@ -214,11 +216,12 @@ function App() {
                                     <Route path="Departments" element={<Navigate to="/hr/departments" replace />} />
                                     <Route path="*" element={<Navigate to="/hr/dashboard" replace />} />
                                 </Route>
-                            </Routes>
-                        </main>
-                        <Footer />
-                    </div>
-                </Router>
+                                </Routes>
+                            </main>
+                            <Footer />
+                        </div>
+                    </Router>
+                </AdProvider>
             </AuthProvider>
         </ThemeProvider>
     );
