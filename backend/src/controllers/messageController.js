@@ -88,34 +88,38 @@ const getPerSessionCapForUser = (user = {}) => {
 };
 
 const expireConversations = async () => {
-    const hasConversations = await tableExists('conversations');
-    if (!hasConversations) {
-        return;
-    }
-    const hasExpiresAt = await columnExists('conversations', 'expires_at');
-    if (!hasExpiresAt) {
-        return;
-    }
-    const expired = await query(
-        `SELECT id
-         FROM conversations
-         WHERE status = 'accepted'
-           AND expires_at IS NOT NULL
-           AND expires_at <= CURRENT_TIMESTAMP`
-    );
+    try {
+        const hasConversations = await tableExists('conversations');
+        if (!hasConversations) {
+            return;
+        }
+        const hasExpiresAt = await columnExists('conversations', 'expires_at');
+        if (!hasExpiresAt) {
+            return;
+        }
+        const expired = await query(
+            `SELECT id
+             FROM conversations
+             WHERE status = 'accepted'
+               AND expires_at IS NOT NULL
+               AND expires_at <= CURRENT_TIMESTAMP`
+        );
 
-    if (expired.rows.length === 0) {
-        return;
+        if (expired.rows.length === 0) {
+            return;
+        }
+
+        const ids = expired.rows.map((row) => row.id);
+
+        await query(
+            `UPDATE conversations
+             SET status = 'ended', ended_at = CURRENT_TIMESTAMP
+             WHERE id = ANY($1::uuid[])`,
+            [ids]
+        );
+    } catch (error) {
+        console.warn('Expire conversations skipped:', error?.message || error);
     }
-
-    const ids = expired.rows.map((row) => row.id);
-
-    await query(
-        `UPDATE conversations
-         SET status = 'ended', ended_at = CURRENT_TIMESTAMP
-         WHERE id = ANY($1::uuid[])`,
-        [ids]
-    );
 };
 
 const expireConversationById = async (conversationId) => {
@@ -584,15 +588,9 @@ const getConversations = async (req, res) => {
         }
 
         const statusFilter = ['pending', 'accepted', 'rejected', 'blocked', 'ended'];
-        const statusType = hasStatus ? await getColumnType('conversations', 'status') : null;
-        const statusTypeName = statusType?.udt_name && /^[a-zA-Z0-9_]+$/.test(statusType.udt_name)
-            ? statusType.udt_name
-            : null;
-        const statusFilterClause = hasStatus && statusTypeName
-            ? `c.status = ANY($2::${statusTypeName}[])`
-            : hasStatus
-                ? 'c.status = ANY($2::text[])'
-                : '';
+        const statusFilterClause = hasStatus
+            ? 'c.status::text = ANY($2::text[])'
+            : '';
         const employeeIdColumn = hasEmployeeId ? 'employee_id' : 'user_id';
 
         let whereClause = '';
