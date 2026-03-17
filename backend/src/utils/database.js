@@ -1049,6 +1049,25 @@ const runMigrations = async () => {
             // Conversations
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS rejected_reason TEXT;",
+            `DO $$
+             DECLARE
+                 con_name text;
+             BEGIN
+                 SELECT conname INTO con_name
+                 FROM pg_constraint
+                 WHERE conrelid = 'conversations'::regclass
+                   AND contype  = 'c'
+                   AND pg_get_constraintdef(oid) LIKE '%status%'
+                 LIMIT 1;
+
+                 IF con_name IS NOT NULL THEN
+                     EXECUTE 'ALTER TABLE conversations DROP CONSTRAINT ' || quote_ident(con_name);
+                 END IF;
+
+                 ALTER TABLE conversations
+                     ADD CONSTRAINT conversations_status_check
+                     CHECK (status IN ('pending','accepted','rejected','blocked','ended'));
+             END $$;`,
 
             // Companies
             "ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;",
