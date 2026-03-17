@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import api from '../services/api';
+import { registerPsychologist } from '../services/registrationService';
 import { resolveMediaUrl } from '../utils/media';
 import './Register.css';
 
@@ -147,7 +147,7 @@ const PsychologistRegister = () => {
 
         setLoading(true);
         try {
-            await api.post('/auth/register/psychologist', {
+            await registerPsychologist({
                 email:           form.email,
                 password:        form.password,
                 displayName:     form.displayName,
@@ -171,7 +171,7 @@ const PsychologistRegister = () => {
             setSubmitted(true);
             window.scrollTo(0, 0);
         } catch (err) {
-            const msg = err?.response?.data?.error || err?.response?.data?.message || 'Submission failed';
+            const msg = err?.message || 'Submission failed';
             toast.error(msg);
         } finally {
             setLoading(false);

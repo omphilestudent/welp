@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import api from '../services/api';
+import { registerEmployee } from '../services/registrationService';
 import './Register.css';
 
 const ROLES = [
@@ -143,7 +143,7 @@ const EmployeeRegistrationForm = () => {
 
         setLoading(true);
         try {
-            const { data } = await api.post('/auth/register', {
+            const data = await registerEmployee({
                 email:       form.email,
                 password:    form.password,
                 displayName: form.displayName,
@@ -158,7 +158,7 @@ const EmployeeRegistrationForm = () => {
             toast.success('Welcome to Welp! 🎉');
             navigate('/dashboard');
         } catch (err) {
-            const msg = err?.response?.data?.error || err?.response?.data?.message || 'Registration failed';
+            const msg = err?.message || 'Registration failed';
             toast.error(msg);
         } finally {
             setLoading(false);

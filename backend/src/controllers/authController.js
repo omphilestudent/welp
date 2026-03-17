@@ -239,61 +239,112 @@ const getUserByIdForProfile = async (userId) => {
     );
 };
 
+const validateRegistrationCredentials = (email, password) => {
+    if (!email || !password) {
+        const error = new Error('Email and password are required');
+        error.statusCode = 400;
+        throw error;
+    }
+    if (password.length < 8) {
+        const error = new Error('Password must be at least 8 characters');
+        error.statusCode = 400;
+        throw error;
+    }
+    return String(email).toLowerCase().trim();
+};
+
+const createUserAccount = async ({
+    email,
+    password,
+    role,
+    displayName,
+    isActive,
+    isVerified,
+    status,
+    isAnonymous,
+    jobTitle
+}) => {
+    const normalizedEmail = validateRegistrationCredentials(email, password);
+
+    const existing = await query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+    if (existing.rows.length > 0) {
+        const error = new Error('An account with this email already exists');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const hasIsActive = await columnExists('users', 'is_active');
+    const hasIsVerified = await columnExists('users', 'is_verified');
+    const hasStatus = await columnExists('users', 'status');
+    const hasIsAnonymous = await columnExists('users', 'is_anonymous');
+    const hasJobTitle = await columnExists('users', 'job_title');
+
+    const cols = ['email', 'password_hash', 'role', 'display_name'];
+    const placeholders = ['$1', '$2', '$3', '$4'];
+    const params = [
+        normalizedEmail,
+        passwordHash,
+        role,
+        displayName || normalizedEmail.split('@')[0]
+    ];
+    let idx = 5;
+
+    if (hasIsActive && isActive !== undefined) {
+        cols.push('is_active');
+        placeholders.push(`$${idx}`);
+        params.push(Boolean(isActive));
+        idx += 1;
+    }
+    if (hasIsVerified && isVerified !== undefined) {
+        cols.push('is_verified');
+        placeholders.push(`$${idx}`);
+        params.push(Boolean(isVerified));
+        idx += 1;
+    }
+    if (hasStatus && status) {
+        cols.push('status');
+        placeholders.push(`$${idx}`);
+        params.push(status);
+        idx += 1;
+    }
+    if (hasIsAnonymous && isAnonymous !== undefined) {
+        cols.push('is_anonymous');
+        placeholders.push(`$${idx}`);
+        params.push(Boolean(isAnonymous));
+        idx += 1;
+    }
+    if (hasJobTitle && jobTitle) {
+        cols.push('job_title');
+        placeholders.push(`$${idx}`);
+        params.push(jobTitle);
+        idx += 1;
+    }
+
+    const result = await query(
+        `INSERT INTO users (${cols.join(', ')})
+         VALUES (${placeholders.join(', ')})
+         RETURNING id, email, display_name, role, token_version, created_at`,
+        params
+    );
+
+    return result.rows[0];
+};
+
 const registerEmployee = async (req, res) => {
     try {
         const { email, password, displayName, isAnonymous = false } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
-
-        if (password.length < 8) {
-            return res.status(400).json({ error: 'Password must be at least 8 characters' });
-        }
-
-        const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
-        if (existing.rows.length > 0) {
-            return res.status(409).json({ error: 'An account with this email already exists' });
-        }
-
-        const passwordHash = await bcrypt.hash(password, 12);
-
-        const hasIsActive = await columnExists('users', 'is_active');
-        const hasIsVerified = await columnExists('users', 'is_verified');
-        const hasIsAnonymous = await columnExists('users', 'is_anonymous');
-
-        const cols = ['email', 'password_hash', 'role', 'display_name'];
-        const placeholders = ['$1', '$2', '$3', '$4'];
-        const params = [email.toLowerCase(), passwordHash, 'employee', displayName || email.split('@')[0]];
-        let idx = 5;
-
-        if (hasIsActive) {
-            cols.push('is_active');
-            placeholders.push(`$${idx}`);
-            params.push(true);
-            idx += 1;
-        }
-        if (hasIsVerified) {
-            cols.push('is_verified');
-            placeholders.push(`$${idx}`);
-            params.push(true);
-            idx += 1;
-        }
-        if (hasIsAnonymous) {
-            cols.push('is_anonymous');
-            placeholders.push(`$${idx}`);
-            params.push(Boolean(isAnonymous));
-            idx += 1;
-        }
-
-        const result = await query(
-            `INSERT INTO users (${cols.join(', ')})
-             VALUES (${placeholders.join(', ')})
-             RETURNING id, email, display_name, role, token_version, created_at`,
-            params
-        );
-
-        const user = result.rows[0];
+        const user = await createUserAccount({
+            email,
+            password,
+            role: 'employee',
+            displayName,
+            isActive: true,
+            isVerified: true,
+            isAnonymous
+        });
         const token = generateToken(user);
 
         enqueueMarketingForUser(user.id).catch((error) => {
@@ -330,6 +381,9 @@ const registerEmployee = async (req, res) => {
         });
     } catch (error) {
         console.error('Register employee error:', error);
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ error: error.message });
+        }
         if (error.code === '23505') {
             return res.status(409).json({ error: 'An account with this email already exists' });
         }
@@ -367,19 +421,8 @@ const registerPsychologist = async (req, res) => {
             hasDocuments: Array.isArray(documents) ? documents.length : Boolean(documents)
         });
 
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
-        if (password.length < 8) {
-            return res.status(400).json({ error: 'Password must be at least 8 characters' });
-        }
         if (!licenseNumber || !licenseBody) {
             return res.status(400).json({ error: 'License number and licensing body are required' });
-        }
-
-        const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
-        if (existing.rows.length > 0) {
-            return res.status(409).json({ error: 'An account with this email already exists' });
         }
 
         const documentPayload = parseApplicationDocuments(documents, 'psychologist_document');
@@ -389,50 +432,15 @@ const registerPsychologist = async (req, res) => {
             return res.status(error.statusCode || 400).json({ error: error.message });
         }
 
-        const passwordHash = await bcrypt.hash(password, 12);
-
-        const hasIsActive = await columnExists('users', 'is_active');
-        const hasIsVerified = await columnExists('users', 'is_verified');
-        const hasStatus = await columnExists('users', 'status');
-
-        const cols = ['email', 'password_hash', 'role', 'display_name'];
-        const placeholders = ['$1', '$2', '$3', '$4'];
-        const params = [email.toLowerCase(), passwordHash, 'psychologist', displayName || email.split('@')[0]];
-        let idx = 5;
-
-        if (hasIsActive) {
-            cols.push('is_active');
-            placeholders.push(`$${idx}`);
-            params.push(false);
-            idx += 1;
-        }
-        if (hasIsVerified) {
-            cols.push('is_verified');
-            placeholders.push(`$${idx}`);
-            params.push(false);
-            idx += 1;
-        }
-        if (hasStatus) {
-            cols.push('status');
-            placeholders.push(`$${idx}`);
-            params.push('pending_review');
-            idx += 1;
-        }
-
-        let userResult;
-        try {
-            userResult = await query(
-                `INSERT INTO users (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id, email, display_name, role`,
-                params
-            );
-        } catch (insertError) {
-            console.error('[registerPsychologist] failed inserting user');
-            console.error('User columns:', cols);
-            console.error('User params:', params);
-            console.error('Error:', insertError.message);
-            throw insertError;
-        }
-        const user = userResult.rows[0];
+        const user = await createUserAccount({
+            email,
+            password,
+            role: 'psychologist',
+            displayName,
+            isActive: false,
+            isVerified: false,
+            status: 'pending_review'
+        });
 
         const appTableAvailable = await tableExists('psychologist_applications');
         console.log('[registerPsychologist] psychologist_applications table exists:', appTableAvailable);
@@ -671,6 +679,9 @@ const registerPsychologist = async (req, res) => {
         });
     } catch (error) {
         console.error('Register psychologist error:', error);
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ error: error.message });
+        }
         if (error.code === '23505') {
             return res.status(409).json({ error: 'An account with this email already exists' });
         }
@@ -707,12 +718,6 @@ const registerBusiness = async (req, res) => {
             contactPhone
         } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
-        if (password.length < 8) {
-            return res.status(400).json({ error: 'Password must be at least 8 characters' });
-        }
         if (!companyName) {
             return res.status(400).json({ error: 'Company name is required' });
         }
@@ -732,11 +737,6 @@ const registerBusiness = async (req, res) => {
             }
         }
 
-        const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
-        if (existing.rows.length > 0) {
-            return res.status(409).json({ error: 'An account with this email already exists' });
-        }
-
         if (claimExistingProfile && claimCompanyId) {
             const companyResult = await query(
                 'SELECT id, is_claimed FROM companies WHERE id = $1',
@@ -751,8 +751,6 @@ const registerBusiness = async (req, res) => {
             }
         }
 
-        const passwordHash = await bcrypt.hash(password, 12);
-
         const documentPayload = parseApplicationDocuments(documents, 'business_document');
         try {
             ensureRequiredDocuments(documentPayload, APPLICATION_DOCUMENT_REQUIREMENTS.business);
@@ -760,46 +758,16 @@ const registerBusiness = async (req, res) => {
             return res.status(error.statusCode || 400).json({ error: error.message });
         }
 
-        const hasIsActive = await columnExists('users', 'is_active');
-        const hasIsVerified = await columnExists('users', 'is_verified');
-        const hasStatus = await columnExists('users', 'status');
-        const hasJobTitle = await columnExists('users', 'job_title');
-
-        const cols = ['email', 'password_hash', 'role', 'display_name'];
-        const placeholders = ['$1', '$2', '$3', '$4'];
-        const params = [email.toLowerCase(), passwordHash, 'business', displayName || email.split('@')[0]];
-        let idx = 5;
-
-        if (hasIsActive) {
-            cols.push('is_active');
-            placeholders.push(`$${idx}`);
-            params.push(false);
-            idx += 1;
-        }
-        if (hasIsVerified) {
-            cols.push('is_verified');
-            placeholders.push(`$${idx}`);
-            params.push(false);
-            idx += 1;
-        }
-        if (hasStatus) {
-            cols.push('status');
-            placeholders.push(`$${idx}`);
-            params.push('pending_review');
-            idx += 1;
-        }
-        if (hasJobTitle && jobTitle) {
-            cols.push('job_title');
-            placeholders.push(`$${idx}`);
-            params.push(jobTitle);
-            idx += 1;
-        }
-
-        const userResult = await query(
-            `INSERT INTO users (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id, email, display_name, role`,
-            params
-        );
-        const user = userResult.rows[0];
+        const user = await createUserAccount({
+            email,
+            password,
+            role: 'business',
+            displayName,
+            isActive: false,
+            isVerified: false,
+            status: 'pending_review',
+            jobTitle
+        });
 
         const appTableAvailable = await tableExists('business_applications');
         if (appTableAvailable) {
@@ -949,6 +917,9 @@ const registerBusiness = async (req, res) => {
         });
     } catch (error) {
         console.error('Register business error:', error);
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ error: error.message });
+        }
         if (error.code === '23505') {
             return res.status(409).json({ error: 'An account with this email already exists' });
         }

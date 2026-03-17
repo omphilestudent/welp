@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import api from '../services/api';
+import { registerBusiness } from '../services/registrationService';
 import { resolveMediaUrl } from '../utils/media';
 import './Register.css';
 
@@ -222,7 +222,7 @@ const BusinessRegister = () => {
 
         setLoading(true);
         try {
-            await api.post('/auth/register/business', {
+            await registerBusiness({
                 email:               form.email,
                 password:            form.password,
                 displayName:         form.displayName,
@@ -246,10 +246,9 @@ const BusinessRegister = () => {
             setSubmitted(true);
             window.scrollTo(0, 0);
         } catch (err) {
-            const status = err?.response?.status;
-            const msg = err?.response?.data?.error || err?.response?.data?.message || 'Submission failed';
+            const msg = err?.message || 'Submission failed';
             toast.error(msg);
-            if (status === 409) {
+            if (msg.toLowerCase().includes('already exists')) {
                 setEmailConflict('This work email is already linked to a Welp account. Please sign in or claim your existing profile to continue.');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
