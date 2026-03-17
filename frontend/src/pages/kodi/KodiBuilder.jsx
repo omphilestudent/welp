@@ -19,6 +19,29 @@ const createDefaultLayout = () => ({
     ]
 });
 
+const slugifyString = (value) => {
+    const slug = value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    return slug || 'kodi-page';
+};
+
+const ensureUniqueSlug = (baseSlug, existingSlugs = []) => {
+    const normalizedBase = baseSlug || 'kodi-page';
+    const taken = new Set(existingSlugs);
+    let candidate = normalizedBase;
+    let counter = 1;
+
+    while (taken.has(candidate)) {
+        candidate = `${normalizedBase}-${counter}`;
+        counter += 1;
+    }
+
+    return candidate;
+};
+
 const COMPONENT_CATEGORIES = {
     layout: ['Container', 'Grid', 'Tabs', 'Accordion'],
     data: ['Table', 'Chart', 'List', 'Card', 'Kanban'],
@@ -271,7 +294,8 @@ const KodiBuilder = () => {
             return;
         }
 
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const baseSlug = slugifyString(name);
+        const slug = ensureUniqueSlug(baseSlug, pages.map((p) => p.slug));
         const layoutPayload = createDefaultLayout();
 
         setCreatingPage(true);
