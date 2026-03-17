@@ -56,13 +56,8 @@ router.post('/:id/click', adsController.recordClick);
 // ==================== BUSINESS ROUTES ====================
 router.use(authenticate);
 
-router.get('/me', authorize('business'), adsController.listMyCampaigns);
-router.post('/', authorize('business'), handleMediaUpload, adsController.createCampaign);
-router.put('/:id', authorize('business'), handleMediaUpload, adsController.updateCampaign);
-router.delete('/:id', authorize('business'), adsController.deleteCampaign);
-router.get('/:id', authorize('business'), adsController.getCampaign);
-
 // ==================== ADMIN ROUTES ====================
+// IMPORTANT: define these BEFORE any '/:id' routes to avoid route shadowing.
 const adminAuth = [authenticate, authorize('admin', 'super_admin')];
 
 router.get('/admin/list', adminAuth, adsController.adminListCampaigns);
@@ -84,5 +79,11 @@ router.delete('/admin/:id', adminAuth, adsController.adminDeleteCampaign);
 router.get('/admin/export/csv', adminAuth, adsController.adminExportCampaigns);
 router.get('/admin/export/report', adminAuth, adsController.adminGenerateReport);
 router.get('/admin/:id/audit', adminAuth, adsController.adminGetAuditLog);
+
+router.get('/me', authorize('business'), adsController.listMyCampaigns);
+router.post('/', authorize('business'), handleMediaUpload, adsController.createCampaign);
+router.put('/:id', authorize('business'), handleMediaUpload, adsController.updateCampaign);
+router.delete('/:id', authorize('business'), adsController.deleteCampaign);
+router.get('/:id', authorize('business'), adsController.getCampaign);
 
 module.exports = router;
