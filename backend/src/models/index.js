@@ -1,5 +1,10 @@
-// models/index.js (partial)
-async function testConnection(retries = 3) {
+const sequelize = require('../config/database');
+
+// Ensure model files are loaded so Sequelize can register them.
+require('./User');
+require('./Role');
+
+const testConnection = async (retries = 3) => {
     for (let i = 0; i < retries; i++) {
         try {
             await sequelize.authenticate();
@@ -9,10 +14,16 @@ async function testConnection(retries = 3) {
             console.log(`⚠️ Connection attempt ${i + 1} failed: ${error.message}`);
             if (i < retries - 1) {
                 console.log('⏳ Waiting 3 seconds before retry...');
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise((resolve) => setTimeout(resolve, 3000));
             }
         }
     }
     console.error('❌ All database connection attempts failed.');
     return false;
-}
+};
+
+module.exports = {
+    sequelize,
+    testConnection
+};
+
