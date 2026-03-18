@@ -272,6 +272,59 @@
     color: #2563eb;
 }
 
+.kodi-portal__neon-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.kodi-portal__neon-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+}
+
+.kodi-portal__neon-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.kodi-portal__neon-table {
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.kodi-portal__neon-table-head,
+.kodi-portal__neon-table-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.kodi-portal__neon-table-head {
+    font-weight: 600;
+    color: #1d4ed8;
+}
+
+.kodi-portal__neon-table-row span {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.kodi-portal__neon-error {
+    color: #dc2626;
+    margin: 0;
+}
+
 .kodi-portal__leads {
     display: flex;
     flex-direction: column;

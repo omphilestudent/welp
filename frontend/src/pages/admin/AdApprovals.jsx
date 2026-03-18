@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import Loading from '../../components/common/Loading';
 import {
@@ -13,48 +13,65 @@ import {
     adminGetAdAnalytics,
     adminListAdFailures
 } from '../../services/adService';
-import './AdApprovals.css'; // Create this CSS file
+import './AdApprovals.css';
 
-const defaultFilters = {
-    reviewStatus: 'pending',
-    status: '',
-    tier: '',
-    business: '',
-    dateRange: 'all',
-    minImpressions: '',
-    maxImpressions: '',
-    minClicks: '',
-    maxClicks: '',
-    minSpend: '',
-    maxSpend: ''
+// Modern, simplified components
+const StatCard = ({ label, value, trend, color = 'blue' }) => (
+    <div className={`stat-card stat-${color}`}>
+        <div className="stat-card__content">
+            <span className="stat-card__label">{label}</span>
+            <span className="stat-card__value">{value}</span>
+            {trend && <span className="stat-card__trend">{trend}</span>}
+        </div>
+    </div>
+);
+
+const Badge = ({ children, variant = 'default' }) => (
+    <span className={`badge badge-${variant}`}>{children}</span>
+);
+
+const Modal = ({ isOpen, onClose, title, children }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal__header">
+                    <h2>{title}</h2>
+                    <button className="modal__close" onClick={onClose}>×</button>
+                </div>
+                <div className="modal__body">{children}</div>
+            </div>
+        </div>
+    );
 };
 
 const AdApprovals = () => {
-    const [filters, setFilters] = useState(defaultFilters);
     const [ads, setAds] = useState([]);
     const [filteredAds, setFilteredAds] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedOverride, setSelectedOverride] = useState({});
     const [selectedAds, setSelectedAds] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        reviewStatus: 'pending',
+        status: '',
+        tier: '',
+        business: '',
+        dateRange: 'all',
+        minImpressions: '',
+        maxImpressions: '',
+        minClicks: '',
+        maxClicks: '',
+        minSpend: '',
+        maxSpend: ''
+    });
     const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
-    const [stats, setStats] = useState({
-        total: 0,
-        pending: 0,
-        approved: 0,
-        rejected: 0,
-        totalImpressions: 0,
-        totalClicks: 0,
-        totalSpend: 0
-    });
-    const [selectedAdDetails, setSelectedAdDetails] = useState(null);
-    const [showDetailsModal, setShowDetailsModal] = useState(false);
-    const [dateRange, setDateRange] = useState({
-        start: '',
-        end: ''
-    });
+    const [selectedAd, setSelectedAd] = useState(null);
+    const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [failureLog, setFailureLog] = useState([]);
     const [failureLoading, setFailureLoading] = useState(false);
+
     const parseFailureDetails = (details) => {
         if (!details) return {};
         if (typeof details === 'string') {
@@ -67,7 +84,8 @@ const AdApprovals = () => {
         return details;
     };
 
-    const fetchAds = async () => {
+    // Fetch ads with current filters
+    const fetchAds = useCallback(async () => {
         setLoading(true);
         try {
             const params = {
@@ -88,33 +106,30 @@ const AdApprovals = () => {
             const adsData = data?.campaigns || data?.ads || [];
             setAds(adsData);
             applyLocalFilters(adsData);
-            calculateStats(adsData);
         } catch (error) {
-            console.error('Failed to fetch ads', error);
-            toast.error('Unable to load advertisements');
+            toast.error('Failed to load ads');
         } finally {
             setLoading(false);
         }
-    };
+    }, [filters, dateRange]);
 
-    const fetchFailureLog = async () => {
+    // Fetch failure log
+    const fetchFailureLog = useCallback(async () => {
         setFailureLoading(true);
         try {
             const { data } = await adminListAdFailures({ limit: 50 });
-            const rows = data?.data || data?.failures || [];
-            setFailureLog(rows);
+            setFailureLog(data?.data || data?.failures || []);
         } catch (error) {
-            console.error('Failed to fetch ad failure log', error);
-            toast.error('Unable to load ad failure log');
+            toast.error('Failed to load ad failure log');
         } finally {
             setFailureLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchAds();
         fetchFailureLog();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [fetchAds, fetchFailureLog]);
 
     // Apply local filters
     const applyLocalFilters = (adsData) => {
@@ -159,40 +174,26 @@ const AdApprovals = () => {
         setFilteredAds(filtered);
     };
 
-    // Calculate statistics
-    const calculateStats = (adsData) => {
-        const stats = {
-            total: adsData.length,
-            pending: adsData.filter(ad => ad.review_status === 'pending').length,
-            approved: adsData.filter(ad => ad.review_status === 'approved').length,
-            rejected: adsData.filter(ad => ad.review_status === 'rejected').length,
-            totalImpressions: adsData.reduce((sum, ad) => sum + (ad.impressions || 0), 0),
-            totalClicks: adsData.reduce((sum, ad) => sum + (ad.clicks || 0), 0),
-            totalSpend: adsData.reduce((sum, ad) => sum + ((ad.spend_minor || 0) / 100), 0)
-        };
-        setStats(stats);
-    };
+    // Calculate stats
+    const stats = useMemo(() => ({
+        total: ads.length,
+        pending: ads.filter(a => a.review_status === 'pending').length,
+        approved: ads.filter(a => a.review_status === 'approved').length,
+        rejected: ads.filter(a => a.review_status === 'rejected').length,
+        totalImpressions: ads.reduce((sum, a) => sum + (a.impressions || 0), 0),
+        totalClicks: ads.reduce((sum, a) => sum + (a.clicks || 0), 0),
+        totalSpend: ads.reduce((sum, a) => sum + ((a.spend_minor || 0) / 100), 0)
+    }), [ads]);
 
-    const handleFilterChange = (field) => (event) => {
-        const value = event.target.value;
-        setFilters((prev) => {
+    // Handle filter changes
+    const handleFilterChange = (field) => (e) => {
+        const value = e.target.value;
+        setFilters(prev => {
             const newFilters = { ...prev, [field]: value };
             // Apply filters after state update
             setTimeout(() => applyLocalFilters(ads), 0);
             return newFilters;
         });
-    };
-
-    const applyFilters = (event) => {
-        event?.preventDefault();
-        fetchAds();
-    };
-
-    const resetFilters = () => {
-        setFilters(defaultFilters);
-        setDateRange({ start: '', end: '' });
-        setSortConfig({ key: 'created_at', direction: 'desc' });
-        fetchAds();
     };
 
     const handleSort = (key) => {
@@ -203,23 +204,46 @@ const AdApprovals = () => {
         setTimeout(() => applyLocalFilters(ads), 0);
     };
 
+    const applyFilters = (e) => {
+        e?.preventDefault();
+        fetchAds();
+    };
+
+    const resetFilters = () => {
+        setFilters({
+            reviewStatus: 'pending',
+            status: '',
+            tier: '',
+            business: '',
+            dateRange: 'all',
+            minImpressions: '',
+            maxImpressions: '',
+            minClicks: '',
+            maxClicks: '',
+            minSpend: '',
+            maxSpend: ''
+        });
+        setDateRange({ start: '', end: '' });
+        setSortConfig({ key: 'created_at', direction: 'desc' });
+        fetchAds();
+    };
+
+    // Handle ad actions
     const handleApprove = async (adId) => {
         try {
             await adminApproveAd({
                 adId,
                 overrideRestrictions: Boolean(selectedOverride[adId])
             });
-            toast.success('Ad approved successfully');
-            await fetchAds();
-            // Clear override for this ad
+            toast.success('Ad approved');
             setSelectedOverride(prev => {
                 const newState = { ...prev };
                 delete newState[adId];
                 return newState;
             });
+            fetchAds();
         } catch (error) {
-            console.error('Approve failed', error);
-            toast.error(error.response?.data?.error || 'Unable to approve ad');
+            toast.error(error.response?.data?.error || 'Failed to approve ad');
         }
     };
 
@@ -228,16 +252,11 @@ const AdApprovals = () => {
         if (!reason) return;
 
         try {
-            await adminRejectAd({
-                adId,
-                reason,
-                notes: reason
-            });
-            toast.success('Ad rejected successfully');
-            await fetchAds();
+            await adminRejectAd({ adId, reason, notes: reason });
+            toast.success('Ad rejected');
+            fetchAds();
         } catch (error) {
-            console.error('Reject failed', error);
-            toast.error(error.response?.data?.error || 'Unable to reject ad');
+            toast.error(error.response?.data?.error || 'Failed to reject ad');
         }
     };
 
@@ -254,12 +273,11 @@ const AdApprovals = () => {
                 adIds: selectedAds,
                 overrideRestrictions: true
             });
-            toast.success(`${selectedAds.length} ad(s) approved successfully`);
+            toast.success(`${selectedAds.length} ad(s) approved`);
             setSelectedAds([]);
-            await fetchAds();
+            fetchAds();
         } catch (error) {
-            console.error('Bulk approve failed', error);
-            toast.error(error.response?.data?.error || 'Unable to bulk approve ads');
+            toast.error(error.response?.data?.error || 'Failed to bulk approve ads');
         }
     };
 
@@ -273,47 +291,41 @@ const AdApprovals = () => {
         if (!reason) return;
 
         try {
-            await adminBulkRejectAds({
-                adIds: selectedAds,
-                reason
-            });
-            toast.success(`${selectedAds.length} ad(s) rejected successfully`);
+            await adminBulkRejectAds({ adIds: selectedAds, reason });
+            toast.success(`${selectedAds.length} ad(s) rejected`);
             setSelectedAds([]);
-            await fetchAds();
+            fetchAds();
         } catch (error) {
-            console.error('Bulk reject failed', error);
-            toast.error(error.response?.data?.error || 'Unable to bulk reject ads');
+            toast.error(error.response?.data?.error || 'Failed to bulk reject ads');
         }
     };
 
     const handlePauseAd = async (adId) => {
         try {
             await adminPauseAd(adId);
-            toast.success('Ad paused successfully');
-            await fetchAds();
+            toast.success('Ad paused');
+            fetchAds();
         } catch (error) {
-            console.error('Pause failed', error);
-            toast.error(error.response?.data?.error || 'Unable to pause ad');
+            toast.error(error.response?.data?.error || 'Failed to pause ad');
         }
     };
 
     const handleResumeAd = async (adId) => {
         try {
             await adminResumeAd(adId);
-            toast.success('Ad resumed successfully');
-            await fetchAds();
+            toast.success('Ad resumed');
+            fetchAds();
         } catch (error) {
-            console.error('Resume failed', error);
-            toast.error(error.response?.data?.error || 'Unable to resume ad');
+            toast.error(error.response?.data?.error || 'Failed to resume ad');
         }
     };
 
-    const handleViewDetails = async (adId) => {
+    const handleViewDetails = async (ad) => {
         try {
             setLoading(true);
             const [detailsResponse, analyticsResponse] = await Promise.all([
-                adminGetAdDetails(adId),
-                adminGetAdAnalytics(adId)
+                adminGetAdDetails(ad.id),
+                adminGetAdAnalytics(ad.id)
             ]);
 
             const campaignDetails =
@@ -328,14 +340,12 @@ const AdApprovals = () => {
                 null;
 
             if (campaignDetails) {
-                setSelectedAdDetails({ ...campaignDetails, analytics: analyticsData });
-                setShowDetailsModal(true);
+                setSelectedAd({ ...campaignDetails, analytics: analyticsData });
             } else {
                 toast.error('Could not load campaign details');
             }
         } catch (error) {
-            console.error('Failed to fetch ad details', error);
-            toast.error('Unable to load ad details');
+            toast.error('Failed to load ad details');
         } finally {
             setLoading(false);
         }
@@ -349,232 +359,223 @@ const AdApprovals = () => {
         }
     };
 
-    const handleSelectAd = (adId) => {
-        setSelectedAds(prev =>
-            prev.includes(adId)
-                ? prev.filter(id => id !== adId)
-                : [...prev, adId]
-        );
-    };
-
     const getSortIcon = (key) => {
         if (sortConfig.key !== key) return '↕️';
         return sortConfig.direction === 'asc' ? '↑' : '↓';
     };
 
-    if (loading && !ads.length) {
-        return <Loading />;
-    }
-
     return (
-        <section className="admin-panel ad-approvals">
-            <header className="admin-panel__header">
+        <div className="ad-approvals">
+            {/* Header */}
+            <div className="page-header">
                 <div>
-                    <p className="admin-panel__eyebrow">Advertising Management</p>
-                    <h1>Ad Approvals & Analytics</h1>
+                    <h1>Ad Approvals</h1>
+                    <p className="text-secondary">Manage and review advertisement submissions</p>
                 </div>
+            </div>
 
-                {/* Stats Cards */}
-                <div className="stats-grid">
-                    <div className="stat-card">
-                        <span className="stat-label">Total Ads</span>
-                        <span className="stat-value">{stats.total}</span>
-                    </div>
-                    <div className="stat-card pending">
-                        <span className="stat-label">Pending</span>
-                        <span className="stat-value">{stats.pending}</span>
-                    </div>
-                    <div className="stat-card approved">
-                        <span className="stat-label">Approved</span>
-                        <span className="stat-value">{stats.approved}</span>
-                    </div>
-                    <div className="stat-card rejected">
-                        <span className="stat-label">Rejected</span>
-                        <span className="stat-value">{stats.rejected}</span>
-                    </div>
-                    <div className="stat-card">
-                        <span className="stat-label">Total Impressions</span>
-                        <span className="stat-value">{stats.totalImpressions.toLocaleString()}</span>
-                    </div>
-                    <div className="stat-card">
-                        <span className="stat-label">Total Clicks</span>
-                        <span className="stat-value">{stats.totalClicks.toLocaleString()}</span>
-                    </div>
-                    <div className="stat-card">
-                        <span className="stat-label">Total Spend</span>
-                        <span className="stat-value">${stats.totalSpend.toFixed(2)}</span>
-                    </div>
-                </div>
+            {/* Stats Grid */}
+            <div className="stats-grid">
+                <StatCard label="Total Ads" value={stats.total} color="blue" />
+                <StatCard label="Pending" value={stats.pending} color="yellow" />
+                <StatCard label="Approved" value={stats.approved} color="green" />
+                <StatCard label="Rejected" value={stats.rejected} color="red" />
+                <StatCard
+                    label="Impressions"
+                    value={stats.totalImpressions.toLocaleString()}
+                    color="purple"
+                />
+                <StatCard
+                    label="Clicks"
+                    value={stats.totalClicks.toLocaleString()}
+                    color="indigo"
+                />
+                <StatCard
+                    label="Total Spend"
+                    value={`$${stats.totalSpend.toFixed(2)}`}
+                    color="pink"
+                />
+            </div>
 
-                {/* Filter Toggle */}
-                <button
-                    className="btn btn-secondary filter-toggle"
-                    onClick={() => setShowFilters(!showFilters)}
-                >
-                    {showFilters ? 'Hide Filters' : 'Show Filters'} 🔍
-                </button>
+            {/* Filter Toggle */}
+            <button
+                className="btn btn-outline filter-toggle"
+                onClick={() => setShowFilters(!showFilters)}
+            >
+                {showFilters ? 'Hide Filters' : 'Show Filters'} 🔍
+            </button>
 
-                {/* Advanced Filters */}
-                {showFilters && (
-                    <form className="admin-filters advanced" onSubmit={applyFilters}>
-                        <div className="filter-row">
-                            <select
-                                value={filters.reviewStatus}
-                                onChange={handleFilterChange('reviewStatus')}
-                                className="filter-select"
-                            >
-                                <option value="pending">Pending review</option>
-                                <option value="approved">Approved</option>
-                                <option value="rejected">Rejected</option>
-                                <option value="">All review statuses</option>
-                            </select>
+            {/* Advanced Filters */}
+            {showFilters && (
+                <form className="advanced-filters" onSubmit={applyFilters}>
+                    <div className="filters-grid">
+                        <select
+                            value={filters.reviewStatus}
+                            onChange={handleFilterChange('reviewStatus')}
+                            className="filter-select"
+                        >
+                            <option value="pending">Pending review</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="">All review statuses</option>
+                        </select>
 
-                            <select
-                                value={filters.status}
-                                onChange={handleFilterChange('status')}
-                                className="filter-select"
-                            >
-                                <option value="">Any campaign status</option>
-                                <option value="pending_review">Pending review</option>
-                                <option value="active">Active</option>
-                                <option value="paused">Paused</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
-                            </select>
+                        <select
+                            value={filters.status}
+                            onChange={handleFilterChange('status')}
+                            className="filter-select"
+                        >
+                            <option value="">Any campaign status</option>
+                            <option value="pending_review">Pending review</option>
+                            <option value="active">Active</option>
+                            <option value="paused">Paused</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
 
-                            <select
-                                value={filters.tier}
-                                onChange={handleFilterChange('tier')}
-                                className="filter-select"
-                            >
-                                <option value="">All tiers</option>
-                                <option value="base">Base</option>
-                                <option value="enhanced">Enhanced</option>
-                                <option value="premium">Premium</option>
-                            </select>
-                        </div>
+                        <select
+                            value={filters.tier}
+                            onChange={handleFilterChange('tier')}
+                            className="filter-select"
+                        >
+                            <option value="">All tiers</option>
+                            <option value="base">Base</option>
+                            <option value="enhanced">Enhanced</option>
+                            <option value="premium">Premium</option>
+                        </select>
 
-                        <div className="filter-row">
+                        <input
+                            type="text"
+                            placeholder="Search business name"
+                            value={filters.business}
+                            onChange={handleFilterChange('business')}
+                            className="filter-input"
+                        />
+
+                        <input
+                            type="date"
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                            className="filter-input"
+                            placeholder="Start date"
+                        />
+
+                        <input
+                            type="date"
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                            className="filter-input"
+                            placeholder="End date"
+                        />
+                    </div>
+
+                    <div className="filters-grid">
+                        <div className="range-filter">
+                            <label>Impressions:</label>
                             <input
-                                type="text"
-                                placeholder="Search business name"
-                                value={filters.business}
-                                onChange={handleFilterChange('business')}
-                                className="filter-input"
+                                type="number"
+                                placeholder="Min"
+                                value={filters.minImpressions}
+                                onChange={handleFilterChange('minImpressions')}
+                                className="filter-input small"
                             />
-
-                            <div className="date-range">
-                                <input
-                                    type="date"
-                                    value={dateRange.start}
-                                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                                    className="filter-input"
-                                />
-                                <span>to</span>
-                                <input
-                                    type="date"
-                                    value={dateRange.end}
-                                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                                    className="filter-input"
-                                />
-                            </div>
+                            <span>to</span>
+                            <input
+                                type="number"
+                                placeholder="Max"
+                                value={filters.maxImpressions}
+                                onChange={handleFilterChange('maxImpressions')}
+                                className="filter-input small"
+                            />
                         </div>
 
-                        <div className="filter-row">
-                            <div className="range-filter">
-                                <label>Impressions:</label>
-                                <input
-                                    type="number"
-                                    placeholder="Min"
-                                    value={filters.minImpressions}
-                                    onChange={handleFilterChange('minImpressions')}
-                                    className="filter-input small"
-                                />
-                                <span>-</span>
-                                <input
-                                    type="number"
-                                    placeholder="Max"
-                                    value={filters.maxImpressions}
-                                    onChange={handleFilterChange('maxImpressions')}
-                                    className="filter-input small"
-                                />
-                            </div>
-
-                            <div className="range-filter">
-                                <label>Clicks:</label>
-                                <input
-                                    type="number"
-                                    placeholder="Min"
-                                    value={filters.minClicks}
-                                    onChange={handleFilterChange('minClicks')}
-                                    className="filter-input small"
-                                />
-                                <span>-</span>
-                                <input
-                                    type="number"
-                                    placeholder="Max"
-                                    value={filters.maxClicks}
-                                    onChange={handleFilterChange('maxClicks')}
-                                    className="filter-input small"
-                                />
-                            </div>
-
-                            <div className="range-filter">
-                                <label>Spend ($):</label>
-                                <input
-                                    type="number"
-                                    placeholder="Min"
-                                    value={filters.minSpend}
-                                    onChange={handleFilterChange('minSpend')}
-                                    className="filter-input small"
-                                    step="0.01"
-                                />
-                                <span>-</span>
-                                <input
-                                    type="number"
-                                    placeholder="Max"
-                                    value={filters.maxSpend}
-                                    onChange={handleFilterChange('maxSpend')}
-                                    className="filter-input small"
-                                    step="0.01"
-                                />
-                            </div>
+                        <div className="range-filter">
+                            <label>Clicks:</label>
+                            <input
+                                type="number"
+                                placeholder="Min"
+                                value={filters.minClicks}
+                                onChange={handleFilterChange('minClicks')}
+                                className="filter-input small"
+                            />
+                            <span>to</span>
+                            <input
+                                type="number"
+                                placeholder="Max"
+                                value={filters.maxClicks}
+                                onChange={handleFilterChange('maxClicks')}
+                                className="filter-input small"
+                            />
                         </div>
 
-                        <div className="filter-actions">
-                            <button type="submit" className="btn btn-primary">
-                                Apply Filters
-                            </button>
-                            <button type="button" className="btn btn-secondary" onClick={resetFilters}>
-                                Reset
-                            </button>
+                        <div className="range-filter">
+                            <label>Spend ($):</label>
+                            <input
+                                type="number"
+                                placeholder="Min"
+                                value={filters.minSpend}
+                                onChange={handleFilterChange('minSpend')}
+                                className="filter-input small"
+                                step="0.01"
+                            />
+                            <span>to</span>
+                            <input
+                                type="number"
+                                placeholder="Max"
+                                value={filters.maxSpend}
+                                onChange={handleFilterChange('maxSpend')}
+                                className="filter-input small"
+                                step="0.01"
+                            />
                         </div>
-                    </form>
-                )}
+                    </div>
 
-                {/* Bulk Actions */}
-                {selectedAds.length > 0 && (
-                    <div className="bulk-actions">
-                        <span>{selectedAds.length} ad(s) selected</span>
-                        <button className="btn btn-success" onClick={handleBulkApprove}>
+                    <div className="filter-actions">
+                        <button type="submit" className="btn btn-primary">
+                            Apply Filters
+                        </button>
+                        <button type="button" className="btn btn-outline" onClick={resetFilters}>
+                            Reset
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* Bulk Actions */}
+            {selectedAds.length > 0 && (
+                <div className="bulk-actions">
+          <span className="bulk-actions__info">
+            {selectedAds.length} ad(s) selected
+          </span>
+                    <div className="bulk-actions__buttons">
+                        <button
+                            className="btn btn-success btn-sm"
+                            onClick={handleBulkApprove}
+                        >
                             Approve Selected
                         </button>
-                        <button className="btn btn-warning" onClick={handleBulkReject}>
+                        <button
+                            className="btn btn-danger btn-sm"
+                            onClick={handleBulkReject}
+                        >
                             Reject Selected
                         </button>
-                        <button className="btn btn-secondary" onClick={() => setSelectedAds([])}>
+                        <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => setSelectedAds([])}
+                        >
                             Clear
                         </button>
                     </div>
-                )}
-            </header>
+                </div>
+            )}
 
             {/* Ads Table */}
-            <div className="admin-table__wrapper">
-                <table className="admin-table">
+            <div className="table-container">
+                <table className="table">
                     <thead>
                     <tr>
-                        <th className="checkbox-col">
+                        <th width="40">
                             <input
                                 type="checkbox"
                                 checked={selectedAds.length === filteredAds.length && filteredAds.length > 0}
@@ -585,7 +586,7 @@ const AdApprovals = () => {
                             Business {getSortIcon('business_name')}
                         </th>
                         <th onClick={() => handleSort('subscription_tier')} className="sortable">
-                            Plan/Tier {getSortIcon('subscription_tier')}
+                            Tier {getSortIcon('subscription_tier')}
                         </th>
                         <th onClick={() => handleSort('status')} className="sortable">
                             Status {getSortIcon('status')}
@@ -594,110 +595,110 @@ const AdApprovals = () => {
                             Review {getSortIcon('review_status')}
                         </th>
                         <th onClick={() => handleSort('impressions')} className="sortable">
-                            Analytics {getSortIcon('impressions')}
+                            Performance {getSortIcon('impressions')}
                         </th>
                         <th onClick={() => handleSort('spend')} className="sortable">
                             Spend {getSortIcon('spend')}
                         </th>
-                        <th>Controls</th>
+                        <th>Actions</th>
                     </tr>
                     </thead>
                     <tbody>
-                    {filteredAds.length === 0 ? (
+                    {loading ? (
                         <tr>
-                            <td colSpan="8" className="no-results">
+                            <td colSpan="8" className="text-center py-8">
+                                <Loading size="small" />
+                            </td>
+                        </tr>
+                    ) : filteredAds.length === 0 ? (
+                        <tr>
+                            <td colSpan="8" className="text-center py-8 text-secondary">
                                 No advertisements found matching your criteria
                             </td>
                         </tr>
                     ) : (
-                        filteredAds.map((ad) => (
-                            <tr key={ad.id} className={selectedAds.includes(ad.id) ? 'selected' : ''}>
-                                <td className="checkbox-col">
+                        filteredAds.map(ad => (
+                            <tr key={ad.id} className={selectedAds.includes(ad.id) ? 'row-selected' : ''}>
+                                <td>
                                     <input
                                         type="checkbox"
                                         checked={selectedAds.includes(ad.id)}
-                                        onChange={() => handleSelectAd(ad.id)}
+                                        onChange={(e) => {
+                                            setSelectedAds(prev =>
+                                                e.target.checked
+                                                    ? [...prev, ad.id]
+                                                    : prev.filter(id => id !== ad.id)
+                                            );
+                                        }}
                                     />
                                 </td>
                                 <td>
                                     <div className="business-info">
-                                        <strong className="business-name">{ad.business_name}</strong>
-                                        <p className="ad-name">{ad.name}</p>
-                                        <small className="owner-email">{ad.owner_email || 'No owner email'}</small>
-                                        <small className="created-date">
-                                            Created: {new Date(ad.created_at).toLocaleDateString()}
-                                        </small>
+                                        <span className="business-name">{ad.business_name}</span>
+                                        <span className="ad-name">{ad.name}</span>
+                                        <span className="text-xs text-secondary">{ad.owner_email || 'No owner email'}</span>
+                                        <span className="text-xs text-secondary">
+                        Created: {new Date(ad.created_at).toLocaleDateString()}
+                      </span>
                                     </div>
                                 </td>
                                 <td>
-                                        <span className={`tier-badge tier-${ad.subscription_tier || 'base'}`}>
-                                            {ad.subscription_tier || 'base'}
-                                        </span>
+                                    <Badge variant={ad.subscription_tier || 'base'}>
+                                        {ad.subscription_tier || 'base'}
+                                    </Badge>
                                 </td>
                                 <td>
-                                        <span className={`status-badge status-${ad.status}`}>
-                                            {ad.status?.replace('_', ' ') || 'unknown'}
-                                        </span>
+                                    <Badge variant={ad.status}>
+                                        {ad.status?.replace('_', ' ') || 'unknown'}
+                                    </Badge>
                                 </td>
                                 <td>
                                     <div className="review-info">
-                                            <span className={`review-badge review-${ad.review_status}`}>
-                                                {ad.review_status}
-                                            </span>
+                                        <Badge variant={ad.review_status}>
+                                            {ad.review_status}
+                                        </Badge>
                                         {ad.review_status === 'pending' && (
                                             <label className="override-toggle">
                                                 <input
                                                     type="checkbox"
                                                     checked={Boolean(selectedOverride[ad.id])}
-                                                    onChange={(event) =>
-                                                        setSelectedOverride((prev) => ({
+                                                    onChange={(e) =>
+                                                        setSelectedOverride(prev => ({
                                                             ...prev,
-                                                            [ad.id]: event.target.checked
+                                                            [ad.id]: e.target.checked
                                                         }))
                                                     }
                                                 />
-                                                <span>Override limits</span>
+                                                <span className="text-xs">Override limits</span>
                                             </label>
                                         )}
                                     </div>
                                 </td>
                                 <td>
-                                    <div className="analytics-stats">
-                                        <p className="stat-row">
-                                            <span className="stat-label">👁️</span>
-                                            <span className="stat-value">{ad.impressions?.toLocaleString() || 0}</span>
-                                        </p>
-                                        <p className="stat-row">
-                                            <span className="stat-label">🖱️</span>
-                                            <span className="stat-value">{ad.clicks?.toLocaleString() || 0}</span>
-                                        </p>
-                                        <p className="stat-row">
-                                            <span className="stat-label">📊</span>
-                                            <span className="stat-value">
-                                                    {ad.impressions ? ((ad.clicks / ad.impressions) * 100).toFixed(2) : 0}% CTR
-                                                </span>
-                                        </p>
+                                    <div className="performance-stats">
+                                        <span>👁️ {ad.impressions?.toLocaleString() || 0}</span>
+                                        <span>🖱️ {ad.clicks?.toLocaleString() || 0}</span>
+                                        <span>📊 {ad.impressions ? ((ad.clicks / ad.impressions) * 100).toFixed(2) : 0}% CTR</span>
                                     </div>
                                 </td>
                                 <td>
                                     <div className="spend-info">
-                                            <span className="spend-amount">
-                                                ${((ad.spend_minor || 0) / 100).toFixed(2)}
-                                            </span>
+                      <span className="spend-amount">
+                        ${((ad.spend_minor || 0) / 100).toFixed(2)}
+                      </span>
                                         {ad.budget && (
                                             <span className="budget-info">
-                                                    of ${(ad.budget / 100).toFixed(2)}
-                                                </span>
+                          of ${(ad.budget / 100).toFixed(2)}
+                        </span>
                                         )}
                                     </div>
                                 </td>
-                                <td className="admin-table__actions">
+                                <td>
                                     <div className="action-buttons">
                                         <button
-                                            type="button"
-                                            onClick={() => handleViewDetails(ad.id)}
                                             className="btn btn-icon"
-                                            title="View Details"
+                                            onClick={() => handleViewDetails(ad)}
+                                            title="View details"
                                         >
                                             📋
                                         </button>
@@ -705,43 +706,43 @@ const AdApprovals = () => {
                                         {ad.review_status === 'pending' && (
                                             <>
                                                 <button
-                                                    type="button"
+                                                    className="btn btn-icon btn-success"
                                                     onClick={() => handleApprove(ad.id)}
-                                                    className="btn btn-success btn-small"
+                                                    title="Approve"
                                                     disabled={loading}
                                                 >
-                                                    ✓ Approve
+                                                    ✓
                                                 </button>
                                                 <button
-                                                    type="button"
+                                                    className="btn btn-icon btn-danger"
                                                     onClick={() => handleReject(ad.id)}
-                                                    className="btn btn-danger btn-small"
+                                                    title="Reject"
                                                     disabled={loading}
                                                 >
-                                                    ✗ Reject
+                                                    ✗
                                                 </button>
                                             </>
                                         )}
 
                                         {ad.status === 'active' && (
                                             <button
-                                                type="button"
+                                                className="btn btn-icon btn-warning"
                                                 onClick={() => handlePauseAd(ad.id)}
-                                                className="btn btn-warning btn-small"
+                                                title="Pause"
                                                 disabled={loading}
                                             >
-                                                ⏸️ Pause
+                                                ⏸️
                                             </button>
                                         )}
 
                                         {ad.status === 'paused' && (
                                             <button
-                                                type="button"
+                                                className="btn btn-icon btn-success"
                                                 onClick={() => handleResumeAd(ad.id)}
-                                                className="btn btn-success btn-small"
+                                                title="Resume"
                                                 disabled={loading}
                                             >
-                                                ▶️ Resume
+                                                ▶️
                                             </button>
                                         )}
                                     </div>
@@ -753,18 +754,19 @@ const AdApprovals = () => {
                 </table>
             </div>
 
-            <section className="ad-failure-log">
-                <div className="section-header">
-                    <h2>Recent Submission Failures</h2>
+            {/* Failure Log */}
+            <div className="failure-log">
+                <div className="failure-log__header">
+                    <h3>Recent Submission Failures</h3>
                     <button
-                        type="button"
-                        className="btn btn-secondary btn-small"
+                        className="btn btn-outline btn-sm"
                         onClick={fetchFailureLog}
                         disabled={failureLoading}
                     >
                         {failureLoading ? 'Refreshing…' : 'Refresh'}
                     </button>
                 </div>
+
                 {failureLoading ? (
                     <div className="failure-loading">
                         <Loading size="small" />
@@ -772,156 +774,128 @@ const AdApprovals = () => {
                 ) : failureLog.length === 0 ? (
                     <p className="failure-empty">No recent failures recorded.</p>
                 ) : (
-                    <div className="ad-failure-log__list">
+                    <div className="failure-log__list">
                         {failureLog.map((failure) => {
                             const details = parseFailureDetails(failure.details);
                             return (
-                                <article key={failure.id || failure.created_at} className="ad-failure-log__item">
-                                    <header className="ad-failure-log__header">
+                                <div key={failure.id || failure.created_at} className="failure-log__item">
+                                    <div className="failure-log__title">
                                         <div>
                                             <strong>{failure.business_name || 'Unlinked business'}</strong>
                                             {failure.user_email && (
                                                 <span className="failure-meta">Submitted by {failure.user_email}</span>
                                             )}
                                         </div>
-                                        <span className="failure-timestamp">
-                                            {new Date(failure.created_at).toLocaleString()}
-                                        </span>
-                                    </header>
-                                    <p className="ad-failure-log__error">{failure.error_message}</p>
-                                    <div className="ad-failure-log__meta">
+                                        <span className="text-xs text-secondary">
+                      {new Date(failure.created_at).toLocaleString()}
+                    </span>
+                                    </div>
+                                    <p className="failure-log__error">{failure.error_message}</p>
+                                    <div className="failure-meta-details">
                                         {details.code && <span>Code: {details.code}</span>}
                                         {Array.isArray(details.placements) && details.placements.length > 0 && (
                                             <span>Placements: {details.placements.join(', ')}</span>
                                         )}
                                         {details.stage && <span>Stage: {details.stage}</span>}
                                     </div>
-                                </article>
+                                </div>
                             );
                         })}
                     </div>
                 )}
-            </section>
+            </div>
 
-            {/* Ad Details Modal */}
-            {showDetailsModal && selectedAdDetails && (
-                <div className="modal" onClick={() => setShowDetailsModal(false)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Ad Details: {selectedAdDetails.name}</h2>
-                            <button className="modal-close" onClick={() => setShowDetailsModal(false)}>×</button>
+            {/* Details Modal */}
+            <Modal
+                isOpen={!!selectedAd}
+                onClose={() => setSelectedAd(null)}
+                title={`Ad Details: ${selectedAd?.name}`}
+            >
+                {selectedAd && (
+                    <div className="details-content">
+                        <div className="details-grid">
+                            <div className="detail-item">
+                                <label>Business</label>
+                                <span>{selectedAd.business_name}</span>
+                            </div>
+                            <div className="detail-item">
+                                <label>Owner</label>
+                                <span>{selectedAd.owner_email}</span>
+                            </div>
+                            <div className="detail-item">
+                                <label>Tier</label>
+                                <Badge variant={selectedAd.subscription_tier}>
+                                    {selectedAd.subscription_tier}
+                                </Badge>
+                            </div>
+                            <div className="detail-item">
+                                <label>Status</label>
+                                <Badge variant={selectedAd.status}>
+                                    {selectedAd.status}
+                                </Badge>
+                            </div>
+                            <div className="detail-item">
+                                <label>Review Status</label>
+                                <Badge variant={selectedAd.review_status}>
+                                    {selectedAd.review_status}
+                                </Badge>
+                            </div>
+                            <div className="detail-item">
+                                <label>Created</label>
+                                <span>{new Date(selectedAd.created_at).toLocaleString()}</span>
+                            </div>
                         </div>
 
-                        <div className="modal-body">
-                            <div className="details-section">
-                                <h3>Basic Information</h3>
-                                <div className="details-grid">
-                                    <div className="detail-item">
-                                        <label>Business:</label>
-                                        <span>{selectedAdDetails.business_name}</span>
+                        {selectedAd.content && (
+                            <div className="content-preview">
+                                <h4>Ad Content</h4>
+                                {selectedAd.content.image && (
+                                    <img src={selectedAd.content.image} alt="Ad preview" className="content-image" />
+                                )}
+                                <div className="content-text">
+                                    <p><strong>Headline:</strong> {selectedAd.content.headline}</p>
+                                    <p><strong>Description:</strong> {selectedAd.content.description}</p>
+                                    {selectedAd.content.cta && (
+                                        <p><strong>CTA:</strong> {selectedAd.content.cta}</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedAd.analytics && (
+                            <div className="analytics-preview">
+                                <h4>Performance Analytics</h4>
+                                <div className="analytics-grid">
+                                    <div className="analytics-item">
+                                        <label>Total Impressions</label>
+                                        <span>{selectedAd.analytics.totalImpressions?.toLocaleString()}</span>
                                     </div>
-                                    <div className="detail-item">
-                                        <label>Owner:</label>
-                                        <span>{selectedAdDetails.owner_email}</span>
+                                    <div className="analytics-item">
+                                        <label>Total Clicks</label>
+                                        <span>{selectedAd.analytics.totalClicks?.toLocaleString()}</span>
                                     </div>
-                                    <div className="detail-item">
-                                        <label>Tier:</label>
-                                        <span className={`tier-badge tier-${selectedAdDetails.subscription_tier}`}>
-                                            {selectedAdDetails.subscription_tier}
-                                        </span>
+                                    <div className="analytics-item">
+                                        <label>CTR</label>
+                                        <span>{selectedAd.analytics.ctr?.toFixed(2)}%</span>
                                     </div>
-                                    <div className="detail-item">
-                                        <label>Status:</label>
-                                        <span className={`status-badge status-${selectedAdDetails.status}`}>
-                                            {selectedAdDetails.status}
-                                        </span>
-                                    </div>
-                                    <div className="detail-item">
-                                        <label>Review Status:</label>
-                                        <span className={`review-badge review-${selectedAdDetails.review_status}`}>
-                                            {selectedAdDetails.review_status}
-                                        </span>
-                                    </div>
-                                    <div className="detail-item">
-                                        <label>Created:</label>
-                                        <span>{new Date(selectedAdDetails.created_at).toLocaleString()}</span>
+                                    <div className="analytics-item">
+                                        <label>Total Spend</label>
+                                        <span>${selectedAd.analytics.totalSpend?.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
+                        )}
 
-                            {selectedAdDetails.content && (
-                                <div className="details-section">
-                                    <h3>Ad Content</h3>
-                                    <div className="content-preview">
-                                        {selectedAdDetails.content.image && (
-                                            <img
-                                                src={selectedAdDetails.content.image}
-                                                alt="Ad preview"
-                                                className="content-image"
-                                            />
-                                        )}
-                                        <div className="content-text">
-                                            <p><strong>Headline:</strong> {selectedAdDetails.content.headline}</p>
-                                            <p><strong>Description:</strong> {selectedAdDetails.content.description}</p>
-                                            {selectedAdDetails.content.cta && (
-                                                <p><strong>CTA:</strong> {selectedAdDetails.content.cta}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {selectedAdDetails.analytics && (
-                                <div className="details-section">
-                                    <h3>Performance Analytics</h3>
-                                    <div className="analytics-charts">
-                                        <div className="analytics-summary">
-                                            <div className="summary-card">
-                                                <span className="summary-label">Total Impressions</span>
-                                                <span className="summary-value">
-                                                    {selectedAdDetails.analytics.totalImpressions?.toLocaleString()}
-                                                </span>
-                                            </div>
-                                            <div className="summary-card">
-                                                <span className="summary-label">Total Clicks</span>
-                                                <span className="summary-value">
-                                                    {selectedAdDetails.analytics.totalClicks?.toLocaleString()}
-                                                </span>
-                                            </div>
-                                            <div className="summary-card">
-                                                <span className="summary-label">CTR</span>
-                                                <span className="summary-value">
-                                                    {selectedAdDetails.analytics.ctr?.toFixed(2)}%
-                                                </span>
-                                            </div>
-                                            <div className="summary-card">
-                                                <span className="summary-label">Total Spend</span>
-                                                <span className="summary-value">
-                                                    ${selectedAdDetails.analytics.totalSpend?.toFixed(2)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {selectedAdDetails.rejection_reason && (
-                                <div className="details-section rejection">
-                                    <h3>Rejection Reason</h3>
-                                    <p className="rejection-reason">{selectedAdDetails.rejection_reason}</p>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowDetailsModal(false)}>
-                                Close
-                            </button>
-                        </div>
+                        {selectedAd.rejection_reason && (
+                            <div className="rejection-reason">
+                                <h4>Rejection Reason</h4>
+                                <p>{selectedAd.rejection_reason}</p>
+                            </div>
+                        )}
                     </div>
-                </div>
-            )}
-        </section>
+                )}
+            </Modal>
+        </div>
     );
 };
 

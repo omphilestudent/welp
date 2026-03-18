@@ -126,7 +126,7 @@ const buildAdQueryContext = (tables) => {
 
     const ownerEmailExpr = ownerExpr ? 'owner.email' : 'NULL';
     const ownerNameExpr = ownerExpr ? 'owner.display_name' : 'NULL';
-    const ownerPhoneExpr = ownerExpr ? 'owner.phone' : 'NULL';
+    const ownerPhoneExpr = ownerExpr ? 'owner.phone_number' : 'NULL';
 
     return {
         joins: joins.join('\n'),

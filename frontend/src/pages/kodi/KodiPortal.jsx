@@ -14,6 +14,7 @@ import {
     linkPlatformPage,
     updatePagePermissions
 } from '../../services/kodiPageService';
+import { fetchTableRecords } from '../../services/neonDataService';
 import './KodiPortal.css';
 
 const PLATFORM_ROLES = ['admin', 'employee', 'business', 'psychologist'];
@@ -70,6 +71,10 @@ const KodiPortal = () => {
     const [leads, setLeads] = useState([]);
     const [loadingLeads, setLoadingLeads] = useState(false);
     const [leadModal, setLeadModal] = useState({ open: false, name: '', email: '', creating: false });
+    const [neonRecords, setNeonRecords] = useState([]);
+    const [neonTable, setNeonTable] = useState('contacts');
+    const [neonLoading, setNeonLoading] = useState(false);
+    const [neonError, setNeonError] = useState('');
 
     const fetchApps = async () => {
         setLoadingApps(true);
@@ -116,6 +121,23 @@ const KodiPortal = () => {
             toast.error('Unable to load leads');
         } finally {
             setLoadingLeads(false);
+        }
+    };
+
+    const handleFetchNeonTable = async () => {
+        setNeonLoading(true);
+        setNeonError('');
+        try {
+            const records = await fetchTableRecords(neonTable, { limit: 5 });
+            setNeonRecords(records || []);
+            if (!records?.length) {
+                setNeonError('No records were returned for that table.');
+            }
+        } catch (error) {
+            setNeonError(error?.message || 'Failed to load data from Neon.');
+            setNeonRecords([]);
+        } finally {
+            setNeonLoading(false);
         }
     };
 
@@ -469,6 +491,47 @@ const KodiPortal = () => {
                                 <p>No metadata objects available.</p>
                             </div>
                         )}
+                    </div>
+                )}
+            </section>
+
+            <section className="kodi-portal__neon-section">
+                <header className="kodi-portal__section-header">
+                    <h2>Neon Data API</h2>
+                    <p>Query the configured Neon REST endpoint directly for live table data.</p>
+                </header>
+                <div className="kodi-portal__neon-controls">
+                    <label>
+                        Table
+                        <select value={neonTable} onChange={(e) => setNeonTable(e.target.value)}>
+                            <option value="contacts">contacts</option>
+                            <option value="businesses">businesses</option>
+                            <option value="subscriptions">subscriptions</option>
+                        </select>
+                    </label>
+                    <button className="btn-primary" onClick={handleFetchNeonTable} disabled={neonLoading}>
+                        {neonLoading ? 'Querying…' : 'Fetch data'}
+                    </button>
+                </div>
+                {neonError && <p className="kodi-portal__neon-error">{neonError}</p>}
+                {neonRecords.length > 0 && (
+                    <div className="kodi-portal__neon-table">
+                        <div className="kodi-portal__neon-table-head">
+                            {(Object.keys(neonRecords[0]).slice(0, 4) || []).map((column) => (
+                                <span key={column}>{column}</span>
+                            ))}
+                        </div>
+                        {neonRecords.map((record, index) => (
+                            <div key={`${record.id || index}`} className="kodi-portal__neon-table-row">
+                                {Object.entries(record)
+                                    .slice(0, 4)
+                                    .map(([column, value]) => (
+                                        <span key={`${index}-${column}`}>
+                                            {typeof value === 'object' ? JSON.stringify(value) : value ?? '—'}
+                                        </span>
+                                    ))}
+                            </div>
+                        ))}
                     </div>
                 )}
             </section>
