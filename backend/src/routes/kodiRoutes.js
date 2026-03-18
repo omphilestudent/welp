@@ -4,6 +4,7 @@ const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const kodiController = require('../controllers/kodiController');
 const kodiPages = require('../modules/kodi/kodiPages.controller');
+const kodiPlatform = require('../modules/kodi/kodi.controller');
 const { authenticateKodiPageSession } = require('../modules/kodi/kodiPageSession.middleware');
 
 const router = express.Router();
@@ -129,5 +130,33 @@ router.delete('/components/:id', kodiController.deleteComponent);
 
 // Audit logs
 router.get('/audit', kodiController.listAuditLogs);
+
+// New builder / runtime platform
+router.post(
+    '/platform/pages',
+    authenticate,
+    kodiPlatform.createPageValidators,
+    kodiPlatform.createPage
+);
+router.get('/platform/pages', authenticate, kodiPlatform.listPages);
+router.put(
+    '/platform/pages/:id/layout',
+    authenticate,
+    kodiPlatform.layoutValidators,
+    kodiPlatform.updateLayout
+);
+router.post(
+    '/platform/pages/:id/activate',
+    authenticate,
+    kodiPlatform.pageIdValidator,
+    kodiPlatform.activatePage
+);
+router.post(
+    '/platform/pages/:id/link',
+    authenticate,
+    validate([body('appId').isInt()]),
+    kodiPlatform.linkPageToApp
+);
+router.get('/platform/runtime/:pageId', authenticate, kodiPlatform.getRuntimeValidator, kodiPlatform.runtimeLoader);
 
 module.exports = router;
