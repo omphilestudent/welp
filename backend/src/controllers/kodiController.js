@@ -1,5 +1,6 @@
 const { query } = require('../utils/database');
 const { sendEmail } = require('../utils/emailService');
+const kodiPlatformService = require('../modules/kodi/kodi.service');
 
 const ROLE_ACCESS = {
     customer_service: ['applications', 'cases', 'ads'],
@@ -212,7 +213,7 @@ const createApplication = async (req, res) => {
         if (!hasAccess(req.user.role, 'applications')) {
             return res.status(403).json({ success: false, error: 'Not authorized' });
         }
-        const { clientName, documents } = req.body || {};
+        const { clientName, documents, contactEmail } = req.body || {};
         if (!clientName) {
             return res.status(400).json({ success: false, error: 'clientName is required' });
         }
@@ -222,6 +223,13 @@ const createApplication = async (req, res) => {
              RETURNING *`,
             [clientName, req.user.id, JSON.stringify(documents || [])]
         );
+        if (!Array.isArray(documents) || documents.length === 0) {
+            await kodiPlatformService.createLead({
+                name: clientName,
+                email: contactEmail || null,
+                status: 'incomplete'
+            });
+        }
         await audit({
             entityType: 'application',
             entityId: result.rows[0].id,

@@ -1,0 +1,177 @@
+.kodi-runtime {
+    padding: 24px;
+    background: #f4f6fb;
+    min-height: 100vh;
+}
+
+.kodi-runtime__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.kodi-runtime__header h1 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+.kodi-runtime__layout {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.kodi-runtime__row {
+    display: flex;
+    gap: 16px;
+}
+
+.kodi-runtime__column {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px;
+    min-height: 160px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kodi-runtime__card {
+    border: 1px solid #e0e5ee;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fafbff;
+    box-shadow: 0 6px 18px rgba(15, 33, 66, 0.12);
+}
+
+.kodi-runtime__card-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: #5e6e86;
+}
+
+.kodi-runtime__card-body {
+    font-size: 0.8rem;
+    color: #1f2b3b;
+}
+
+.kodi-runtime__card-body pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.runtime-panel-highlight {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.runtime-panel-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.runtime-panel-actions button {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #cdd7e6;
+    background: white;
+    color: #1f2b3b;
+    font-size: 0.85rem;
+}
+
+.runtime-panel-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.runtime-panel-stats span {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #e6f0ff;
+    font-size: 0.8rem;
+    color: #0b3b71;
+}
+
+.runtime-record-page {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.runtime-record-search {
+    display: flex;
+    gap: 6px;
+}
+
+.runtime-record-search input {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #d8dde6;
+}
+
+.runtime-record-search button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background: #1589ee;
+    color: white;
+    cursor: pointer;
+}
+
+.runtime-record-details {
+    background: white;
+    border-radius: 6px;
+    padding: 10px;
+    border: 1px solid #d8dde6;
+}
+
+.runtime-record-name {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    color: #16325c;
+}
+
+.runtime-record-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.runtime-record-filters span {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eef1f7;
+    font-size: 0.75rem;
+    color: #54698d;
+}
+
+.runtime-record-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.runtime-record-timeline-item {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid #d8dde6;
+    font-size: 0.8rem;
+    color: #1f2b3b;
+}
+
+.kodi-runtime__error {
+    text-align: center;
+    margin-top: 80px;
+    color: #c23934;
+}

@@ -325,6 +325,104 @@ const requestChatWithPsychologist = async (req, res) => {
     }
 };
 
+const extendConversation = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const requestedMinutes = Number(req.body.extendMinutes || 10);
+        const minutesToExtend = Math.min(60, Math.max(5, requestedMinutes));
+        const result = await query(
+            `SELECT id, employee_id, psychologist_id, status, expires_at, time_limit_minutes
+             FROM conversations
+             WHERE id = $1
+               AND employee_id = $2`,
+            [conversationId, req.user.id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(410).json({
+                error: 'Conversation expired or deleted. Request a new chat to continue, provided you have minutes left.'
+            });
+        }
+        const conversation = result.rows[0];
+        const psychologistId = conversation.psychologist_id;
+        if (!psychologistId) {
+            return res.status(410).json({
+                error: 'Psychologist is no longer available. Please request a new chat using your remaining minutes.'
+            });
+        }
+        const psychResult = await query(
+            `SELECT id
+             FROM users
+             WHERE id = $1
+               AND role = 'psychologist'`,
+            [psychologistId]
+        );
+        if (psychResult.rows.length === 0) {
+            return res.status(410).json({
+                error: 'Psychologist is no longer available. Please request a new chat using your remaining minutes.'
+            });
+        }
+        if (!['accepted', 'ended'].includes(String(conversation.status || '').toLowerCase())) {
+            return res.status(400).json({ error: 'Conversation is not eligible for extension' });
+        }
+
+        await ensureChatQuota(req.user, minutesToExtend);
+        const now = new Date();
+        const currentExpiresAt = conversation.expires_at ? new Date(conversation.expires_at) : null;
+        const baseMs = currentExpiresAt && currentExpiresAt > now ? currentExpiresAt.getTime() : now.getTime();
+        const newExpiresAt = new Date(baseMs + minutesToExtend * 60 * 1000);
+
+        await query(
+            `UPDATE conversations
+             SET time_limit_minutes = COALESCE(time_limit_minutes, 0) + $1,
+                 expires_at = $2,
+                 status = 'accepted',
+                 ended_at = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3`,
+            [minutesToExtend, newExpiresAt, conversationId]
+        );
+        const sender = await query(
+            'SELECT id, display_name FROM users WHERE id = $1',
+            [req.user.id]
+        );
+        const senderName = sender.rows[0]?.display_name || 'Someone';
+        const notification = await createUserNotification({
+            userId: req.user.id,
+            type: 'conversation_extended',
+            message: `Your session was extended by ${minutesToExtend} minutes.`,
+            entityType: 'conversation',
+            entityId: conversationId,
+            metadata: { extendedMinutes: minutesToExtend }
+        });
+        const psychNotification = await createUserNotification({
+            userId: psychologistId,
+            type: 'conversation_extended',
+            message: `${senderName} extended the session by ${minutesToExtend} minutes.`,
+            entityType: 'conversation',
+            entityId: conversationId,
+            metadata: { extendedMinutes: minutesToExtend }
+        });
+        const io = req.app?.get('io');
+        if (io) {
+            if (notification) io.to(`user-${req.user.id}`).emit('notification', notification);
+            if (psychNotification) io.to(`user-${conversation.psychologist_id}`).emit('notification', psychNotification);
+            io.to(`conversation-${conversationId}`).emit('conversation.extended', {
+                conversationId,
+                expiresAt: newExpiresAt,
+                extendedMinutes: minutesToExtend
+            });
+        }
+        res.json({
+            success: true,
+            extendedMinutes: minutesToExtend,
+            expiresAt: newExpiresAt
+        });
+    } catch (error) {
+        console.error('Extend conversation error:', error);
+        res.status(500).json({ error: error.message || 'Failed to extend conversation' });
+    }
+};
+
 
 const getAvailablePsychologists = async (req, res) => {
     try {
@@ -1295,6 +1393,7 @@ const removePsychologistFavorite = async (req, res) => {
 module.exports = {
 
     requestChatWithPsychologist,
+    extendConversation,
     getAvailablePsychologists,
 
 

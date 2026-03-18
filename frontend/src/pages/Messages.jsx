@@ -40,6 +40,12 @@ const Messages = () => {
     const [isMuted, setIsMuted] = useState(false);
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [callStartedAt, setCallStartedAt] = useState(null);
+    const [extendingSession, setExtendingSession] = useState(false);
+    const [psychologistDeletedNotice, setPsychologistDeletedNotice] = useState('');
+
+    useEffect(() => {
+        setPsychologistDeletedNotice('');
+    }, [activeConversation?.id]);
     const [callDurationSec, setCallDurationSec] = useState(0);
     const hasFetchedConversations = React.useRef(false);
     const localVideoRef = React.useRef(null);
@@ -155,6 +161,33 @@ const Messages = () => {
             setConversations([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleExtendSession = async () => {
+        if (!activeConversation?.id) return;
+        if ((chatUsage?.remaining ?? 0) <= 0) {
+            toast.error('You do not have any remaining chat minutes to extend the session.');
+            return;
+        }
+        setExtendingSession(true);
+        try {
+            await api.post(`/messages/conversations/${activeConversation.id}/extend`, {
+                extendMinutes: Math.min(10, chatUsage?.remaining || 10)
+            });
+            toast.success('Session extended by a few minutes.');
+            await Promise.all([loadChatUsage(), fetchConversations()]);
+            setNow(Date.now());
+            setPsychologistDeletedNotice('');
+        } catch (error) {
+            const status = error?.response?.status;
+            const message = error?.response?.data?.error || 'Failed to extend the session';
+            toast.error(message);
+            if (status === 410 || status === 404) {
+                setPsychologistDeletedNotice(message);
+            }
+        } finally {
+            setExtendingSession(false);
         }
     };
 
@@ -1084,8 +1117,22 @@ const Messages = () => {
                                             Daily limit reached. Come back tomorrow for more chats.
                                         </p>
                                     )}
+                                </div>
+                                {psychologistDeletedNotice && (
+                                    <div className="upgrade-reminder" style={{ marginTop: '0.75rem' }}>
+                                        <FaExclamationTriangle />
+                                        <span>{psychologistDeletedNotice}</span>
                                     </div>
-                                </section>
+                                )}
+                                {psychologistDeletedNotice && featuredPsychologist && ((chatUsage?.remaining ?? 0) > 0) && (
+                                    <button
+                                        className="btn btn-outline btn-small"
+                                        onClick={() => handleRequestPsychologist(featuredPsychologist)}
+                                    >
+                                        Request a new psychologist
+                                    </button>
+                                )}
+                            </section>
                             )}
                             <section className="available-psych-card">
                                 <div className="available-psych-card__header">
@@ -1187,14 +1234,14 @@ const Messages = () => {
                                     {hasResponse ? 'Psychologist has replied' : 'Waiting for a reply'}
                                 </div>
                                 <div className="conversation-status-actions">
-                                      <button
-                                          className="btn btn-outline btn-small"
-                                          onClick={handleVideoCall}
-                                          disabled={!canStartVideoCall || isFreeEmployee}
+                                    <button
+                                        className="btn btn-outline btn-small"
+                                        onClick={handleVideoCall}
+                                        disabled={!canStartVideoCall || isFreeEmployee}
                                           title={isFreeEmployee ? callRestrictionCopy : undefined}
                                       >
                                         <FaVideo /> Setup video call
-                                      </button>
+                                    </button>
                                     <button
                                         className="btn btn-secondary btn-small"
                                         onClick={handleViewHistory}
@@ -1202,6 +1249,15 @@ const Messages = () => {
                                     >
                                         <FaHistory /> View message history
                                     </button>
+                                    {isConversationExpired && (chatUsage?.remaining ?? 0) > 0 && (
+                                        <button
+                                            className="btn btn-primary btn-small"
+                                            onClick={handleExtendSession}
+                                            disabled={extendingSession}
+                                        >
+                                            {extendingSession ? 'Extending…' : 'Extend session'}
+                                        </button>
+                                    )}
                                 </div>
                                   {showUpgradeReminder && (
                                       <div className="upgrade-reminder">

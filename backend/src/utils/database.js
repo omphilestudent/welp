@@ -603,6 +603,91 @@ const createTables = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS kodi_apps (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_pages (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                label VARCHAR(255) NOT NULL,
+                page_type VARCHAR(50) NOT NULL CHECK (page_type IN ('record','app','home')),
+                status VARCHAR(50) NOT NULL CHECK (status IN ('draft','built','activated')) DEFAULT 'draft',
+                linked_app_id UUID REFERENCES kodi_apps(id) ON DELETE SET NULL,
+                layout JSONB DEFAULT '{}'::jsonb,
+                settings JSONB DEFAULT '{}'::jsonb,
+                created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                activated_at TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS app_page_mapping (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                app_id UUID REFERENCES kodi_apps(id) ON DELETE CASCADE,
+                page_id UUID REFERENCES kodi_pages(id) ON DELETE CASCADE,
+                UNIQUE (app_id, page_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_permissions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                role VARCHAR(50) NOT NULL,
+                page_id UUID REFERENCES kodi_pages(id) ON DELETE CASCADE,
+                can_view BOOLEAN DEFAULT false,
+                can_edit BOOLEAN DEFAULT false,
+                can_use BOOLEAN DEFAULT false,
+                UNIQUE (role, page_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_objects (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(100) UNIQUE NOT NULL,
+                label VARCHAR(100) NOT NULL,
+                description TEXT,
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_fields (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                object_id UUID REFERENCES kodi_objects(id) ON DELETE CASCADE,
+                field_name VARCHAR(100) NOT NULL,
+                field_type VARCHAR(50) NOT NULL,
+                is_required BOOLEAN DEFAULT false,
+                is_readonly BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (object_id, field_name)
+            );
+
+            CREATE TABLE IF NOT EXISTS leads (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255),
+                status VARCHAR(50) DEFAULT 'incomplete',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS opportunities (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+                stage VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_app_users (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                app_id UUID NOT NULL REFERENCES kodi_apps(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                permissions JSONB DEFAULT '{}'::jsonb,
+                assigned_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (app_id, user_id)
+            );
+
+
             -- Email verifications table
             CREATE TABLE IF NOT EXISTS email_verifications (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -876,6 +961,10 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_kodi_cases_priority             ON kodi_cases(priority);
             CREATE INDEX IF NOT EXISTS idx_kodi_ads_status                 ON kodi_ads(status);
             CREATE INDEX IF NOT EXISTS idx_kodi_components_type            ON kodi_components(component_type);
+            CREATE INDEX IF NOT EXISTS idx_kodi_pages_status                ON kodi_pages(status);
+            CREATE INDEX IF NOT EXISTS idx_kodi_pages_app                  ON kodi_pages(linked_app_id);
+            CREATE INDEX IF NOT EXISTS idx_app_page_mapping_app            ON app_page_mapping(app_id);
+            CREATE INDEX IF NOT EXISTS idx_kodi_app_users_app              ON kodi_app_users(app_id);
             CREATE INDEX IF NOT EXISTS idx_kodi_audit_entity               ON kodi_audit_logs(entity_type, entity_id);
         `;
 

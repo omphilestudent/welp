@@ -60,6 +60,9 @@ import KodiDashboard from './pages/kodi/KodiDashboard';
 import KodiLogin from './pages/kodi/KodiLogin';
 import KodiPage from './pages/kodi/KodiPage';
 import KodiBuilder from './pages/kodi/KodiBuilder';
+import KodiPortal from './pages/kodi/KodiPortal';
+import KodiTimes from './pages/kodi/KodiTimes';
+import KodiRuntime from './pages/kodi/KodiRuntime';
 
 // HR Pages
 import Employees from './pages/hr/Employees';
@@ -187,6 +190,46 @@ function App() {
                                     element={
                                         <PrivateRoute>
                                             <KodiDashboard />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/kodi/times"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiTimes />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/kodi/portal"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiPortal />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/kodi/builder/:pageId"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiBuilder />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/kodi/builder"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiBuilder />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/kodi/runtime/:pageId"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiRuntime />
                                         </PrivateRoute>
                                     }
                                 />

@@ -54,6 +54,15 @@ router.post('/request-chat',
     messageController.requestChatWithPsychologist
 );
 
+router.post('/conversations/:conversationId/extend',
+    authenticate,
+    authorize('employee'),
+    validate([
+        body('extendMinutes').optional().isInt({ min: 5, max: 60 })
+    ]),
+    messageController.extendConversation
+);
+
 router.get('/available-psychologists',
     authenticate,
     authorize('employee'),
@@ -112,6 +121,15 @@ router.post('/conversations/:conversationId/video/start',
     applyTierLimits({ feature: 'video' }),
     restrictUnverifiedPsychologist,
     messageController.startVideoSession
+);
+
+router.post('/conversations/:conversationId/extend',
+    authenticate,
+    authorize('employee'),
+    validate([
+        body('extendMinutes').optional().isInt({ min: 5, max: 60 })
+    ]),
+    messageController.extendConversation
 );
 
 router.post('/conversations/:conversationId/read',

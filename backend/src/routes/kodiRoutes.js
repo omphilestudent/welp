@@ -1,5 +1,5 @@
 const express = require('express');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const kodiController = require('../controllers/kodiController');
@@ -66,7 +66,8 @@ router.get('/applications/:id', kodiController.getApplication);
 router.post('/applications',
     validate([
         body('clientName').trim().isLength({ min: 2 }),
-        body('documents').optional()
+        body('documents').optional(),
+        body('contactEmail').optional().isEmail().normalizeEmail()
     ]),
     kodiController.createApplication
 );
@@ -157,6 +158,20 @@ router.post(
     validate([body('appId').isInt()]),
     kodiPlatform.linkPageToApp
 );
+router.get('/platform/apps/:id/users', authenticate, kodiPlatform.appIdValidator, kodiPlatform.listAppUsers);
+router.post('/platform/apps/:id/users', authenticate, kodiPlatform.assignAppUserValidators, kodiPlatform.assignAppUser);
+router.post('/platform/apps', authenticate, kodiPlatform.createAppValidators, kodiPlatform.createApp);
 router.get('/platform/runtime/:pageId', authenticate, kodiPlatform.getRuntimeValidator, kodiPlatform.runtimeLoader);
+router.get('/platform/apps', authenticate, kodiPlatform.listApps);
+router.get('/platform/objects', authenticate, kodiPlatform.listObjects);
+router.post('/platform/objects', authenticate, kodiPlatform.objectValidators, kodiPlatform.createObject);
+router.get('/platform/objects/:id/fields', authenticate, validate([param('id').isUUID()]), kodiPlatform.listObjectFields);
+router.post('/platform/objects/:id/fields', authenticate, kodiPlatform.fieldValidators, kodiPlatform.createObjectField);
+router.get('/platform/leads', authenticate, kodiPlatform.listLeads);
+router.post('/platform/leads', authenticate, kodiPlatform.leadValidators, kodiPlatform.createLead);
+router.post('/platform/leads/:id/convert', authenticate, kodiPlatform.convertLeadValidators, kodiPlatform.convertLead);
+router.get('/platform/leads/:id/opportunities', authenticate, validate([param('id').isUUID()]), kodiPlatform.listOpportunities);
+router.get('/platform/pages/:id/permissions', authenticate, kodiPlatform.pageIdValidator, kodiPlatform.getPagePermissions);
+router.post('/platform/pages/:id/permissions', authenticate, kodiPlatform.pagePermissionValidators, kodiPlatform.updatePagePermissions);
 
 module.exports = router;

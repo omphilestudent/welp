@@ -5,25 +5,39 @@ const ensureColumns = (layout) => {
         return { ...DEFAULT_LAYOUT };
     }
 
-    const normalized = { ...layout };
-    if (!Array.isArray(normalized.columns)) {
-        normalized.columns = DEFAULT_LAYOUT.columns;
-    } else {
-        normalized.columns = normalized.columns.map((col) => ({
-            width: Number.isFinite(col.width) ? col.width : 12,
-            components: Array.isArray(col.components) ? col.components : []
-        }));
-    }
+    const baseRows = Array.isArray(layout.rows) ? layout.rows : DEFAULT_LAYOUT.rows;
+    const normalized = {
+        ...DEFAULT_LAYOUT,
+        ...layout,
+        rows: baseRows.map((row, rowIndex) => {
+            const rowColumns = Array.isArray(row.columns)
+                ? row.columns
+                : DEFAULT_LAYOUT.rows[rowIndex]?.columns || DEFAULT_LAYOUT.rows[0].columns;
 
-    normalized.orientation = normalized.orientation || 'horizontal';
-    normalized.type = normalized.type || '1-column';
+            return {
+                ...row,
+                id: row.id || `row-${rowIndex}`,
+                columns: rowColumns.map((col, colIndex) => ({
+                    id: col.id || `col-${rowIndex}-${colIndex}`,
+                    width: Number.isFinite(col.width) ? col.width : 12,
+                    components: Array.isArray(col.components) ? col.components : []
+                }))
+            };
+        })
+    };
+
+    normalized.orientation = normalized.orientation || DEFAULT_LAYOUT.orientation;
+    normalized.type = normalized.type || DEFAULT_LAYOUT.type;
 
     return normalized;
 };
 
 const layoutHasComponent = (layout) => {
-    if (!layout || !Array.isArray(layout.columns)) return false;
-    return layout.columns.some((col) => Array.isArray(col.components) && col.components.length > 0);
+    if (!layout || !Array.isArray(layout.rows)) return false;
+    return layout.rows.some((row) =>
+        Array.isArray(row.columns) &&
+        row.columns.some((col) => Array.isArray(col.components) && col.components.length > 0)
+    );
 };
 
 module.exports = {

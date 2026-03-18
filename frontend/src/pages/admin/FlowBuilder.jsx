@@ -439,6 +439,7 @@ export default function FlowBuilder() {
     const [addMenu, setAddMenu] = useState({ open: false, x: 0, y: 0, from: null, edge: null, query: '' });
     const [logicModal, setLogicModal] = useState({ open: false, name: '', code: '', from: null, edge: null });
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
+    const [hoveredEdge, setHoveredEdge] = useState(null);
     const historyRef = useRef([]);
     const historyIndexRef = useRef(-1);
     const restoringRef = useRef(false);
@@ -939,41 +940,121 @@ export default function FlowBuilder() {
                                 >
                                     <path d="M0,0 L6,3 L0,6 Z" className="fb-edge-arrow" />
                                 </marker>
+                                <linearGradient id="thread-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stopColor="#94a3b8" />
+                                    <stop offset="50%" stopColor="#cbd5e1" />
+                                    <stop offset="100%" stopColor="#94a3b8" />
+                                </linearGradient>
+                                <filter id="thread-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feDropShadow dx="1" dy="1" stdDeviation="1" floodOpacity="0.1" />
+                                </filter>
                             </defs>
                             {edges.map((edge) => {
                                 const from = positions[edge.from];
                                 const to = positions[edge.to];
                                 if (!from || !to) return null;
+
+                                // Calculate connection points
                                 const x1 = from.x + 232;
                                 const y1 = from.y + 40 + (edge.handle === 'yes' ? 0 : edge.handle === 'no' ? 18 : 0);
                                 const x2 = to.x + 8;
                                 const y2 = to.y + 40;
+
+                                // Create natural curve for string effect
+                                const midX = (x1 + x2) / 2;
+                                const midY = (y1 + y2) / 2;
+
+                                // Add slight sag to the string based on distance
+                                const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                                const sag = Math.min(30, distance * 0.15);
+
                                 const isBranch = edge.handle === 'yes' || edge.handle === 'no';
-                                const targetX = isBranch ? x2 : x1;
-                                const path = isBranch
-                                    ? `M ${x1} ${y1} L ${x1} ${(y1 + y2) / 2} L ${targetX} ${(y1 + y2) / 2} L ${targetX} ${y2}`
-                                    : `M ${x1} ${y1} L ${targetX} ${y2}`;
+                                const controlX1 = isBranch ? x1 : x1 + (x2 - x1) * 0.25;
+                                const controlY1 = isBranch ? y1 + sag : y1 + sag;
+                                const controlX2 = isBranch ? x2 : x2 - (x2 - x1) * 0.25;
+                                const controlY2 = isBranch ? y2 + sag : y2 + sag;
+
+                                const path = `M ${x1} ${y1} 
+                                             C ${controlX1} ${controlY1},
+                                               ${controlX2} ${controlY2},
+                                               ${x2} ${y2}`;
+
                                 const label = edge.label || (edge.handle === 'yes' ? 'TRUE' : edge.handle === 'no' ? 'FALSE' : 'NEXT');
+                                const isHovered = hoveredEdge === edge.id;
+
                                 return (
-                                    <path key={edge.id} d={path} className="fb-edge-path" markerEnd="url(#fb-arrow)">
+                                    <path
+                                        key={edge.id}
+                                        d={path}
+                                        className={`fb-edge-path ${isHovered ? 'hovered' : ''}`}
+                                        data-handle={edge.handle || 'out'}
+                                        markerEnd="url(#fb-arrow)"
+                                        onMouseEnter={() => setHoveredEdge(edge.id)}
+                                        onMouseLeave={() => setHoveredEdge(null)}
+                                    >
                                         <title>{label}</title>
                                     </path>
                                 );
                             })}
                         </svg>
+
+                        {/* Knots at connection points */}
+                        <div className="fb-knots-layer">
+                            {edges.map((edge) => {
+                                const from = positions[edge.from];
+                                const to = positions[edge.to];
+                                if (!from || !to) return null;
+
+                                const x1 = from.x + 232;
+                                const y1 = from.y + 40 + (edge.handle === 'yes' ? 0 : edge.handle === 'no' ? 18 : 0);
+                                const x2 = to.x + 8;
+                                const y2 = to.y + 40;
+
+                                return (
+                                    <div key={`knots-${edge.id}`}>
+                                        <div
+                                            className="fb-thread-knot"
+                                            style={{
+                                                left: x1 - 4,
+                                                top: y1 - 4,
+                                                backgroundColor: edge.handle === 'yes' ? '#10b981' :
+                                                    edge.handle === 'no' ? '#ef4444' :
+                                                        edge.handle === 'out' ? '#3b82f6' : '#94a3b8'
+                                            }}
+                                        />
+                                        <div
+                                            className="fb-thread-knot"
+                                            style={{
+                                                left: x2 - 4,
+                                                top: y2 - 4,
+                                                backgroundColor: edge.handle === 'yes' ? '#10b981' :
+                                                    edge.handle === 'no' ? '#ef4444' :
+                                                        edge.handle === 'out' ? '#3b82f6' : '#94a3b8'
+                                            }}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Edge add buttons */}
                         {edges.map((edge) => {
                             const from = positions[edge.from];
                             const to = positions[edge.to];
                             if (!from || !to) return null;
+
                             const x1 = from.x + 232;
                             const y1 = from.y + 40 + (edge.handle === 'yes' ? 0 : edge.handle === 'no' ? 18 : 0);
                             const x2 = to.x + 8;
                             const y2 = to.y + 40;
+
                             const midX = (x1 + x2) / 2;
-                            const midY = (y1 + y2) / 2;
+                            const midY = (y1 + y2) / 2 - 10; // Offset slightly up from the sag
+
                             const rect = canvasRef.current?.getBoundingClientRect();
                             const screenX = rect ? rect.left + viewport.x + midX * viewport.zoom : midX;
                             const screenY = rect ? rect.top + viewport.y + midY * viewport.zoom : midY;
+
                             return (
                                 <button
                                     key={`edge-${edge.id}`}
@@ -990,6 +1071,7 @@ export default function FlowBuilder() {
                                 </button>
                             );
                         })}
+
                         <div className="fb-inner" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
                             {nodes.map((node) => {
                                 const pos = positions[node.id] || { x: 80, y: 80 };
@@ -1149,10 +1231,6 @@ export default function FlowBuilder() {
                                         </label>
                                     )}
                                 </>
-                            )}
-
-                            {selected.type === 'start' && (
-                                <div className="hint">Start node routes into your flow.</div>
                             )}
 
                             {selected.type === 'email' && (
@@ -1333,6 +1411,7 @@ export default function FlowBuilder() {
                     )}
                 </aside>
             </div>
+
             {addMenu.open && (
                 <div className="fb-add-menu" style={{ left: addMenu.x, top: addMenu.y }}>
                     <input

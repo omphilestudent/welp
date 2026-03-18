@@ -1,10 +1,18 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import Loading from '../../components/common/Loading';
-import { createKodiPage, listKCComponents, listKodiPages, updateKodiPage } from '../../services/kodiPageService';
+import {
+    createPlatformPage,
+    listKCComponents,
+    listPlatformPages,
+    updatePlatformLayout
+} from '../../services/kodiPageService';
 import './KodiBuilder.css';
+import { useParams } from 'react-router-dom';
 
 const createDefaultLayout = () => ({
+    type: '1-column',
+    orientation: 'horizontal',
     rows: [
         {
             id: `row-${Date.now()}`,
@@ -51,6 +59,67 @@ const COMPONENT_CATEGORIES = {
     kodi: ['PanelHighlight', 'RecordPage']
 };
 
+const DEFAULT_COMPONENT_LAYOUT = {
+    width: 6,
+    height: 2,
+    minWidth: 2,
+    maxWidth: 12
+};
+
+const GRID_COLUMNS = 12;
+
+const BUILT_IN_OBJECTS = [
+    { name: 'contacts', label: 'Contacts' },
+    { name: 'employees', label: 'Employees' },
+    { name: 'businesses', label: 'Businesses' },
+    { name: 'psychologists', label: 'Psychologists' },
+    { name: 'subscriptions', label: 'Subscriptions' }
+];
+
+const BUILT_IN_OBJECT_FIELDS = {
+    contacts: ['firstName', 'lastName', 'email', 'company', 'status'],
+    employees: ['displayName', 'email', 'role', 'status'],
+    businesses: ['businessName', 'industry', 'city', 'tier'],
+    psychologists: ['name', 'specialty', 'availability', 'rating'],
+    subscriptions: ['plan', 'status', 'renewalDate', 'owner']
+};
+
+const parseCommaSeparated = (value) =>
+    (value || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+const formatCommaSeparated = (value) => {
+    if (Array.isArray(value)) return value.join(', ');
+    if (typeof value === 'string') return value;
+    return '';
+};
+
+const cloneLayoutState = (sourceLayout) => {
+    const baseLayout =
+        sourceLayout && Array.isArray(sourceLayout.rows) && sourceLayout.rows.length > 0
+            ? sourceLayout
+            : createDefaultLayout();
+
+    return {
+        ...baseLayout,
+        rows: baseLayout.rows.map((row) => ({
+            ...row,
+            columns: (row.columns || []).map((col) => ({
+                ...col,
+                components: (col.components || []).map((comp) => ({
+                    ...comp,
+                    props: { ...(comp.props || {}) },
+                    layout: { ...(comp.layout || DEFAULT_COMPONENT_LAYOUT) },
+                    visibilityRule: { ...(comp.visibilityRule || {}) },
+                    settings: { ...(comp.settings || {}) }
+                }))
+            }))
+        }))
+    };
+};
+
 const BUILT_IN_COMPONENTS = [
     {
         id: 'panel-highlights',
@@ -83,15 +152,25 @@ const BUILT_IN_COMPONENTS = [
     }
 ];
 
+const COMPONENT_ACTIONS = [
+    { id: 'edit', label: 'Edit properties', description: 'Open the property panel' },
+    { id: 'delete', label: 'Delete component', description: 'Remove from canvas' },
+    { id: 'clone', label: 'Clone component', description: 'Duplicate next to source' },
+    { id: 'sendEmail', label: 'Send email action', description: 'Trigger a follow-up email' },
+    { id: 'assignPsychologist', label: 'Assign psychologist', description: 'Trigger assignment workflow' }
+];
+
 const KodiBuilder = () => {
+    const { pageId: routePageId } = useParams();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [pages, setPages] = useState([]);
     const [components, setComponents] = useState([]);
-    const [selectedPageId, setSelectedPageId] = useState('');
+    const [selectedPageId, setSelectedPageId] = useState(routePageId || '');
     const [layout, setLayout] = useState(null);
     const [selectedComponent, setSelectedComponent] = useState(null);
     const [showProperties, setShowProperties] = useState(false);
+    const [selectedComponentPosition, setSelectedComponentPosition] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [zoom, setZoom] = useState(100);
@@ -99,10 +178,12 @@ const KodiBuilder = () => {
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [isDragging, setIsDragging] = useState(false);
+    const [dropTarget, setDropTarget] = useState(null);
     const [showAddPageGuide, setShowAddPageGuide] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newPageName, setNewPageName] = useState('');
     const [creatingPage, setCreatingPage] = useState(false);
+    const [settingsJson, setSettingsJson] = useState('{}');
 
     const selectedPage = useMemo(() => pages.find((p) => p.id === selectedPageId) || null, [pages, selectedPageId]);
     const mergedComponents = useMemo(() => [...BUILT_IN_COMPONENTS, ...components], [components]);
@@ -118,17 +199,25 @@ const KodiBuilder = () => {
     const load = async () => {
         setLoading(true);
         try {
-            const [pagesRes, compRes] = await Promise.all([listKodiPages(), listKCComponents()]);
-            const pagesData = pagesRes?.data || [];
-            const compsData = compRes?.data || [];
+            const [pagesData, compsData] = await Promise.all([listPlatformPages(), listKCComponents()]);
 
             setPages(pagesData);
             setComponents(compsData);
 
             if (pagesData.length > 0) {
-                const firstPage = pagesData[0];
-                setSelectedPageId(firstPage.id);
-                setLayout(firstPage.layout || createDefaultLayout());
+                const matchesRoute = routePageId && pagesData.some((p) => p.id === routePageId);
+                const selectedId = matchesRoute ? routePageId : pagesData[0].id;
+                const selected = pagesData.find((p) => p.id === selectedId) || pagesData[0];
+                setSelectedPageId(selectedId);
+                const layoutPayload = selected.layout || createDefaultLayout();
+                const normalizedLayout = cloneLayoutState(layoutPayload);
+                setLayout(normalizedLayout);
+                setHistory([]);
+                setHistoryIndex(-1);
+                setSelectedComponent(null);
+                setSelectedComponentPosition(null);
+                setShowProperties(false);
+                setDropTarget(null);
             }
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to load Kodi builder data');
@@ -139,15 +228,28 @@ const KodiBuilder = () => {
 
     useEffect(() => {
         load();
-    }, []);
+    }, [routePageId]);
+
+    useEffect(() => {
+        if (!selectedComponent) {
+            setSettingsJson('{}');
+            return;
+        }
+        try {
+            setSettingsJson(JSON.stringify(selectedComponent.settings || {}, null, 2));
+        } catch {
+            setSettingsJson('{}');
+        }
+    }, [selectedComponent]);
 
     // Save to history
     const saveToHistory = useCallback((newLayout) => {
-        setHistory(prev => {
+        const snapshot = cloneLayoutState(newLayout);
+        setHistory((prev) => {
             const newHistory = prev.slice(0, historyIndex + 1);
-            return [...newHistory, newLayout];
+            return [...newHistory, snapshot];
         });
-        setHistoryIndex(prev => prev + 1);
+        setHistoryIndex((prev) => prev + 1);
     }, [historyIndex]);
 
     // Handle layout changes
@@ -173,22 +275,17 @@ const KodiBuilder = () => {
 
     // Add row
     const addRow = () => {
-        const newLayout = {
-            ...layout,
-            rows: [
-                ...(layout?.rows || []),
+        const newLayout = cloneLayoutState(layout);
+        newLayout.rows.push({
+            id: `row-${Date.now()}`,
+            columns: [
                 {
-                    id: `row-${Date.now()}`,
-                    columns: [
-                        {
-                            id: `col-${Date.now()}-1`,
-                            width: 12,
-                            components: []
-                        }
-                    ]
+                    id: `col-${Date.now()}-1`,
+                    width: GRID_COLUMNS,
+                    components: []
                 }
             ]
-        };
+        });
         updateLayout(newLayout);
         toast.success('Row added');
     };
@@ -197,29 +294,28 @@ const KodiBuilder = () => {
     const addColumn = (rowIndex) => {
         if (!layout?.rows) return;
 
-        const currentColumns = layout.rows[rowIndex].columns.length;
-        if (currentColumns >= 4) {
+        const newLayout = cloneLayoutState(layout);
+        const row = newLayout.rows[rowIndex];
+        if (!row) return;
+
+        if (row.columns.length >= 4) {
             toast.error('Maximum 4 columns per row');
             return;
         }
 
-        const newWidth = Math.floor(12 / (currentColumns + 1));
+        const newColumnsCount = row.columns.length + 1;
+        const sharedWidth = Math.max(1, Math.floor(GRID_COLUMNS / newColumnsCount));
 
-        const newLayout = { ...layout };
-        newLayout.rows[rowIndex].columns = [
-            ...newLayout.rows[rowIndex].columns,
-            {
-                id: `col-${Date.now()}-${currentColumns + 1}`,
-                width: newWidth,
-                components: []
-            }
-        ];
-
-        // Redistribute widths
-        newLayout.rows[rowIndex].columns = newLayout.rows[rowIndex].columns.map(col => ({
+        row.columns = row.columns.map((col) => ({
             ...col,
-            width: newWidth
+            width: sharedWidth
         }));
+
+        row.columns.push({
+            id: `col-${Date.now()}-${newColumnsCount}`,
+            width: sharedWidth,
+            components: []
+        });
 
         updateLayout(newLayout);
         toast.success('Column added');
@@ -227,24 +323,35 @@ const KodiBuilder = () => {
 
     // Delete row
     const deleteRow = (rowIndex) => {
-        const newLayout = {
-            ...layout,
-            rows: layout.rows.filter((_, index) => index !== rowIndex)
-        };
+        if (!layout?.rows) return;
+        if (layout.rows.length === 1) {
+            toast.error('At least one row must remain');
+            return;
+        }
+
+        const newLayout = cloneLayoutState(layout);
+        newLayout.rows.splice(rowIndex, 1);
         updateLayout(newLayout);
         toast.success('Row deleted');
     };
 
     // Delete column
     const deleteColumn = (rowIndex, colIndex) => {
-        const newLayout = { ...layout };
-        newLayout.rows[rowIndex].columns = newLayout.rows[rowIndex].columns.filter((_, index) => index !== colIndex);
+        if (!layout?.rows) return;
+        const row = layout.rows[rowIndex];
+        if (!row || row.columns.length === 1) {
+            toast.error('Each row must keep at least one column');
+            return;
+        }
 
-        // Redistribute widths
-        const newWidth = Math.floor(12 / newLayout.rows[rowIndex].columns.length);
-        newLayout.rows[rowIndex].columns = newLayout.rows[rowIndex].columns.map(col => ({
+        const newLayout = cloneLayoutState(layout);
+        const targetRow = newLayout.rows[rowIndex];
+        targetRow.columns.splice(colIndex, 1);
+
+        const redistributedWidth = Math.max(1, Math.floor(GRID_COLUMNS / targetRow.columns.length));
+        targetRow.columns = targetRow.columns.map((col) => ({
             ...col,
-            width: newWidth
+            width: redistributedWidth
         }));
 
         updateLayout(newLayout);
@@ -253,26 +360,163 @@ const KodiBuilder = () => {
 
     // Add component to column
     const addComponentToColumn = (rowIndex, colIndex, component) => {
-        const newLayout = { ...layout };
+        if (!layout?.rows) return;
+        const newLayout = cloneLayoutState(layout);
+        const column = newLayout.rows[rowIndex]?.columns[colIndex];
+        if (!column) return;
+
         const newComponent = {
             ...component,
-            instanceId: `${component.id}-${Date.now()}`,
-            settings: {}
+            instanceId: `${component.component_name || component.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            props: { ...(component.props || {}) },
+            settings: { ...(component.settings || {}) },
+            layout: { ...(component.layout || DEFAULT_COMPONENT_LAYOUT) },
+            visibilityRule: { ...(component.visibilityRule || {}) }
         };
 
-        newLayout.rows[rowIndex].columns[colIndex].components.push(newComponent);
+        column.components.push(newComponent);
         updateLayout(newLayout);
-        toast.success(`${component.component_name} added`);
+        toast.success(`${component.displayName || component.component_name || 'Component'} added`);
     };
 
     // Remove component
     const removeComponent = (rowIndex, colIndex, compIndex) => {
-        const newLayout = { ...layout };
-        newLayout.rows[rowIndex].columns[colIndex].components =
-            newLayout.rows[rowIndex].columns[colIndex].components.filter((_, index) => index !== compIndex);
+        if (!layout?.rows) return;
+        const newLayout = cloneLayoutState(layout);
+        const column = newLayout.rows[rowIndex]?.columns[colIndex];
+        if (!column) return;
+
+        column.components.splice(compIndex, 1);
         updateLayout(newLayout);
         setSelectedComponent(null);
+        setSelectedComponentPosition(null);
         toast.success('Component removed');
+    };
+
+    const cloneComponent = () => {
+        if (!selectedComponentPosition || !layout?.rows) return;
+        const { rowIndex, colIndex, compIndex } = selectedComponentPosition;
+        const newLayout = cloneLayoutState(layout);
+        const column = newLayout.rows[rowIndex]?.columns[colIndex];
+        if (!column) return;
+        const source = column.components[compIndex];
+        if (!source) return;
+
+        const duplicate = {
+            ...source,
+            instanceId: `${source.instanceId || source.component_name}-${Date.now()}-${Math.random()
+                .toString(36)
+                .slice(2, 6)}`
+        };
+        column.components.splice(compIndex + 1, 0, duplicate);
+        updateLayout(newLayout);
+        toast.success('Component cloned');
+    };
+
+    const recordComponentAction = (actionId) => {
+        if (!selectedComponentPosition || !layout?.rows) return;
+        const { rowIndex, colIndex, compIndex } = selectedComponentPosition;
+        const newLayout = cloneLayoutState(layout);
+        const column = newLayout.rows[rowIndex]?.columns[colIndex];
+        if (!column) return;
+        const component = column.components[compIndex];
+        if (!component) return;
+        component.props = component.props || {};
+        const existing = new Set(component.props.actions || []);
+        existing.add(actionId);
+        component.props.actions = Array.from(existing);
+        updateLayout(newLayout);
+    };
+
+    const executeCustomAction = (actionId) => {
+        const actionLabels = {
+            sendEmail: 'Send email',
+            assignPsychologist: 'Assign psychologist'
+        };
+        recordComponentAction(actionId);
+        toast.success(`${actionLabels[actionId] || 'Custom action'} executed`);
+    };
+
+    const handleComponentAction = (actionId) => {
+        if (!selectedComponentPosition) {
+            toast.error('Select a component to run actions');
+            return;
+        }
+        switch (actionId) {
+            case 'edit':
+                setShowProperties(true);
+                break;
+            case 'delete':
+                removeComponent(
+                    selectedComponentPosition.rowIndex,
+                    selectedComponentPosition.colIndex,
+                    selectedComponentPosition.compIndex
+                );
+                break;
+            case 'clone':
+                cloneComponent();
+                break;
+            default:
+                executeCustomAction(actionId);
+        }
+    };
+
+    const handleComponentDragStart = (event, rowIndex, colIndex, compIndex) => {
+        event.dataTransfer.setData(
+            'kodi-layout-component',
+            JSON.stringify({ rowIndex, colIndex, compIndex })
+        );
+        event.dataTransfer.effectAllowed = 'move';
+        setIsDragging(true);
+    };
+
+    const moveLayoutComponent = (source, targetRowIndex, targetColIndex) => {
+        if (!layout?.rows) return;
+        const newLayout = cloneLayoutState(layout);
+        const sourceRow = newLayout.rows[source.rowIndex];
+        const sourceColumn = sourceRow?.columns[source.colIndex];
+        if (!sourceColumn) return;
+
+        const [componentToMove] = sourceColumn.components.splice(source.compIndex, 1);
+        if (!componentToMove) return;
+
+        const targetColumn = newLayout.rows[targetRowIndex]?.columns[targetColIndex];
+        if (!targetColumn) return;
+
+        targetColumn.components.push(componentToMove);
+        updateLayout(newLayout);
+        setSelectedComponent(componentToMove);
+        setSelectedComponentPosition({
+            rowIndex: targetRowIndex,
+            colIndex: targetColIndex,
+            compIndex: targetColumn.components.length - 1
+        });
+    };
+
+    const handleColumnDrop = (rowIndex, colIndex, event) => {
+        event.preventDefault();
+        const layoutPayload = event.dataTransfer.getData('kodi-layout-component');
+        if (layoutPayload) {
+            const parsed = JSON.parse(layoutPayload);
+            moveLayoutComponent(parsed, rowIndex, colIndex);
+        } else {
+            const compPayload = event.dataTransfer.getData('kodi-component');
+            if (compPayload) {
+                const component = JSON.parse(compPayload);
+                addComponentToColumn(rowIndex, colIndex, component);
+            }
+        }
+        setDropTarget(null);
+        setIsDragging(false);
+    };
+
+    const handleColumnDragEnter = (rowIndex, colIndex, event) => {
+        event.preventDefault();
+        setDropTarget(`${rowIndex}-${colIndex}`);
+    };
+
+    const handleColumnDragLeave = () => {
+        setDropTarget(null);
     };
 
     // Save page
@@ -281,8 +525,13 @@ const KodiBuilder = () => {
 
         setSaving(true);
         try {
-            await updateKodiPage(selectedPage.id, { layout });
+            await updatePlatformLayout(selectedPage.id, layout);
             toast.success('Page saved successfully');
+            setPages((prev) =>
+                prev.map((page) =>
+                    page.id === selectedPage.id ? { ...page, layout, status: 'built' } : page
+                )
+            );
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to save page');
         } finally {
@@ -303,41 +552,13 @@ const KodiBuilder = () => {
             return;
         }
 
-        const baseSlug = slugifyString(name);
-        let slug = ensureUniqueSlug(baseSlug, pages.map((p) => p.slug));
         const layoutPayload = createDefaultLayout();
-
         setCreatingPage(true);
         try {
-            let createdPage = null;
-            let attempt = 0;
-            let lastError = null;
-
-            while (!createdPage && attempt < 3) {
-                try {
-                    const res = await createKodiPage({
-                        name,
-                        slug,
-                        layout: layoutPayload
-                    });
-                    createdPage = res?.data;
-                } catch (error) {
-                    lastError = error;
-                    const message = (error?.response?.data?.error || '').toLowerCase();
-                    if (!message.includes('slug already exists')) {
-                        throw error;
-                    }
-                    attempt += 1;
-                    const refreshed = await listKodiPages();
-                    const refreshedSlugs = (refreshed?.data || []).map((p) => p.slug);
-                    slug = ensureUniqueSlug(`${baseSlug}-${attempt}`, refreshedSlugs);
-                }
-            }
-
-            if (!createdPage) {
-                throw lastError || new Error('Failed to create page');
-            }
-
+            const createdPage = await createPlatformPage({
+                label: name,
+                pageType: 'record'
+            });
             setPages((prev) => [createdPage, ...prev]);
             setSelectedPageId(createdPage.id);
             updateLayout(createdPage.layout || layoutPayload);
@@ -366,8 +587,8 @@ const KodiBuilder = () => {
 
     const renderPreviewContent = (comp) => {
         if (comp.component_type === 'PanelHighlight') {
-            const actions = comp.preview?.actions || ['Add Call', 'New Task'];
-            const stats = comp.preview?.stats || ['Leads: 0', 'Calls: 0'];
+            const actions = comp.props?.actions || comp.preview?.actions || ['Add Call', 'New Task'];
+            const stats = comp.props?.stats || comp.preview?.stats || ['Leads: 0', 'Calls: 0'];
             return (
                 <div className="panel-highlight-preview">
                     <div className="panel-actions">
@@ -422,11 +643,122 @@ const KodiBuilder = () => {
         );
     };
 
+    const selectComponent = (rowIndex, colIndex, compIndex, component) => {
+        setSelectedComponent(component);
+        setSelectedComponentPosition({ rowIndex, colIndex, compIndex });
+        setShowProperties(true);
+    };
+
+    const updateSelectedComponent = (updater) => {
+        if (!selectedComponentPosition || !layout?.rows) return;
+        const { rowIndex, colIndex, compIndex } = selectedComponentPosition;
+        const newLayout = cloneLayoutState(layout);
+        const target = newLayout.rows[rowIndex]?.columns[colIndex]?.components[compIndex];
+        if (!target) return;
+        const updatedComponent = { ...target, ...updater(target) };
+        newLayout.rows[rowIndex].columns[colIndex].components[compIndex] = updatedComponent;
+        updateLayout(newLayout);
+        setSelectedComponent(updatedComponent);
+    };
+
+    const updateComponentProp = (key, value) => {
+        updateSelectedComponent((prev) => ({
+            props: { ...prev.props, [key]: value }
+        }));
+    };
+
+    const updateComponentSetting = (key, value) => {
+        updateSelectedComponent((prev) => ({
+            settings: { ...prev.settings, [key]: value }
+        }));
+    };
+
+    const updateComponentSpacing = (type, edge, value) => {
+        const normalizedValue = value === '' ? '' : Number(value);
+        updateSelectedComponent((prev) => ({
+            settings: {
+                ...prev.settings,
+                [type]: {
+                    ...prev.settings?.[type],
+                    [edge]: Number.isNaN(normalizedValue) ? value : normalizedValue
+                }
+            }
+        }));
+    };
+
+    const handleArrayPropChange = (key, rawValue) => {
+        updateComponentProp(key, parseCommaSeparated(rawValue));
+    };
+
+    const handleSettingsJsonApply = () => {
+        try {
+            const parsed = JSON.parse(settingsJson || '{}');
+            updateComponentSetting('settings', parsed);
+            toast.success('Settings synchronized');
+        } catch (error) {
+            toast.error('Invalid JSON, please review the syntax');
+        }
+    };
+
+    const updateVisibilityRule = (field, operator, value) => {
+        updateSelectedComponent((prev) => ({
+            visibilityRule: {
+                ...prev.visibilityRule,
+                field: field ?? prev.visibilityRule?.field,
+                operator: operator ?? prev.visibilityRule?.operator,
+                value: value ?? prev.visibilityRule?.value
+            }
+        }));
+    };
+
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const clampWidth = (value, layout) =>
+        clamp(value, layout?.minWidth || DEFAULT_COMPONENT_LAYOUT.minWidth, layout?.maxWidth || DEFAULT_COMPONENT_LAYOUT.maxWidth);
+    const clampHeight = (value) => clamp(value, 1, 12);
+
+    const adjustComponentWidth = (delta) => {
+        updateSelectedComponent((prev) => {
+            const layout = prev.layout || DEFAULT_COMPONENT_LAYOUT;
+            const current = layout.width || DEFAULT_COMPONENT_LAYOUT.width;
+            const next = clampWidth(current + delta, layout);
+            return {
+                layout: {
+                    ...layout,
+                    width: next
+                }
+            };
+        });
+    };
+
+    const adjustComponentHeight = (delta) => {
+        updateSelectedComponent((prev) => {
+            const layout = prev.layout || DEFAULT_COMPONENT_LAYOUT;
+            const current = layout.height || DEFAULT_COMPONENT_LAYOUT.height;
+            const next = clampHeight(current + delta);
+            return {
+                layout: {
+                    ...layout,
+                    height: next
+                }
+            };
+        });
+    };
+
     // Component card click
     const handleComponentClick = (component) => {
         setSelectedComponent(component);
         setShowProperties(true);
     };
+
+    const selectedComponentProps = selectedComponent?.props || {};
+    const selectedComponentSettings = selectedComponent?.settings || {};
+    const selectedComponentWidth = selectedComponent?.layout?.width || DEFAULT_COMPONENT_LAYOUT.width;
+    const selectedComponentHeight = selectedComponent?.layout?.height || DEFAULT_COMPONENT_LAYOUT.height;
+    const selectedComponentFieldsValue = formatCommaSeparated(selectedComponentProps.fields);
+    const selectedComponentActionsValue = formatCommaSeparated(selectedComponentProps.actions);
+    const selectedDataSourceFieldHints =
+        BUILT_IN_OBJECT_FIELDS[selectedComponentProps.dataSource] || [];
+    const getSpacingValue = (type, side) => selectedComponentSettings[type]?.[side] ?? '';
 
     if (loading) return <Loading />;
 
@@ -485,7 +817,14 @@ const KodiBuilder = () => {
                             onChange={(e) => {
                                 const page = pages.find(p => p.id === e.target.value);
                                 setSelectedPageId(e.target.value);
-                                setLayout(page?.layout || createDefaultLayout());
+                                const layoutPayload = page?.layout || createDefaultLayout();
+                                setLayout(cloneLayoutState(layoutPayload));
+                                setHistory([]);
+                                setHistoryIndex(-1);
+                                setSelectedComponent(null);
+                                setSelectedComponentPosition(null);
+                                setShowProperties(false);
+                                setDropTarget(null);
                             }}
                             className="page-select"
                         >
@@ -604,10 +943,11 @@ const KodiBuilder = () => {
                             filteredComponents.map((comp) => (
                                 <div
                                     key={comp.id}
-                                    className={`component-item ${selectedComponent?.id === comp.id ? 'selected' : ''}`}
+                                    className={`component-item ${selectedComponent?.instanceId === comp.instanceId ? 'selected' : ''}`}
                                     draggable
                                     onDragStart={(e) => {
-                                        e.dataTransfer.setData('component', JSON.stringify(comp));
+                                        e.dataTransfer.setData('kodi-component', JSON.stringify(comp));
+                                        e.dataTransfer.effectAllowed = 'copy';
                                         setIsDragging(true);
                                     }}
                                     onDragEnd={() => setIsDragging(false)}
@@ -693,21 +1033,17 @@ const KodiBuilder = () => {
 
                                             <div className="row-columns">
                                                 {row.columns.map((col, colIndex) => (
-                                                    <div
-                                                        key={col.id || colIndex}
-                                                        className="builder-column"
-                                                        style={{ width: `${(col.width / 12) * 100}%` }}
-                                                        onDragOver={(e) => e.preventDefault()}
-                                                        onDrop={(e) => {
-                                                            e.preventDefault();
-                                                            const compData = e.dataTransfer.getData('component');
-                                                            if (compData) {
-                                                                const component = JSON.parse(compData);
-                                                                addComponentToColumn(rowIndex, colIndex, component);
-                                                            }
-                                                            setIsDragging(false);
-                                                        }}
-                                                    >
+                                            <div
+                                                key={col.id || colIndex}
+                                                className={`builder-column ${dropTarget === `${rowIndex}-${colIndex}` ? 'drop-active' : ''}`}
+                                                style={{ width: `${(col.width / 12) * 100}%` }}
+                                                onDragOver={(e) => {
+                                                    e.preventDefault();
+                                                    handleColumnDragEnter(rowIndex, colIndex, e);
+                                                }}
+                                                onDragLeave={handleColumnDragLeave}
+                                                onDrop={(e) => handleColumnDrop(rowIndex, colIndex, e)}
+                                            >
                                                         <div className="column-header">
                                                             <span className="column-width">{col.width}/12</span>
                                                             <button
@@ -726,13 +1062,41 @@ const KodiBuilder = () => {
                                                                 </div>
                                                             ) : (
                                                                 col.components.map((comp, compIndex) => (
-                                                                    <div
-                                                                        key={comp.instanceId || compIndex}
-                                                                        className={`component-preview ${selectedComponent?.id === comp.id ? 'selected' : ''}`}
-                                                                        onClick={() => setSelectedComponent(comp)}
-                                                                    >
+                                                        <div
+                                                            key={comp.instanceId || compIndex}
+                                                            className={`component-preview ${selectedComponent?.instanceId === comp.instanceId ? 'selected' : ''}`}
+                                                            draggable
+                                                            onDragStart={(e) => handleComponentDragStart(e, rowIndex, colIndex, compIndex)}
+                                                            onDragEnd={() => setIsDragging(false)}
+                                                            onClick={() => selectComponent(rowIndex, colIndex, compIndex, comp)}
+                                                        >
                                                                         <div className="preview-header">
                                                                             <span className="preview-name">{getComponentLabel(comp)}</span>
+                                                                            {selectedComponent?.instanceId === comp.instanceId && (
+                                                                                <div className="component-resize-controls">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            adjustComponentWidth(-1);
+                                                                                        }}
+                                                                                    >
+                                                                                        -
+                                                                                    </button>
+                                                                                    <span className="component-width-label">
+                                                                                        {(comp.layout?.width || DEFAULT_COMPONENT_LAYOUT.width)}/12
+                                                                                    </span>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            adjustComponentWidth(1);
+                                                                                        }}
+                                                                                    >
+                                                                                        +
+                                                                                    </button>
+                                                                                </div>
+                                                                            )}
                                                                             <button
                                                                                 className="btn-icon-small delete"
                                                                                 onClick={(e) => {
@@ -804,49 +1168,142 @@ const KodiBuilder = () => {
                             </div>
 
                             <div className="property-section">
-                                <h4>Settings</h4>
+                                <h4>General</h4>
                                 <div className="property-item">
-                                    <label>Width</label>
-                                    <select className="property-select">
-                                        <option>Full Width</option>
-                                        <option>Half Width</option>
-                                        <option>Auto</option>
-                                    </select>
+                                    <label>Title</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={selectedComponentProps.title || selectedComponentLabel}
+                                        onChange={(e) => updateComponentProp("title", e.target.value)}
+                                    />
                                 </div>
                                 <div className="property-item">
-                                    <label>Margin</label>
+                                    <label>Subtitle</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={selectedComponentProps.subtitle || ""}
+                                        onChange={(e) => updateComponentProp("subtitle", e.target.value)}
+                                    />
+                                </div>
+                                <div className="property-item">
+                                    <label>Description</label>
+                                    <textarea
+                                        className="property-textarea"
+                                        rows={3}
+                                        value={selectedComponentProps.description || ""}
+                                        onChange={(e) => updateComponentProp("description", e.target.value)}
+                                    />
+                                </div>
+                                <div className="property-item">
+                                    <label>
+                                        Actions
+                                        <span className="property-hint">Comma separated</span>
+                                    </label>
+                                    <textarea
+                                        className="property-textarea"
+                                        rows={2}
+                                        value={selectedComponentActionsValue}
+                                        onChange={(e) => handleArrayPropChange("actions", e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="property-section">
+                                <h4>Actions</h4>
+                                <div className="component-action-bar">
+                                    {COMPONENT_ACTIONS.map((action) => (
+                                        <button
+                                            key={action.id}
+                                            type="button"
+                                            className="component-action-button"
+                                            onClick={() => handleComponentAction(action.id)}
+                                        >
+                                            {action.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="property-section">
+                                <h4>Layout & Size</h4>
+                                <div className="property-item">
+                                    <label>Width ({selectedComponentWidth}/12)</label>
                                     <div className="property-input-group">
-                                        <input type="number" placeholder="Top" className="property-input-small" />
-                                        <input type="number" placeholder="Right" className="property-input-small" />
-                                        <input type="number" placeholder="Bottom" className="property-input-small" />
-                                        <input type="number" placeholder="Left" className="property-input-small" />
+                                        <button
+                                            type="button"
+                                            className="btn-icon-small"
+                                            onClick={() => adjustComponentWidth(-1)}
+                                        >
+                                            -
+                                        </button>
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            min={selectedComponent?.layout?.minWidth || DEFAULT_COMPONENT_LAYOUT.minWidth}
+                                            max={selectedComponent?.layout?.maxWidth || DEFAULT_COMPONENT_LAYOUT.maxWidth}
+                                            value={selectedComponentWidth}
+                                            onChange={(e) => {
+                                                const value = Number(e.target.value);
+                                                if (!Number.isNaN(value)) {
+                                                    updateSelectedComponent((prev) => {
+                                                        const layout = prev.layout || DEFAULT_COMPONENT_LAYOUT;
+                                                        return {
+                                                            layout: {
+                                                                ...layout,
+                                                                width: clampWidth(value, layout)
+                                                            }
+                                                        };
+                                                    });
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="btn-icon-small"
+                                            onClick={() => adjustComponentWidth(1)}
+                                        >
+                                            +
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="property-item">
-                                    <label>Padding</label>
+                                    <label>Height ({selectedComponentHeight})</label>
                                     <div className="property-input-group">
-                                        <input type="number" placeholder="Top" className="property-input-small" />
-                                        <input type="number" placeholder="Right" className="property-input-small" />
-                                        <input type="number" placeholder="Bottom" className="property-input-small" />
-                                        <input type="number" placeholder="Left" className="property-input-small" />
+                                        <button
+                                            type="button"
+                                            className="btn-icon-small"
+                                            onClick={() => adjustComponentHeight(-1)}
+                                        >
+                                            -
+                                        </button>
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            min={1}
+                                            max={12}
+                                            value={selectedComponentHeight}
+                                            onChange={(e) => {
+                                                const value = Number(e.target.value);
+                                                if (!Number.isNaN(value)) {
+                                                    updateSelectedComponent((prev) => ({
+                                                        layout: {
+                                                            ...prev.layout,
+                                                            height: clampHeight(value)
+                                                        }
+                                                    }));
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="btn-icon-small"
+                                            onClick={() => adjustComponentHeight(1)}
+                                        >
+                                            +
+                                        </button>
                                     </div>
-                                </div>
-                                <div className="property-item">
-                                    <label>Background Color</label>
-                                    <input type="color" className="property-color" />
-                                </div>
-                                <div className="property-item">
-                                    <label>Text Color</label>
-                                    <input type="color" className="property-color" />
-                                </div>
-                                <div className="property-item">
-                                    <label>Border</label>
-                                    <select className="property-select">
-                                        <option>None</option>
-                                        <option>Solid</option>
-                                        <option>Dashed</option>
-                                        <option>Dotted</option>
-                                    </select>
                                 </div>
                             </div>
 
@@ -854,38 +1311,199 @@ const KodiBuilder = () => {
                                 <h4>Data Binding</h4>
                                 <div className="property-item">
                                     <label>Data Source</label>
-                                    <select className="property-select">
-                                        <option>Static</option>
-                                        <option>API</option>
-                                        <option>Database</option>
+                                    <select
+                                        className="property-select"
+                                        value={selectedComponentProps.dataSource || ""}
+                                        onChange={(e) => updateComponentProp("dataSource", e.target.value)}
+                                    >
+                                        <option value="">Select data source</option>
+                                        {BUILT_IN_OBJECTS.map((source) => (
+                                            <option key={source.name} value={source.name}>
+                                                {source.label}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="property-item">
+                                    <label>
+                                        Fields
+                                        {selectedDataSourceFieldHints.length > 0 && (
+                                            <span className="property-hint">
+                                                Suggested: {selectedDataSourceFieldHints.join(', ')}
+                                            </span>
+                                        )}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={selectedComponentFieldsValue}
+                                        onChange={(e) => handleArrayPropChange("fields", e.target.value)}
+                                        placeholder="id, name, status"
+                                    />
+                                </div>
+                                <div className="property-item">
                                     <label>API Endpoint</label>
-                                    <input type="text" className="property-input" placeholder="/api/data" />
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={selectedComponentProps.endpoint || ""}
+                                        onChange={(e) => updateComponentProp("endpoint", e.target.value)}
+                                        placeholder="/api/contacts"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="property-section">
+                                <h4>Spacing & Styling</h4>
+                                <div className="property-item">
+                                    <label>Margin</label>
+                                    <div className="property-input-group">
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            placeholder="Top"
+                                            value={getSpacingValue("margin", "top")}
+                                            onChange={(e) => updateComponentSpacing("margin", "top", e.target.value)}
+                                        />
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            placeholder="Right"
+                                            value={getSpacingValue("margin", "right")}
+                                            onChange={(e) => updateComponentSpacing("margin", "right", e.target.value)}
+                                        />
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            placeholder="Bottom"
+                                            value={getSpacingValue("margin", "bottom")}
+                                            onChange={(e) => updateComponentSpacing("margin", "bottom", e.target.value)}
+                                        />
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            placeholder="Left"
+                                            value={getSpacingValue("margin", "left")}
+                                            onChange={(e) => updateComponentSpacing("margin", "left", e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="property-item">
+                                    <label>Padding</label>
+                                    <div className="property-input-group">
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            placeholder="Top"
+                                            value={getSpacingValue("padding", "top")}
+                                            onChange={(e) => updateComponentSpacing("padding", "top", e.target.value)}
+                                        />
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            placeholder="Right"
+                                            value={getSpacingValue("padding", "right")}
+                                            onChange={(e) => updateComponentSpacing("padding", "right", e.target.value)}
+                                        />
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            placeholder="Bottom"
+                                            value={getSpacingValue("padding", "bottom")}
+                                            onChange={(e) => updateComponentSpacing("padding", "bottom", e.target.value)}
+                                        />
+                                        <input
+                                            type="number"
+                                            className="property-input-small"
+                                            placeholder="Left"
+                                            value={getSpacingValue("padding", "left")}
+                                            onChange={(e) => updateComponentSpacing("padding", "left", e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="property-item">
+                                    <label>Background Color</label>
+                                    <input
+                                        type="color"
+                                        className="property-color"
+                                        value={selectedComponentSettings.backgroundColor || "#ffffff"}
+                                        onChange={(e) => updateComponentSetting("backgroundColor", e.target.value)}
+                                    />
+                                </div>
+                                <div className="property-item">
+                                    <label>Text Color</label>
+                                    <input
+                                        type="color"
+                                        className="property-color"
+                                        value={selectedComponentSettings.textColor || "#1f2b3b"}
+                                        onChange={(e) => updateComponentSetting("textColor", e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="property-section">
+                                <h4>Visibility Rule</h4>
+                                <div className="property-item">
+                                    <label>Field</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        placeholder="subscription.status"
+                                        value={selectedComponent?.visibilityRule?.field || ''}
+                                        onChange={(e) => updateVisibilityRule(e.target.value, null, null)}
+                                    />
+                                </div>
+                                <div className="property-item">
+                                    <label>Operator</label>
+                                    <select
+                                        className="property-select"
+                                        value={selectedComponent?.visibilityRule?.operator || 'equals'}
+                                        onChange={(e) => updateVisibilityRule(null, e.target.value, null)}
+                                    >
+                                        <option value="equals">Equals</option>
+                                        <option value="not_equals">Not equals</option>
+                                        <option value="in">In</option>
+                                        <option value="contains">Contains</option>
+                                    </select>
+                                </div>
+                                <div className="property-item">
+                                    <label>Value</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        placeholder="active"
+                                        value={selectedComponent?.visibilityRule?.value || ''}
+                                        onChange={(e) => updateVisibilityRule(null, null, e.target.value)}
+                                    />
                                 </div>
                             </div>
 
                             <div className="property-section">
                                 <h4>Advanced</h4>
                                 <div className="property-item">
-                                    <label>CSS Class</label>
-                                    <input type="text" className="property-input" placeholder="custom-class" />
-                                </div>
-                                <div className="property-item">
-                                    <label>ID</label>
-                                    <input type="text" className="property-input" placeholder="component-id" />
-                                </div>
-                                <div className="property-item">
-                                    <label>Custom Attributes</label>
-                                    <textarea className="property-textarea" placeholder='{"data-testid": "component"}' />
+                                    <label>
+                                        Settings JSON
+                                        <button type="button" className="btn-text small" onClick={handleSettingsJsonApply}>
+                                            Apply JSON
+                                        </button>
+                                    </label>
+                                    <textarea
+                                        className="property-textarea"
+                                        rows={6}
+                                        value={settingsJson}
+                                        onChange={(e) => setSettingsJson(e.target.value)}
+                                    />
                                 </div>
                             </div>
                         </div>
 
                         <div className="panel-footer">
-                            <button className="btn-secondary">Apply</button>
-                            <button className="btn-primary">Save Changes</button>
+                            <button className="btn-secondary" onClick={() => setShowProperties(false)}>
+                                Close
+                            </button>
+                            <button className="btn-primary" onClick={handleSave} disabled={saving}>
+                                {saving ? 'Saving...' : 'Save Page'}
+                            </button>
                         </div>
                     </aside>
                 )}

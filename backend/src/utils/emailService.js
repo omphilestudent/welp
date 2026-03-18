@@ -893,6 +893,63 @@ View ticket: ${loginUrl}
     return sendEmail({ to: receiverEmail, subject, html, text });
 }
 
+const buildPermissionList = (permissions = {}) => {
+    const entries = [
+        ['Can view', Boolean(permissions.canView)],
+        ['Can edit', Boolean(permissions.canEdit)],
+        ['Can use', Boolean(permissions.canUse)]
+    ];
+    return entries.map(([label, value]) => `<li>${label}: ${value ? 'Yes' : 'No'}</li>`).join('');
+};
+
+const sendAppAccessEmail = async ({ to, name, appName, loginUrl, pageUrl, permissions }) => {
+    if (!to || !appName) {
+        return { success: false, error: 'Missing recipient or app label' };
+    }
+    const greeting = name ? `Hi ${name}` : 'Hello';
+    const subject = `Access granted to ${appName} on Kodi Builder`;
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <h2>${greeting},</h2>
+            <p>You've been granted access to <strong>${appName}</strong> inside the Kodi Builder.</p>
+            <p>
+              <a href="${loginUrl}" style="display: inline-block; background: #2563eb; color: #fff; padding: 10px 18px; border-radius: 999px; text-decoration: none;">
+                Log in to Kodi Builder
+              </a>
+            </p>
+            ${pageUrl ? `<p><a href="${pageUrl}">Open the assigned page</a></p>` : ''}
+            <div style="margin-top: 16px;">
+              <p><strong>Permissions:</strong></p>
+              <ul>${buildPermissionList(permissions)}</ul>
+            </div>
+            <p style="margin-top: 24px;">If you did not expect this access, contact your administrator.</p>
+            <p>— The Kodi Builder Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+    const textLines = [
+        `${greeting},`,
+        '',
+        `You've been granted access to ${appName} inside the Kodi Builder.`,
+        loginUrl ? `Log in: ${loginUrl}` : '',
+        pageUrl ? `Assigned page: ${pageUrl}` : '',
+        '',
+        'Permissions:',
+        `- Can view: ${Boolean(permissions.canView) ? 'Yes' : 'No'}`,
+        `- Can edit: ${Boolean(permissions.canEdit) ? 'Yes' : 'No'}`,
+        `- Can use: ${Boolean(permissions.canUse) ? 'Yes' : 'No'}`,
+        '',
+        'If you did not expect this access, contact your administrator.',
+        '— The Kodi Builder Team'
+    ];
+    const text = textLines.filter(Boolean).join('\n');
+    return sendEmail({ to, subject, html, text });
+};
+
 module.exports = {
     sendClaimInvitation,
     sendVerificationEmail,
@@ -907,5 +964,6 @@ module.exports = {
     sendMessageNotificationEmail,
     sendConversationRequestEmail,
     sendConversationAcceptedEmail,
-    sendTicketNotificationEmail
+    sendTicketNotificationEmail,
+    sendAppAccessEmail
 };

@@ -3,6 +3,7 @@ const { validate } = require('../../middleware/validation');
 const service = require('./kodi.service');
 const builder = require('./kodi.builder');
 const runtime = require('./kodi.runtime');
+const perms = require('./kodi.permissions');
 
 const createPageValidators = validate([
     body('label').trim().isLength({ min: 2 }),
@@ -18,6 +19,49 @@ const layoutValidators = validate([
 const pageIdValidator = validate([param('id').isInt()]);
 
 const getRuntimeValidator = validate([param('pageId').isInt()]);
+
+const createAppValidators = validate([
+    body('name').trim().isLength({ min: 2 }),
+    body('description').optional().trim()
+]);
+
+const pagePermissionValidators = validate([
+    param('id').isInt(),
+    body('role').isIn(['admin', 'employee', 'business', 'psychologist']),
+    body('canView').optional().isBoolean(),
+    body('canEdit').optional().isBoolean(),
+    body('canUse').optional().isBoolean()
+]);
+
+const appIdValidator = validate([param('id').isUUID()]);
+const assignAppUserValidators = validate([
+    param('id').isUUID(),
+    body('email').isEmail().normalizeEmail(),
+    body('permissions').optional().isObject(),
+    body('permissions.canView').optional().isBoolean(),
+    body('permissions.canEdit').optional().isBoolean(),
+    body('permissions.canUse').optional().isBoolean()
+]);
+const objectValidators = validate([
+    body('name').trim().isLength({ min: 1 }),
+    body('label').trim().isLength({ min: 1 }),
+    body('description').optional().trim()
+]);
+const fieldValidators = validate([
+    param('id').isUUID(),
+    body('fieldName').trim().isLength({ min: 1 }),
+    body('fieldType').trim().isLength({ min: 1 }),
+    body('isRequired').optional().isBoolean(),
+    body('isReadonly').optional().isBoolean()
+]);
+const leadValidators = validate([
+    body('name').trim().isLength({ min: 2 }),
+    body('email').optional().isEmail()
+]);
+const convertLeadValidators = validate([
+    param('id').isUUID(),
+    body('stage').optional().trim()
+]);
 
 const createPage = async (req, res) => {
     try {
@@ -109,16 +153,189 @@ const listApps = async (req, res) => {
     }
 };
 
+const listAppUsers = async (req, res) => {
+    try {
+        const users = await service.listAppUsers(req.params.id);
+        return res.json({ success: true, data: users });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: 'Failed to load app users' });
+    }
+};
+
+const assignAppUser = async (req, res) => {
+    try {
+        const payload = await service.assignUserToApp({
+            appId: req.params.id,
+            email: req.body.email,
+            permissions: req.body.permissions || {},
+            assignedBy: req.user?.id
+        });
+        return res.json({ success: true, data: payload });
+    } catch (error) {
+        return res.status(400).json({ success: false, error: error.message || 'Failed to assign user to app' });
+    }
+};
+
+const listObjects = async (req, res) => {
+    try {
+        const objects = await service.listObjects();
+        return res.json({ success: true, data: objects });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: 'Failed to load objects' });
+    }
+};
+
+const createObject = async (req, res) => {
+    try {
+        const object = await service.createObject({
+            name: req.body.name,
+            label: req.body.label,
+            description: req.body.description,
+            metadata: req.body.metadata
+        });
+        return res.status(201).json({ success: true, data: object });
+    } catch (error) {
+        return res.status(400).json({ success: false, error: 'Failed to create object' });
+    }
+};
+
+const listObjectFields = async (req, res) => {
+    try {
+        const fields = await service.listObjectFields(req.params.id);
+        return res.json({ success: true, data: fields });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: 'Failed to load object fields' });
+    }
+};
+
+const createObjectField = async (req, res) => {
+    try {
+        const field = await service.createField({
+            objectId: req.params.id,
+            fieldName: req.body.fieldName,
+            fieldType: req.body.fieldType,
+            isRequired: req.body.isRequired,
+            isReadonly: req.body.isReadonly
+        });
+        return res.status(201).json({ success: true, data: field });
+    } catch (error) {
+        return res.status(400).json({ success: false, error: 'Failed to create field' });
+    }
+};
+
+const listLeads = async (req, res) => {
+    try {
+        const leads = await service.listLeads();
+        return res.json({ success: true, data: leads });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: 'Failed to load leads' });
+    }
+};
+
+const createLead = async (req, res) => {
+    try {
+        const lead = await service.createLead({
+            name: req.body.name,
+            email: req.body.email,
+            status: req.body.status
+        });
+        return res.status(201).json({ success: true, data: lead });
+    } catch (error) {
+        return res.status(400).json({ success: false, error: 'Failed to create lead' });
+    }
+};
+
+const listOpportunities = async (req, res) => {
+    try {
+        const opportunities = await service.listOpportunities(req.params.id);
+        return res.json({ success: true, data: opportunities });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: 'Failed to load opportunities' });
+    }
+};
+
+const convertLead = async (req, res) => {
+    try {
+        const opportunity = await service.convertLead({
+            leadId: req.params.id,
+            stage: req.body.stage
+        });
+        return res.json({ success: true, data: opportunity });
+    } catch (error) {
+        return res.status(400).json({ success: false, error: 'Failed to convert lead' });
+    }
+};
+
+const createApp = async (req, res) => {
+    try {
+        const app = await service.createApp({
+            name: req.body.name,
+            description: req.body.description
+        });
+        return res.status(201).json({ success: true, data: app });
+    } catch (error) {
+        return res.status(400).json({ success: false, error: 'Failed to create app' });
+    }
+};
+
+const getPagePermissions = async (req, res) => {
+    try {
+        const pageId = Number(req.params.id);
+        const rows = await service.listPermissions(pageId);
+        return res.json({ success: true, data: perms.formatPermissions(rows) });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: 'Failed to load permissions' });
+    }
+};
+
+const updatePagePermissions = async (req, res) => {
+    try {
+        const pageId = Number(req.params.id);
+        await service.insertPermission({
+            role: req.body.role,
+            pageId,
+            canView: req.body.canView,
+            canEdit: req.body.canEdit,
+            canUse: req.body.canUse
+        });
+        const rows = await service.listPermissions(pageId);
+        return res.json({ success: true, data: perms.formatPermissions(rows) });
+    } catch (error) {
+        return res.status(400).json({ success: false, error: 'Failed to update permissions' });
+    }
+};
+
 module.exports = {
     createPageValidators,
     layoutValidators,
     pageIdValidator,
     getRuntimeValidator,
+    createAppValidators,
+    appIdValidator,
+    assignAppUserValidators,
     createPage,
     listPages,
     updateLayout,
     activatePage,
     runtimeLoader,
     linkPageToApp,
-    listApps
+    listApps,
+    createApp,
+    pagePermissionValidators,
+    getPagePermissions,
+    updatePagePermissions,
+    listAppUsers,
+    assignAppUser,
+    objectValidators,
+    fieldValidators,
+    listObjects,
+    createObject,
+    listObjectFields,
+    createObjectField,
+    leadValidators,
+    convertLeadValidators,
+    listLeads,
+    createLead,
+    listOpportunities,
+    convertLead
 };
