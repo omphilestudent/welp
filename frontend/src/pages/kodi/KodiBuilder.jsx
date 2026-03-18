@@ -54,7 +54,8 @@ const COMPONENT_CATEGORIES = {
 const BUILT_IN_COMPONENTS = [
     {
         id: 'panel-highlights',
-        component_name: 'Panel Highlights',
+        component_name: 'PanelHighlight',
+        displayName: 'Panel Highlights',
         component_type: 'PanelHighlight',
         description: 'Showcase quick actions with buttons and summary pills.',
         version: '1.0',
@@ -65,7 +66,8 @@ const BUILT_IN_COMPONENTS = [
     },
     {
         id: 'record-page',
-        component_name: 'Record Page',
+        component_name: 'RecordPage',
+        displayName: 'Record Page',
         component_type: 'RecordPage',
         description: 'Display client details, timeline, and quick search.',
         version: '1.0',
@@ -104,6 +106,13 @@ const KodiBuilder = () => {
 
     const selectedPage = useMemo(() => pages.find((p) => p.id === selectedPageId) || null, [pages, selectedPageId]);
     const mergedComponents = useMemo(() => [...BUILT_IN_COMPONENTS, ...components], [components]);
+
+    const getComponentLabel = (comp) => comp?.displayName || comp?.display_name || comp?.component_name || 'Component';
+    const openLivePage = () => {
+        if (!selectedPage?.slug) return;
+        window.open(`/kodi/page/${selectedPage.slug}`, '_blank', 'noopener,noreferrer');
+    };
+    const selectedComponentLabel = selectedComponent ? getComponentLabel(selectedComponent) : '';
 
     // Load data
     const load = async () => {
@@ -295,25 +304,46 @@ const KodiBuilder = () => {
         }
 
         const baseSlug = slugifyString(name);
-        const slug = ensureUniqueSlug(baseSlug, pages.map((p) => p.slug));
+        let slug = ensureUniqueSlug(baseSlug, pages.map((p) => p.slug));
         const layoutPayload = createDefaultLayout();
 
         setCreatingPage(true);
         try {
-            const res = await createKodiPage({
-                name,
-                slug,
-                layout: layoutPayload
-            });
-            const created = res?.data;
-            if (created?.id) {
-                setPages((prev) => [created, ...prev]);
-                setSelectedPageId(created.id);
-                updateLayout(created.layout || layoutPayload);
-                toast.success('Page created');
-                setShowAddPageGuide(false);
-                setIsAddModalOpen(false);
+            let createdPage = null;
+            let attempt = 0;
+            let lastError = null;
+
+            while (!createdPage && attempt < 3) {
+                try {
+                    const res = await createKodiPage({
+                        name,
+                        slug,
+                        layout: layoutPayload
+                    });
+                    createdPage = res?.data;
+                } catch (error) {
+                    lastError = error;
+                    const message = (error?.response?.data?.error || '').toLowerCase();
+                    if (!message.includes('slug already exists')) {
+                        throw error;
+                    }
+                    attempt += 1;
+                    const refreshed = await listKodiPages();
+                    const refreshedSlugs = (refreshed?.data || []).map((p) => p.slug);
+                    slug = ensureUniqueSlug(`${baseSlug}-${attempt}`, refreshedSlugs);
+                }
             }
+
+            if (!createdPage) {
+                throw lastError || new Error('Failed to create page');
+            }
+
+            setPages((prev) => [createdPage, ...prev]);
+            setSelectedPageId(createdPage.id);
+            updateLayout(createdPage.layout || layoutPayload);
+            toast.success('Page created');
+            setShowAddPageGuide(false);
+            setIsAddModalOpen(false);
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to create page');
         } finally {
@@ -326,8 +356,10 @@ const KodiBuilder = () => {
         return mergedComponents.filter(comp => {
             const matchesSearch = comp.component_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.description?.toLowerCase().includes(searchTerm.toLowerCase());
+            const categoryOptions = COMPONENT_CATEGORIES[selectedCategory];
             const matchesCategory = selectedCategory === 'all' ||
-                COMPONENT_CATEGORIES[selectedCategory]?.includes(comp.component_type);
+                categoryOptions?.includes(comp.component_type) ||
+                categoryOptions?.includes(comp.component_name);
             return matchesSearch && matchesCategory;
         });
     }, [mergedComponents, searchTerm, selectedCategory]);
@@ -512,6 +544,15 @@ const KodiBuilder = () => {
                         ▦
                     </button>
 
+                    <button
+                        className="btn-secondary"
+                        onClick={openLivePage}
+                        disabled={!selectedPage?.slug}
+                        title="Open the live page"
+                    >
+                        View Live Page
+                    </button>
+
                     <button className="btn-primary" onClick={handleSave} disabled={saving}>
                         {saving ? 'Saving...' : 'Save Page'}
                     </button>
@@ -584,7 +625,7 @@ const KodiBuilder = () => {
                                         {!['Table','Form','Chart','Card','Button','Input','PanelHighlight','RecordPage'].includes(comp.component_type) && '📦'}
                                     </div>
                                     <div className="component-info">
-                                        <div className="component-name">{comp.component_name}</div>
+                                        <div className="component-name">{getComponentLabel(comp)}</div>
                                         <div className="component-type">{comp.component_type} · v{comp.version}</div>
                                     </div>
                                 </div>
@@ -691,7 +732,7 @@ const KodiBuilder = () => {
                                                                         onClick={() => setSelectedComponent(comp)}
                                                                     >
                                                                         <div className="preview-header">
-                                                                            <span className="preview-name">{comp.component_name}</span>
+                                                                            <span className="preview-name">{getComponentLabel(comp)}</span>
                                                                             <button
                                                                                 className="btn-icon-small delete"
                                                                                 onClick={(e) => {
@@ -737,7 +778,7 @@ const KodiBuilder = () => {
                                     <label>Name</label>
                                     <input
                                         type="text"
-                                        value={selectedComponent.component_name}
+                                        value={selectedComponentLabel}
                                         readOnly
                                         className="property-input"
                                     />

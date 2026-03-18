@@ -1,0 +1,121 @@
+.kodi-record-page {
+    display: flex;
+    flex-direction: row;
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    gap: 20px;
+    box-shadow: 0 14px 35px rgba(15, 33, 66, 0.12);
+    min-height: 220px;
+    color: #1f2b3b;
+}
+
+.kodi-record-page__sidebar {
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kodi-record-page__badge {
+    align-self: flex-start;
+    padding: 4px 12px;
+    background: #f4f6fb;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #0f62fe;
+}
+
+.kodi-record-page__details h3 {
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.kodi-record-page__details p {
+    margin: 4px 0;
+    font-size: 0.85rem;
+    color: #54698d;
+}
+
+.kodi-record-page__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.kodi-record-page__filters span {
+    padding: 4px 10px;
+    border: 1px solid #d8dde6;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: #16325c;
+}
+
+.kodi-record-page__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kodi-record-page__search {
+    display: flex;
+    gap: 8px;
+}
+
+.kodi-record-page__search input {
+    flex: 1;
+    border: 1px solid #d8dde6;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+.kodi-record-page__search button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    background: #1589ee;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.kodi-record-page__hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #646f87;
+}
+
+.kodi-record-page__timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kodi-record-page__timeline-item {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #e0e5ee;
+    background: #fbfbff;
+    font-size: 0.85rem;
+    color: #1f2b3b;
+}
+
+@media (max-width: 768px) {
+    .kodi-record-page {
+        flex-direction: column;
+    }
+
+    .kodi-record-page__sidebar {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .kodi-record-page__main {
+        width: 100%;
+    }
+}

@@ -1,4 +1,16 @@
 import React, { useMemo } from 'react';
+import GridLayout from './components/GridLayout';
+import SectionContainer from './components/SectionContainer';
+import ActivityTimeline from './components/ActivityTimeline';
+import ProgressKPI from './components/ProgressKPI';
+import ModalPopup from './components/ModalPopup';
+import SearchFilter from './components/SearchFilter';
+import TabsNavigation from './components/TabsNavigation';
+import ChartDisplay from './components/ChartDisplay';
+import CustomCodeWidget from './components/CustomCodeWidget';
+import CustomEmailTemplate from './components/CustomEmailTemplate';
+import CustomPageComponent from './components/CustomPageComponent';
+import KYCStatusWidget from './components/KYCStatusWidget';
 import DataTable from './components/DataTable';
 import Tabs from './components/Tabs';
 import Accordion from './components/Accordion';
@@ -7,17 +19,35 @@ import NotificationPanel from './components/NotificationPanel';
 import FormBuilder from './components/FormBuilder';
 import CardList from './components/CardList';
 import RecordViewer from './components/RecordViewer';
+import PanelHighlight from './components/PanelHighlight';
+import RecordPage from './components/RecordPage';
 import CaseWidget from './components/widgets/CaseWidget';
 import AdsWidget from './components/widgets/AdsWidget';
 import ClientApplicationsWidget from './components/widgets/ClientApplicationsWidget';
 
 const componentMap = {
+    GridLayout,
+    SectionContainer,
+    ActivityTimeline,
+    ProgressKPI,
+    ModalPopup,
+    SearchFilter,
+    TabsNavigation,
+    ChartDisplay,
+    CustomCodeWidget,
+    CustomEmailTemplate,
+    CustomPageComponent,
+    KYCStatusWidget,
     DataTable,
     RecordViewer,
     CardList,
+    PanelHighlight,
+    RecordPage,
     ClientApplicationsWidget,
     CaseWidget,
+    CaseManagementWidget: CaseWidget,
     AdsWidget,
+    AdsReviewWidget: AdsWidget,
     Tabs,
     Accordion,
     Button,
