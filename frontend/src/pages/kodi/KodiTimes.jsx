@@ -23,11 +23,19 @@ const statusStyles = {
     activated: { label: 'Activated', className: 'status-chip activated' }
 };
 
+const formatDateTime = (value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.valueOf())) return '—';
+    return date.toLocaleString();
+};
+
 const KodiTimes = () => {
     const navigate = useNavigate();
     const [pages, setPages] = useState([]);
     const [apps, setApps] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loadingPages, setLoadingPages] = useState(true);
+    const [loadingApps, setLoadingApps] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [linkModal, setLinkModal] = useState({ open: false, page: null });
     const [form, setForm] = useState({ label: '', pageType: 'record' });
@@ -36,23 +44,26 @@ const KodiTimes = () => {
     const [selectedAppId, setSelectedAppId] = useState('');
 
     const fetchPages = async () => {
-        setLoading(true);
+        setLoadingPages(true);
         try {
             const data = await listPlatformPages();
             setPages(data);
         } catch (error) {
-            toast.error('Failed to load KodI pages');
+            toast.error('Failed to load Kodi pages');
         } finally {
-            setLoading(false);
+            setLoadingPages(false);
         }
     };
 
     const fetchApps = async () => {
+        setLoadingApps(true);
         try {
             const data = await listPlatformApps();
             setApps(data);
         } catch (error) {
-            toast.error('Failed to load Kodi apps');
+            toast.error('Cannot load Kodi apps');
+        } finally {
+            setLoadingApps(false);
         }
     };
 
@@ -61,9 +72,10 @@ const KodiTimes = () => {
         fetchApps();
     }, []);
 
-    const refreshPages = async () => {
-        await fetchPages();
-    };
+    const unactivatedPages = useMemo(
+        () => pages.filter((page) => page.status !== 'activated' || !page.linked_app_id),
+        [pages]
+    );
 
     const openCreateModal = () => {
         setForm({ label: '', pageType: 'record' });
@@ -78,18 +90,18 @@ const KodiTimes = () => {
         }
         setCreating(true);
         try {
-            const created = await createPlatformPage({
+            const page = await createPlatformPage({
                 label: form.label.trim(),
                 pageType: form.pageType
             });
-            toast.success('Page created, loading builder...');            
-            navigate(`/kodi/builder/${created.id}`);
+            toast.success('Page created — loading builder');
+            navigate(`/kodi/builder/${page.id}`);
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to create page');
         } finally {
             setCreating(false);
             setModalOpen(false);
-            refreshPages();
+            fetchPages();
         }
     };
 
@@ -98,9 +110,9 @@ const KodiTimes = () => {
         try {
             await activatePlatformPage(page.id);
             toast.success('Page activated');
-            refreshPages();
+            fetchPages();
         } catch (error) {
-            toast.error(error?.response?.data?.error || 'Failed to activate page');
+            toast.error(error?.response?.data?.error || 'Activation failed');
         } finally {
             setActivatingId(null);
         }
@@ -118,36 +130,32 @@ const KodiTimes = () => {
         }
         try {
             await linkPlatformPage(linkModal.page.id, Number(selectedAppId));
-            toast.success('Page linked to app');
+            toast.success('Page linked to Kodi app');
             setLinkModal({ open: false, page: null });
-            refreshPages();
+            fetchPages();
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to link page');
         }
     };
 
-    const unactivatedPages = useMemo(
-        () => pages.filter((page) => page.status !== 'activated'),
-        [pages]
-    );
-
     return (
         <div className="kodi-times">
             <header className="kodi-times__header">
                 <div>
-                    <p className="kodi-times__eyebrow">Builder Console</p>
+                    <p className="kodi-times__eyebrow">Times Builder</p>
                     <h1>Kodi Pages</h1>
                 </div>
                 <button className="btn-primary" onClick={openCreateModal}>
-                    + Create Page
+                    + Add New Kodi Page
                 </button>
             </header>
 
             <section className="kodi-times__table-wrapper">
                 <header className="kodi-times__section-header">
-                    <h2>All Pages</h2>
+                    <h2>Times</h2>
+                    <p className="kodi-times__subtitle">Built pages, statuses, linked apps, and ownership.</p>
                 </header>
-                {loading ? (
+                {loadingPages ? (
                     <div className="kodi-times__loader">
                         <Loading />
                     </div>
@@ -158,6 +166,8 @@ const KodiTimes = () => {
                             <span>Type</span>
                             <span>Status</span>
                             <span>Linked App</span>
+                            <span>Created By</span>
+                            <span>Created At</span>
                             <span>Actions</span>
                         </div>
                         {pages.map((page) => {
@@ -171,26 +181,35 @@ const KodiTimes = () => {
                                         <span className={status.className}>{status.label}</span>
                                     </span>
                                     <span>{page.app_name || '—'}</span>
+                                    <span>{page.created_by_name || '—'}</span>
+                                    <span>{formatDateTime(page.created_at)}</span>
                                     <span className="kodi-times__actions">
                                         <button
                                             className="btn-text"
                                             onClick={() => navigate(`/kodi/builder/${page.id}`)}
                                         >
-                                            ✏️ Edit
+                                            Edit
                                         </button>
                                         <button
                                             className="btn-text"
                                             onClick={() => handleActivate(page)}
                                             disabled={page.status === 'activated' || activatingId === page.id}
                                         >
-                                            ✅ Activate
+                                            Activate
                                         </button>
                                         <button
                                             className="btn-text"
                                             onClick={() => openLinkModal(page)}
                                             disabled={page.status !== 'activated'}
                                         >
-                                            📎 Link to App
+                                            Link to App
+                                        </button>
+                                        <button
+                                            className="btn-text"
+                                            onClick={() => navigate(`/kodi/runtime/${page.id}`)}
+                                            disabled={page.status !== 'activated'}
+                                        >
+                                            View Runtime
                                         </button>
                                     </span>
                                 </div>
@@ -198,7 +217,7 @@ const KodiTimes = () => {
                         })}
                         {pages.length === 0 && (
                             <div className="kodi-times__empty">
-                                No pages found. Create a new page to get started.
+                                No Kodi pages yet. Create one to begin building experiences.
                             </div>
                         )}
                     </div>
@@ -216,6 +235,12 @@ const KodiTimes = () => {
                                 <div>
                                     <strong>{page.label}</strong>
                                     <p>{page.page_type}</p>
+                                </div>
+                                <div className="kodi-times__card-status">
+                                    <span className="status-chip" aria-label={page.status}>
+                                        {page.status?.toUpperCase() || 'DRAFT'}
+                                    </span>
+                                    <span>{page.app_name ? 'Linked' : 'App pending'}</span>
                                 </div>
                                 <div className="kodi-times__card-actions">
                                     <button
@@ -248,9 +273,7 @@ const KodiTimes = () => {
                                 Page Type
                                 <select
                                     value={form.pageType}
-                                    onChange={(e) =>
-                                        setForm((prev) => ({ ...prev, pageType: e.target.value }))
-                                    }
+                                    onChange={(e) => setForm((prev) => ({ ...prev, pageType: e.target.value }))}
                                 >
                                     {PAGE_TYPES.map((option) => (
                                         <option key={option.value} value={option.value}>
@@ -277,19 +300,26 @@ const KodiTimes = () => {
                     <div className="kodi-times__modal">
                         <h3>Link Page to App</h3>
                         <p>
-                            Page: <strong>{linkModal.page.label}</strong>
+                            <strong>{linkModal.page?.label}</strong>
+                            <span className="kodi-times__modal-subtext">Select the app that will expose this page.</span>
                         </p>
-                        <label>
-                            Select App
-                            <select value={selectedAppId} onChange={(e) => setSelectedAppId(e.target.value)}>
-                                <option value="">Select an app</option>
-                                {apps.map((app) => (
-                                    <option key={app.id} value={app.id}>
-                                        {app.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                        {loadingApps ? (
+                            <Loading />
+                        ) : apps.length === 0 ? (
+                            <p>No Kodi apps available. Create one in the portal first.</p>
+                        ) : (
+                            <label>
+                                Select App
+                                <select value={selectedAppId} onChange={(e) => setSelectedAppId(e.target.value)}>
+                                    <option value="">Select an app</option>
+                                    {apps.map((app) => (
+                                        <option key={app.id} value={app.id}>
+                                            {app.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        )}
                         <div className="kodi-times__modal-actions">
                             <button
                                 type="button"
@@ -298,7 +328,12 @@ const KodiTimes = () => {
                             >
                                 Cancel
                             </button>
-                            <button type="button" className="btn-primary" onClick={handleLinkSubmit}>
+                            <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={handleLinkSubmit}
+                                disabled={!apps.length || !selectedAppId}
+                            >
                                 Link Page
                             </button>
                         </div>

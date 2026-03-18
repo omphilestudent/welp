@@ -39,9 +39,12 @@ const createPage = async ({ label, pageType, linkedAppId, createdBy }) => {
 
 const listPages = async () => {
     const result = await query(
-        `SELECT p.*, a.name AS app_name
+        `SELECT p.*,
+                a.name AS app_name,
+                COALESCE(u.display_name, u.email, 'System') AS created_by_name
          FROM kodi_pages p
          LEFT JOIN kodi_apps a ON a.id = p.linked_app_id
+         LEFT JOIN users u ON u.id = p.created_by
          ORDER BY p.created_at DESC`
     );
     return result.rows;
