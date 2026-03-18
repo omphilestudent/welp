@@ -110,6 +110,65 @@ const defaultComponents = [
             props: ['title'],
             events: []
         }
+    },
+    {
+        component_name: 'PanelHighlight',
+        component_type: 'widget',
+        code: 'frontend:PanelHighlight',
+        config: {
+            category: 'kodi',
+            props: [
+                { name: 'title', type: 'string', label: 'Title', default: 'Highlights' },
+                { name: 'description', type: 'string', label: 'Description', default: 'Track the most important calls and tasks.' },
+                { name: 'badge', type: 'string', label: 'Badge', default: 'Live' },
+                { name: 'actions', type: 'array', label: 'Action Buttons', default: '["Add Call","New Task","Send Update"]' },
+                { name: 'stats', type: 'array', label: 'Stats', default: '["Leads: 8","Calls: 12","Open Tasks: 3"]' },
+                { name: 'accentColor', type: 'string', label: 'Accent Color', default: '#0f62fe' },
+                { name: 'textColor', type: 'string', label: 'Text Color', default: '#ffffff' }
+            ],
+            events: ['onAction'],
+            permissions: ['admin', 'sales', 'customer_service'],
+            style: { theme: 'kodi', spacing: 'medium' }
+        }
+    },
+    {
+        component_name: 'RecordPage',
+        component_type: 'page_block',
+        code: 'frontend:RecordPage',
+        config: {
+            category: 'kodi',
+            props: [
+                {
+                    name: 'client',
+                    type: 'object',
+                    label: 'Client Profile',
+                    description: 'Object with name, account, phone, email, status',
+                    default: '{"name":"Jordan Smith","account":"AC-124","phone":"+1 (555) 010-1010","email":"jordan@example.com","status":"VIP"}'
+                },
+                {
+                    name: 'timeline',
+                    type: 'array',
+                    label: 'Timeline',
+                    default: '["Last contact: Email - 8 mins ago","Next follow-up: Demo Friday","Notes: Referral from Anna"]'
+                },
+                {
+                    name: 'filters',
+                    type: 'array',
+                    label: 'Quick Filters',
+                    default: '["Open","Prospect","VIP"]'
+                },
+                { name: 'highlight', type: 'string', label: 'Highlight Tag', default: 'Priority client' },
+                {
+                    name: 'quickMessage',
+                    type: 'string',
+                    label: 'Quick Message',
+                    default: 'Search across clients, cases, and documents.'
+                }
+            ],
+            events: ['onSearch'],
+            permissions: ['admin', 'customer_service', 'sales'],
+            style: { theme: 'record', spacing: 'medium' }
+        }
     }
 ];
 

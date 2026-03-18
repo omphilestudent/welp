@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_kodi_page_access_active ON kodi_page_access(is_ac
 CREATE TABLE IF NOT EXISTS kc_kodi_components (
                                                   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     component_name VARCHAR(160) UNIQUE NOT NULL,
-    component_type VARCHAR(24) NOT NULL CHECK (component_type IN ('widget','page_block','email','logic')),
+    component_type VARCHAR(24) NOT NULL CHECK (component_type IN ('widget','page_block','email','logic','layout','data','action','business','utility','custom')),
     code TEXT NOT NULL,
     config JSONB DEFAULT '{}'::jsonb,
     version INTEGER DEFAULT 1,
@@ -57,4 +57,3 @@ CREATE TABLE IF NOT EXISTS kodi_page_component_mapping (
 
 CREATE INDEX IF NOT EXISTS idx_kodi_page_component_page ON kodi_page_component_mapping(kodi_page_id);
 CREATE INDEX IF NOT EXISTS idx_kodi_page_component_component ON kodi_page_component_mapping(component_id);
-
