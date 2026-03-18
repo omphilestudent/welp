@@ -7,69 +7,128 @@ const DEFINITIONS = [
         description: 'Individuals who interact with Kodi apps',
         fields: [
             { fieldName: 'first_name', fieldType: 'string', isRequired: true },
-            { fieldName: 'last_name', fieldType: 'string', isRequired: true },
+            { fieldName: 'surname', fieldType: 'string', isRequired: true },
             { fieldName: 'email', fieldType: 'string', isRequired: true },
-            { fieldName: 'phone', fieldType: 'string' },
-            { fieldName: 'company', fieldType: 'string' }
-        ]
+            { fieldName: 'phone_number', fieldType: 'string' }
+        ],
+        metadata: {
+            relationships: [{ target: 'subscription', type: 'one_to_many', sourceField: 'contact_id' }]
+        }
     },
     {
         name: 'employee',
         label: 'Employee',
         description: 'Internal staff members',
         fields: [
-            { fieldName: 'full_name', fieldType: 'string', isRequired: true },
+            { fieldName: 'contact_id', fieldType: 'uuid', isRequired: true },
             { fieldName: 'role', fieldType: 'string' },
             { fieldName: 'department', fieldType: 'string' },
-            { fieldName: 'manager', fieldType: 'string' }
-        ]
+            { fieldName: 'status', fieldType: 'string' }
+        ],
+        metadata: {
+            relationships: [{ target: 'contact', type: 'one_to_one', sourceField: 'contact_id' }]
+        }
     },
     {
         name: 'psychologist',
         label: 'Psychologist',
         description: 'Verified psychologists available for sessions',
         fields: [
+            { fieldName: 'contact_id', fieldType: 'uuid', isRequired: true },
             { fieldName: 'specialty', fieldType: 'string' },
             { fieldName: 'availability', fieldType: 'string' },
-            { fieldName: 'license_number', fieldType: 'string' },
-            { fieldName: 'rating', fieldType: 'number' }
-        ]
+            { fieldName: 'kyc_status', fieldType: 'string' }
+        ],
+        metadata: {
+            relationships: [{ target: 'contact', type: 'one_to_one', sourceField: 'contact_id' }]
+        }
     },
     {
         name: 'business',
         label: 'Business User',
         description: 'Business accounts managing Kodi apps',
         fields: [
+            { fieldName: 'contact_id', fieldType: 'uuid', isRequired: true },
             { fieldName: 'business_name', fieldType: 'string', isRequired: true },
             { fieldName: 'industry', fieldType: 'string' },
-            { fieldName: 'subscription_status', fieldType: 'string' },
-            { fieldName: 'linked_contacts', fieldType: 'string' }
-        ]
+            { fieldName: 'approval_status', fieldType: 'string' }
+        ],
+        metadata: {
+            relationships: [{ target: 'contact', type: 'one_to_one', sourceField: 'contact_id' }]
+        }
     },
     {
         name: 'subscription',
         label: 'Subscription',
         description: 'Plan and renewal information',
         fields: [
-            { fieldName: 'plan', fieldType: 'string' },
+            { fieldName: 'contact_id', fieldType: 'uuid', isRequired: true },
+            { fieldName: 'plan_type', fieldType: 'string' },
             { fieldName: 'status', fieldType: 'string' },
-            { fieldName: 'starts_at', fieldType: 'date' },
-            { fieldName: 'ends_at', fieldType: 'date' }
-        ]
+            { fieldName: 'start_date', fieldType: 'date' },
+            { fieldName: 'end_date', fieldType: 'date' }
+        ],
+        metadata: {
+            relationships: [{ target: 'contact', type: 'many_to_one', sourceField: 'contact_id' }]
+        }
     }
 ];
 
 const upsertObjects = async () => {
+    try {
+        await query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
+    } catch {}
+    try {
+        await query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+    } catch {}
+
+    const createTablesWithDefault = async (defaultExpr) => {
+        await query(`
+            CREATE TABLE IF NOT EXISTS kodi_objects (
+                id UUID PRIMARY KEY DEFAULT ${defaultExpr},
+                name VARCHAR(100) UNIQUE NOT NULL,
+                label VARCHAR(100) NOT NULL,
+                description TEXT,
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await query(`
+            CREATE TABLE IF NOT EXISTS kodi_fields (
+                id UUID PRIMARY KEY DEFAULT ${defaultExpr},
+                object_id UUID REFERENCES kodi_objects(id) ON DELETE CASCADE,
+                field_name VARCHAR(100) NOT NULL,
+                field_type VARCHAR(50) NOT NULL,
+                is_required BOOLEAN DEFAULT false,
+                is_readonly BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (object_id, field_name)
+            );
+        `);
+    };
+
+    try {
+        await createTablesWithDefault('gen_random_uuid()');
+    } catch (error) {
+        if (String(error?.message || '').includes('gen_random_uuid')) {
+            await createTablesWithDefault('uuid_generate_v4()');
+        } else {
+            throw error;
+        }
+    }
+
     const objects = [];
     for (const definition of DEFINITIONS) {
         const result = await query(
-            `INSERT INTO kodi_objects (name, label, description)
-             VALUES ($1, $2, $3)
+            `INSERT INTO kodi_objects (name, label, description, metadata)
+             VALUES ($1, $2, $3, $4::jsonb)
              ON CONFLICT (name) DO UPDATE
                  SET label = EXCLUDED.label,
-                     description = COALESCE(EXCLUDED.description, kodi_objects.description)
+                     description = COALESCE(EXCLUDED.description, kodi_objects.description),
+                     metadata = COALESCE(EXCLUDED.metadata, kodi_objects.metadata)
              RETURNING *`,
-            [definition.name, definition.label, definition.description]
+            [definition.name, definition.label, definition.description, JSON.stringify(definition.metadata || {})]
         );
         objects.push({ ...definition, id: result.rows[0].id });
     }

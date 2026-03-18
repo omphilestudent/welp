@@ -129,7 +129,7 @@ const KodiTimes = () => {
             return;
         }
         try {
-            await linkPlatformPage(linkModal.page.id, Number(selectedAppId));
+            await linkPlatformPage(linkModal.page.id, selectedAppId);
             toast.success('Page linked to Kodi app');
             setLinkModal({ open: false, page: null });
             fetchPages();

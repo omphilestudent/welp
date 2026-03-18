@@ -227,7 +227,9 @@ const createApplication = async (req, res) => {
             await kodiPlatformService.createLead({
                 name: clientName,
                 email: contactEmail || null,
-                status: 'incomplete'
+                status: 'incomplete',
+                applicationStatus: 'incomplete',
+                source: 'application_start'
             });
         }
         await audit({

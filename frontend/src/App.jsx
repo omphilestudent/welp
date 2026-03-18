@@ -50,7 +50,7 @@ import MLInteractions from './pages/admin/MLInteractions';
 import RegistrationApplications from './pages/admin/RegistrationApplications';
 import CalendarTroubleshoot from './pages/admin/CalendarTroubleshoot';
 import ClaimRequests from './pages/admin/ClaimRequests';
-import MarketingEmails from './pages/admin/MarketingEmails';
+import AdminMarketing from './pages/admin/AdminMarketing';
 import AdApprovals from './pages/admin/AdApprovals';
 import FlowManagement from './pages/admin/FlowManagement';
 import FlowAdmin from './pages/admin/FlowAdmin';
@@ -59,10 +59,10 @@ import AdminTickets from './pages/admin/AdminTickets';
 import KodiDashboard from './pages/kodi/KodiDashboard';
 import KodiLogin from './pages/kodi/KodiLogin';
 import KodiPage from './pages/kodi/KodiPage';
-import KodiBuilder from './pages/kodi/KodiBuilder';
-import KodiPortal from './pages/kodi/KodiPortal';
 import KodiTimes from './pages/kodi/KodiTimes';
-import KodiRuntime from './pages/kodi/KodiRuntime';
+import KodiBuilderPage from './pages/kodi/KodiBuilderPage';
+import KodiRuntimePage from './pages/kodi/KodiRuntimePage';
+import KodiPortalPage from './pages/kodi/KodiPortalPage';
 
 // HR Pages
 import Employees from './pages/hr/Employees';
@@ -205,31 +205,31 @@ function App() {
                                     path="/kodi/portal"
                                     element={
                                         <PrivateRoute>
-                                            <KodiPortal />
+                                            <KodiPortalPage />
                                         </PrivateRoute>
                                     }
                                 />
                                 <Route
                                     path="/kodi/builder/:pageId"
                                     element={
-                                        <PrivateRoute>
-                                            <KodiBuilder />
-                                        </PrivateRoute>
+                                        <AdminRoute requiredRole="admin">
+                                            <KodiBuilderPage />
+                                        </AdminRoute>
                                     }
                                 />
                                 <Route
                                     path="/kodi/builder"
                                     element={
-                                        <PrivateRoute>
-                                            <KodiBuilder />
-                                        </PrivateRoute>
+                                        <AdminRoute requiredRole="admin">
+                                            <KodiBuilderPage />
+                                        </AdminRoute>
                                     }
                                 />
                                 <Route
                                     path="/kodi/runtime/:pageId"
                                     element={
                                         <PrivateRoute>
-                                            <KodiRuntime />
+                                            <KodiRuntimePage />
                                         </PrivateRoute>
                                     }
                                 />
@@ -257,13 +257,13 @@ function App() {
                                     <Route path="reviews" element={<ReviewModeration />} />
                                     <Route path="applications" element={<RegistrationApplications />} />
                                     <Route path="claims" element={<ClaimRequests />} />
-                                    <Route path="marketing" element={<MarketingEmails />} />
+                                    <Route path="marketing" element={<AdminMarketing />} />
                                     <Route path="ads" element={<AdApprovals />} />
                                     <Route path="tickets" element={<AdminTickets />} />
                                     <Route path="flows" element={<FlowAdmin />} />
                                     <Route path="flows/advanced" element={<FlowManagement />} />
                                     <Route path="flows/:id/builder" element={<FlowBuilder />} />
-                                    <Route path="kodi/builder" element={<KodiBuilder />} />
+                                    <Route path="kodi/builder" element={<KodiBuilderPage />} />
                                     <Route path="calendar" element={<CalendarTroubleshoot />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />

@@ -9,7 +9,8 @@ const { companyValidation } = require('../middleware/validation');
 const adminController = require('../controllers/adminController');
 const adminAdsController = require('../controllers/adminAdsController');
 const companyController = require('../controllers/companyController');
-const marketingController = require('../controllers/marketingController');
+const marketingRoutes = require('../modules/marketing/marketing.routes');
+const marketingController = require('../modules/marketing/marketing.controller');
 
 const router = express.Router();
 
@@ -143,36 +144,37 @@ router.patch('/subscriptions/pricing/:countryCode', adminController.updateCountr
 router.get('/settings', adminController.getSystemSettings);
 router.get('/session-settings', adminController.getSessionSettings);
 
-// Marketing email templates
+router.use('/marketing', marketingRoutes);
+// Explicit admin marketing routes (fallback)
 router.get('/marketing/templates', marketingController.listTemplates);
-router.post('/marketing/templates',
-    validate([
-        body('name').isString().trim().notEmpty(),
-        body('subject').isString().trim().notEmpty(),
-        body('body_html').isString().notEmpty(),
-        body('body_text').optional().isString(),
-        body('is_active').optional().isBoolean()
-    ]),
-    marketingController.createTemplate
+router.get('/marketing/templates/:id',
+    validate([param('id').isUUID()]),
+    marketingController.getTemplate
 );
+router.post('/marketing/templates', marketingController.createTemplate);
 router.put('/marketing/templates/:id',
-    validate([
-        body('name').isString().trim().notEmpty(),
-        body('subject').isString().trim().notEmpty(),
-        body('body_html').isString().notEmpty(),
-        body('body_text').optional().isString(),
-        body('is_active').optional().isBoolean()
-    ]),
+    validate([param('id').isUUID()]),
     marketingController.updateTemplate
 );
-router.delete('/marketing/templates/:id', marketingController.deleteTemplate);
-router.post('/marketing/templates/:id/test',
-    validate([
-        body('email').optional().isEmail(),
-        body('userId').optional().isUUID()
-    ]),
-    marketingController.sendTemplateTest
+router.post('/marketing/templates/:id/preview',
+    validate([param('id').isUUID()]),
+    marketingController.previewTemplate
 );
+router.get('/marketing/campaigns', marketingController.listCampaigns);
+router.post('/marketing/campaigns', marketingController.createCampaign);
+router.put('/marketing/campaigns/:id',
+    validate([param('id').isUUID()]),
+    marketingController.updateCampaign
+);
+router.post('/marketing/campaigns/:id/run',
+    validate([param('id').isUUID()]),
+    marketingController.runCampaign
+);
+router.get('/marketing/triggers', marketingController.listTriggers);
+router.put('/marketing/triggers/:triggerKey', marketingController.updateTrigger);
+router.get('/marketing/logs', marketingController.listLogs);
+router.get('/marketing/settings', marketingController.getSettings);
+router.put('/marketing/settings', marketingController.updateSettings);
 
 // Claim requests (business profile ownership)
 router.get('/claim-requests', companyController.getPendingClaimRequests);

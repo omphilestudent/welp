@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
+const { authorizeAdmin } = require('../middleware/adminAuth');
 const { validate } = require('../middleware/validation');
 const kodiController = require('../controllers/kodiController');
 const kodiPages = require('../modules/kodi/kodiPages.controller');
@@ -136,42 +137,65 @@ router.get('/audit', kodiController.listAuditLogs);
 router.post(
     '/platform/pages',
     authenticate,
+    authorizeAdmin(),
     kodiPlatform.createPageValidators,
     kodiPlatform.createPage
 );
-router.get('/platform/pages', authenticate, kodiPlatform.listPages);
+router.get('/platform/pages', authenticate, authorizeAdmin(), kodiPlatform.listPages);
 router.put(
     '/platform/pages/:id/layout',
     authenticate,
+    authorizeAdmin(),
     kodiPlatform.layoutValidators,
     kodiPlatform.updateLayout
 );
 router.post(
     '/platform/pages/:id/activate',
     authenticate,
+    authorizeAdmin(),
     kodiPlatform.pageIdValidator,
     kodiPlatform.activatePage
 );
 router.post(
     '/platform/pages/:id/link',
     authenticate,
-    validate([body('appId').isInt()]),
+    authorizeAdmin(),
+    validate([body('appId').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    })]),
     kodiPlatform.linkPageToApp
 );
-router.get('/platform/apps/:id/users', authenticate, kodiPlatform.appIdValidator, kodiPlatform.listAppUsers);
-router.post('/platform/apps/:id/users', authenticate, kodiPlatform.assignAppUserValidators, kodiPlatform.assignAppUser);
-router.post('/platform/apps', authenticate, kodiPlatform.createAppValidators, kodiPlatform.createApp);
+router.get('/platform/apps/:id/users', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.listAppUsers);
+router.post('/platform/apps/:id/users', authenticate, authorizeAdmin(), kodiPlatform.assignAppUserValidators, kodiPlatform.assignAppUser);
+router.get('/platform/pages/:id/users', authenticate, authorizeAdmin(), kodiPlatform.pageIdValidator, kodiPlatform.listPageUsers);
+router.post('/platform/pages/:id/users', authenticate, authorizeAdmin(), kodiPlatform.assignPageUserValidators, kodiPlatform.assignPageUser);
+router.post('/platform/apps', authenticate, authorizeAdmin(), kodiPlatform.createAppValidators, kodiPlatform.createApp);
+router.put('/platform/apps/:id', authenticate, authorizeAdmin(), kodiPlatform.updateAppValidators, kodiPlatform.updateApp);
 router.get('/platform/runtime/:pageId', authenticate, kodiPlatform.getRuntimeValidator, kodiPlatform.runtimeLoader);
-router.get('/platform/apps', authenticate, kodiPlatform.listApps);
-router.get('/platform/objects', authenticate, kodiPlatform.listObjects);
-router.post('/platform/objects', authenticate, kodiPlatform.objectValidators, kodiPlatform.createObject);
-router.get('/platform/objects/:id/fields', authenticate, validate([param('id').isUUID()]), kodiPlatform.listObjectFields);
-router.post('/platform/objects/:id/fields', authenticate, kodiPlatform.fieldValidators, kodiPlatform.createObjectField);
-router.get('/platform/leads', authenticate, kodiPlatform.listLeads);
-router.post('/platform/leads', authenticate, kodiPlatform.leadValidators, kodiPlatform.createLead);
-router.post('/platform/leads/:id/convert', authenticate, kodiPlatform.convertLeadValidators, kodiPlatform.convertLead);
-router.get('/platform/leads/:id/opportunities', authenticate, validate([param('id').isUUID()]), kodiPlatform.listOpportunities);
-router.get('/platform/pages/:id/permissions', authenticate, kodiPlatform.pageIdValidator, kodiPlatform.getPagePermissions);
-router.post('/platform/pages/:id/permissions', authenticate, kodiPlatform.pagePermissionValidators, kodiPlatform.updatePagePermissions);
+router.get('/platform/apps', authenticate, authorizeAdmin(), kodiPlatform.listApps);
+router.get('/platform/objects', authenticate, authorizeAdmin(), kodiPlatform.listObjects);
+router.get('/platform/components', authenticate, authorizeAdmin(), kodiPlatform.listComponentRegistry);
+router.post('/platform/objects', authenticate, authorizeAdmin(), kodiPlatform.objectValidators, kodiPlatform.createObject);
+router.get('/platform/objects/:id/fields', authenticate, authorizeAdmin(), validate([param('id').custom((val) => {
+    if (val === undefined || val === null) return false;
+    const str = String(val);
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str) || /^\d+$/.test(str);
+})]), kodiPlatform.listObjectFields);
+router.post('/platform/objects/:id/fields', authenticate, authorizeAdmin(), kodiPlatform.fieldValidators, kodiPlatform.createObjectField);
+router.get('/platform/leads', authenticate, authorizeAdmin(), kodiPlatform.listLeads);
+router.post('/platform/leads', authenticate, authorizeAdmin(), kodiPlatform.leadValidators, kodiPlatform.createLead);
+router.post('/platform/leads/:id/convert', authenticate, authorizeAdmin(), kodiPlatform.convertLeadValidators, kodiPlatform.convertLead);
+router.get('/platform/leads/:id/opportunities', authenticate, authorizeAdmin(), validate([param('id').custom((val) => {
+    if (val === undefined || val === null) return false;
+    const str = String(val);
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str) || /^\d+$/.test(str);
+})]), kodiPlatform.listOpportunities);
+router.get('/platform/pages/:id/permissions', authenticate, authorizeAdmin(), kodiPlatform.pageIdValidator, kodiPlatform.getPagePermissions);
+router.post('/platform/pages/:id/permissions', authenticate, authorizeAdmin(), kodiPlatform.pagePermissionValidators, kodiPlatform.updatePagePermissions);
 
 module.exports = router;

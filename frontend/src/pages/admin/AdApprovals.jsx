@@ -72,6 +72,15 @@ const AdApprovals = () => {
     const [failureLog, setFailureLog] = useState([]);
     const [failureLoading, setFailureLoading] = useState(false);
 
+    const getAdId = (ad) => ad?.id || ad?.campaign_id || ad?.campaignId;
+    const normalizeReviewStatus = (status) => {
+        const raw = String(status || '').toLowerCase();
+        if (!raw) return 'pending';
+        if (raw === 'pending_review') return 'pending';
+        return raw;
+    };
+    const normalizeStatus = (status) => String(status || '').toLowerCase() || 'pending';
+
     const parseFailureDetails = (details) => {
         if (!details) return {};
         if (typeof details === 'string') {
@@ -104,8 +113,14 @@ const AdApprovals = () => {
 
             const { data } = await adminListAds(params);
             const adsData = data?.campaigns || data?.ads || [];
-            setAds(adsData);
-            applyLocalFilters(adsData);
+            const normalized = adsData.map((ad) => ({
+                ...ad,
+                id: getAdId(ad),
+                review_status: normalizeReviewStatus(ad.review_status),
+                status: normalizeStatus(ad.status)
+            }));
+            setAds(normalized);
+            applyLocalFilters(normalized);
         } catch (error) {
             toast.error('Failed to load ads');
         } finally {
@@ -177,9 +192,9 @@ const AdApprovals = () => {
     // Calculate stats
     const stats = useMemo(() => ({
         total: ads.length,
-        pending: ads.filter(a => a.review_status === 'pending').length,
-        approved: ads.filter(a => a.review_status === 'approved').length,
-        rejected: ads.filter(a => a.review_status === 'rejected').length,
+        pending: ads.filter(a => normalizeReviewStatus(a.review_status) === 'pending').length,
+        approved: ads.filter(a => normalizeReviewStatus(a.review_status) === 'approved').length,
+        rejected: ads.filter(a => normalizeReviewStatus(a.review_status) === 'rejected').length,
         totalImpressions: ads.reduce((sum, a) => sum + (a.impressions || 0), 0),
         totalClicks: ads.reduce((sum, a) => sum + (a.clicks || 0), 0),
         totalSpend: ads.reduce((sum, a) => sum + ((a.spend_minor || 0) / 100), 0)
@@ -323,9 +338,10 @@ const AdApprovals = () => {
     const handleViewDetails = async (ad) => {
         try {
             setLoading(true);
+            const id = getAdId(ad);
             const [detailsResponse, analyticsResponse] = await Promise.all([
-                adminGetAdDetails(ad.id),
-                adminGetAdAnalytics(ad.id)
+                adminGetAdDetails(id),
+                adminGetAdAnalytics(id)
             ]);
 
             const campaignDetails =
@@ -355,7 +371,7 @@ const AdApprovals = () => {
         if (selectedAds.length === filteredAds.length) {
             setSelectedAds([]);
         } else {
-            setSelectedAds(filteredAds.map(ad => ad.id));
+            setSelectedAds(filteredAds.map(ad => getAdId(ad)));
         }
     };
 
@@ -618,16 +634,16 @@ const AdApprovals = () => {
                         </tr>
                     ) : (
                         filteredAds.map(ad => (
-                            <tr key={ad.id} className={selectedAds.includes(ad.id) ? 'row-selected' : ''}>
+                            <tr key={getAdId(ad)} className={selectedAds.includes(getAdId(ad)) ? 'row-selected' : ''}>
                                 <td>
                                     <input
                                         type="checkbox"
-                                        checked={selectedAds.includes(ad.id)}
+                                        checked={selectedAds.includes(getAdId(ad))}
                                         onChange={(e) => {
                                             setSelectedAds(prev =>
                                                 e.target.checked
-                                                    ? [...prev, ad.id]
-                                                    : prev.filter(id => id !== ad.id)
+                                                    ? [...prev, getAdId(ad)]
+                                                    : prev.filter(id => id !== getAdId(ad))
                                             );
                                         }}
                                     />
@@ -654,18 +670,18 @@ const AdApprovals = () => {
                                 </td>
                                 <td>
                                     <div className="review-info">
-                                        <Badge variant={ad.review_status}>
-                                            {ad.review_status}
+                                        <Badge variant={normalizeReviewStatus(ad.review_status)}>
+                                            {normalizeReviewStatus(ad.review_status)}
                                         </Badge>
-                                        {ad.review_status === 'pending' && (
+                                        {normalizeReviewStatus(ad.review_status) === 'pending' && (
                                             <label className="override-toggle">
                                                 <input
                                                     type="checkbox"
-                                                    checked={Boolean(selectedOverride[ad.id])}
+                                                    checked={Boolean(selectedOverride[getAdId(ad)])}
                                                     onChange={(e) =>
                                                         setSelectedOverride(prev => ({
                                                             ...prev,
-                                                            [ad.id]: e.target.checked
+                                                            [getAdId(ad)]: e.target.checked
                                                         }))
                                                     }
                                                 />
@@ -703,11 +719,11 @@ const AdApprovals = () => {
                                             📋
                                         </button>
 
-                                        {ad.review_status === 'pending' && (
+                                        {normalizeReviewStatus(ad.review_status) === 'pending' && (
                                             <>
                                                 <button
                                                     className="btn btn-icon btn-success"
-                                                    onClick={() => handleApprove(ad.id)}
+                                                    onClick={() => handleApprove(getAdId(ad))}
                                                     title="Approve"
                                                     disabled={loading}
                                                 >
@@ -715,7 +731,7 @@ const AdApprovals = () => {
                                                 </button>
                                                 <button
                                                     className="btn btn-icon btn-danger"
-                                                    onClick={() => handleReject(ad.id)}
+                                                    onClick={() => handleReject(getAdId(ad))}
                                                     title="Reject"
                                                     disabled={loading}
                                                 >
@@ -724,10 +740,10 @@ const AdApprovals = () => {
                                             </>
                                         )}
 
-                                        {ad.status === 'active' && (
+                                        {normalizeStatus(ad.status) === 'active' && (
                                             <button
                                                 className="btn btn-icon btn-warning"
-                                                onClick={() => handlePauseAd(ad.id)}
+                                                onClick={() => handlePauseAd(getAdId(ad))}
                                                 title="Pause"
                                                 disabled={loading}
                                             >
@@ -735,10 +751,10 @@ const AdApprovals = () => {
                                             </button>
                                         )}
 
-                                        {ad.status === 'paused' && (
+                                        {normalizeStatus(ad.status) === 'paused' && (
                                             <button
                                                 className="btn btn-icon btn-success"
-                                                onClick={() => handleResumeAd(ad.id)}
+                                                onClick={() => handleResumeAd(getAdId(ad))}
                                                 title="Resume"
                                                 disabled={loading}
                                             >

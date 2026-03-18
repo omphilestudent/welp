@@ -1,6 +1,10 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+const isTestRun = process.env.NODE_ENV === 'test'
+    || process.argv.some((arg) => arg.includes('tests'))
+    || process.argv.some((arg) => arg.toLowerCase().includes('seed'));
+
 // ── Connection pool ────────────────────────────────────────────────────────────
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -18,17 +22,19 @@ pool.on('error', (err) => {
     console.error('❌ Unexpected database pool error:', err.message);
 });
 
-pool.connect((err, client, release) => {
-    if (err) {
-        console.error('❌ Error connecting to database:', err.message);
-        console.error('   → Check your DATABASE_URL in .env');
-        console.error('   → Make sure your Neon project is not suspended');
-        console.error('   → Verify you are using the POOLED connection string from Neon console');
-    } else {
-        console.log('✅ Successfully connected to Neon PostgreSQL database');
-        release();
-    }
-});
+if (!isTestRun) {
+    pool.connect((err, client, release) => {
+        if (err) {
+            console.error('❌ Error connecting to database:', err.message);
+            console.error('   → Check your DATABASE_URL in .env');
+            console.error('   → Make sure your Neon project is not suspended');
+            console.error('   → Verify you are using the POOLED connection string from Neon console');
+        } else {
+            console.log('✅ Successfully connected to Neon PostgreSQL database');
+            release();
+        }
+    });
+}
 
 // ── Table creation ─────────────────────────────────────────────────────────────
 const createTables = async () => {
@@ -666,6 +672,8 @@ const createTables = async () => {
                 name VARCHAR(255) NOT NULL,
                 email VARCHAR(255),
                 status VARCHAR(50) DEFAULT 'incomplete',
+                application_status VARCHAR(50) DEFAULT 'incomplete',
+                source VARCHAR(120),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -673,6 +681,8 @@ const createTables = async () => {
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
                 stage VARCHAR(50),
+                owner VARCHAR(120),
+                value NUMERIC,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -685,6 +695,104 @@ const createTables = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (app_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_page_users (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                page_id UUID NOT NULL REFERENCES kodi_pages(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                permissions JSONB DEFAULT '{}'::jsonb,
+                assigned_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (page_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS marketing_email_templates (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                key VARCHAR(120) UNIQUE NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                category VARCHAR(50) NOT NULL CHECK (category IN ('marketing','trigger')),
+                audience VARCHAR(50) NOT NULL,
+                subject TEXT NOT NULL,
+                preheader TEXT,
+                html_body TEXT NOT NULL,
+                text_body TEXT,
+                logo_asset_path TEXT DEFAULT 'logo-1.png',
+                is_active BOOLEAN DEFAULT true,
+                created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS marketing_campaigns (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                template_id UUID REFERENCES marketing_email_templates(id) ON DELETE SET NULL,
+                name VARCHAR(255) NOT NULL,
+                audience_type VARCHAR(50) NOT NULL CHECK (audience_type IN ('employee','psychologist')),
+                send_type VARCHAR(50) NOT NULL DEFAULT 'scheduled',
+                frequency_type VARCHAR(50) NOT NULL DEFAULT 'weekly',
+                days_of_week JSONB DEFAULT '[]'::jsonb,
+                is_active BOOLEAN DEFAULT true,
+                created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                last_run_at TIMESTAMP,
+                next_run_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS email_trigger_configs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                trigger_key VARCHAR(120) UNIQUE NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                is_enabled BOOLEAN DEFAULT true,
+                config JSONB DEFAULT '{}'::jsonb,
+                created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS email_delivery_logs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                template_id UUID REFERENCES marketing_email_templates(id) ON DELETE SET NULL,
+                campaign_id UUID REFERENCES marketing_campaigns(id) ON DELETE SET NULL,
+                trigger_key VARCHAR(120),
+                recipient_email TEXT NOT NULL,
+                recipient_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                recipient_type VARCHAR(50),
+                subject TEXT,
+                status VARCHAR(20) NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','sent','failed','skipped')),
+                provider_message_id TEXT,
+                error_message TEXT,
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sent_at TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS business_email_preferences (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                business_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+                allow_unregistered_review_emails BOOLEAN DEFAULT true,
+                stop_after_registration BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (business_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS scraped_business_emails (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                business_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+                business_name VARCHAR(255),
+                source_url TEXT,
+                email TEXT NOT NULL,
+                email_type VARCHAR(50) DEFAULT 'general',
+                confidence_score NUMERIC,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
 
@@ -1082,7 +1190,119 @@ const insertDefaultData = async () => {
                 features = EXCLUDED.features::jsonb,
                 limits = EXCLUDED.limits::jsonb,
                 metadata = EXCLUDED.metadata::jsonb,
-                updated_at = CURRENT_TIMESTAMP;
+                  updated_at = CURRENT_TIMESTAMP;
+          `);
+
+        await pool.query(`
+            INSERT INTO marketing_email_templates (key, name, category, audience, subject, preheader, html_body, text_body, logo_asset_path, is_active)
+            VALUES
+              ('employee_subscription_campaign','Employee Subscription Campaign','marketing','employee',
+               'Your employee support updates','Weekly updates from Welp',
+               '<p>Hi {{first_name}},</p><p>Here are the latest updates for your employee support plan.</p><p><a class="cta" href="{{register_link}}">View your dashboard</a></p>',
+               'Hi {{first_name}}, Here are the latest updates for your employee support plan.','logo-1.png',true),
+              ('psychologist_subscription_campaign','Psychologist Subscription Campaign','marketing','psychologist',
+               'Psychologist partner updates','Weekly updates from Welp',
+               '<p>Hi {{first_name}},</p><p>Here are the latest updates for your psychologist partner plan.</p><p><a class="cta" href="{{register_link}}">Open your dashboard</a></p>',
+               'Hi {{first_name}}, Here are the latest updates for your psychologist partner plan.','logo-1.png',true),
+              ('employee_product_participation','Employee Participation Campaign','marketing','employee',
+               'Join {{product_name}}','New participation campaign',
+               '<p>Hi {{first_name}},</p><p>We are inviting you to join {{product_name}}.</p><p><strong>Subscription:</strong> {{subscription_name}}</p><p><a class="cta" href="{{register_link}}">Get started</a></p>',
+               'Hi {{first_name}}, Join {{product_name}}. Subscription: {{subscription_name}}. Start here: {{register_link}}','logo-1.png',true),
+              ('employee_internal_offers','Employee Internal Offers','marketing','employee',
+               'Internal offers from Welp','Limited-time offers',
+               '<p>Hi {{first_name}},</p><p>We have internal offers available for you.</p><p><a class="cta" href="{{register_link}}">View offers</a></p>',
+               'Hi {{first_name}}, We have internal offers available. View offers: {{register_link}}','logo-1.png',true),
+              ('psychologist_product_participation','Psychologist Participation Campaign','marketing','psychologist',
+               'Participate in {{product_name}}','New participation campaign',
+               '<p>Hi {{first_name}},</p><p>We would love your participation in {{product_name}}.</p><p><strong>Program:</strong> {{subscription_name}}</p><p><a class="cta" href="{{register_link}}">Participate now</a></p>',
+               'Hi {{first_name}}, Participate in {{product_name}}. Program: {{subscription_name}}. Join: {{register_link}}','logo-1.png',true),
+              ('psychologist_internal_offers','Psychologist Internal Offers','marketing','psychologist',
+               'Internal partner offers','Latest partner incentives',
+               '<p>Hi {{first_name}},</p><p>Here are your latest partner incentives.</p><p><a class="cta" href="{{register_link}}">View incentives</a></p>',
+               'Hi {{first_name}}, Here are your latest partner incentives. View: {{register_link}}','logo-1.png',true),
+              ('business_unregistered_review_trigger','Business review outreach','trigger','business',
+               'A new review mentions {{company_name}}','Claim your business profile',
+               '<p>Hello,</p><p>A review was recently submitted for {{company_name}} on Welp.</p><p><a class="cta" href="{{register_link}}">Claim your business profile</a></p>',
+               'A review was submitted for {{company_name}}. Claim your profile: {{register_link}}','logo-1.png',true),
+              ('chat_notification_user_recipient','Chat reply notification (user)','trigger','employee',
+               'You have a new chat reply','New message waiting',
+               '<p>Hi {{first_name}},</p><p>You have a new chat reply waiting in Welp.</p><p><a class="cta" href="{{chat_link}}">Open chat</a></p>',
+               'You have a new chat reply. Open chat: {{chat_link}}','logo-1.png',true),
+              ('chat_notification_psychologist_recipient','Chat reply notification (psychologist)','trigger','psychologist',
+               'You have a new chat reply','New message waiting',
+               '<p>Hi {{first_name}},</p><p>You have a new chat reply waiting in Welp.</p><p><a class="cta" href="{{chat_link}}">Open chat</a></p>',
+               'You have a new chat reply. Open chat: {{chat_link}}','logo-1.png',true)
+            ON CONFLICT (key) DO NOTHING;
+        `);
+
+        await pool.query(`
+            INSERT INTO marketing_campaigns (template_id, name, audience_type, send_type, frequency_type, days_of_week, is_active)
+            SELECT t.id, 'Employee recurring campaign', 'employee', 'scheduled', 'weekly', '["Monday","Wednesday","Friday"]'::jsonb, true
+            FROM marketing_email_templates t
+            WHERE t.key = 'employee_subscription_campaign'
+              AND NOT EXISTS (SELECT 1 FROM marketing_campaigns c WHERE c.audience_type = 'employee');
+        `);
+
+        await pool.query(`
+            INSERT INTO marketing_campaigns (template_id, name, audience_type, send_type, frequency_type, days_of_week, is_active)
+            SELECT t.id, 'Psychologist recurring campaign', 'psychologist', 'scheduled', 'weekly', '["Monday","Wednesday","Friday"]'::jsonb, true
+            FROM marketing_email_templates t
+            WHERE t.key = 'psychologist_subscription_campaign'
+              AND NOT EXISTS (SELECT 1 FROM marketing_campaigns c WHERE c.audience_type = 'psychologist');
+        `);
+
+        await pool.query(`
+            INSERT INTO email_trigger_configs (trigger_key, name, description, is_enabled, config)
+            VALUES
+              ('business_unregistered_review_email','Business unregistered review outreach','Outreach emails for unregistered businesses',true,'{}'::jsonb),
+              ('chat_reply_notification_email','Chat reply notification','Notify chat recipient of new reply',true,'{}'::jsonb)
+            ON CONFLICT (trigger_key) DO NOTHING;
+        `);
+
+        await pool.query(`
+            INSERT INTO kodi_objects (name, label, description, metadata)
+            VALUES
+                ('contact', 'Contact', 'Primary contact records', '{"relationships":[{"type":"has_one","object":"subscription","field":"contact_id"}]}'::jsonb),
+                ('employee', 'Employee', 'Internal employee details', '{"relationships":[{"type":"belongs_to","object":"contact","field":"contact_id"}]}'::jsonb),
+                ('psychologist', 'Psychologist', 'Psychologist profile metadata', '{"relationships":[{"type":"belongs_to","object":"contact","field":"contact_id"}]}'::jsonb),
+                ('business_user', 'Business User', 'Business user metadata', '{"relationships":[{"type":"belongs_to","object":"contact","field":"contact_id"}]}'::jsonb),
+                ('subscription', 'Subscription', 'Subscription details', '{"relationships":[{"type":"belongs_to","object":"contact","field":"contact_id"}]}'::jsonb)
+            ON CONFLICT (name) DO UPDATE
+                SET label = EXCLUDED.label,
+                    description = EXCLUDED.description,
+                    metadata = COALESCE(EXCLUDED.metadata, kodi_objects.metadata);
+        `);
+
+        await pool.query(`
+            INSERT INTO kodi_fields (object_id, field_name, field_type, is_required, is_readonly)
+            SELECT id, field_name, field_type, is_required, is_readonly
+            FROM (
+                SELECT o.id, 'first_name' AS field_name, 'string' AS field_type, true AS is_required, false AS is_readonly FROM kodi_objects o WHERE o.name = 'contact'
+                UNION ALL SELECT o.id, 'surname', 'string', true, false FROM kodi_objects o WHERE o.name = 'contact'
+                UNION ALL SELECT o.id, 'email', 'string', true, false FROM kodi_objects o WHERE o.name = 'contact'
+                UNION ALL SELECT o.id, 'phone_number', 'string', false, false FROM kodi_objects o WHERE o.name = 'contact'
+                UNION ALL SELECT o.id, 'contact_id', 'uuid', true, true FROM kodi_objects o WHERE o.name = 'employee'
+                UNION ALL SELECT o.id, 'role', 'string', false, false FROM kodi_objects o WHERE o.name = 'employee'
+                UNION ALL SELECT o.id, 'department', 'string', false, false FROM kodi_objects o WHERE o.name = 'employee'
+                UNION ALL SELECT o.id, 'status', 'string', false, false FROM kodi_objects o WHERE o.name = 'employee'
+                UNION ALL SELECT o.id, 'contact_id', 'uuid', true, true FROM kodi_objects o WHERE o.name = 'psychologist'
+                UNION ALL SELECT o.id, 'specialty', 'string', false, false FROM kodi_objects o WHERE o.name = 'psychologist'
+                UNION ALL SELECT o.id, 'availability', 'string', false, false FROM kodi_objects o WHERE o.name = 'psychologist'
+                UNION ALL SELECT o.id, 'kyc_status', 'string', false, false FROM kodi_objects o WHERE o.name = 'psychologist'
+                UNION ALL SELECT o.id, 'contact_id', 'uuid', true, true FROM kodi_objects o WHERE o.name = 'business_user'
+                UNION ALL SELECT o.id, 'business_name', 'string', true, false FROM kodi_objects o WHERE o.name = 'business_user'
+                UNION ALL SELECT o.id, 'industry', 'string', false, false FROM kodi_objects o WHERE o.name = 'business_user'
+                UNION ALL SELECT o.id, 'approval_status', 'string', false, false FROM kodi_objects o WHERE o.name = 'business_user'
+                UNION ALL SELECT o.id, 'contact_id', 'uuid', true, true FROM kodi_objects o WHERE o.name = 'subscription'
+                UNION ALL SELECT o.id, 'plan_type', 'string', false, false FROM kodi_objects o WHERE o.name = 'subscription'
+                UNION ALL SELECT o.id, 'status', 'string', false, false FROM kodi_objects o WHERE o.name = 'subscription'
+                UNION ALL SELECT o.id, 'start_date', 'date', false, false FROM kodi_objects o WHERE o.name = 'subscription'
+                UNION ALL SELECT o.id, 'end_date', 'date', false, false FROM kodi_objects o WHERE o.name = 'subscription'
+            ) field_defs
+            ON CONFLICT (object_id, field_name) DO UPDATE
+                SET field_type = EXCLUDED.field_type,
+                    is_required = EXCLUDED.is_required,
+                    is_readonly = EXCLUDED.is_readonly;
         `);
 
         await pool.query(`
@@ -1149,6 +1369,12 @@ const runMigrations = async () => {
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS new_values JSONB;",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;",
             "ALTER TABLE audit_logs ALTER COLUMN metadata SET DEFAULT '{}'::jsonb;",
+            // Kodi leads/opportunities enrichment
+            "ALTER TABLE leads ADD COLUMN IF NOT EXISTS application_status VARCHAR(50) DEFAULT 'incomplete';",
+            "ALTER TABLE leads ALTER COLUMN application_status SET DEFAULT 'incomplete';",
+            "ALTER TABLE leads ADD COLUMN IF NOT EXISTS source VARCHAR(120);",
+            "ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS owner VARCHAR(120);",
+            "ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS value NUMERIC;",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;",
@@ -1726,7 +1952,11 @@ const setupDatabase = async () => {
     await insertDefaultData();
 };
 
-setupDatabase();
+if (!isTestRun) {
+    setupDatabase();
+} else {
+    console.log('🧪 Skipping database setup for test run');
+}
 
 // ── Exports ────────────────────────────────────────────────────────────────────
 module.exports = {

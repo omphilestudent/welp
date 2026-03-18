@@ -1,0 +1,4479 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R 20 0 R 22 0 R 24 0 R 26 0 R 28 0 R 30 0 R 32 0 R 34 0 R 36 0 R 38 0 R 40 0 R 42 0 R 44 0 R 46 0 R 48 0 R 50 0 R 52 0 R 54 0 R 56 0 R 58 0 R 60 0 R 62 0 R 64 0 R 66 0 R] /Count 32 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+5 0 obj
+<< /Length 2816 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(Kodi Builder + Kodi Portal Code Diffs) Tj
+T*
+(========================================) Tj
+T*
+(Generated: 2026-03-18T19:26:53) Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/pages/kodi/KodiBuilderPage.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/pages/kodi/KodiBuilderPage.jsx) Tj
+T*
+(import React, { useEffect, useMemo, useState } from 'react';) Tj
+T*
+(import { useNavigate, useParams } from 'react-router-dom';) Tj
+T*
+(import toast from 'react-hot-toast';) Tj
+T*
+(import Loading from '../../components/common/Loading';) Tj
+T*
+(import BuilderCanvas from '../../components/kodi/BuilderCanvas';) Tj
+T*
+(import ComponentLibrary from '../../components/kodi/ComponentLibrary';) Tj
+T*
+(import ConfigSidebar from '../../components/kodi/ConfigSidebar';) Tj
+T*
+(import LayoutSwitcher from '../../components/kodi/LayoutSwitcher';) Tj
+T*
+(import AppLinkModal from '../../components/kodi/AppLinkModal';) Tj
+T*
+(import CreatePageModal from '../../components/kodi/CreatePageModal';) Tj
+T*
+(import {) Tj
+T*
+(    activatePlatformPage,) Tj
+T*
+(    createPlatformPage,) Tj
+T*
+(    linkPlatformPage,) Tj
+T*
+(    listPlatformApps,) Tj
+T*
+(    listPlatformComponents,) Tj
+T*
+(    listPlatformObjects,) Tj
+T*
+(    listPlatformPages,) Tj
+T*
+(    updatePlatformLayout) Tj
+T*
+(} from '../../services/kodiPageService';) Tj
+T*
+(import './KodiBuilder.css';) Tj
+T*
+() Tj
+T*
+(const DEFAULT_LAYOUT = {) Tj
+T*
+(    type: '1-column',) Tj
+T*
+(    orientation: 'horizontal',) Tj
+T*
+(    rows: [) Tj
+T*
+(        {) Tj
+T*
+(            id: 'row-1',) Tj
+T*
+(            columns: [{ id: 'col-1', width: 12, components: [] }]) Tj
+T*
+(        }) Tj
+T*
+(    ]) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(const cloneLayout = \(layout\) => \({) Tj
+T*
+(    ...layout,) Tj
+T*
+(    rows: \(layout.rows || []\).map\(\(row\) => \({) Tj
+T*
+(        ...row,) Tj
+T*
+(        columns: \(row.columns || []\).map\(\(col\) => \({) Tj
+T*
+(            ...col,) Tj
+T*
+(            components: \(col.components || []\).map\(\(component\) => \({) Tj
+T*
+(                ...component,) Tj
+T*
+(                layout: { width: 6, height: 2, minWidth: 2, maxWidth: 12, ...\(component.layout || {}\) },) Tj
+T*
+(                binding: { ...\(component.binding || {}\) },) Tj
+T*
+(                style: { ...\(component.style || {}\) },) Tj
+T*
+(                permissions: { ...\(component.permissions || {}\) }) Tj
+T*
+(            }\)\)) Tj
+T*
+(        }\)\)) Tj
+T*
+(    }\)\)) Tj
+T*
+(}\);) Tj
+T*
+() Tj
+T*
+(const reflowColumns = \(layout, columnsPerRow\) => {) Tj
+T*
+(    const flatComponents = [];) Tj
+T*
+(    layout.rows.forEach\(\(row\) => {) Tj
+T*
+(        row.columns.forEach\(\(col\) => {) Tj
+T*
+(            \(col.components || []\).forEach\(\(comp\) => flatComponents.push\(comp\)\);) Tj
+T*
+(        }\);) Tj
+T*
+(    }\);) Tj
+T*
+() Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 7 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+7 0 obj
+<< /Length 3166 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(    const rows = [];) Tj
+T*
+(    let index = 0;) Tj
+T*
+(    while \(index < flatComponents.length || rows.length === 0\) {) Tj
+T*
+(        const columns = Array.from\({ length: columnsPerRow }\).map\(\(_, colIndex\) => \({) Tj
+T*
+(            id: `col-${rows.length}-${colIndex}`,) Tj
+T*
+(            width: Math.floor\(12 / columnsPerRow\),) Tj
+T*
+(            components: []) Tj
+T*
+(        }\)\);) Tj
+T*
+(        columns.forEach\(\(col\) => {) Tj
+T*
+(            if \(flatComponents[index]\) {) Tj
+T*
+(                col.components.push\(flatComponents[index]\);) Tj
+T*
+(                index += 1;) Tj
+T*
+(            }) Tj
+T*
+(        }\);) Tj
+T*
+(        rows.push\({ id: `row-${rows.length}`, columns }\);) Tj
+T*
+(        if \(flatComponents.length === 0\) break;) Tj
+T*
+(    }) Tj
+T*
+() Tj
+T*
+(    return { ...layout, rows };) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(const KodiBuilderPage = \(\) => {) Tj
+T*
+(    const { pageId } = useParams\(\);) Tj
+T*
+(    const navigate = useNavigate\(\);) Tj
+T*
+(    const [loading, setLoading] = useState\(true\);) Tj
+T*
+(    const [pages, setPages] = useState\([]\);) Tj
+T*
+(    const [components, setComponents] = useState\([]\);) Tj
+T*
+(    const [objects, setObjects] = useState\([]\);) Tj
+T*
+(    const [layout, setLayout] = useState\(DEFAULT_LAYOUT\);) Tj
+T*
+(    const [selectedComponent, setSelectedComponent] = useState\(null\);) Tj
+T*
+(    const [selectedPosition, setSelectedPosition] = useState\(null\);) Tj
+T*
+(    const [saving, setSaving] = useState\(false\);) Tj
+T*
+(    const [linkModalOpen, setLinkModalOpen] = useState\(false\);) Tj
+T*
+(    const [apps, setApps] = useState\([]\);) Tj
+T*
+(    const [appsLoading, setAppsLoading] = useState\(false\);) Tj
+T*
+(    const [selectedAppId, setSelectedAppId] = useState\(''\);) Tj
+T*
+(    const [createModalOpen, setCreateModalOpen] = useState\(false\);) Tj
+T*
+(    const [previewRole, setPreviewRole] = useState\('admin'\);) Tj
+T*
+() Tj
+T*
+(    const currentPage = useMemo\(\(\) => pages.find\(\(page\) => String\(page.id\) === String\(pageId\)\), [pages, pageId]\);) Tj
+T*
+() Tj
+T*
+(    const loadData = async \(\) => {) Tj
+T*
+(        setLoading\(true\);) Tj
+T*
+(        try {) Tj
+T*
+(            const [pagesData, componentsData, objectsData] = await Promise.all\([) Tj
+T*
+(                listPlatformPages\(\),) Tj
+T*
+(                listPlatformComponents\(\),) Tj
+T*
+(                listPlatformObjects\(\)) Tj
+T*
+(            ]\);) Tj
+T*
+(            setPages\(pagesData || []\);) Tj
+T*
+(            setComponents\(componentsData || []\);) Tj
+T*
+(            setObjects\(objectsData || []\);) Tj
+T*
+(            const page = \(pagesData || []\).find\(\(item\) => String\(item.id\) === String\(pageId\)\);) Tj
+T*
+(            setLayout\(cloneLayout\(page?.layout || DEFAULT_LAYOUT\)\);) Tj
+T*
+(        } catch \(error\) {) Tj
+T*
+(            toast.error\(error?.response?.data?.error || 'Failed to load builder data'\);) Tj
+T*
+(        } finally {) Tj
+T*
+(            setLoading\(false\);) Tj
+T*
+(        }) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    useEffect\(\(\) => {) Tj
+T*
+(        loadData\(\);) Tj
+T*
+(    }, [pageId]\);) Tj
+T*
+() Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 9 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+9 0 obj
+<< /Length 3164 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(    const updateLayout = \(updater\) => {) Tj
+T*
+(        setLayout\(\(prev\) => {) Tj
+T*
+(            const next = cloneLayout\(prev\);) Tj
+T*
+(            updater\(next\);) Tj
+T*
+(            return next;) Tj
+T*
+(        }\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleComponentDrop = \({ source, target, component }\) => {) Tj
+T*
+(        updateLayout\(\(draft\) => {) Tj
+T*
+(            const targetCol = draft.rows[target.rowIndex]?.columns[target.colIndex];) Tj
+T*
+(            if \(!targetCol\) return;) Tj
+T*
+() Tj
+T*
+(            let payload = component;) Tj
+T*
+(            if \(source\) {) Tj
+T*
+(                const sourceCol = draft.rows[source.rowIndex]?.columns[source.colIndex];) Tj
+T*
+(                if \(!sourceCol\) return;) Tj
+T*
+(                payload = sourceCol.components.splice\(source.compIndex, 1\)[0];) Tj
+T*
+(            }) Tj
+T*
+(            if \(!payload\) return;) Tj
+T*
+() Tj
+T*
+(            const instance = source) Tj
+T*
+(                ? payload) Tj
+T*
+(                : {) Tj
+T*
+(                    ...payload,) Tj
+T*
+(                    instanceId: `${payload.name}-${Date.now\(\)}-${Math.random\(\).toString\(36\).slice\(2, 6\)}`,) Tj
+T*
+(                    label: payload.label,) Tj
+T*
+(                    component_type: payload.name,) Tj
+T*
+(                    layout: payload.defaultLayout || { width: 6, height: 2, minWidth: 2, maxWidth: 12 },) Tj
+T*
+(                    props: payload.defaultProps || {},) Tj
+T*
+(                    binding: {},) Tj
+T*
+(                    visibilityRule: {},) Tj
+T*
+(                    permissions: { roles: [] },) Tj
+T*
+(                    actions: [],) Tj
+T*
+(                    style: {}) Tj
+T*
+(                };) Tj
+T*
+() Tj
+T*
+(            const insertAt = target.targetIndex ?? targetCol.components.length;) Tj
+T*
+(            const adjustedIndex =) Tj
+T*
+(                source &&) Tj
+T*
+(                source.rowIndex === target.rowIndex &&) Tj
+T*
+(                source.colIndex === target.colIndex &&) Tj
+T*
+(                insertAt > source.compIndex) Tj
+T*
+(                    ? insertAt - 1) Tj
+T*
+(                    : insertAt;) Tj
+T*
+(            targetCol.components.splice\(adjustedIndex, 0, instance\);) Tj
+T*
+(            setSelectedComponent\(instance\);) Tj
+T*
+(            setSelectedPosition\({ rowIndex: target.rowIndex, colIndex: target.colIndex, compIndex: adjustedIndex }\);) Tj
+T*
+(        }\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleSelectComponent = \(component, position\) => {) Tj
+T*
+(        setSelectedComponent\(component\);) Tj
+T*
+(        setSelectedPosition\(position\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleUpdateSelected = \(next\) => {) Tj
+T*
+(        if \(!selectedPosition\) return;) Tj
+T*
+(        updateLayout\(\(draft\) => {) Tj
+T*
+(            const target = draft.rows[selectedPosition.rowIndex]?.columns[selectedPosition.colIndex]?.components[selectedPosition.compIndex];) Tj
+T*
+(            if \(!target\) return;) Tj
+T*
+(            Object.assign\(target, next\);) Tj
+T*
+(            setSelectedComponent\(target\);) Tj
+T*
+(        }\);) Tj
+T*
+(    };) Tj
+ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 11 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+11 0 obj
+<< /Length 2703 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+() Tj
+T*
+(    const handleSave = async \(\) => {) Tj
+T*
+(        if \(!currentPage\) return;) Tj
+T*
+(        setSaving\(true\);) Tj
+T*
+(        try {) Tj
+T*
+(            await updatePlatformLayout\(currentPage.id, layout\);) Tj
+T*
+(            toast.success\('Layout saved'\);) Tj
+T*
+(        } catch \(error\) {) Tj
+T*
+(            toast.error\(error?.response?.data?.error || 'Save failed'\);) Tj
+T*
+(        } finally {) Tj
+T*
+(            setSaving\(false\);) Tj
+T*
+(        }) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleActivate = async \(\) => {) Tj
+T*
+(        if \(!currentPage\) return;) Tj
+T*
+(        try {) Tj
+T*
+(            await activatePlatformPage\(currentPage.id\);) Tj
+T*
+(            toast.success\('Page activated'\);) Tj
+T*
+(            loadData\(\);) Tj
+T*
+(        } catch \(error\) {) Tj
+T*
+(            toast.error\(error?.response?.data?.error || 'Activation failed'\);) Tj
+T*
+(        }) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const openLinkModal = async \(\) => {) Tj
+T*
+(        setLinkModalOpen\(true\);) Tj
+T*
+(        setAppsLoading\(true\);) Tj
+T*
+(        try {) Tj
+T*
+(            const data = await listPlatformApps\(\);) Tj
+T*
+(            setApps\(data || []\);) Tj
+T*
+(        } catch \(error\) {) Tj
+T*
+(            toast.error\('Failed to load apps'\);) Tj
+T*
+(        } finally {) Tj
+T*
+(            setAppsLoading\(false\);) Tj
+T*
+(        }) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleLink = async \(\) => {) Tj
+T*
+(        if \(!selectedAppId || !currentPage\) return;) Tj
+T*
+(        try {) Tj
+T*
+(            await linkPlatformPage\(currentPage.id, selectedAppId\);) Tj
+T*
+(            toast.success\('Page linked'\);) Tj
+T*
+(            setLinkModalOpen\(false\);) Tj
+T*
+(            setSelectedAppId\(''\);) Tj
+T*
+(            loadData\(\);) Tj
+T*
+(        } catch \(error\) {) Tj
+T*
+(            toast.error\(error?.response?.data?.error || 'Link failed'\);) Tj
+T*
+(        }) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleLayoutChange = \(patch\) => {) Tj
+T*
+(        setLayout\(\(prev\) => {) Tj
+T*
+(            let next = { ...prev, ...patch };) Tj
+T*
+(            if \(patch.type\) {) Tj
+T*
+(                const columns = patch.type === '3-column' ? 3 : patch.type === '2-column' ? 2 : 1;) Tj
+T*
+(                next = reflowColumns\(next, columns\);) Tj
+T*
+(            }) Tj
+T*
+(            if \(patch.orientation === 'mixed'\) {) Tj
+T*
+(                next.rows = next.rows.map\(\(row, index\) => \({) Tj
+T*
+(                    ...row,) Tj
+T*
+(                    orientation: index % 2 === 0 ? 'horizontal' : 'vertical') Tj
+T*
+(                }\)\);) Tj
+T*
+(            }) Tj
+T*
+(            return next;) Tj
+ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 13 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+13 0 obj
+<< /Length 3415 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(        }\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleCreatePage = async \(payload\) => {) Tj
+T*
+(        try {) Tj
+T*
+(            const page = await createPlatformPage\(payload\);) Tj
+T*
+(            toast.success\('Page created'\);) Tj
+T*
+(            navigate\(`/kodi/builder/${page.id}`\);) Tj
+T*
+(        } catch \(error\) {) Tj
+T*
+(            toast.error\(error?.response?.data?.error || 'Failed to create page'\);) Tj
+T*
+(        } finally {) Tj
+T*
+(            setCreateModalOpen\(false\);) Tj
+T*
+(        }) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    if \(loading\) {) Tj
+T*
+(        return \() Tj
+T*
+(            <div className="kodi-builder">) Tj
+T*
+(                <Loading />) Tj
+T*
+(            </div>) Tj
+T*
+(        \);) Tj
+T*
+(    }) Tj
+T*
+() Tj
+T*
+(    return \() Tj
+T*
+(        <div className="kodi-builder">) Tj
+T*
+(            <header className="kodi-builder__toolbar">) Tj
+T*
+(                <div>) Tj
+T*
+(                    <h1>{currentPage?.label || 'Kodi Builder'}</h1>) Tj
+T*
+(                    <p>Status: {currentPage?.status || 'draft'}</p>) Tj
+T*
+(                </div>) Tj
+T*
+(                <div className="kodi-builder__toolbar-actions">) Tj
+T*
+(                    <select value={previewRole} onChange={\(e\) => setPreviewRole\(e.target.value\)}>) Tj
+T*
+(                        <option value="admin">Admin</option>) Tj
+T*
+(                        <option value="employee">Employee</option>) Tj
+T*
+(                        <option value="psychologist">Psychologist</option>) Tj
+T*
+(                        <option value="business_user">Business User</option>) Tj
+T*
+(                    </select>) Tj
+T*
+(                    <button className="btn-secondary" onClick={\(\) => navigate\('/kodi/times'\)}>Back to Times</button>) Tj
+T*
+(                    <button className="btn-secondary" onClick={\(\) => setCreateModalOpen\(true\)}>Create Page</button>) Tj
+T*
+(                    <button className="btn-secondary" onClick={\(\) => window.open\(`/kodi/runtime/${pageId}`, '_blank'\)}>Preview Runtime</button>) Tj
+T*
+(                    <button className="btn-secondary" onClick={openLinkModal}>Link to App</button>) Tj
+T*
+(                    <button className="btn-secondary" onClick={handleActivate}>Activate Page</button>) Tj
+T*
+(                    <button className="btn-primary" onClick={handleSave} disabled={saving}>) Tj
+T*
+(                        {saving ? 'Saving...' : 'Save Layout'}) Tj
+T*
+(                    </button>) Tj
+T*
+(                </div>) Tj
+T*
+(            </header>) Tj
+T*
+() Tj
+T*
+(            <LayoutSwitcher) Tj
+T*
+(                layoutType={layout.type}) Tj
+T*
+(                orientation={layout.orientation}) Tj
+T*
+(                onChange={handleLayoutChange}) Tj
+T*
+(            />) Tj
+T*
+() Tj
+T*
+(            <div className="kodi-builder__content">) Tj
+T*
+(                <ComponentLibrary) Tj
+T*
+(                    components={components}) Tj
+T*
+(                    onDragStart={\(event, component\) => {) Tj
+T*
+(                        event.dataTransfer.setData\('kodi-component-library', JSON.stringify\(component\)\);) Tj
+T*
+(                        event.dataTransfer.effectAllowed = 'copy';) Tj
+T*
+(                    }}) Tj
+T*
+(                />) Tj
+T*
+(                <BuilderCanvas) Tj
+T*
+(                    layout={layout}) Tj
+T*
+(                    selected={selectedComponent}) Tj
+ET
+endstream
+endobj
+14 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 15 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+15 0 obj
+<< /Length 2708 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(                    onSelectComponent={handleSelectComponent}) Tj
+T*
+(                    onLayoutChange={updateLayout}) Tj
+T*
+(                    onComponentDrop={handleComponentDrop}) Tj
+T*
+(                    previewRole={previewRole}) Tj
+T*
+(                />) Tj
+T*
+(                <ConfigSidebar) Tj
+T*
+(                    component={selectedComponent}) Tj
+T*
+(                    objects={objects}) Tj
+T*
+(                    onUpdate={handleUpdateSelected}) Tj
+T*
+(                    onClose={\(\) => setSelectedComponent\(null\)}) Tj
+T*
+(                />) Tj
+T*
+(            </div>) Tj
+T*
+() Tj
+T*
+(            <AppLinkModal) Tj
+T*
+(                open={linkModalOpen}) Tj
+T*
+(                apps={apps}) Tj
+T*
+(                loading={appsLoading}) Tj
+T*
+(                selectedId={selectedAppId}) Tj
+T*
+(                onSelect={setSelectedAppId}) Tj
+T*
+(                onClose={\(\) => setLinkModalOpen\(false\)}) Tj
+T*
+(                onSubmit={handleLink}) Tj
+T*
+(            />) Tj
+T*
+() Tj
+T*
+(            <CreatePageModal) Tj
+T*
+(                open={createModalOpen}) Tj
+T*
+(                onClose={\(\) => setCreateModalOpen\(false\)}) Tj
+T*
+(                onSubmit={handleCreatePage}) Tj
+T*
+(            />) Tj
+T*
+(        </div>) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default KodiBuilderPage;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/BuilderCanvas.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/BuilderCanvas.jsx) Tj
+T*
+(import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';) Tj
+T*
+(import ResizeHandle from './ResizeHandle';) Tj
+T*
+() Tj
+T*
+(const GRID_COLUMNS = 12;) Tj
+T*
+() Tj
+T*
+(const clamp = \(value, min, max\) => Math.min\(Math.max\(value, min\), max\);) Tj
+T*
+() Tj
+T*
+(const BuilderCanvas = \({) Tj
+T*
+(    layout,) Tj
+T*
+(    selected,) Tj
+T*
+(    onSelectComponent,) Tj
+T*
+(    onLayoutChange,) Tj
+T*
+(    onComponentDrop,) Tj
+T*
+(    previewRole) Tj
+T*
+(}\) => {) Tj
+T*
+(    const canvasRef = useRef\(null\);) Tj
+T*
+(    const [dragOver, setDragOver] = useState\(null\);) Tj
+T*
+(    const [resizeState, setResizeState] = useState\(null\);) Tj
+T*
+() Tj
+T*
+(    const handleDragStart = \(event, position\) => {) Tj
+T*
+(        event.dataTransfer.setData\('kodi-component-instance', JSON.stringify\(position\)\);) Tj
+T*
+(        event.dataTransfer.effectAllowed = 'move';) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleDrop = \(event, rowIndex, colIndex, targetIndex\) => {) Tj
+T*
+(        event.preventDefault\(\);) Tj
+T*
+(        const instancePayload = event.dataTransfer.getData\('kodi-component-instance'\);) Tj
+ET
+endstream
+endobj
+16 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 17 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+17 0 obj
+<< /Length 3199 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(        const libraryPayload = event.dataTransfer.getData\('kodi-component-library'\);) Tj
+T*
+(        if \(instancePayload\) {) Tj
+T*
+(            onComponentDrop?.\({) Tj
+T*
+(                source: JSON.parse\(instancePayload\),) Tj
+T*
+(                target: { rowIndex, colIndex, targetIndex }) Tj
+T*
+(            }\);) Tj
+T*
+(        } else if \(libraryPayload\) {) Tj
+T*
+(            onComponentDrop?.\({) Tj
+T*
+(                source: null,) Tj
+T*
+(                target: { rowIndex, colIndex, targetIndex },) Tj
+T*
+(                component: JSON.parse\(libraryPayload\)) Tj
+T*
+(            }\);) Tj
+T*
+(        }) Tj
+T*
+(        setDragOver\(null\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const handleResize = useCallback\(\(event\) => {) Tj
+T*
+(        if \(!resizeState\) return;) Tj
+T*
+(        event.preventDefault\(\);) Tj
+T*
+(        const { start, component, position, type } = resizeState;) Tj
+T*
+(        const deltaX = event.clientX - start.x;) Tj
+T*
+(        const deltaY = event.clientY - start.y;) Tj
+T*
+(        const colWidth = 56;) Tj
+T*
+(        const rowHeight = 48;) Tj
+T*
+(        let nextWidth = component.layout?.width || 6;) Tj
+T*
+(        let nextHeight = component.layout?.height || 2;) Tj
+T*
+(        if \(type === 'width' || type === 'both'\) {) Tj
+T*
+(            nextWidth = clamp\() Tj
+T*
+(                nextWidth + Math.round\(deltaX / colWidth\),) Tj
+T*
+(                component.layout?.minWidth || 2,) Tj
+T*
+(                component.layout?.maxWidth || GRID_COLUMNS) Tj
+T*
+(            \);) Tj
+T*
+(        }) Tj
+T*
+(        if \(type === 'height' || type === 'both'\) {) Tj
+T*
+(            nextHeight = clamp\(nextHeight + Math.round\(deltaY / rowHeight\), 1, 12\);) Tj
+T*
+(        }) Tj
+T*
+(        onLayoutChange?.\(\(draft\) => {) Tj
+T*
+(            const target = draft.rows[position.rowIndex]?.columns[position.colIndex]?.components[position.compIndex];) Tj
+T*
+(            if \(!target\) return;) Tj
+T*
+(            target.layout = { ...target.layout, width: nextWidth, height: nextHeight };) Tj
+T*
+(        }\);) Tj
+T*
+(    }, [resizeState, onLayoutChange]\);) Tj
+T*
+() Tj
+T*
+(    const stopResize = useCallback\(\(\) => {) Tj
+T*
+(        if \(resizeState\) setResizeState\(null\);) Tj
+T*
+(    }, [resizeState]\);) Tj
+T*
+() Tj
+T*
+(    useEffect\(\(\) => {) Tj
+T*
+(        if \(!resizeState\) return undefined;) Tj
+T*
+(        window.addEventListener\('mousemove', handleResize\);) Tj
+T*
+(        window.addEventListener\('mouseup', stopResize\);) Tj
+T*
+(        return \(\) => {) Tj
+T*
+(            window.removeEventListener\('mousemove', handleResize\);) Tj
+T*
+(            window.removeEventListener\('mouseup', stopResize\);) Tj
+T*
+(        };) Tj
+T*
+(    }, [handleResize, stopResize, resizeState]\);) Tj
+T*
+() Tj
+T*
+(    const gridTemplate = useMemo\(\(\) => `repeat\(${GRID_COLUMNS}, minmax\(0, 1fr\)\)`, []\);) Tj
+T*
+(    const hasPermission = \(component\) => {) Tj
+T*
+(        const roles = component?.permissions?.roles;) Tj
+T*
+(        if \(!previewRole || !roles || roles.length === 0\) return true;) Tj
+T*
+(        return roles.includes\(previewRole\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    return \() Tj
+ET
+endstream
+endobj
+18 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 19 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+19 0 obj
+<< /Length 5709 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(        <section className="kodi-builder__canvas" ref={canvasRef}>) Tj
+T*
+(            {\(layout?.rows || []\).map\(\(row, rowIndex\) => {) Tj
+T*
+(                const orientation = row.orientation || layout.orientation || 'horizontal';) Tj
+T*
+(                return \() Tj
+T*
+(                    <div key={row.id || rowIndex} className={`kodi-builder__row kodi-builder__row--${orientation}`}>) Tj
+T*
+(                        {\(row.columns || []\).map\(\(column, colIndex\) => \() Tj
+T*
+(                            <div) Tj
+T*
+(                                key={column.id || `${rowIndex}-${colIndex}`}) Tj
+T*
+(                                className={`kodi-builder__column ${dragOver === `${rowIndex}-${colIndex}` ? 'is-over' : ''}`}) Tj
+T*
+(                                onDragOver={\(event\) => event.preventDefault\(\)}) Tj
+T*
+(                                onDragEnter={\(\) => setDragOver\(`${rowIndex}-${colIndex}`\)}) Tj
+T*
+(                                onDragLeave={\(\) => setDragOver\(null\)}) Tj
+T*
+(                                onDrop={\(event\) => handleDrop\(event, rowIndex, colIndex, \(column.components || []\).length\)}) Tj
+T*
+(                            >) Tj
+T*
+(                                <div) Tj
+T*
+(                                    className="kodi-builder__column-grid") Tj
+T*
+(                                    style={{ gridTemplateColumns: gridTemplate }}) Tj
+T*
+(                                >) Tj
+T*
+(                                    {\(column.components || []\).map\(\(component, compIndex\) => {) Tj
+T*
+(                                        const layoutConfig = component.layout || {};) Tj
+T*
+(                                        const isSelected = selected?.instanceId === component.instanceId;) Tj
+T*
+(                                        const gridColumn = `span ${layoutConfig.width || 6}`;) Tj
+T*
+(                                        const gridRow = `span ${layoutConfig.height || 2}`;) Tj
+T*
+(                                        return \() Tj
+T*
+(                                            <div) Tj
+T*
+(                                                key={component.instanceId || `${rowIndex}-${colIndex}-${compIndex}`}) Tj
+T*
+(                                                className={`kodi-builder__component ${isSelected ? 'is-selected' : ''} ${!hasPermission\(component\) ? 'is-hidden' : ''}`}) Tj
+T*
+(                                                style={{ gridColumn, gridRow }}) Tj
+T*
+(                                                draggable) Tj
+T*
+(                                                onDragStart={\(event\) =>) Tj
+T*
+(                                                    handleDragStart\(event, { rowIndex, colIndex, compIndex }\)) Tj
+T*
+(                                                }) Tj
+T*
+(                                                onClick={\(\) => onSelectComponent?.\(component, { rowIndex, colIndex, compIndex }\)}) Tj
+T*
+(                                                onDrop={\(event\) => handleDrop\(event, rowIndex, colIndex, compIndex\)}) Tj
+T*
+(                                                onDragOver={\(event\) => event.preventDefault\(\)}) Tj
+T*
+(                                            >) Tj
+T*
+(                                                <div className="kodi-builder__component-header">) Tj
+T*
+(                                                    <strong>{component.label || component.name}</strong>) Tj
+T*
+(                                                    <span>{component.component_type}</span>) Tj
+T*
+(                                                </div>) Tj
+T*
+(                                                <div className="kodi-builder__component-body">) Tj
+T*
+(                                                    <p>{hasPermission\(component\) ? \(component.description || 'Drag to reorder or resize.'\) : 'Hidden by permissions'}</p>) Tj
+T*
+(                                                </div>) Tj
+T*
+(                                                <ResizeHandle) Tj
+T*
+(                                                    direction="width") Tj
+T*
+(                                                    onResizeStart={\(start\) =>) Tj
+T*
+(                                                        setResizeState\({) Tj
+T*
+(                                                            start,) Tj
+T*
+(                                                            component,) Tj
+T*
+(                                                            position: { rowIndex, colIndex, compIndex },) Tj
+T*
+(                                                            type: 'width') Tj
+T*
+(                                                        }\)) Tj
+T*
+(                                                    }) Tj
+T*
+(                                                />) Tj
+T*
+(                                                <ResizeHandle) Tj
+T*
+(                                                    direction="height") Tj
+T*
+(                                                    onResizeStart={\(start\) =>) Tj
+T*
+(                                                        setResizeState\({) Tj
+T*
+(                                                            start,) Tj
+T*
+(                                                            component,) Tj
+T*
+(                                                            position: { rowIndex, colIndex, compIndex },) Tj
+T*
+(                                                            type: 'height') Tj
+T*
+(                                                        }\)) Tj
+T*
+(                                                    }) Tj
+T*
+(                                                />) Tj
+ET
+endstream
+endobj
+20 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 21 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+21 0 obj
+<< /Length 3162 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(                                            </div>) Tj
+T*
+(                                        \);) Tj
+T*
+(                                    }\)}) Tj
+T*
+(                                </div>) Tj
+T*
+(                                {\(column.components || []\).length === 0 && \() Tj
+T*
+(                                    <div className="kodi-builder__column-empty">Drop components here</div>) Tj
+T*
+(                                \)}) Tj
+T*
+(                            </div>) Tj
+T*
+(                        \)\)}) Tj
+T*
+(                    </div>) Tj
+T*
+(                \);) Tj
+T*
+(            }\)}) Tj
+T*
+(        </section>) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default BuilderCanvas;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/ComponentLibrary.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/ComponentLibrary.jsx) Tj
+T*
+(import React, { useMemo, useState } from 'react';) Tj
+T*
+() Tj
+T*
+(const ComponentLibrary = \({ components = [], onDragStart, onSelect }\) => {) Tj
+T*
+(    const [search, setSearch] = useState\(''\);) Tj
+T*
+(    const [category, setCategory] = useState\('all'\);) Tj
+T*
+() Tj
+T*
+(    const categories = useMemo\(\(\) => {) Tj
+T*
+(        const set = new Set\(components.map\(\(item\) => item.category\).filter\(Boolean\)\);) Tj
+T*
+(        return ['all', ...Array.from\(set\)];) Tj
+T*
+(    }, [components]\);) Tj
+T*
+() Tj
+T*
+(    const filtered = useMemo\(\(\) => {) Tj
+T*
+(        const term = search.trim\(\).toLowerCase\(\);) Tj
+T*
+(        return components.filter\(\(item\) => {) Tj
+T*
+(            if \(category !== 'all' && item.category !== category\) return false;) Tj
+T*
+(            if \(!term\) return true;) Tj
+T*
+(            const haystack = `${item.label || ''} ${item.name || ''} ${item.description || ''}`.toLowerCase\(\);) Tj
+T*
+(            return haystack.includes\(term\);) Tj
+T*
+(        }\);) Tj
+T*
+(    }, [components, search, category]\);) Tj
+T*
+() Tj
+T*
+(    return \() Tj
+T*
+(        <aside className="kodi-builder__library">) Tj
+T*
+(            <div className="kodi-builder__library-header">) Tj
+T*
+(                <h3>Components</h3>) Tj
+T*
+(                <input) Tj
+T*
+(                    type="text") Tj
+T*
+(                    placeholder="Search components...") Tj
+T*
+(                    value={search}) Tj
+T*
+(                    onChange={\(event\) => setSearch\(event.target.value\)}) Tj
+T*
+(                />) Tj
+T*
+(                <select value={category} onChange={\(event\) => setCategory\(event.target.value\)}>) Tj
+T*
+(                    {categories.map\(\(item\) => \() Tj
+T*
+(                        <option key={item} value={item}>) Tj
+T*
+(                            {item === 'all' ? 'All categories' : item}) Tj
+T*
+(                        </option>) Tj
+T*
+(                    \)\)}) Tj
+T*
+(                </select>) Tj
+T*
+(            </div>) Tj
+T*
+(            <div className="kodi-builder__library-list">) Tj
+T*
+(                {filtered.map\(\(component\) => \() Tj
+T*
+(                    <div) Tj
+T*
+(                        key={component.id}) Tj
+ET
+endstream
+endobj
+22 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 23 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+23 0 obj
+<< /Length 2744 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(                        className="kodi-builder__library-item") Tj
+T*
+(                        draggable) Tj
+T*
+(                        onDragStart={\(event\) => onDragStart\(event, component\)}) Tj
+T*
+(                        onClick={\(\) => onSelect?.\(component\)}) Tj
+T*
+(                    >) Tj
+T*
+(                        <div>) Tj
+T*
+(                            <strong>{component.label || component.name}</strong>) Tj
+T*
+(                            <p>{component.description || 'Kodi component'}</p>) Tj
+T*
+(                        </div>) Tj
+T*
+(                        <span className="kodi-builder__library-type">{component.category}</span>) Tj
+T*
+(                    </div>) Tj
+T*
+(                \)\)}) Tj
+T*
+(                {!filtered.length && <p className="kodi-builder__library-empty">No components found.</p>}) Tj
+T*
+(            </div>) Tj
+T*
+(        </aside>) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default ComponentLibrary;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/ConfigSidebar.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/ConfigSidebar.jsx) Tj
+T*
+(import React, { useMemo } from 'react';) Tj
+T*
+(import PermissionEditor from './PermissionEditor';) Tj
+T*
+(import VisibilityRuleEditor from './VisibilityRuleEditor';) Tj
+T*
+() Tj
+T*
+(const ConfigSidebar = \({) Tj
+T*
+(    component,) Tj
+T*
+(    objects = [],) Tj
+T*
+(    onUpdate,) Tj
+T*
+(    onClose) Tj
+T*
+(}\) => {) Tj
+T*
+(    const objectOptions = useMemo\(\(\) => objects || [], [objects]\);) Tj
+T*
+(    const selectedObject = objectOptions.find\(\(obj\) => obj.name === component?.binding?.object\);) Tj
+T*
+(    const fields = selectedObject?.fields || [];) Tj
+T*
+() Tj
+T*
+(    if \(!component\) {) Tj
+T*
+(        return \() Tj
+T*
+(            <aside className="kodi-config">) Tj
+T*
+(                <div className="kodi-config__empty">) Tj
+T*
+(                    <p>Select a component to configure.</p>) Tj
+T*
+(                </div>) Tj
+T*
+(            </aside>) Tj
+T*
+(        \);) Tj
+T*
+(    }) Tj
+T*
+() Tj
+T*
+(    const update = \(patch\) => {) Tj
+T*
+(        onUpdate\({ ...component, ...patch }\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const updateBinding = \(patch\) => {) Tj
+T*
+(        update\({ binding: { ...\(component.binding || {}\), ...patch } }\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    const updateStyle = \(patch\) => {) Tj
+T*
+(        update\({ style: { ...\(component.style || {}\), ...patch } }\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    return \() Tj
+T*
+(        <aside className="kodi-config">) Tj
+T*
+(            <div className="kodi-config__header">) Tj
+T*
+(                <div>) Tj
+T*
+(                    <p>Configure</p>) Tj
+ET
+endstream
+endobj
+24 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 25 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+25 0 obj
+<< /Length 3483 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(                    <h3>{component.label || component.name}</h3>) Tj
+T*
+(                </div>) Tj
+T*
+(                <button className="btn-text" onClick={onClose}>) Tj
+T*
+(                    Close) Tj
+T*
+(                </button>) Tj
+T*
+(            </div>) Tj
+T*
+() Tj
+T*
+(            <div className="kodi-config__body">) Tj
+T*
+(                <div className="kodi-config__section">) Tj
+T*
+(                    <h4>Label</h4>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Title) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="text") Tj
+T*
+(                            value={component.label || ''}) Tj
+T*
+(                            onChange={\(event\) => update\({ label: event.target.value }\)}) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                </div>) Tj
+T*
+() Tj
+T*
+(                <div className="kodi-config__section">) Tj
+T*
+(                    <h4>Data Binding</h4>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Object) Tj
+T*
+(                        <select) Tj
+T*
+(                            value={component.binding?.object || ''}) Tj
+T*
+(                            onChange={\(event\) => updateBinding\({ object: event.target.value }\)}) Tj
+T*
+(                        >) Tj
+T*
+(                            <option value="">Select object</option>) Tj
+T*
+(                            {objectOptions.map\(\(obj\) => \() Tj
+T*
+(                                <option key={obj.id} value={obj.name}>) Tj
+T*
+(                                    {obj.label}) Tj
+T*
+(                                </option>) Tj
+T*
+(                            \)\)}) Tj
+T*
+(                        </select>) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Field) Tj
+T*
+(                        <select) Tj
+T*
+(                            value={component.binding?.field || ''}) Tj
+T*
+(                            onChange={\(event\) => updateBinding\({ field: event.target.value }\)}) Tj
+T*
+(                        >) Tj
+T*
+(                            <option value="">Select field</option>) Tj
+T*
+(                            {fields.map\(\(field\) => \() Tj
+T*
+(                                <option key={field.id || field.field_name} value={field.field_name}>) Tj
+T*
+(                                    {field.field_name}) Tj
+T*
+(                                </option>) Tj
+T*
+(                            \)\)}) Tj
+T*
+(                        </select>) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Data source) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="text") Tj
+T*
+(                            value={component.binding?.source || ''}) Tj
+T*
+(                            onChange={\(event\) => updateBinding\({ source: event.target.value }\)}) Tj
+T*
+(                            placeholder="/api/contacts") Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                </div>) Tj
+T*
+() Tj
+T*
+(                <div className="kodi-config__section">) Tj
+T*
+(                    <h4>Size</h4>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Width \(1-12\)) Tj
+ET
+endstream
+endobj
+26 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 27 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+27 0 obj
+<< /Length 3511 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(                        <input) Tj
+T*
+(                            type="number") Tj
+T*
+(                            min={component.layout?.minWidth || 1}) Tj
+T*
+(                            max={component.layout?.maxWidth || 12}) Tj
+T*
+(                            value={component.layout?.width || 6}) Tj
+T*
+(                            onChange={\(event\) =>) Tj
+T*
+(                                update\({ layout: { ...component.layout, width: Number\(event.target.value\) } }\)) Tj
+T*
+(                            }) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Min width) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="number") Tj
+T*
+(                            min={1}) Tj
+T*
+(                            max={12}) Tj
+T*
+(                            value={component.layout?.minWidth || 2}) Tj
+T*
+(                            onChange={\(event\) =>) Tj
+T*
+(                                update\({ layout: { ...component.layout, minWidth: Number\(event.target.value\) } }\)) Tj
+T*
+(                            }) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Max width) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="number") Tj
+T*
+(                            min={1}) Tj
+T*
+(                            max={12}) Tj
+T*
+(                            value={component.layout?.maxWidth || 12}) Tj
+T*
+(                            onChange={\(event\) =>) Tj
+T*
+(                                update\({ layout: { ...component.layout, maxWidth: Number\(event.target.value\) } }\)) Tj
+T*
+(                            }) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Height \(rows\)) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="number") Tj
+T*
+(                            min={1}) Tj
+T*
+(                            max={12}) Tj
+T*
+(                            value={component.layout?.height || 2}) Tj
+T*
+(                            onChange={\(event\) =>) Tj
+T*
+(                                update\({ layout: { ...component.layout, height: Number\(event.target.value\) } }\)) Tj
+T*
+(                            }) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                </div>) Tj
+T*
+() Tj
+T*
+(                <VisibilityRuleEditor) Tj
+T*
+(                    value={component.visibilityRule}) Tj
+T*
+(                    onChange={\(rule\) => update\({ visibilityRule: rule }\)}) Tj
+T*
+(                />) Tj
+T*
+() Tj
+T*
+(                <PermissionEditor) Tj
+T*
+(                    value={component.permissions}) Tj
+T*
+(                    onChange={\(permissions\) => update\({ permissions }\)}) Tj
+T*
+(                />) Tj
+T*
+() Tj
+T*
+(                <div className="kodi-config__section">) Tj
+T*
+(                    <h4>Actions & Links</h4>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Action labels \(comma separated\)) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="text") Tj
+T*
+(                            value={\(component.actions || []\).join\(', '\)}) Tj
+ET
+endstream
+endobj
+28 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 29 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+29 0 obj
+<< /Length 3214 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(                            onChange={\(event\) =>) Tj
+T*
+(                                update\({ actions: event.target.value.split\(','\).map\(\(item\) => item.trim\(\)\).filter\(Boolean\) }\)) Tj
+T*
+(                            }) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Primary link) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="text") Tj
+T*
+(                            value={component.link || ''}) Tj
+T*
+(                            onChange={\(event\) => update\({ link: event.target.value }\)}) Tj
+T*
+(                            placeholder="https://") Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                </div>) Tj
+T*
+() Tj
+T*
+(                <div className="kodi-config__section">) Tj
+T*
+(                    <h4>Style</h4>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Background) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="color") Tj
+T*
+(                            value={component.style?.background || '#ffffff'}) Tj
+T*
+(                            onChange={\(event\) => updateStyle\({ background: event.target.value }\)}) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <label className="kodi-config__field">) Tj
+T*
+(                        Text color) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="color") Tj
+T*
+(                            value={component.style?.color || '#1f2b3b'}) Tj
+T*
+(                            onChange={\(event\) => updateStyle\({ color: event.target.value }\)}) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                </div>) Tj
+T*
+(            </div>) Tj
+T*
+(        </aside>) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default ConfigSidebar;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/LayoutSwitcher.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/LayoutSwitcher.jsx) Tj
+T*
+(import React from 'react';) Tj
+T*
+() Tj
+T*
+(const LayoutSwitcher = \({ layoutType, orientation, onChange }\) => \() Tj
+T*
+(    <div className="kodi-builder__layout-switcher">) Tj
+T*
+(        <div>) Tj
+T*
+(            <label>) Tj
+T*
+(                Layout) Tj
+T*
+(                <select value={layoutType} onChange={\(event\) => onChange\({ type: event.target.value }\)}>) Tj
+T*
+(                    <option value="1-column">1 column</option>) Tj
+T*
+(                    <option value="2-column">2 column</option>) Tj
+T*
+(                    <option value="3-column">3 column</option>) Tj
+T*
+(                </select>) Tj
+T*
+(            </label>) Tj
+T*
+(        </div>) Tj
+T*
+(        <div>) Tj
+T*
+(            <label>) Tj
+T*
+(                Orientation) Tj
+T*
+(                <select value={orientation} onChange={\(event\) => onChange\({ orientation: event.target.value }\)}>) Tj
+T*
+(                    <option value="horizontal">Horizontal</option>) Tj
+ET
+endstream
+endobj
+30 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 31 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+31 0 obj
+<< /Length 2338 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(                    <option value="vertical">Vertical</option>) Tj
+T*
+(                    <option value="mixed">Mixed</option>) Tj
+T*
+(                </select>) Tj
+T*
+(            </label>) Tj
+T*
+(        </div>) Tj
+T*
+(    </div>) Tj
+T*
+(\);) Tj
+T*
+() Tj
+T*
+(export default LayoutSwitcher;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/ResizeHandle.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/ResizeHandle.jsx) Tj
+T*
+(import React, { useRef } from 'react';) Tj
+T*
+() Tj
+T*
+(const ResizeHandle = \({ direction = 'both', onResizeStart }\) => {) Tj
+T*
+(    const startRef = useRef\(null\);) Tj
+T*
+() Tj
+T*
+(    const onMouseDown = \(event\) => {) Tj
+T*
+(        event.preventDefault\(\);) Tj
+T*
+(        event.stopPropagation\(\);) Tj
+T*
+(        const start = { x: event.clientX, y: event.clientY };) Tj
+T*
+(        startRef.current = start;) Tj
+T*
+(        if \(onResizeStart\) {) Tj
+T*
+(            onResizeStart\(start\);) Tj
+T*
+(        }) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    return \() Tj
+T*
+(        <div) Tj
+T*
+(            className={`kodi-resize-handle kodi-resize-handle--${direction}`}) Tj
+T*
+(            onMouseDown={onMouseDown}) Tj
+T*
+(            role="presentation") Tj
+T*
+(        />) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default ResizeHandle;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/PermissionEditor.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/PermissionEditor.jsx) Tj
+T*
+(import React from 'react';) Tj
+T*
+() Tj
+T*
+(const ROLE_OPTIONS = [) Tj
+T*
+(    { id: 'admin', label: 'Admin' },) Tj
+T*
+(    { id: 'employee', label: 'Employee' },) Tj
+T*
+(    { id: 'business_user', label: 'Business User' },) Tj
+T*
+(    { id: 'psychologist', label: 'Psychologist' }) Tj
+T*
+(];) Tj
+T*
+() Tj
+T*
+(const PermissionEditor = \({ value, onChange }\) => {) Tj
+T*
+(    const roles = new Set\(value?.roles || []\);) Tj
+T*
+(    const toggle = \(role\) => {) Tj
+T*
+(        const next = new Set\(roles\);) Tj
+T*
+(        if \(next.has\(role\)\) {) Tj
+T*
+(            next.delete\(role\);) Tj
+T*
+(        } else {) Tj
+T*
+(            next.add\(role\);) Tj
+T*
+(        }) Tj
+T*
+(        onChange\({ roles: Array.from\(next\) }\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+ET
+endstream
+endobj
+32 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 33 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+33 0 obj
+<< /Length 2831 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(    return \() Tj
+T*
+(        <div className="kodi-config__section">) Tj
+T*
+(            <h4>Permissions</h4>) Tj
+T*
+(            <div className="kodi-config__checkbox-group">) Tj
+T*
+(                {ROLE_OPTIONS.map\(\(role\) => \() Tj
+T*
+(                    <label key={role.id}>) Tj
+T*
+(                        <input) Tj
+T*
+(                            type="checkbox") Tj
+T*
+(                            checked={roles.has\(role.id\)}) Tj
+T*
+(                            onChange={\(\) => toggle\(role.id\)}) Tj
+T*
+(                        />) Tj
+T*
+(                        {role.label}) Tj
+T*
+(                    </label>) Tj
+T*
+(                \)\)}) Tj
+T*
+(            </div>) Tj
+T*
+(        </div>) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default PermissionEditor;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/VisibilityRuleEditor.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/VisibilityRuleEditor.jsx) Tj
+T*
+(import React from 'react';) Tj
+T*
+() Tj
+T*
+(const OPERATORS = [) Tj
+T*
+(    { value: 'equals', label: 'Equals' },) Tj
+T*
+(    { value: 'not_equals', label: 'Not equals' },) Tj
+T*
+(    { value: 'exists', label: 'Exists' },) Tj
+T*
+(    { value: 'not_exists', label: 'Not exists' },) Tj
+T*
+(    { value: 'contains', label: 'Contains' },) Tj
+T*
+(    { value: 'in', label: 'In list' },) Tj
+T*
+(    { value: 'greater_than', label: 'Greater than' },) Tj
+T*
+(    { value: 'less_than', label: 'Less than' }) Tj
+T*
+(];) Tj
+T*
+() Tj
+T*
+(const VisibilityRuleEditor = \({ value, onChange }\) => {) Tj
+T*
+(    const rule = value || {};) Tj
+T*
+(    const update = \(patch\) => {) Tj
+T*
+(        onChange\({ ...rule, ...patch }\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    return \() Tj
+T*
+(        <div className="kodi-config__section">) Tj
+T*
+(            <h4>Visibility Rules</h4>) Tj
+T*
+(            <label className="kodi-config__field">) Tj
+T*
+(                Field) Tj
+T*
+(                <input) Tj
+T*
+(                    type="text") Tj
+T*
+(                    value={rule.field || ''}) Tj
+T*
+(                    onChange={\(event\) => update\({ field: event.target.value }\)}) Tj
+T*
+(                    placeholder="subscription.status") Tj
+T*
+(                />) Tj
+T*
+(            </label>) Tj
+T*
+(            <label className="kodi-config__field">) Tj
+T*
+(                Operator) Tj
+T*
+(                <select value={rule.operator || 'equals'} onChange={\(event\) => update\({ operator: event.target.value }\)}>) Tj
+T*
+(                    {OPERATORS.map\(\(op\) => \() Tj
+T*
+(                        <option key={op.value} value={op.value}>) Tj
+T*
+(                            {op.label}) Tj
+T*
+(                        </option>) Tj
+T*
+(                    \)\)}) Tj
+T*
+(                </select>) Tj
+ET
+endstream
+endobj
+34 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 35 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+35 0 obj
+<< /Length 2784 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(            </label>) Tj
+T*
+(            <label className="kodi-config__field">) Tj
+T*
+(                Value) Tj
+T*
+(                <input) Tj
+T*
+(                    type="text") Tj
+T*
+(                    value={rule.value ?? ''}) Tj
+T*
+(                    onChange={\(event\) => update\({ value: event.target.value }\)}) Tj
+T*
+(                    placeholder="active") Tj
+T*
+(                />) Tj
+T*
+(            </label>) Tj
+T*
+(        </div>) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default VisibilityRuleEditor;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/AppLinkModal.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/AppLinkModal.jsx) Tj
+T*
+(import React from 'react';) Tj
+T*
+(import Loading from '../common/Loading';) Tj
+T*
+() Tj
+T*
+(const AppLinkModal = \({ open, apps = [], loading, selectedId, onSelect, onClose, onSubmit }\) => {) Tj
+T*
+(    if \(!open\) return null;) Tj
+T*
+(    return \() Tj
+T*
+(        <div className="kodi-modal">) Tj
+T*
+(            <div className="kodi-modal__content">) Tj
+T*
+(                <div className="kodi-modal__header">) Tj
+T*
+(                    <h3>Link to App</h3>) Tj
+T*
+(                    <button className="btn-text" onClick={onClose}>Close</button>) Tj
+T*
+(                </div>) Tj
+T*
+(                {loading ? \() Tj
+T*
+(                    <Loading />) Tj
+T*
+(                \) : \() Tj
+T*
+(                    <label className="kodi-modal__field">) Tj
+T*
+(                        Select app) Tj
+T*
+(                        <select value={selectedId} onChange={\(event\) => onSelect\(event.target.value\)}>) Tj
+T*
+(                            <option value="">Select an app</option>) Tj
+T*
+(                            {apps.map\(\(app\) => \() Tj
+T*
+(                                <option key={app.id} value={app.id}>) Tj
+T*
+(                                    {app.name}) Tj
+T*
+(                                </option>) Tj
+T*
+(                            \)\)}) Tj
+T*
+(                        </select>) Tj
+T*
+(                    </label>) Tj
+T*
+(                \)}) Tj
+T*
+(                <button className="btn-primary" onClick={onSubmit} disabled={!selectedId}>) Tj
+T*
+(                    Link App) Tj
+T*
+(                </button>) Tj
+T*
+(            </div>) Tj
+T*
+(        </div>) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default AppLinkModal;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/components/kodi/CreatePageModal.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(NEW FILE: frontend/src/components/kodi/CreatePageModal.jsx) Tj
+T*
+(import React, { useState } from 'react';) Tj
+T*
+() Tj
+T*
+(const PAGE_TYPES = [) Tj
+T*
+(    { value: 'record', label: 'Record Page' },) Tj
+ET
+endstream
+endobj
+36 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 37 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+37 0 obj
+<< /Length 2913 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(    { value: 'app', label: 'App Page' },) Tj
+T*
+(    { value: 'home', label: 'Home Page' }) Tj
+T*
+(];) Tj
+T*
+() Tj
+T*
+(const CreatePageModal = \({ open, onClose, onSubmit }\) => {) Tj
+T*
+(    const [form, setForm] = useState\({ label: '', pageType: 'record' }\);) Tj
+T*
+() Tj
+T*
+(    if \(!open\) return null;) Tj
+T*
+() Tj
+T*
+(    const handleSubmit = \(event\) => {) Tj
+T*
+(        event.preventDefault\(\);) Tj
+T*
+(        onSubmit\(form\);) Tj
+T*
+(    };) Tj
+T*
+() Tj
+T*
+(    return \() Tj
+T*
+(        <div className="kodi-modal">) Tj
+T*
+(            <div className="kodi-modal__content">) Tj
+T*
+(                <div className="kodi-modal__header">) Tj
+T*
+(                    <h3>Create Page</h3>) Tj
+T*
+(                    <button className="btn-text" onClick={onClose}>Close</button>) Tj
+T*
+(                </div>) Tj
+T*
+(                <form onSubmit={handleSubmit}>) Tj
+T*
+(                    <label className="kodi-modal__field">) Tj
+T*
+(                        Label) Tj
+T*
+(                        <input) Tj
+T*
+(                            value={form.label}) Tj
+T*
+(                            onChange={\(event\) => setForm\(\(prev\) => \({ ...prev, label: event.target.value }\)\)}) Tj
+T*
+(                        />) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <label className="kodi-modal__field">) Tj
+T*
+(                        Page Type) Tj
+T*
+(                        <select) Tj
+T*
+(                            value={form.pageType}) Tj
+T*
+(                            onChange={\(event\) => setForm\(\(prev\) => \({ ...prev, pageType: event.target.value }\)\)}) Tj
+T*
+(                        >) Tj
+T*
+(                            {PAGE_TYPES.map\(\(option\) => \() Tj
+T*
+(                                <option key={option.value} value={option.value}>) Tj
+T*
+(                                    {option.label}) Tj
+T*
+(                                </option>) Tj
+T*
+(                            \)\)}) Tj
+T*
+(                        </select>) Tj
+T*
+(                    </label>) Tj
+T*
+(                    <button className="btn-primary" type="submit">) Tj
+T*
+(                        Create Page) Tj
+T*
+(                    </button>) Tj
+T*
+(                </form>) Tj
+T*
+(            </div>) Tj
+T*
+(        </div>) Tj
+T*
+(    \);) Tj
+T*
+(};) Tj
+T*
+() Tj
+T*
+(export default CreatePageModal;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/pages/kodi/KodiBuilder.css) Tj
+T*
+(----------------------------------------) Tj
+T*
+(diff --git a/frontend/src/pages/kodi/KodiBuilder.css b/frontend/src/pages/kodi/KodiBuilder.css) Tj
+T*
+(index e7653cd6..790c54f5 100644) Tj
+T*
+(--- a/frontend/src/pages/kodi/KodiBuilder.css) Tj
+T*
+(+++ b/frontend/src/pages/kodi/KodiBuilder.css) Tj
+T*
+(@@ -1072,3 +1072,233 @@) Tj
+T*
+(     border: 1px solid rgba\(255, 255, 255, 0.3\);) Tj
+T*
+(     background: rgba\(255, 255, 255, 0.1\);) Tj
+T*
+( }) Tj
+T*
+(+) Tj
+ET
+endstream
+endobj
+38 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 39 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+39 0 obj
+<< /Length 1809 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(+.kodi-builder {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    flex-direction: column;) Tj
+T*
+(+    gap: 16px;) Tj
+T*
+(+    padding: 24px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__toolbar {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    justify-content: space-between;) Tj
+T*
+(+    align-items: center;) Tj
+T*
+(+    background: #ffffff;) Tj
+T*
+(+    border: 1px solid #e2e8f0;) Tj
+T*
+(+    border-radius: 12px;) Tj
+T*
+(+    padding: 16px 20px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__toolbar-actions {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    flex-wrap: wrap;) Tj
+T*
+(+    gap: 10px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__content {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    grid-template-columns: 280px minmax\(0, 1fr\) 320px;) Tj
+T*
+(+    gap: 16px;) Tj
+T*
+(+    min-height: 70vh;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__library,) Tj
+T*
+(+.kodi-config {) Tj
+T*
+(+    background: #ffffff;) Tj
+T*
+(+    border: 1px solid #e2e8f0;) Tj
+T*
+(+    border-radius: 12px;) Tj
+T*
+(+    padding: 16px;) Tj
+T*
+(+    height: 100%;) Tj
+T*
+(+    overflow: hidden;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__library-header {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 8px;) Tj
+T*
+(+    margin-bottom: 12px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__library-list {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 10px;) Tj
+T*
+(+    overflow-y: auto;) Tj
+T*
+(+    max-height: calc\(70vh - 140px\);) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__library-item {) Tj
+T*
+(+    border: 1px solid #e2e8f0;) Tj
+T*
+(+    border-radius: 10px;) Tj
+T*
+(+    padding: 10px 12px;) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    justify-content: space-between;) Tj
+T*
+(+    gap: 12px;) Tj
+T*
+(+    cursor: grab;) Tj
+T*
+(+    background: #f8fafc;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__library-type {) Tj
+ET
+endstream
+endobj
+40 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 41 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+41 0 obj
+<< /Length 1784 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(+    font-size: 12px;) Tj
+T*
+(+    color: #64748b;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__canvas {) Tj
+T*
+(+    background: #f8fafc;) Tj
+T*
+(+    border: 1px dashed #cbd5f5;) Tj
+T*
+(+    border-radius: 12px;) Tj
+T*
+(+    padding: 16px;) Tj
+T*
+(+    overflow: auto;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__row {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    gap: 12px;) Tj
+T*
+(+    margin-bottom: 16px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__row--vertical {) Tj
+T*
+(+    flex-direction: column;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__column {) Tj
+T*
+(+    flex: 1;) Tj
+T*
+(+    background: #ffffff;) Tj
+T*
+(+    border-radius: 10px;) Tj
+T*
+(+    border: 1px solid #e2e8f0;) Tj
+T*
+(+    padding: 12px;) Tj
+T*
+(+    min-height: 140px;) Tj
+T*
+(+    position: relative;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__column-grid {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 8px;) Tj
+T*
+(+    grid-auto-rows: 48px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__column-empty {) Tj
+T*
+(+    position: absolute;) Tj
+T*
+(+    inset: 12px;) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    align-items: center;) Tj
+T*
+(+    justify-content: center;) Tj
+T*
+(+    color: #94a3b8;) Tj
+T*
+(+    font-size: 13px;) Tj
+T*
+(+    pointer-events: none;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__component {) Tj
+T*
+(+    background: #ffffff;) Tj
+T*
+(+    border: 1px solid #cbd5f5;) Tj
+T*
+(+    border-radius: 10px;) Tj
+T*
+(+    padding: 10px;) Tj
+T*
+(+    position: relative;) Tj
+T*
+(+    cursor: grab;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__component.is-selected {) Tj
+T*
+(+    border-color: #6366f1;) Tj
+T*
+(+    box-shadow: 0 0 0 2px rgba\(99, 102, 241, 0.2\);) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__component.is-hidden {) Tj
+T*
+(+    opacity: 0.5;) Tj
+ET
+endstream
+endobj
+42 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 43 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+43 0 obj
+<< /Length 1663 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(+    border-style: dashed;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__component-header {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    justify-content: space-between;) Tj
+T*
+(+    font-size: 12px;) Tj
+T*
+(+    margin-bottom: 6px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-resize-handle {) Tj
+T*
+(+    position: absolute;) Tj
+T*
+(+    background: rgba\(99, 102, 241, 0.7\);) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-resize-handle--width {) Tj
+T*
+(+    width: 6px;) Tj
+T*
+(+    top: 8px;) Tj
+T*
+(+    bottom: 8px;) Tj
+T*
+(+    right: 2px;) Tj
+T*
+(+    cursor: ew-resize;) Tj
+T*
+(+    border-radius: 4px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-resize-handle--height {) Tj
+T*
+(+    height: 6px;) Tj
+T*
+(+    left: 8px;) Tj
+T*
+(+    right: 8px;) Tj
+T*
+(+    bottom: 2px;) Tj
+T*
+(+    cursor: ns-resize;) Tj
+T*
+(+    border-radius: 4px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-config__header {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    justify-content: space-between;) Tj
+T*
+(+    align-items: center;) Tj
+T*
+(+    margin-bottom: 16px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-config__body {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 18px;) Tj
+T*
+(+    overflow-y: auto;) Tj
+T*
+(+    max-height: calc\(70vh - 120px\);) Tj
+T*
+(+    padding-right: 8px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-config__section {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 8px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-config__field {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 6px;) Tj
+T*
+(+    font-size: 13px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-config__checkbox-group {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 6px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-builder__layout-switcher {) Tj
+ET
+endstream
+endobj
+44 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 45 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+45 0 obj
+<< /Length 2064 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(+    display: flex;) Tj
+T*
+(+    gap: 12px;) Tj
+T*
+(+    align-items: center;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-modal {) Tj
+T*
+(+    position: fixed;) Tj
+T*
+(+    inset: 0;) Tj
+T*
+(+    background: rgba\(15, 23, 42, 0.45\);) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    align-items: center;) Tj
+T*
+(+    justify-content: center;) Tj
+T*
+(+    z-index: 50;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-modal__content {) Tj
+T*
+(+    background: #ffffff;) Tj
+T*
+(+    border-radius: 12px;) Tj
+T*
+(+    padding: 20px;) Tj
+T*
+(+    width: 420px;) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 12px;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-modal__header {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    justify-content: space-between;) Tj
+T*
+(+    align-items: center;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+(+.kodi-modal__field {) Tj
+T*
+(+    display: grid;) Tj
+T*
+(+    gap: 6px;) Tj
+T*
+(+}) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/pages/kodi/KodiPortal.jsx) Tj
+T*
+(----------------------------------------) Tj
+T*
+(diff --git a/frontend/src/pages/kodi/KodiPortal.jsx b/frontend/src/pages/kodi/KodiPortal.jsx) Tj
+T*
+(index 577fe45e..a5543ba6 100644) Tj
+T*
+(--- a/frontend/src/pages/kodi/KodiPortal.jsx) Tj
+T*
+(+++ b/frontend/src/pages/kodi/KodiPortal.jsx) Tj
+T*
+(@@ -3,21 +3,25 @@ import toast from 'react-hot-toast';) Tj
+T*
+( import Loading from '../../components/common/Loading';) Tj
+T*
+( import {) Tj
+T*
+(     assignAppUser,) Tj
+T*
+(+    assignPageUser,) Tj
+T*
+(     createLead,) Tj
+T*
+(     createPlatformApp,) Tj
+T*
+(     createPlatformField,) Tj
+T*
+(+    convertLead,) Tj
+T*
+(     listLeads,) Tj
+T*
+(+    listLeadOpportunities,) Tj
+T*
+(     listPagePermissions,) Tj
+T*
+(     listPlatformApps,) Tj
+T*
+(     listPlatformObjects,) Tj
+T*
+(     listPlatformPages,) Tj
+T*
+(     linkPlatformPage,) Tj
+T*
+(-    updatePagePermissions) Tj
+T*
+(+    updatePagePermissions,) Tj
+T*
+(+    updatePlatformApp) Tj
+T*
+( } from '../../services/kodiPageService';) Tj
+T*
+( import { fetchTableRecords } from '../../services/neonDataService';) Tj
+T*
+( import './KodiPortal.css';) Tj
+T*
+( ) Tj
+ET
+endstream
+endobj
+46 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 47 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+47 0 obj
+<< /Length 3467 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(-const PLATFORM_ROLES = ['admin', 'employee', 'business', 'psychologist'];) Tj
+T*
+(+const PLATFORM_ROLES = ['admin', 'employee', 'business_user', 'psychologist'];) Tj
+T*
+( ) Tj
+T*
+( const unwrapResponse = \(payload\) => {) Tj
+T*
+(     if \(!payload\) return [];) Tj
+T*
+(@@ -51,6 +55,9 @@ const KodiPortal = \(\) => {) Tj
+T*
+(     }\);) Tj
+T*
+(     const [appForm, setAppForm] = useState\({ name: '', description: '' }\);) Tj
+T*
+(     const [creatingApp, setCreatingApp] = useState\(false\);) Tj
+T*
+(+    const [editAppModal, setEditAppModal] = useState\({ open: false, app: null }\);) Tj
+T*
+(+    const [editForm, setEditForm] = useState\({ name: '', description: '', isActive: true }\);) Tj
+T*
+(+    const [savingApp, setSavingApp] = useState\(false\);) Tj
+T*
+(     const [linking, setLinking] = useState\(false\);) Tj
+T*
+(     const [savingPermissions, setSavingPermissions] = useState\(false\);) Tj
+T*
+(     const [objects, setObjects] = useState\([]\);) Tj
+T*
+(@@ -62,6 +69,13 @@ const KodiPortal = \(\) => {) Tj
+T*
+(         permissions: { canView: true, canEdit: false, canUse: false },) Tj
+T*
+(         assigning: false) Tj
+T*
+(     }\);) Tj
+T*
+(+    const [assignPageUserModal, setAssignPageUserModal] = useState\({) Tj
+T*
+(+        open: false,) Tj
+T*
+(+        page: null,) Tj
+T*
+(+        email: '',) Tj
+T*
+(+        permissions: { canView: true, canEdit: false, canUse: false },) Tj
+T*
+(+        assigning: false) Tj
+T*
+(+    }\);) Tj
+T*
+(     const [fieldModal, setFieldModal] = useState\({) Tj
+T*
+(         open: false,) Tj
+T*
+(         object: null,) Tj
+T*
+(@@ -71,6 +85,7 @@ const KodiPortal = \(\) => {) Tj
+T*
+(     const [leads, setLeads] = useState\([]\);) Tj
+T*
+(     const [loadingLeads, setLoadingLeads] = useState\(false\);) Tj
+T*
+(     const [leadModal, setLeadModal] = useState\({ open: false, name: '', email: '', creating: false }\);) Tj
+T*
+(+    const [leadOpportunities, setLeadOpportunities] = useState\({}\);) Tj
+T*
+(     const [neonRecords, setNeonRecords] = useState\([]\);) Tj
+T*
+(     const [neonTable, setNeonTable] = useState\('contacts'\);) Tj
+T*
+(     const [neonLoading, setNeonLoading] = useState\(false\);) Tj
+T*
+(@@ -116,7 +131,16 @@ const KodiPortal = \(\) => {) Tj
+T*
+(         setLoadingLeads\(true\);) Tj
+T*
+(         try {) Tj
+T*
+(             const data = await listLeads\(\);) Tj
+T*
+(-            setLeads\(unwrapResponse\(data\)\);) Tj
+T*
+(+            const rows = unwrapResponse\(data\);) Tj
+T*
+(+            setLeads\(rows\);) Tj
+T*
+(+            const opportunityRows = await Promise.all\() Tj
+T*
+(+                rows.map\(\(lead\) => listLeadOpportunities\(lead.id\).catch\(\(\) => []\)\)) Tj
+T*
+(+            \);) Tj
+T*
+(+            const map = {};) Tj
+T*
+(+            rows.forEach\(\(lead, index\) => {) Tj
+T*
+(+                map[lead.id] = opportunityRows[index] || [];) Tj
+T*
+(+            }\);) Tj
+T*
+(+            setLeadOpportunities\(map\);) Tj
+T*
+(         } catch \(error\) {) Tj
+T*
+(             toast.error\('Unable to load leads'\);) Tj
+T*
+(         } finally {) Tj
+T*
+(@@ -183,6 +207,39 @@ const KodiPortal = \(\) => {) Tj
+T*
+(         }) Tj
+T*
+(     };) Tj
+T*
+( ) Tj
+T*
+(+    const openEditAppModal = \(app\) => {) Tj
+T*
+(+        setEditAppModal\({ open: true, app }\);) Tj
+T*
+(+        setEditForm\({) Tj
+T*
+(+            name: app?.name || '',) Tj
+T*
+(+            description: app?.description || '',) Tj
+T*
+(+            isActive: app?.is_active !== false) Tj
+ET
+endstream
+endobj
+48 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 49 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+49 0 obj
+<< /Length 2731 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(+        }\);) Tj
+T*
+(+    };) Tj
+T*
+(+) Tj
+T*
+(+    const handleUpdateApp = async \(event\) => {) Tj
+T*
+(+        event.preventDefault\(\);) Tj
+T*
+(+        if \(!editAppModal.app\) return;) Tj
+T*
+(+        if \(!editForm.name.trim\(\)\) {) Tj
+T*
+(+            toast.error\('App name is required'\);) Tj
+T*
+(+            return;) Tj
+T*
+(+        }) Tj
+T*
+(+        setSavingApp\(true\);) Tj
+T*
+(+        try {) Tj
+T*
+(+            await updatePlatformApp\(editAppModal.app.id, {) Tj
+T*
+(+                name: editForm.name.trim\(\),) Tj
+T*
+(+                description: editForm.description.trim\(\),) Tj
+T*
+(+                isActive: editForm.isActive) Tj
+T*
+(+            }\);) Tj
+T*
+(+            toast.success\('App updated'\);) Tj
+T*
+(+            setEditAppModal\({ open: false, app: null }\);) Tj
+T*
+(+            refreshData\(\);) Tj
+T*
+(+        } catch \(error\) {) Tj
+T*
+(+            toast.error\(error?.response?.data?.error || 'Failed to update app'\);) Tj
+T*
+(+        } finally {) Tj
+T*
+(+            setSavingApp\(false\);) Tj
+T*
+(+        }) Tj
+T*
+(+    };) Tj
+T*
+(+) Tj
+T*
+(     const openLinkModal = \(app\) => {) Tj
+T*
+(         setLinkModal\({ open: true, app, pageId: '' }\);) Tj
+T*
+(     };) Tj
+T*
+(@@ -195,7 +252,7 @@ const KodiPortal = \(\) => {) Tj
+T*
+(         if \(!linkModal.app\) return;) Tj
+T*
+(         setLinking\(true\);) Tj
+T*
+(         try {) Tj
+T*
+(-            await linkPlatformPage\(linkModal.app.id, linkModal.pageId\);) Tj
+T*
+(+            await linkPlatformPage\(linkModal.pageId, linkModal.app.id\);) Tj
+T*
+(             toast.success\('Page linked to app'\);) Tj
+T*
+(             setLinkModal\({ open: false, app: null, pageId: '' }\);) Tj
+T*
+(             refreshData\(\);) Tj
+T*
+(@@ -216,6 +273,16 @@ const KodiPortal = \(\) => {) Tj
+T*
+(         }\);) Tj
+T*
+(     };) Tj
+T*
+( ) Tj
+T*
+(+    const openAssignPageUserModal = \(page\) => {) Tj
+T*
+(+        setAssignPageUserModal\({) Tj
+T*
+(+            open: true,) Tj
+T*
+(+            page,) Tj
+T*
+(+            email: '',) Tj
+T*
+(+            permissions: { canView: true, canEdit: false, canUse: false },) Tj
+T*
+(+            assigning: false) Tj
+T*
+(+        }\);) Tj
+T*
+(+    };) Tj
+T*
+(+) Tj
+T*
+(     const toggleAssignPermission = \(field\) => {) Tj
+T*
+(         setAssignUserModal\(\(prev\) => \({) Tj
+T*
+(             ...prev,) Tj
+T*
+(@@ -249,6 +316,32 @@ const KodiPortal = \(\) => {) Tj
+T*
+(         }) Tj
+T*
+(     };) Tj
+T*
+( ) Tj
+T*
+(+    const handleAssignPageUser = async \(\) => {) Tj
+T*
+(+        if \(!assignPageUserModal.page || !assignPageUserModal.email.trim\(\)\) {) Tj
+T*
+(+            toast.error\('Provide an email to invite'\);) Tj
+T*
+(+            return;) Tj
+T*
+(+        }) Tj
+ET
+endstream
+endobj
+50 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 51 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+51 0 obj
+<< /Length 3404 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(+        setAssignPageUserModal\(\(prev\) => \({ ...prev, assigning: true }\)\);) Tj
+T*
+(+        try {) Tj
+T*
+(+            await assignPageUser\(assignPageUserModal.page.id, {) Tj
+T*
+(+                email: assignPageUserModal.email.trim\(\),) Tj
+T*
+(+                permissions: assignPageUserModal.permissions) Tj
+T*
+(+            }\);) Tj
+T*
+(+            toast.success\('User assigned to page'\);) Tj
+T*
+(+            setAssignPageUserModal\({) Tj
+T*
+(+                open: false,) Tj
+T*
+(+                page: null,) Tj
+T*
+(+                email: '',) Tj
+T*
+(+                permissions: { canView: true, canEdit: false, canUse: false },) Tj
+T*
+(+                assigning: false) Tj
+T*
+(+            }\);) Tj
+T*
+(+            refreshData\(\);) Tj
+T*
+(+        } catch \(error\) {) Tj
+T*
+(+            toast.error\(error?.response?.data?.error || 'Unable to assign user'\);) Tj
+T*
+(+            setAssignPageUserModal\(\(prev\) => \({ ...prev, assigning: false }\)\);) Tj
+T*
+(+        }) Tj
+T*
+(+    };) Tj
+T*
+(+) Tj
+T*
+(     const openFieldModal = \(object\) => {) Tj
+T*
+(         setFieldModal\({) Tj
+T*
+(             open: true,) Tj
+T*
+(@@ -297,7 +390,12 @@ const KodiPortal = \(\) => {) Tj
+T*
+(         }) Tj
+T*
+(         setLeadModal\(\(prev\) => \({ ...prev, creating: true }\)\);) Tj
+T*
+(         try {) Tj
+T*
+(-            await createLead\({ name: leadModal.name.trim\(\), email: leadModal.email.trim\(\) }\);) Tj
+T*
+(+            await createLead\({) Tj
+T*
+(+                name: leadModal.name.trim\(\),) Tj
+T*
+(+                email: leadModal.email.trim\(\),) Tj
+T*
+(+                applicationStatus: 'manual',) Tj
+T*
+(+                source: 'manual') Tj
+T*
+(+            }\);) Tj
+T*
+(             toast.success\('Lead created'\);) Tj
+T*
+(             setLeadModal\({ open: false, name: '', email: '', creating: false }\);) Tj
+T*
+(             fetchLeads\(\);) Tj
+T*
+(@@ -307,6 +405,16 @@ const KodiPortal = \(\) => {) Tj
+T*
+(         }) Tj
+T*
+(     };) Tj
+T*
+( ) Tj
+T*
+(+    const handleConvertLead = async \(leadId\) => {) Tj
+T*
+(+        try {) Tj
+T*
+(+            await convertLead\(leadId, { stage: 'qualified' }\);) Tj
+T*
+(+            toast.success\('Lead converted to opportunity'\);) Tj
+T*
+(+            fetchLeads\(\);) Tj
+T*
+(+        } catch \(error\) {) Tj
+T*
+(+            toast.error\(error?.response?.data?.error || 'Conversion failed'\);) Tj
+T*
+(+        }) Tj
+T*
+(+    };) Tj
+T*
+(+) Tj
+T*
+(     const openPermissionModal = async \(page\) => {) Tj
+T*
+(         setPermissionModal\(\(prev\) => \({ ...prev, open: true, page, role: PLATFORM_ROLES[0] }\)\);) Tj
+T*
+(         try {) Tj
+T*
+(@@ -396,6 +504,9 @@ const KodiPortal = \(\) => {) Tj
+T*
+(                                     <p>{app.description || 'No description provided.'}</p>) Tj
+T*
+(                                 </div>) Tj
+T*
+(                                 <div className="kodi-portal__card-actions">) Tj
+T*
+(+                                    <button className="btn-text" onClick={\(\) => openEditAppModal\(app\)}>) Tj
+T*
+(+                                        Edit App) Tj
+T*
+(+                                    </button>) Tj
+T*
+(                                     <button className="btn-text" onClick={\(\) => openLinkModal\(app\)}>) Tj
+T*
+(                                         Link Page) Tj
+T*
+(                                     </button>) Tj
+ET
+endstream
+endobj
+52 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 53 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+53 0 obj
+<< /Length 4484 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(@@ -421,6 +532,9 @@ const KodiPortal = \(\) => {) Tj
+T*
+(                                                 <button className="btn-text" onClick={\(\) => openPermissionModal\(page\)}>) Tj
+T*
+(                                                     Assign role) Tj
+T*
+(                                                 </button>) Tj
+T*
+(+                                                <button className="btn-text" onClick={\(\) => openAssignPageUserModal\(page\)}>) Tj
+T*
+(+                                                    Assign user) Tj
+T*
+(+                                                </button>) Tj
+T*
+(                                             </div>) Tj
+T*
+(                                         </div>) Tj
+T*
+(                                     \)\)) Tj
+T*
+(@@ -554,8 +668,22 @@ const KodiPortal = \(\) => {) Tj
+T*
+(                                 <div>) Tj
+T*
+(                                     <h3>{lead.name}</h3>) Tj
+T*
+(                                     <p>{lead.email || 'Email not provided'}</p>) Tj
+T*
+(+                                    <p>Application: {lead.application_status || 'incomplete'}</p>) Tj
+T*
+(+                                    <p>Source: {lead.source || 'manual'}</p>) Tj
+T*
+(+                                </div>) Tj
+T*
+(+                                <div className="kodi-portal__lead-actions">) Tj
+T*
+(+                                    <span className="kodi-portal__status-chip">{lead.status || 'incomplete'}</span>) Tj
+T*
+(+                                    {\(leadOpportunities[lead.id] || []\).length > 0 && \() Tj
+T*
+(+                                        <span className="kodi-portal__status-chip">) Tj
+T*
+(+                                            Stage: {leadOpportunities[lead.id][0]?.stage || 'prospecting'}) Tj
+T*
+(+                                        </span>) Tj
+T*
+(+                                    \)}) Tj
+T*
+(+                                    {lead.status !== 'converted' && \() Tj
+T*
+(+                                        <button className="btn-text" onClick={\(\) => handleConvertLead\(lead.id\)}>) Tj
+T*
+(+                                            Convert) Tj
+T*
+(+                                        </button>) Tj
+T*
+(+                                    \)}) Tj
+T*
+(                                 </div>) Tj
+T*
+(-                                <span className="kodi-portal__status-chip">{lead.status || 'incomplete'}</span>) Tj
+T*
+(                             </article>) Tj
+T*
+(                         \)\)}) Tj
+T*
+(                     </div>) Tj
+T*
+(@@ -637,6 +765,50 @@ const KodiPortal = \(\) => {) Tj
+T*
+(                 </div>) Tj
+T*
+(             \)}) Tj
+T*
+( ) Tj
+T*
+(+            {editAppModal.open && editAppModal.app && \() Tj
+T*
+(+                <div className="kodi-portal__modal">) Tj
+T*
+(+                    <div className="kodi-portal__modal-content">) Tj
+T*
+(+                        <div className="kodi-portal__modal-header">) Tj
+T*
+(+                            <h2>Edit {editAppModal.app.name}</h2>) Tj
+T*
+(+                            <button className="btn-text" onClick={\(\) => setEditAppModal\({ open: false, app: null }\)}>) Tj
+T*
+(+                                Close) Tj
+T*
+(+                            </button>) Tj
+T*
+(+                        </div>) Tj
+T*
+(+                        <form className="kodi-portal__form" onSubmit={handleUpdateApp}>) Tj
+T*
+(+                            <label>) Tj
+T*
+(+                                App name) Tj
+T*
+(+                                <input) Tj
+T*
+(+                                    type="text") Tj
+T*
+(+                                    value={editForm.name}) Tj
+T*
+(+                                    onChange={\(event\) => setEditForm\(\(prev\) => \({ ...prev, name: event.target.value }\)\)}) Tj
+T*
+(+                                />) Tj
+T*
+(+                            </label>) Tj
+T*
+(+                            <label>) Tj
+T*
+(+                                Description) Tj
+T*
+(+                                <textarea) Tj
+T*
+(+                                    rows="3") Tj
+T*
+(+                                    value={editForm.description}) Tj
+T*
+(+                                    onChange={\(event\) =>) Tj
+T*
+(+                                        setEditForm\(\(prev\) => \({ ...prev, description: event.target.value }\)\)) Tj
+T*
+(+                                    }) Tj
+T*
+(+                                />) Tj
+ET
+endstream
+endobj
+54 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 55 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+55 0 obj
+<< /Length 4051 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(+                            </label>) Tj
+T*
+(+                            <label className="kodi-portal__checkbox">) Tj
+T*
+(+                                <input) Tj
+T*
+(+                                    type="checkbox") Tj
+T*
+(+                                    checked={editForm.isActive}) Tj
+T*
+(+                                    onChange={\(\) => setEditForm\(\(prev\) => \({ ...prev, isActive: !prev.isActive }\)\)}) Tj
+T*
+(+                                />) Tj
+T*
+(+                                App is active) Tj
+T*
+(+                            </label>) Tj
+T*
+(+                            <button className="btn-primary" type="submit" disabled={savingApp}>) Tj
+T*
+(+                                {savingApp ? 'Saving...' : 'Save changes'}) Tj
+T*
+(+                            </button>) Tj
+T*
+(+                        </form>) Tj
+T*
+(+                    </div>) Tj
+T*
+(+                </div>) Tj
+T*
+(+            \)}) Tj
+T*
+(+) Tj
+T*
+(             {permissionModal.open && permissionModal.page && \() Tj
+T*
+(                 <div className="kodi-portal__modal">) Tj
+T*
+(                     <div className="kodi-portal__modal-content">) Tj
+T*
+(@@ -766,6 +938,85 @@ const KodiPortal = \(\) => {) Tj
+T*
+(                 </div>) Tj
+T*
+(             \)}) Tj
+T*
+( ) Tj
+T*
+(+            {assignPageUserModal.open && assignPageUserModal.page && \() Tj
+T*
+(+                <div className="kodi-portal__modal">) Tj
+T*
+(+                    <div className="kodi-portal__modal-content">) Tj
+T*
+(+                        <div className="kodi-portal__modal-header">) Tj
+T*
+(+                            <h2>Assign user to {assignPageUserModal.page.label}</h2>) Tj
+T*
+(+                            <button) Tj
+T*
+(+                                className="btn-text") Tj
+T*
+(+                                onClick={\(\) =>) Tj
+T*
+(+                                    setAssignPageUserModal\({) Tj
+T*
+(+                                        open: false,) Tj
+T*
+(+                                        page: null,) Tj
+T*
+(+                                        email: '',) Tj
+T*
+(+                                        permissions: { canView: true, canEdit: false, canUse: false },) Tj
+T*
+(+                                        assigning: false) Tj
+T*
+(+                                    }\)) Tj
+T*
+(+                                }) Tj
+T*
+(+                            >) Tj
+T*
+(+                                Close) Tj
+T*
+(+                            </button>) Tj
+T*
+(+                        </div>) Tj
+T*
+(+                        <div className="kodi-portal__form">) Tj
+T*
+(+                            <label>) Tj
+T*
+(+                                User email) Tj
+T*
+(+                                <input) Tj
+T*
+(+                                    type="email") Tj
+T*
+(+                                    value={assignPageUserModal.email}) Tj
+T*
+(+                                    onChange={\(event\) => setAssignPageUserModal\(\(prev\) => \({ ...prev, email: event.target.value }\)\)}) Tj
+T*
+(+                                    placeholder="user@example.com") Tj
+T*
+(+                                />) Tj
+T*
+(+                            </label>) Tj
+T*
+(+                            <div className="kodi-portal__checkbox-group">) Tj
+T*
+(+                                <label>) Tj
+T*
+(+                                    <input) Tj
+T*
+(+                                        type="checkbox") Tj
+T*
+(+                                        checked={assignPageUserModal.permissions.canView}) Tj
+T*
+(+                                        onChange={\(\) =>) Tj
+T*
+(+                                            setAssignPageUserModal\(\(prev\) => \({) Tj
+T*
+(+                                                ...prev,) Tj
+T*
+(+                                                permissions: { ...prev.permissions, canView: !prev.permissions.canView }) Tj
+T*
+(+                                            }\)\)) Tj
+T*
+(+                                        }) Tj
+ET
+endstream
+endobj
+56 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 57 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+57 0 obj
+<< /Length 3391 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(+                                    />) Tj
+T*
+(+                                    Can view) Tj
+T*
+(+                                </label>) Tj
+T*
+(+                                <label>) Tj
+T*
+(+                                    <input) Tj
+T*
+(+                                        type="checkbox") Tj
+T*
+(+                                        checked={assignPageUserModal.permissions.canEdit}) Tj
+T*
+(+                                        onChange={\(\) =>) Tj
+T*
+(+                                            setAssignPageUserModal\(\(prev\) => \({) Tj
+T*
+(+                                                ...prev,) Tj
+T*
+(+                                                permissions: { ...prev.permissions, canEdit: !prev.permissions.canEdit }) Tj
+T*
+(+                                            }\)\)) Tj
+T*
+(+                                        }) Tj
+T*
+(+                                    />) Tj
+T*
+(+                                    Can edit) Tj
+T*
+(+                                </label>) Tj
+T*
+(+                                <label>) Tj
+T*
+(+                                    <input) Tj
+T*
+(+                                        type="checkbox") Tj
+T*
+(+                                        checked={assignPageUserModal.permissions.canUse}) Tj
+T*
+(+                                        onChange={\(\) =>) Tj
+T*
+(+                                            setAssignPageUserModal\(\(prev\) => \({) Tj
+T*
+(+                                                ...prev,) Tj
+T*
+(+                                                permissions: { ...prev.permissions, canUse: !prev.permissions.canUse }) Tj
+T*
+(+                                            }\)\)) Tj
+T*
+(+                                        }) Tj
+T*
+(+                                    />) Tj
+T*
+(+                                    Can use) Tj
+T*
+(+                                </label>) Tj
+T*
+(+                            </div>) Tj
+T*
+(+                            <button className="btn-primary" onClick={handleAssignPageUser} disabled={assignPageUserModal.assigning}>) Tj
+T*
+(+                                {assignPageUserModal.assigning ? 'Assigning...' : 'Assign user'}) Tj
+T*
+(+                            </button>) Tj
+T*
+(+                        </div>) Tj
+T*
+(+                    </div>) Tj
+T*
+(+                </div>) Tj
+T*
+(+            \)}) Tj
+T*
+(+) Tj
+T*
+(             {fieldModal.open && fieldModal.object && \() Tj
+T*
+(                 <div className="kodi-portal__modal">) Tj
+T*
+(                     <div className="kodi-portal__modal-content">) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(FILE: frontend/src/pages/kodi/KodiPortal.css) Tj
+T*
+(----------------------------------------) Tj
+T*
+(diff --git a/frontend/src/pages/kodi/KodiPortal.css b/frontend/src/pages/kodi/KodiPortal.css) Tj
+T*
+(index 79a3fafe..62972b06 100644) Tj
+T*
+(--- a/frontend/src/pages/kodi/KodiPortal.css) Tj
+T*
+(+++ b/frontend/src/pages/kodi/KodiPortal.css) Tj
+T*
+(@@ -209,6 +209,14 @@) Tj
+T*
+(     color: #374151;) Tj
+T*
+( }) Tj
+T*
+( ) Tj
+T*
+(+.kodi-portal__checkbox {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    align-items: center;) Tj
+T*
+(+    gap: 0.4rem;) Tj
+T*
+(+    font-size: 0.9rem;) Tj
+T*
+(+    color: #374151;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+( .kodi-portal__loader,) Tj
+T*
+( .kodi-portal__empty {) Tj
+T*
+(     grid-column: 1/-1;) Tj
+T*
+(@@ -348,6 +356,13 @@) Tj
+ET
+endstream
+endobj
+58 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 59 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+59 0 obj
+<< /Length 1696 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(     gap: 1rem;) Tj
+T*
+( }) Tj
+T*
+( ) Tj
+T*
+(+.kodi-portal__lead-actions {) Tj
+T*
+(+    display: flex;) Tj
+T*
+(+    flex-direction: column;) Tj
+T*
+(+    gap: 0.35rem;) Tj
+T*
+(+    align-items: flex-end;) Tj
+T*
+(+}) Tj
+T*
+(+) Tj
+T*
+( .kodi-portal__status-chip {) Tj
+T*
+(     padding: 0.2rem 0.7rem;) Tj
+T*
+(     border-radius: 999px;) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(Styles Added) Tj
+T*
+(========================================) Tj
+T*
+(frontend/src/pages/kodi/KodiBuilder.css:) Tj
+T*
+() Tj
+T*
+(.kodi-builder {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    flex-direction: column;) Tj
+T*
+(    gap: 16px;) Tj
+T*
+(    padding: 24px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__toolbar {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    justify-content: space-between;) Tj
+T*
+(    align-items: center;) Tj
+T*
+(    background: #ffffff;) Tj
+T*
+(    border: 1px solid #e2e8f0;) Tj
+T*
+(    border-radius: 12px;) Tj
+T*
+(    padding: 16px 20px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__toolbar-actions {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    flex-wrap: wrap;) Tj
+T*
+(    gap: 10px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__content {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    grid-template-columns: 280px minmax\(0, 1fr\) 320px;) Tj
+T*
+(    gap: 16px;) Tj
+T*
+(    min-height: 70vh;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__library,) Tj
+T*
+(.kodi-config {) Tj
+T*
+(    background: #ffffff;) Tj
+T*
+(    border: 1px solid #e2e8f0;) Tj
+T*
+(    border-radius: 12px;) Tj
+T*
+(    padding: 16px;) Tj
+T*
+(    height: 100%;) Tj
+T*
+(    overflow: hidden;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__library-header {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 8px;) Tj
+T*
+(    margin-bottom: 12px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+ET
+endstream
+endobj
+60 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 61 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+61 0 obj
+<< /Length 1724 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(.kodi-builder__library-list {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 10px;) Tj
+T*
+(    overflow-y: auto;) Tj
+T*
+(    max-height: calc\(70vh - 140px\);) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__library-item {) Tj
+T*
+(    border: 1px solid #e2e8f0;) Tj
+T*
+(    border-radius: 10px;) Tj
+T*
+(    padding: 10px 12px;) Tj
+T*
+(    display: flex;) Tj
+T*
+(    justify-content: space-between;) Tj
+T*
+(    gap: 12px;) Tj
+T*
+(    cursor: grab;) Tj
+T*
+(    background: #f8fafc;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__library-type {) Tj
+T*
+(    font-size: 12px;) Tj
+T*
+(    color: #64748b;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__canvas {) Tj
+T*
+(    background: #f8fafc;) Tj
+T*
+(    border: 1px dashed #cbd5f5;) Tj
+T*
+(    border-radius: 12px;) Tj
+T*
+(    padding: 16px;) Tj
+T*
+(    overflow: auto;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__row {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    gap: 12px;) Tj
+T*
+(    margin-bottom: 16px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__row--vertical {) Tj
+T*
+(    flex-direction: column;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__column {) Tj
+T*
+(    flex: 1;) Tj
+T*
+(    background: #ffffff;) Tj
+T*
+(    border-radius: 10px;) Tj
+T*
+(    border: 1px solid #e2e8f0;) Tj
+T*
+(    padding: 12px;) Tj
+T*
+(    min-height: 140px;) Tj
+T*
+(    position: relative;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__column-grid {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 8px;) Tj
+T*
+(    grid-auto-rows: 48px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__column-empty {) Tj
+T*
+(    position: absolute;) Tj
+T*
+(    inset: 12px;) Tj
+T*
+(    display: flex;) Tj
+T*
+(    align-items: center;) Tj
+T*
+(    justify-content: center;) Tj
+T*
+(    color: #94a3b8;) Tj
+T*
+(    font-size: 13px;) Tj
+ET
+endstream
+endobj
+62 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 63 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+63 0 obj
+<< /Length 1734 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(    pointer-events: none;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__component {) Tj
+T*
+(    background: #ffffff;) Tj
+T*
+(    border: 1px solid #cbd5f5;) Tj
+T*
+(    border-radius: 10px;) Tj
+T*
+(    padding: 10px;) Tj
+T*
+(    position: relative;) Tj
+T*
+(    cursor: grab;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__component.is-selected {) Tj
+T*
+(    border-color: #6366f1;) Tj
+T*
+(    box-shadow: 0 0 0 2px rgba\(99, 102, 241, 0.2\);) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__component.is-hidden {) Tj
+T*
+(    opacity: 0.5;) Tj
+T*
+(    border-style: dashed;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__component-header {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    justify-content: space-between;) Tj
+T*
+(    font-size: 12px;) Tj
+T*
+(    margin-bottom: 6px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-resize-handle {) Tj
+T*
+(    position: absolute;) Tj
+T*
+(    background: rgba\(99, 102, 241, 0.7\);) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-resize-handle--width {) Tj
+T*
+(    width: 6px;) Tj
+T*
+(    top: 8px;) Tj
+T*
+(    bottom: 8px;) Tj
+T*
+(    right: 2px;) Tj
+T*
+(    cursor: ew-resize;) Tj
+T*
+(    border-radius: 4px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-resize-handle--height {) Tj
+T*
+(    height: 6px;) Tj
+T*
+(    left: 8px;) Tj
+T*
+(    right: 8px;) Tj
+T*
+(    bottom: 2px;) Tj
+T*
+(    cursor: ns-resize;) Tj
+T*
+(    border-radius: 4px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-config__header {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    justify-content: space-between;) Tj
+T*
+(    align-items: center;) Tj
+T*
+(    margin-bottom: 16px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-config__body {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 18px;) Tj
+T*
+(    overflow-y: auto;) Tj
+T*
+(    max-height: calc\(70vh - 120px\);) Tj
+T*
+(    padding-right: 8px;) Tj
+ET
+endstream
+endobj
+64 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 65 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+65 0 obj
+<< /Length 1558 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-config__section {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 8px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-config__field {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 6px;) Tj
+T*
+(    font-size: 13px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-config__checkbox-group {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 6px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-builder__layout-switcher {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    gap: 12px;) Tj
+T*
+(    align-items: center;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-modal {) Tj
+T*
+(    position: fixed;) Tj
+T*
+(    inset: 0;) Tj
+T*
+(    background: rgba\(15, 23, 42, 0.45\);) Tj
+T*
+(    display: flex;) Tj
+T*
+(    align-items: center;) Tj
+T*
+(    justify-content: center;) Tj
+T*
+(    z-index: 50;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-modal__content {) Tj
+T*
+(    background: #ffffff;) Tj
+T*
+(    border-radius: 12px;) Tj
+T*
+(    padding: 20px;) Tj
+T*
+(    width: 420px;) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 12px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-modal__header {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    justify-content: space-between;) Tj
+T*
+(    align-items: center;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-modal__field {) Tj
+T*
+(    display: grid;) Tj
+T*
+(    gap: 6px;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(frontend/src/pages/kodi/KodiPortal.css:) Tj
+T*
+(.kodi-portal__checkbox {) Tj
+T*
+(    display: flex;) Tj
+T*
+(    align-items: center;) Tj
+T*
+(    gap: 0.4rem;) Tj
+T*
+(    font-size: 0.9rem;) Tj
+T*
+(    color: #374151;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(.kodi-portal__lead-actions {) Tj
+T*
+(    display: flex;) Tj
+ET
+endstream
+endobj
+66 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 67 0 R /Resources << /Font << /F1 3 0 R >> >> >> >>
+endobj
+67 0 obj
+<< /Length 146 >>
+stream
+BT
+/F1 9 Tf
+36 747 Td
+(    flex-direction: column;) Tj
+T*
+(    gap: 0.35rem;) Tj
+T*
+(    align-items: flex-end;) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+() Tj
+ET
+endstream
+endobj
+xref
+0 68
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000331 00000 n 
+0000000399 00000 n 
+0000000528 00000 n 
+0000003396 00000 n 
+0000003525 00000 n 
+0000006743 00000 n 
+0000006872 00000 n 
+0000010088 00000 n 
+0000010219 00000 n 
+0000012975 00000 n 
+0000013106 00000 n 
+0000016574 00000 n 
+0000016705 00000 n 
+0000019466 00000 n 
+0000019597 00000 n 
+0000022849 00000 n 
+0000022980 00000 n 
+0000028742 00000 n 
+0000028873 00000 n 
+0000032088 00000 n 
+0000032219 00000 n 
+0000035016 00000 n 
+0000035147 00000 n 
+0000038683 00000 n 
+0000038814 00000 n 
+0000042378 00000 n 
+0000042509 00000 n 
+0000045776 00000 n 
+0000045907 00000 n 
+0000048298 00000 n 
+0000048429 00000 n 
+0000051313 00000 n 
+0000051444 00000 n 
+0000054281 00000 n 
+0000054412 00000 n 
+0000057378 00000 n 
+0000057509 00000 n 
+0000059371 00000 n 
+0000059502 00000 n 
+0000061339 00000 n 
+0000061470 00000 n 
+0000063186 00000 n 
+0000063317 00000 n 
+0000065434 00000 n 
+0000065565 00000 n 
+0000069085 00000 n 
+0000069216 00000 n 
+0000072000 00000 n 
+0000072131 00000 n 
+0000075588 00000 n 
+0000075719 00000 n 
+0000080256 00000 n 
+0000080387 00000 n 
+0000084491 00000 n 
+0000084622 00000 n 
+0000088066 00000 n 
+0000088197 00000 n 
+0000089946 00000 n 
+0000090077 00000 n 
+0000091854 00000 n 
+0000091985 00000 n 
+0000093772 00000 n 
+0000093903 00000 n 
+0000095514 00000 n 
+0000095645 00000 n 
+trailer
+<< /Size 68 /Root 1 0 R >>
+startxref
+97213
+%%EOF

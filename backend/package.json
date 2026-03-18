@@ -7,7 +7,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "npm run test:auto-review",
-    "test:auto-review": "node tests/autoReviewHelpers.test.js && node tests/adWorkflow.test.js && node tests/emailMarketingService.test.js && node tests/emailMarketingApi.test.js && node tests/adminPricing.test.js && node tests/pricingServiceCountry.test.js && node tests/flowService.test.js && node tests/flowRuntimeEngine.test.js"
+    "test:auto-review": "node tests/autoReviewHelpers.test.js && node tests/adWorkflow.test.js && node tests/emailMarketingService.test.js && node tests/emailMarketingApi.test.js && node tests/adminPricing.test.js && node tests/pricingServiceCountry.test.js && node tests/flowService.test.js && node tests/flowRuntimeEngine.test.js && node tests/kodiPlatform.test.js && node tests/marketingService.test.js",
+    "seed:kodi-objects": "node src/seeders/kodiObjectsSeeder.js",
+    "seed:kodi-components": "node src/seeders/kodiComponentsSeeder.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

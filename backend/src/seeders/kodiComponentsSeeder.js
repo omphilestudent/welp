@@ -174,19 +174,20 @@ const defaultComponents = [
 
 const seedKodiComponents = async ({ createdByUserId = null } = {}) => {
     // Table might not exist yet in some environments.
-    const table = await query(`SELECT to_regclass('public.kc_kodi_components') as t`);
+    const table = await query(`SELECT to_regclass('public.kodi_components') as t`);
     if (!table.rows[0]?.t) {
-        console.warn('kc_kodi_components table not found; skipping Kodi components seed.');
+        console.warn('kodi_components table not found; skipping Kodi components seed.');
         return { inserted: 0, skipped: defaultComponents.length };
     }
 
     let inserted = 0;
     for (const comp of defaultComponents) {
+        const componentType = comp.component_type === 'page_block' ? 'custom_page' : 'custom_widget';
         const result = await query(
-            `INSERT INTO kc_kodi_components (component_name, component_type, code, config, version, created_by_user_id)
-             VALUES ($1, $2, $3, $4, 1, $5)
+            `INSERT INTO kodi_components (component_name, component_type, code, version, created_by_user_id)
+             VALUES ($1, $2, $3, 1, $4)
              ON CONFLICT (component_name) DO NOTHING`,
-            [comp.component_name, comp.component_type, comp.code, comp.config || {}, createdByUserId]
+            [comp.component_name, componentType, comp.code, createdByUserId]
         );
         if (result.rowCount > 0) inserted += 1;
     }

@@ -1,4 +1,5 @@
-const { query } = require('../utils/database');
+const database = require('../utils/database');
+const query = (...args) => database.query(...args);
 
 const parseJson = (value, fallback = {}) => {
     if (value === null || value === undefined) return fallback;

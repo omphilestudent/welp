@@ -209,6 +209,14 @@
     color: #374151;
 }
 
+.kodi-portal__checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    color: #374151;
+}
+
 .kodi-portal__loader,
 .kodi-portal__empty {
     grid-column: 1/-1;
@@ -346,6 +354,13 @@
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
+}
+
+.kodi-portal__lead-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: flex-end;
 }
 
 .kodi-portal__status-chip {

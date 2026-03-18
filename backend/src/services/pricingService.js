@@ -1,4 +1,5 @@
-const { query } = require('../utils/database');
+const database = require('../utils/database');
+const query = (...args) => database.query(...args);
 
 const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'USD').toUpperCase();
 const CURRENCY_CACHE_TTL_MS = Number(process.env.CURRENCY_CACHE_TTL_MS || 300_000);

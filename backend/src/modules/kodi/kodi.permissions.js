@@ -11,6 +11,9 @@ const formatPermissions = (rows) => {
 };
 
 const userHasViewAccess = (permissionMap, role) => {
+    if (!permissionMap || Object.keys(permissionMap).length === 0) {
+        return role === 'admin';
+    }
     if (!role) return false;
     const entry = permissionMap[role];
     return Boolean(entry?.can_view);

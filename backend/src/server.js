@@ -17,6 +17,9 @@ const userRoutes = require('./routes/userRoutes');
 const psychologistRoutes = require('./routes/psychologistRoutes');
 const pricingRoutes = require('./routes/pricingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const marketingAdminRoutes = require('./modules/marketing/marketing.routes');
+const { authenticate } = require('./middleware/auth');
+const { authorizeAdmin } = require('./middleware/adminAuth');
 const applicationRoutes = require('./routes/applicationRoutes');
 const hrRoutes = require('./routes/hrRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
@@ -31,7 +34,9 @@ const flowRuntimeRoutes = require('./routes/flowRuntimeRoutes');
 const adsRoutes = require('./routes/adsRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
 const kodiRoutes = require('./routes/kodiRoutes');
+const kodiPlatformRoutes = require('./modules/kodi/kodi.routes');
 const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
+const { startScheduler: startMarketingCampaignScheduler } = require('./modules/marketing/marketing.scheduler');
 const { initEmailMarketingTables, startEmailCampaignScheduler } = require('./services/emailMarketingService');
 const { query } = require('./utils/database');
 const { createUserNotification } = require('./utils/userNotifications');
@@ -170,6 +175,7 @@ app.use('/api/admin/flows', adminFlowRoutes);
 app.use('/api/admin/tickets', adminTicketRoutes);
 app.use('/api/flows', flowRuntimeRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/marketing', authenticate, authorizeAdmin(), marketingAdminRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
@@ -180,6 +186,7 @@ app.use('/api/admin/emailCampaigns', emailMarketingRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/kodi', kodiRoutes);
+app.use('/api/kodi/platform', kodiPlatformRoutes);
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {
@@ -752,6 +759,7 @@ const startServer = async () => {
                 await initMarketingTables();
                 await initEmailMarketingTables();
                 startMarketingScheduler();
+                startMarketingCampaignScheduler();
                 startEmailCampaignScheduler();
             } catch (error) {
                 console.warn('⚠️ Marketing scheduler init failure:', error.message);

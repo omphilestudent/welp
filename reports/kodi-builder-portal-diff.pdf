@@ -1,0 +1,1109 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+2 0 obj
+<< /Length 4474 >>
+stream
+BT
+/F1 9 Tf
+36 756 Td
+(﻿diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx) Tj
+0 -11 Td
+(index 05fe4d1b..ff145c49 100644) Tj
+0 -11 Td
+(--- a/frontend/src/App.jsx) Tj
+0 -11 Td
+(+++ b/frontend/src/App.jsx) Tj
+0 -11 Td
+(@@ -59,10 +59,10 @@ import AdminTickets from './pages/admin/AdminTickets';) Tj
+0 -11 Td
+( import KodiDashboard from './pages/kodi/KodiDashboard';) Tj
+0 -11 Td
+( import KodiLogin from './pages/kodi/KodiLogin';) Tj
+0 -11 Td
+( import KodiPage from './pages/kodi/KodiPage';) Tj
+0 -11 Td
+(-import KodiBuilder from './pages/kodi/KodiBuilder';) Tj
+0 -11 Td
+(-import KodiPortal from './pages/kodi/KodiPortal';) Tj
+0 -11 Td
+( import KodiTimes from './pages/kodi/KodiTimes';) Tj
+0 -11 Td
+(-import KodiRuntime from './pages/kodi/KodiRuntime';) Tj
+0 -11 Td
+(+import KodiBuilderPage from './pages/kodi/KodiBuilderPage';) Tj
+0 -11 Td
+(+import KodiRuntimePage from './pages/kodi/KodiRuntimePage';) Tj
+0 -11 Td
+(+import KodiPortalPage from './pages/kodi/KodiPortalPage';) Tj
+0 -11 Td
+( ) Tj
+0 -11 Td
+( // HR Pages) Tj
+0 -11 Td
+( import Employees from './pages/hr/Employees';) Tj
+0 -11 Td
+(@@ -205,31 +205,31 @@ function App\(\) {) Tj
+0 -11 Td
+(                                     path="/kodi/portal") Tj
+0 -11 Td
+(                                     element={) Tj
+0 -11 Td
+(                                         <PrivateRoute>) Tj
+0 -11 Td
+(-                                            <KodiPortal />) Tj
+0 -11 Td
+(+                                            <KodiPortalPage />) Tj
+0 -11 Td
+(                                         </PrivateRoute>) Tj
+0 -11 Td
+(                                     }) Tj
+0 -11 Td
+(                                 />) Tj
+0 -11 Td
+(                                 <Route) Tj
+0 -11 Td
+(                                     path="/kodi/builder/:pageId") Tj
+0 -11 Td
+(                                     element={) Tj
+0 -11 Td
+(-                                        <PrivateRoute>) Tj
+0 -11 Td
+(-                                            <KodiBuilder />) Tj
+0 -11 Td
+(-                                        </PrivateRoute>) Tj
+0 -11 Td
+(+                                        <AdminRoute requiredRole="admin">) Tj
+0 -11 Td
+(+                                            <KodiBuilderPage />) Tj
+0 -11 Td
+(+                                        </AdminRoute>) Tj
+0 -11 Td
+(                                     }) Tj
+0 -11 Td
+(                                 />) Tj
+0 -11 Td
+(                                 <Route) Tj
+0 -11 Td
+(                                     path="/kodi/builder") Tj
+0 -11 Td
+(                                     element={) Tj
+0 -11 Td
+(-                                        <PrivateRoute>) Tj
+0 -11 Td
+(-                                            <KodiBuilder />) Tj
+0 -11 Td
+(-                                        </PrivateRoute>) Tj
+0 -11 Td
+(+                                        <AdminRoute requiredRole="admin">) Tj
+0 -11 Td
+(+                                            <KodiBuilderPage />) Tj
+0 -11 Td
+(+                                        </AdminRoute>) Tj
+0 -11 Td
+(                                     }) Tj
+0 -11 Td
+(                                 />) Tj
+0 -11 Td
+(                                 <Route) Tj
+0 -11 Td
+(                                     path="/kodi/runtime/:pageId") Tj
+0 -11 Td
+(                                     element={) Tj
+0 -11 Td
+(                                         <PrivateRoute>) Tj
+0 -11 Td
+(-                                            <KodiRuntime />) Tj
+0 -11 Td
+(+                                            <KodiRuntimePage />) Tj
+0 -11 Td
+(                                         </PrivateRoute>) Tj
+0 -11 Td
+(                                     }) Tj
+0 -11 Td
+(                                 />) Tj
+0 -11 Td
+(@@ -263,7 +263,7 @@ function App\(\) {) Tj
+0 -11 Td
+(                                     <Route path="flows" element={<FlowAdmin />} />) Tj
+0 -11 Td
+(                                     <Route path="flows/advanced" element={<FlowManagement />} />) Tj
+0 -11 Td
+(                                     <Route path="flows/:id/builder" element={<FlowBuilder />} />) Tj
+0 -11 Td
+(-                                    <Route path="kodi/builder" element={<KodiBuilder />} />) Tj
+0 -11 Td
+(+                                    <Route path="kodi/builder" element={<KodiBuilderPage />} />) Tj
+0 -11 Td
+(                                     <Route path="calendar" element={<CalendarTroubleshoot />} />) Tj
+0 -11 Td
+ET
+endstream
+endobj
+3 0 obj
+<< /Length 2506 >>
+stream
+BT
+/F1 9 Tf
+36 756 Td
+(                                     <Route path="subscriptions" element={<SubscriptionManagement />} />) Tj
+0 -11 Td
+(                                     <Route path="settings" element={<SystemSettings />} />) Tj
+0 -11 Td
+(diff --git a/frontend/src/pages/kodi/KodiBuilder.css b/frontend/src/pages/kodi/KodiBuilder.css) Tj
+0 -11 Td
+(index e7653cd6..552ddc8f 100644) Tj
+0 -11 Td
+(--- a/frontend/src/pages/kodi/KodiBuilder.css) Tj
+0 -11 Td
+(+++ b/frontend/src/pages/kodi/KodiBuilder.css) Tj
+0 -11 Td
+(@@ -1072,3 +1072,228 @@) Tj
+0 -11 Td
+(     border: 1px solid rgba\(255, 255, 255, 0.3\);) Tj
+0 -11 Td
+(     background: rgba\(255, 255, 255, 0.1\);) Tj
+0 -11 Td
+( }) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    flex-direction: column;) Tj
+0 -11 Td
+(+    gap: 16px;) Tj
+0 -11 Td
+(+    padding: 24px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__toolbar {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    justify-content: space-between;) Tj
+0 -11 Td
+(+    align-items: center;) Tj
+0 -11 Td
+(+    background: #ffffff;) Tj
+0 -11 Td
+(+    border: 1px solid #e2e8f0;) Tj
+0 -11 Td
+(+    border-radius: 12px;) Tj
+0 -11 Td
+(+    padding: 16px 20px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__toolbar-actions {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    flex-wrap: wrap;) Tj
+0 -11 Td
+(+    gap: 10px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__content {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    grid-template-columns: 280px minmax\(0, 1fr\) 320px;) Tj
+0 -11 Td
+(+    gap: 16px;) Tj
+0 -11 Td
+(+    min-height: 70vh;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__library,) Tj
+0 -11 Td
+(+.kodi-config {) Tj
+0 -11 Td
+(+    background: #ffffff;) Tj
+0 -11 Td
+(+    border: 1px solid #e2e8f0;) Tj
+0 -11 Td
+(+    border-radius: 12px;) Tj
+0 -11 Td
+(+    padding: 16px;) Tj
+0 -11 Td
+(+    height: 100%;) Tj
+0 -11 Td
+(+    overflow: hidden;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__library-header {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 8px;) Tj
+0 -11 Td
+(+    margin-bottom: 12px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__library-list {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 10px;) Tj
+0 -11 Td
+(+    overflow-y: auto;) Tj
+0 -11 Td
+(+    max-height: calc\(70vh - 140px\);) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__library-item {) Tj
+0 -11 Td
+ET
+endstream
+endobj
+4 0 obj
+<< /Length 2181 >>
+stream
+BT
+/F1 9 Tf
+36 756 Td
+(+    border: 1px solid #e2e8f0;) Tj
+0 -11 Td
+(+    border-radius: 10px;) Tj
+0 -11 Td
+(+    padding: 10px 12px;) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    justify-content: space-between;) Tj
+0 -11 Td
+(+    gap: 12px;) Tj
+0 -11 Td
+(+    cursor: grab;) Tj
+0 -11 Td
+(+    background: #f8fafc;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__library-type {) Tj
+0 -11 Td
+(+    font-size: 12px;) Tj
+0 -11 Td
+(+    color: #64748b;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__canvas {) Tj
+0 -11 Td
+(+    background: #f8fafc;) Tj
+0 -11 Td
+(+    border: 1px dashed #cbd5f5;) Tj
+0 -11 Td
+(+    border-radius: 12px;) Tj
+0 -11 Td
+(+    padding: 16px;) Tj
+0 -11 Td
+(+    overflow: auto;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__row {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    gap: 12px;) Tj
+0 -11 Td
+(+    margin-bottom: 16px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__row--vertical {) Tj
+0 -11 Td
+(+    flex-direction: column;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__column {) Tj
+0 -11 Td
+(+    flex: 1;) Tj
+0 -11 Td
+(+    background: #ffffff;) Tj
+0 -11 Td
+(+    border-radius: 10px;) Tj
+0 -11 Td
+(+    border: 1px solid #e2e8f0;) Tj
+0 -11 Td
+(+    padding: 12px;) Tj
+0 -11 Td
+(+    min-height: 140px;) Tj
+0 -11 Td
+(+    position: relative;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__column-grid {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 8px;) Tj
+0 -11 Td
+(+    grid-auto-rows: 48px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__column-empty {) Tj
+0 -11 Td
+(+    position: absolute;) Tj
+0 -11 Td
+(+    inset: 12px;) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    align-items: center;) Tj
+0 -11 Td
+(+    justify-content: center;) Tj
+0 -11 Td
+(+    color: #94a3b8;) Tj
+0 -11 Td
+(+    font-size: 13px;) Tj
+0 -11 Td
+(+    pointer-events: none;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__component {) Tj
+0 -11 Td
+(+    background: #ffffff;) Tj
+0 -11 Td
+(+    border: 1px solid #cbd5f5;) Tj
+0 -11 Td
+(+    border-radius: 10px;) Tj
+0 -11 Td
+(+    padding: 10px;) Tj
+0 -11 Td
+ET
+endstream
+endobj
+5 0 obj
+<< /Length 2094 >>
+stream
+BT
+/F1 9 Tf
+36 756 Td
+(+    position: relative;) Tj
+0 -11 Td
+(+    cursor: grab;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__component.is-selected {) Tj
+0 -11 Td
+(+    border-color: #6366f1;) Tj
+0 -11 Td
+(+    box-shadow: 0 0 0 2px rgba\(99, 102, 241, 0.2\);) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__component-header {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    justify-content: space-between;) Tj
+0 -11 Td
+(+    font-size: 12px;) Tj
+0 -11 Td
+(+    margin-bottom: 6px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-resize-handle {) Tj
+0 -11 Td
+(+    position: absolute;) Tj
+0 -11 Td
+(+    background: rgba\(99, 102, 241, 0.7\);) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-resize-handle--width {) Tj
+0 -11 Td
+(+    width: 6px;) Tj
+0 -11 Td
+(+    top: 8px;) Tj
+0 -11 Td
+(+    bottom: 8px;) Tj
+0 -11 Td
+(+    right: 2px;) Tj
+0 -11 Td
+(+    cursor: ew-resize;) Tj
+0 -11 Td
+(+    border-radius: 4px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-resize-handle--height {) Tj
+0 -11 Td
+(+    height: 6px;) Tj
+0 -11 Td
+(+    left: 8px;) Tj
+0 -11 Td
+(+    right: 8px;) Tj
+0 -11 Td
+(+    bottom: 2px;) Tj
+0 -11 Td
+(+    cursor: ns-resize;) Tj
+0 -11 Td
+(+    border-radius: 4px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-config__header {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    justify-content: space-between;) Tj
+0 -11 Td
+(+    align-items: center;) Tj
+0 -11 Td
+(+    margin-bottom: 16px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-config__body {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 18px;) Tj
+0 -11 Td
+(+    overflow-y: auto;) Tj
+0 -11 Td
+(+    max-height: calc\(70vh - 120px\);) Tj
+0 -11 Td
+(+    padding-right: 8px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-config__section {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 8px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-config__field {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 6px;) Tj
+0 -11 Td
+(+    font-size: 13px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+ET
+endstream
+endobj
+6 0 obj
+<< /Length 2382 >>
+stream
+BT
+/F1 9 Tf
+36 756 Td
+(+.kodi-config__checkbox-group {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 6px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-builder__layout-switcher {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    gap: 12px;) Tj
+0 -11 Td
+(+    align-items: center;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-modal {) Tj
+0 -11 Td
+(+    position: fixed;) Tj
+0 -11 Td
+(+    inset: 0;) Tj
+0 -11 Td
+(+    background: rgba\(15, 23, 42, 0.45\);) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    align-items: center;) Tj
+0 -11 Td
+(+    justify-content: center;) Tj
+0 -11 Td
+(+    z-index: 50;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-modal__content {) Tj
+0 -11 Td
+(+    background: #ffffff;) Tj
+0 -11 Td
+(+    border-radius: 12px;) Tj
+0 -11 Td
+(+    padding: 20px;) Tj
+0 -11 Td
+(+    width: 420px;) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 12px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-modal__header {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    justify-content: space-between;) Tj
+0 -11 Td
+(+    align-items: center;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+.kodi-modal__field {) Tj
+0 -11 Td
+(+    display: grid;) Tj
+0 -11 Td
+(+    gap: 6px;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(diff --git a/frontend/src/pages/kodi/KodiPortal.css b/frontend/src/pages/kodi/KodiPortal.css) Tj
+0 -11 Td
+(index 79a3fafe..6b47a983 100644) Tj
+0 -11 Td
+(--- a/frontend/src/pages/kodi/KodiPortal.css) Tj
+0 -11 Td
+(+++ b/frontend/src/pages/kodi/KodiPortal.css) Tj
+0 -11 Td
+(@@ -348,6 +348,13 @@) Tj
+0 -11 Td
+(     gap: 1rem;) Tj
+0 -11 Td
+( }) Tj
+0 -11 Td
+( ) Tj
+0 -11 Td
+(+.kodi-portal__lead-actions {) Tj
+0 -11 Td
+(+    display: flex;) Tj
+0 -11 Td
+(+    flex-direction: column;) Tj
+0 -11 Td
+(+    gap: 0.35rem;) Tj
+0 -11 Td
+(+    align-items: flex-end;) Tj
+0 -11 Td
+(+}) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+( .kodi-portal__status-chip {) Tj
+0 -11 Td
+(     padding: 0.2rem 0.7rem;) Tj
+0 -11 Td
+(     border-radius: 999px;) Tj
+0 -11 Td
+(diff --git a/frontend/src/pages/kodi/KodiPortal.jsx b/frontend/src/pages/kodi/KodiPortal.jsx) Tj
+0 -11 Td
+(index 577fe45e..66b18e3c 100644) Tj
+0 -11 Td
+(--- a/frontend/src/pages/kodi/KodiPortal.jsx) Tj
+0 -11 Td
+(+++ b/frontend/src/pages/kodi/KodiPortal.jsx) Tj
+0 -11 Td
+(@@ -6,7 +6,9 @@ import {) Tj
+0 -11 Td
+(     createLead,) Tj
+0 -11 Td
+(     createPlatformApp,) Tj
+0 -11 Td
+ET
+endstream
+endobj
+7 0 obj
+<< /Length 3726 >>
+stream
+BT
+/F1 9 Tf
+36 756 Td
+(     createPlatformField,) Tj
+0 -11 Td
+(+    convertLead,) Tj
+0 -11 Td
+(     listLeads,) Tj
+0 -11 Td
+(+    listLeadOpportunities,) Tj
+0 -11 Td
+(     listPagePermissions,) Tj
+0 -11 Td
+(     listPlatformApps,) Tj
+0 -11 Td
+(     listPlatformObjects,) Tj
+0 -11 Td
+(@@ -71,6 +73,7 @@ const KodiPortal = \(\) => {) Tj
+0 -11 Td
+(     const [leads, setLeads] = useState\([]\);) Tj
+0 -11 Td
+(     const [loadingLeads, setLoadingLeads] = useState\(false\);) Tj
+0 -11 Td
+(     const [leadModal, setLeadModal] = useState\({ open: false, name: '', email: '', creating: false }\);) Tj
+0 -11 Td
+(+    const [leadOpportunities, setLeadOpportunities] = useState\({}\);) Tj
+0 -11 Td
+(     const [neonRecords, setNeonRecords] = useState\([]\);) Tj
+0 -11 Td
+(     const [neonTable, setNeonTable] = useState\('contacts'\);) Tj
+0 -11 Td
+(     const [neonLoading, setNeonLoading] = useState\(false\);) Tj
+0 -11 Td
+(@@ -116,7 +119,16 @@ const KodiPortal = \(\) => {) Tj
+0 -11 Td
+(         setLoadingLeads\(true\);) Tj
+0 -11 Td
+(         try {) Tj
+0 -11 Td
+(             const data = await listLeads\(\);) Tj
+0 -11 Td
+(-            setLeads\(unwrapResponse\(data\)\);) Tj
+0 -11 Td
+(+            const rows = unwrapResponse\(data\);) Tj
+0 -11 Td
+(+            setLeads\(rows\);) Tj
+0 -11 Td
+(+            const opportunityRows = await Promise.all\() Tj
+0 -11 Td
+(+                rows.map\(\(lead\) => listLeadOpportunities\(lead.id\).catch\(\(\) => []\)\)) Tj
+0 -11 Td
+(+            \);) Tj
+0 -11 Td
+(+            const map = {};) Tj
+0 -11 Td
+(+            rows.forEach\(\(lead, index\) => {) Tj
+0 -11 Td
+(+                map[lead.id] = opportunityRows[index] || [];) Tj
+0 -11 Td
+(+            }\);) Tj
+0 -11 Td
+(+            setLeadOpportunities\(map\);) Tj
+0 -11 Td
+(         } catch \(error\) {) Tj
+0 -11 Td
+(             toast.error\('Unable to load leads'\);) Tj
+0 -11 Td
+(         } finally {) Tj
+0 -11 Td
+(@@ -195,7 +207,7 @@ const KodiPortal = \(\) => {) Tj
+0 -11 Td
+(         if \(!linkModal.app\) return;) Tj
+0 -11 Td
+(         setLinking\(true\);) Tj
+0 -11 Td
+(         try {) Tj
+0 -11 Td
+(-            await linkPlatformPage\(linkModal.app.id, linkModal.pageId\);) Tj
+0 -11 Td
+(+            await linkPlatformPage\(linkModal.pageId, linkModal.app.id\);) Tj
+0 -11 Td
+(             toast.success\('Page linked to app'\);) Tj
+0 -11 Td
+(             setLinkModal\({ open: false, app: null, pageId: '' }\);) Tj
+0 -11 Td
+(             refreshData\(\);) Tj
+0 -11 Td
+(@@ -297,7 +309,12 @@ const KodiPortal = \(\) => {) Tj
+0 -11 Td
+(         }) Tj
+0 -11 Td
+(         setLeadModal\(\(prev\) => \({ ...prev, creating: true }\)\);) Tj
+0 -11 Td
+(         try {) Tj
+0 -11 Td
+(-            await createLead\({ name: leadModal.name.trim\(\), email: leadModal.email.trim\(\) }\);) Tj
+0 -11 Td
+(+            await createLead\({) Tj
+0 -11 Td
+(+                name: leadModal.name.trim\(\),) Tj
+0 -11 Td
+(+                email: leadModal.email.trim\(\),) Tj
+0 -11 Td
+(+                applicationStatus: 'manual',) Tj
+0 -11 Td
+(+                source: 'manual') Tj
+0 -11 Td
+(+            }\);) Tj
+0 -11 Td
+(             toast.success\('Lead created'\);) Tj
+0 -11 Td
+(             setLeadModal\({ open: false, name: '', email: '', creating: false }\);) Tj
+0 -11 Td
+(             fetchLeads\(\);) Tj
+0 -11 Td
+(@@ -307,6 +324,16 @@ const KodiPortal = \(\) => {) Tj
+0 -11 Td
+(         }) Tj
+0 -11 Td
+(     };) Tj
+0 -11 Td
+( ) Tj
+0 -11 Td
+(+    const handleConvertLead = async \(leadId\) => {) Tj
+0 -11 Td
+(+        try {) Tj
+0 -11 Td
+(+            await convertLead\(leadId, { stage: 'qualified' }\);) Tj
+0 -11 Td
+(+            toast.success\('Lead converted to opportunity'\);) Tj
+0 -11 Td
+(+            fetchLeads\(\);) Tj
+0 -11 Td
+ET
+endstream
+endobj
+8 0 obj
+<< /Length 5324 >>
+stream
+BT
+/F1 9 Tf
+36 756 Td
+(+        } catch \(error\) {) Tj
+0 -11 Td
+(+            toast.error\(error?.response?.data?.error || 'Conversion failed'\);) Tj
+0 -11 Td
+(+        }) Tj
+0 -11 Td
+(+    };) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(     const openPermissionModal = async \(page\) => {) Tj
+0 -11 Td
+(         setPermissionModal\(\(prev\) => \({ ...prev, open: true, page, role: PLATFORM_ROLES[0] }\)\);) Tj
+0 -11 Td
+(         try {) Tj
+0 -11 Td
+(@@ -554,8 +581,22 @@ const KodiPortal = \(\) => {) Tj
+0 -11 Td
+(                                 <div>) Tj
+0 -11 Td
+(                                     <h3>{lead.name}</h3>) Tj
+0 -11 Td
+(                                     <p>{lead.email || 'Email not provided'}</p>) Tj
+0 -11 Td
+(+                                    <p>Application: {lead.application_status || 'incomplete'}</p>) Tj
+0 -11 Td
+(+                                    <p>Source: {lead.source || 'manual'}</p>) Tj
+0 -11 Td
+(+                                </div>) Tj
+0 -11 Td
+(+                                <div className="kodi-portal__lead-actions">) Tj
+0 -11 Td
+(+                                    <span className="kodi-portal__status-chip">{lead.status || 'incomplete'}</span>) Tj
+0 -11 Td
+(+                                    {\(leadOpportunities[lead.id] || []\).length > 0 && \() Tj
+0 -11 Td
+(+                                        <span className="kodi-portal__status-chip">) Tj
+0 -11 Td
+(+                                            Stage: {leadOpportunities[lead.id][0]?.stage || 'prospecting'}) Tj
+0 -11 Td
+(+                                        </span>) Tj
+0 -11 Td
+(+                                    \)}) Tj
+0 -11 Td
+(+                                    {lead.status !== 'converted' && \() Tj
+0 -11 Td
+(+                                        <button className="btn-text" onClick={\(\) => handleConvertLead\(lead.id\)}>) Tj
+0 -11 Td
+(+                                            Convert) Tj
+0 -11 Td
+(+                                        </button>) Tj
+0 -11 Td
+(+                                    \)}) Tj
+0 -11 Td
+(                                 </div>) Tj
+0 -11 Td
+(-                                <span className="kodi-portal__status-chip">{lead.status || 'incomplete'}</span>) Tj
+0 -11 Td
+(                             </article>) Tj
+0 -11 Td
+(                         \)\)}) Tj
+0 -11 Td
+(                     </div>) Tj
+0 -11 Td
+(diff --git a/frontend/src/services/kodiPageService.js b/frontend/src/services/kodiPageService.js) Tj
+0 -11 Td
+(index 90a78768..6d04e43c 100644) Tj
+0 -11 Td
+(--- a/frontend/src/services/kodiPageService.js) Tj
+0 -11 Td
+(+++ b/frontend/src/services/kodiPageService.js) Tj
+0 -11 Td
+(@@ -34,35 +34,41 @@ export const deactivateKodiPage = async \(id\) => \(await api.delete\(`/kodi/pages/$) Tj
+0 -11 Td
+( export const listKCComponents = async \(\) => \(await api.get\('/kodi/kc-components'\)\).data;) Tj
+0 -11 Td
+( export const createKCComponent = async \(payload\) => \(await api.post\('/kodi/kc-components', payload\)\).data;) Tj
+0 -11 Td
+( ) Tj
+0 -11 Td
+(-export const listPlatformPages = async \(\) => \(await api.get\('/kodi/platform/pages'\)\).data;) Tj
+0 -11 Td
+(-export const createPlatformPage = async \(payload\) => \(await api.post\('/kodi/platform/pages', payload\)\).data;) Tj
+0 -11 Td
+(+const unwrap = \(response\) => {) Tj
+0 -11 Td
+(+    if \(response?.success && response.data !== undefined\) return response.data;) Tj
+0 -11 Td
+(+    return response;) Tj
+0 -11 Td
+(+};) Tj
+0 -11 Td
+(+) Tj
+0 -11 Td
+(+export const listPlatformPages = async \(\) => unwrap\(\(await api.get\('/kodi/platform/pages'\)\).data\);) Tj
+0 -11 Td
+(+export const createPlatformPage = async \(payload\) => unwrap\(\(await api.post\('/kodi/platform/pages', payload\)\).data\);) Tj
+0 -11 Td
+( export const updatePlatformLayout = async \(pageId, layout\) =>) Tj
+0 -11 Td
+(-    \(await api.put\(`/kodi/platform/pages/${pageId}/layout`, { layout }\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.put\(`/kodi/platform/pages/${pageId}/layout`, { layout }\)\).data\);) Tj
+0 -11 Td
+( export const activatePlatformPage = async \(pageId\) =>) Tj
+0 -11 Td
+(-    \(await api.post\(`/kodi/platform/pages/${pageId}/activate`\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.post\(`/kodi/platform/pages/${pageId}/activate`\)\).data\);) Tj
+0 -11 Td
+( export const linkPlatformPage = async \(pageId, appId\) =>) Tj
+0 -11 Td
+(-    \(await api.post\(`/kodi/platform/pages/${pageId}/link`, { appId }\)\).data;) Tj
+0 -11 Td
+(-export const listPlatformApps = async \(\) => \(await api.get\('/kodi/platform/apps'\)\).data;) Tj
+0 -11 Td
+(-export const createPlatformApp = async \(payload\) => \(await api.post\('/kodi/platform/apps', payload\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.post\(`/kodi/platform/pages/${pageId}/link`, { appId }\)\).data\);) Tj
+0 -11 Td
+(+export const listPlatformApps = async \(\) => unwrap\(\(await api.get\('/kodi/platform/apps'\)\).data\);) Tj
+0 -11 Td
+(+export const createPlatformApp = async \(payload\) => unwrap\(\(await api.post\('/kodi/platform/apps', payload\)\).data\);) Tj
+0 -11 Td
+( export const listPagePermissions = async \(pageId\) =>) Tj
+0 -11 Td
+(-    \(await api.get\(`/kodi/platform/pages/${pageId}/permissions`\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.get\(`/kodi/platform/pages/${pageId}/permissions`\)\).data\);) Tj
+0 -11 Td
+ET
+endstream
+endobj
+9 0 obj
+<< /Length 3287 >>
+stream
+BT
+/F1 9 Tf
+36 756 Td
+( export const updatePagePermissions = async \(pageId, payload\) =>) Tj
+0 -11 Td
+(-    \(await api.post\(`/kodi/platform/pages/${pageId}/permissions`, payload\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.post\(`/kodi/platform/pages/${pageId}/permissions`, payload\)\).data\);) Tj
+0 -11 Td
+( export const fetchRuntimePage = async \(pageId\) =>) Tj
+0 -11 Td
+(-    \(await api.get\(`/kodi/platform/runtime/${pageId}`\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.get\(`/kodi/platform/runtime/${pageId}`\)\).data\);) Tj
+0 -11 Td
+( export const listAppUsers = async \(appId\) =>) Tj
+0 -11 Td
+(-    \(await api.get\(`/kodi/platform/apps/${appId}/users`\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.get\(`/kodi/platform/apps/${appId}/users`\)\).data\);) Tj
+0 -11 Td
+( export const assignAppUser = async \(appId, payload\) =>) Tj
+0 -11 Td
+(-    \(await api.post\(`/kodi/platform/apps/${appId}/users`, payload\)\).data;) Tj
+0 -11 Td
+(-export const listPlatformObjects = async \(\) => \(await api.get\('/kodi/platform/objects'\)\).data;) Tj
+0 -11 Td
+(-export const createPlatformObject = async \(payload\) => \(await api.post\('/kodi/platform/objects', payload\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.post\(`/kodi/platform/apps/${appId}/users`, payload\)\).data\);) Tj
+0 -11 Td
+(+export const listPlatformObjects = async \(\) => unwrap\(\(await api.get\('/kodi/platform/objects'\)\).data\);) Tj
+0 -11 Td
+(+export const createPlatformObject = async \(payload\) => unwrap\(\(await api.post\('/kodi/platform/objects', payload\)\).data\);) Tj
+0 -11 Td
+( export const listPlatformObjectFields = async \(objectId\) =>) Tj
+0 -11 Td
+(-    \(await api.get\(`/kodi/platform/objects/${objectId}/fields`\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.get\(`/kodi/platform/objects/${objectId}/fields`\)\).data\);) Tj
+0 -11 Td
+( export const createPlatformField = async \(objectId, payload\) =>) Tj
+0 -11 Td
+(-    \(await api.post\(`/kodi/platform/objects/${objectId}/fields`, payload\)\).data;) Tj
+0 -11 Td
+(-export const listLeads = async \(\) => \(await api.get\('/kodi/platform/leads'\)\).data;) Tj
+0 -11 Td
+(-export const createLead = async \(payload\) => \(await api.post\('/kodi/platform/leads', payload\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.post\(`/kodi/platform/objects/${objectId}/fields`, payload\)\).data\);) Tj
+0 -11 Td
+(+export const listLeads = async \(\) => unwrap\(\(await api.get\('/kodi/platform/leads'\)\).data\);) Tj
+0 -11 Td
+(+export const createLead = async \(payload\) => unwrap\(\(await api.post\('/kodi/platform/leads', payload\)\).data\);) Tj
+0 -11 Td
+( export const convertLead = async \(leadId, payload\) =>) Tj
+0 -11 Td
+(-    \(await api.post\(`/kodi/platform/leads/${leadId}/convert`, payload\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.post\(`/kodi/platform/leads/${leadId}/convert`, payload\)\).data\);) Tj
+0 -11 Td
+( export const listLeadOpportunities = async \(leadId\) =>) Tj
+0 -11 Td
+(-    \(await api.get\(`/kodi/platform/leads/${leadId}/opportunities`\)\).data;) Tj
+0 -11 Td
+(+    unwrap\(\(await api.get\(`/kodi/platform/leads/${leadId}/opportunities`\)\).data\);) Tj
+0 -11 Td
+(+export const listPlatformComponents = async \(\) => unwrap\(\(await api.get\('/kodi/platform/components'\)\).data\);) Tj
+0 -11 Td
+ET
+endstream
+endobj
+10 0 obj
+<< /Type /Pages /Kids [11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R 18 0 R] /Count 8 >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+12 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 3 0 R >>
+endobj
+13 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 4 0 R >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 5 0 R >>
+endobj
+15 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 6 0 R >>
+endobj
+16 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 7 0 R >>
+endobj
+17 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 8 0 R >>
+endobj
+18 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 9 0 R >>
+endobj
+19 0 obj
+<< /Type /Catalog /Pages 10 0 R >>
+endobj
+xref
+0 20
+0000000000 65535 f 
+0000000009 00000 n 
+0000000077 00000 n 
+0000004603 00000 n 
+0000007161 00000 n 
+0000009394 00000 n 
+0000011540 00000 n 
+0000013974 00000 n 
+0000017752 00000 n 
+0000023128 00000 n 
+0000026467 00000 n 
+0000026575 00000 n 
+0000026703 00000 n 
+0000026831 00000 n 
+0000026959 00000 n 
+0000027087 00000 n 
+0000027215 00000 n 
+0000027343 00000 n 
+0000027471 00000 n 
+0000027599 00000 n 
+trailer
+<< /Size 20 /Root 19 0 R >>
+startxref
+27650
+%%EOF

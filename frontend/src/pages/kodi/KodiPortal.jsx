@@ -3,21 +3,25 @@ import toast from 'react-hot-toast';
 import Loading from '../../components/common/Loading';
 import {
     assignAppUser,
+    assignPageUser,
     createLead,
     createPlatformApp,
     createPlatformField,
+    convertLead,
     listLeads,
+    listLeadOpportunities,
     listPagePermissions,
     listPlatformApps,
     listPlatformObjects,
     listPlatformPages,
     linkPlatformPage,
-    updatePagePermissions
+    updatePagePermissions,
+    updatePlatformApp
 } from '../../services/kodiPageService';
 import { fetchTableRecords } from '../../services/neonDataService';
 import './KodiPortal.css';
 
-const PLATFORM_ROLES = ['admin', 'employee', 'business', 'psychologist'];
+const PLATFORM_ROLES = ['admin', 'employee', 'business_user', 'psychologist'];
 
 const unwrapResponse = (payload) => {
     if (!payload) return [];
@@ -51,6 +55,9 @@ const KodiPortal = () => {
     });
     const [appForm, setAppForm] = useState({ name: '', description: '' });
     const [creatingApp, setCreatingApp] = useState(false);
+    const [editAppModal, setEditAppModal] = useState({ open: false, app: null });
+    const [editForm, setEditForm] = useState({ name: '', description: '', isActive: true });
+    const [savingApp, setSavingApp] = useState(false);
     const [linking, setLinking] = useState(false);
     const [savingPermissions, setSavingPermissions] = useState(false);
     const [objects, setObjects] = useState([]);
@@ -58,6 +65,13 @@ const KodiPortal = () => {
     const [assignUserModal, setAssignUserModal] = useState({
         open: false,
         app: null,
+        email: '',
+        permissions: { canView: true, canEdit: false, canUse: false },
+        assigning: false
+    });
+    const [assignPageUserModal, setAssignPageUserModal] = useState({
+        open: false,
+        page: null,
         email: '',
         permissions: { canView: true, canEdit: false, canUse: false },
         assigning: false
@@ -71,6 +85,7 @@ const KodiPortal = () => {
     const [leads, setLeads] = useState([]);
     const [loadingLeads, setLoadingLeads] = useState(false);
     const [leadModal, setLeadModal] = useState({ open: false, name: '', email: '', creating: false });
+    const [leadOpportunities, setLeadOpportunities] = useState({});
     const [neonRecords, setNeonRecords] = useState([]);
     const [neonTable, setNeonTable] = useState('contacts');
     const [neonLoading, setNeonLoading] = useState(false);
@@ -116,7 +131,16 @@ const KodiPortal = () => {
         setLoadingLeads(true);
         try {
             const data = await listLeads();
-            setLeads(unwrapResponse(data));
+            const rows = unwrapResponse(data);
+            setLeads(rows);
+            const opportunityRows = await Promise.all(
+                rows.map((lead) => listLeadOpportunities(lead.id).catch(() => []))
+            );
+            const map = {};
+            rows.forEach((lead, index) => {
+                map[lead.id] = opportunityRows[index] || [];
+            });
+            setLeadOpportunities(map);
         } catch (error) {
             toast.error('Unable to load leads');
         } finally {
@@ -183,6 +207,39 @@ const KodiPortal = () => {
         }
     };
 
+    const openEditAppModal = (app) => {
+        setEditAppModal({ open: true, app });
+        setEditForm({
+            name: app?.name || '',
+            description: app?.description || '',
+            isActive: app?.is_active !== false
+        });
+    };
+
+    const handleUpdateApp = async (event) => {
+        event.preventDefault();
+        if (!editAppModal.app) return;
+        if (!editForm.name.trim()) {
+            toast.error('App name is required');
+            return;
+        }
+        setSavingApp(true);
+        try {
+            await updatePlatformApp(editAppModal.app.id, {
+                name: editForm.name.trim(),
+                description: editForm.description.trim(),
+                isActive: editForm.isActive
+            });
+            toast.success('App updated');
+            setEditAppModal({ open: false, app: null });
+            refreshData();
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to update app');
+        } finally {
+            setSavingApp(false);
+        }
+    };
+
     const openLinkModal = (app) => {
         setLinkModal({ open: true, app, pageId: '' });
     };
@@ -195,7 +252,7 @@ const KodiPortal = () => {
         if (!linkModal.app) return;
         setLinking(true);
         try {
-            await linkPlatformPage(linkModal.app.id, linkModal.pageId);
+            await linkPlatformPage(linkModal.pageId, linkModal.app.id);
             toast.success('Page linked to app');
             setLinkModal({ open: false, app: null, pageId: '' });
             refreshData();
@@ -210,6 +267,16 @@ const KodiPortal = () => {
         setAssignUserModal({
             open: true,
             app,
+            email: '',
+            permissions: { canView: true, canEdit: false, canUse: false },
+            assigning: false
+        });
+    };
+
+    const openAssignPageUserModal = (page) => {
+        setAssignPageUserModal({
+            open: true,
+            page,
             email: '',
             permissions: { canView: true, canEdit: false, canUse: false },
             assigning: false
@@ -246,6 +313,32 @@ const KodiPortal = () => {
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Unable to assign user');
             setAssignUserModal((prev) => ({ ...prev, assigning: false }));
+        }
+    };
+
+    const handleAssignPageUser = async () => {
+        if (!assignPageUserModal.page || !assignPageUserModal.email.trim()) {
+            toast.error('Provide an email to invite');
+            return;
+        }
+        setAssignPageUserModal((prev) => ({ ...prev, assigning: true }));
+        try {
+            await assignPageUser(assignPageUserModal.page.id, {
+                email: assignPageUserModal.email.trim(),
+                permissions: assignPageUserModal.permissions
+            });
+            toast.success('User assigned to page');
+            setAssignPageUserModal({
+                open: false,
+                page: null,
+                email: '',
+                permissions: { canView: true, canEdit: false, canUse: false },
+                assigning: false
+            });
+            refreshData();
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Unable to assign user');
+            setAssignPageUserModal((prev) => ({ ...prev, assigning: false }));
         }
     };
 
@@ -297,13 +390,28 @@ const KodiPortal = () => {
         }
         setLeadModal((prev) => ({ ...prev, creating: true }));
         try {
-            await createLead({ name: leadModal.name.trim(), email: leadModal.email.trim() });
+            await createLead({
+                name: leadModal.name.trim(),
+                email: leadModal.email.trim(),
+                applicationStatus: 'manual',
+                source: 'manual'
+            });
             toast.success('Lead created');
             setLeadModal({ open: false, name: '', email: '', creating: false });
             fetchLeads();
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to create lead');
             setLeadModal((prev) => ({ ...prev, creating: false }));
+        }
+    };
+
+    const handleConvertLead = async (leadId) => {
+        try {
+            await convertLead(leadId, { stage: 'qualified' });
+            toast.success('Lead converted to opportunity');
+            fetchLeads();
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Conversion failed');
         }
     };
 
@@ -396,6 +504,9 @@ const KodiPortal = () => {
                                     <p>{app.description || 'No description provided.'}</p>
                                 </div>
                                 <div className="kodi-portal__card-actions">
+                                    <button className="btn-text" onClick={() => openEditAppModal(app)}>
+                                        Edit App
+                                    </button>
                                     <button className="btn-text" onClick={() => openLinkModal(app)}>
                                         Link Page
                                     </button>
@@ -420,6 +531,9 @@ const KodiPortal = () => {
                                                 <span className="kodi-portal__status-chip">{page.status}</span>
                                                 <button className="btn-text" onClick={() => openPermissionModal(page)}>
                                                     Assign role
+                                                </button>
+                                                <button className="btn-text" onClick={() => openAssignPageUserModal(page)}>
+                                                    Assign user
                                                 </button>
                                             </div>
                                         </div>
@@ -554,8 +668,22 @@ const KodiPortal = () => {
                                 <div>
                                     <h3>{lead.name}</h3>
                                     <p>{lead.email || 'Email not provided'}</p>
+                                    <p>Application: {lead.application_status || 'incomplete'}</p>
+                                    <p>Source: {lead.source || 'manual'}</p>
                                 </div>
-                                <span className="kodi-portal__status-chip">{lead.status || 'incomplete'}</span>
+                                <div className="kodi-portal__lead-actions">
+                                    <span className="kodi-portal__status-chip">{lead.status || 'incomplete'}</span>
+                                    {(leadOpportunities[lead.id] || []).length > 0 && (
+                                        <span className="kodi-portal__status-chip">
+                                            Stage: {leadOpportunities[lead.id][0]?.stage || 'prospecting'}
+                                        </span>
+                                    )}
+                                    {lead.status !== 'converted' && (
+                                        <button className="btn-text" onClick={() => handleConvertLead(lead.id)}>
+                                            Convert
+                                        </button>
+                                    )}
+                                </div>
                             </article>
                         ))}
                     </div>
@@ -633,6 +761,50 @@ const KodiPortal = () => {
                                 {linking ? 'Linking...' : 'Link Page'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {editAppModal.open && editAppModal.app && (
+                <div className="kodi-portal__modal">
+                    <div className="kodi-portal__modal-content">
+                        <div className="kodi-portal__modal-header">
+                            <h2>Edit {editAppModal.app.name}</h2>
+                            <button className="btn-text" onClick={() => setEditAppModal({ open: false, app: null })}>
+                                Close
+                            </button>
+                        </div>
+                        <form className="kodi-portal__form" onSubmit={handleUpdateApp}>
+                            <label>
+                                App name
+                                <input
+                                    type="text"
+                                    value={editForm.name}
+                                    onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
+                                />
+                            </label>
+                            <label>
+                                Description
+                                <textarea
+                                    rows="3"
+                                    value={editForm.description}
+                                    onChange={(event) =>
+                                        setEditForm((prev) => ({ ...prev, description: event.target.value }))
+                                    }
+                                />
+                            </label>
+                            <label className="kodi-portal__checkbox">
+                                <input
+                                    type="checkbox"
+                                    checked={editForm.isActive}
+                                    onChange={() => setEditForm((prev) => ({ ...prev, isActive: !prev.isActive }))}
+                                />
+                                App is active
+                            </label>
+                            <button className="btn-primary" type="submit" disabled={savingApp}>
+                                {savingApp ? 'Saving...' : 'Save changes'}
+                            </button>
+                        </form>
                     </div>
                 </div>
             )}
@@ -760,6 +932,85 @@ const KodiPortal = () => {
                             </div>
                             <button className="btn-primary" onClick={handleAssignUser} disabled={assignUserModal.assigning}>
                                 {assignUserModal.assigning ? 'Assigning...' : 'Assign user'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {assignPageUserModal.open && assignPageUserModal.page && (
+                <div className="kodi-portal__modal">
+                    <div className="kodi-portal__modal-content">
+                        <div className="kodi-portal__modal-header">
+                            <h2>Assign user to {assignPageUserModal.page.label}</h2>
+                            <button
+                                className="btn-text"
+                                onClick={() =>
+                                    setAssignPageUserModal({
+                                        open: false,
+                                        page: null,
+                                        email: '',
+                                        permissions: { canView: true, canEdit: false, canUse: false },
+                                        assigning: false
+                                    })
+                                }
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <div className="kodi-portal__form">
+                            <label>
+                                User email
+                                <input
+                                    type="email"
+                                    value={assignPageUserModal.email}
+                                    onChange={(event) => setAssignPageUserModal((prev) => ({ ...prev, email: event.target.value }))}
+                                    placeholder="user@example.com"
+                                />
+                            </label>
+                            <div className="kodi-portal__checkbox-group">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={assignPageUserModal.permissions.canView}
+                                        onChange={() =>
+                                            setAssignPageUserModal((prev) => ({
+                                                ...prev,
+                                                permissions: { ...prev.permissions, canView: !prev.permissions.canView }
+                                            }))
+                                        }
+                                    />
+                                    Can view
+                                </label>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={assignPageUserModal.permissions.canEdit}
+                                        onChange={() =>
+                                            setAssignPageUserModal((prev) => ({
+                                                ...prev,
+                                                permissions: { ...prev.permissions, canEdit: !prev.permissions.canEdit }
+                                            }))
+                                        }
+                                    />
+                                    Can edit
+                                </label>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={assignPageUserModal.permissions.canUse}
+                                        onChange={() =>
+                                            setAssignPageUserModal((prev) => ({
+                                                ...prev,
+                                                permissions: { ...prev.permissions, canUse: !prev.permissions.canUse }
+                                            }))
+                                        }
+                                    />
+                                    Can use
+                                </label>
+                            </div>
+                            <button className="btn-primary" onClick={handleAssignPageUser} disabled={assignPageUserModal.assigning}>
+                                {assignPageUserModal.assigning ? 'Assigning...' : 'Assign user'}
                             </button>
                         </div>
                     </div>

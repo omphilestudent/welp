@@ -680,6 +680,16 @@ const claimCompany = async (req, res) => {
             [companyId, req.user.id]
         );
 
+        await query(
+            `INSERT INTO business_email_preferences (business_id, allow_unregistered_review_emails, stop_after_registration)
+             VALUES ($1, false, true)
+             ON CONFLICT (business_id) DO UPDATE
+                SET allow_unregistered_review_emails = false,
+                    stop_after_registration = true,
+                    updated_at = CURRENT_TIMESTAMP`,
+            [companyId]
+        );
+
         await query('COMMIT');
         transactionStarted = false;
         const updatedCompany = await fetchCompanyByIdStrict(companyId);
@@ -1450,6 +1460,16 @@ const approveClaimRequest = async (req, res) => {
              VALUES ($1, $2)
              ON CONFLICT (company_id, user_id) DO NOTHING`,
             [claimRequest.rows[0].company_id, claimRequest.rows[0].user_id]
+        );
+
+        await query(
+            `INSERT INTO business_email_preferences (business_id, allow_unregistered_review_emails, stop_after_registration)
+             VALUES ($1, false, true)
+             ON CONFLICT (business_id) DO UPDATE
+                SET allow_unregistered_review_emails = false,
+                    stop_after_registration = true,
+                    updated_at = CURRENT_TIMESTAMP`,
+            [claimRequest.rows[0].company_id]
         );
 
         await query('COMMIT');

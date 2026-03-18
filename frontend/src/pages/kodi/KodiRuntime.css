@@ -175,3 +175,57 @@
     margin-top: 80px;
     color: #c23934;
 }
+
+.kodi-runtime__layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.kodi-runtime__row {
+    display: flex;
+    gap: 12px;
+}
+
+.kodi-runtime__column {
+    flex: 1;
+    display: grid;
+    gap: 12px;
+}
+
+.kodi-runtime__card {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    background: #ffffff;
+}
+
+.kodi-runtime__card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.kodi-runtime__json {
+    background: #0f172a;
+    color: #f8fafc;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 12px;
+}
+
+.kodi-runtime__actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.kodi-runtime__empty {
+    padding: 24px;
+    border: 1px dashed #cbd5f5;
+    border-radius: 12px;
+    text-align: center;
+    color: #64748b;
+}

@@ -902,7 +902,7 @@ const buildPermissionList = (permissions = {}) => {
     return entries.map(([label, value]) => `<li>${label}: ${value ? 'Yes' : 'No'}</li>`).join('');
 };
 
-const sendAppAccessEmail = async ({ to, name, appName, loginUrl, pageUrl, permissions }) => {
+const sendAppAccessEmail = async ({ to, name, appName, loginUrl, pageUrl, pageName, permissions }) => {
     if (!to || !appName) {
         return { success: false, error: 'Missing recipient or app label' };
     }
@@ -920,7 +920,7 @@ const sendAppAccessEmail = async ({ to, name, appName, loginUrl, pageUrl, permis
                 Log in to Kodi Builder
               </a>
             </p>
-            ${pageUrl ? `<p><a href="${pageUrl}">Open the assigned page</a></p>` : ''}
+              ${pageUrl ? `<p><a href="${pageUrl}">Open the assigned page${pageName ? ` (${pageName})` : ''}</a></p>` : ''}
             <div style="margin-top: 16px;">
               <p><strong>Permissions:</strong></p>
               <ul>${buildPermissionList(permissions)}</ul>
@@ -936,7 +936,7 @@ const sendAppAccessEmail = async ({ to, name, appName, loginUrl, pageUrl, permis
         '',
         `You've been granted access to ${appName} inside the Kodi Builder.`,
         loginUrl ? `Log in: ${loginUrl}` : '',
-        pageUrl ? `Assigned page: ${pageUrl}` : '',
+          pageUrl ? `Assigned page: ${pageName ? `${pageName} - ` : ''}${pageUrl}` : '',
         '',
         'Permissions:',
         `- Can view: ${Boolean(permissions.canView) ? 'Yes' : 'No'}`,

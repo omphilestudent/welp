@@ -9,6 +9,7 @@ const {
 const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaService');
 const { PLAN_LIMITS } = require('../services/subscriptionService');
 const { emitFlowEvent } = require('../services/flowEngine');
+const { handleChatReplyNotification } = require('../modules/marketing/marketing.triggers');
 
 const tableExists = async (tableName) => {
     try {
@@ -1065,10 +1066,17 @@ const sendMessage = async (req, res) => {
 
         const result = await query(
             `INSERT INTO messages (conversation_id, sender_id, content)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
+        VALUES ($1, $2, $3)
+        RETURNING *`,
             [conversationId, req.user.id, content]
         );
+        handleChatReplyNotification({
+            messageId: result.rows[0]?.id,
+            conversationId,
+            senderId: req.user.id
+        }).catch((error) => {
+            console.error('Chat reply notification error:', error.message);
+        });
 
 
         await query(

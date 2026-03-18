@@ -3,6 +3,7 @@ const { query } = require('../utils/database');
 const { moderateReview, analyzeSentiment } = require('../services/mlServices');
 const { createAdminNotification } = require('../utils/adminNotifications');
 const { triggerReviewNotification } = require('../services/reviewNotificationService');
+const { handleBusinessReviewOutreach } = require('../modules/marketing/marketing.triggers');
 
 
 const updateReviewsTable = async () => {
@@ -182,6 +183,9 @@ const createReview = async (req, res) => {
 
         triggerReviewNotification(review.id).catch((notifyError) => {
             console.error('Review notification trigger failed:', notifyError.message);
+        });
+        handleBusinessReviewOutreach({ reviewId: review.id }).catch((error) => {
+            console.error('Business review outreach error:', error.message);
         });
 
         await createAdminNotification({

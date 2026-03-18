@@ -34,35 +34,47 @@ export const deactivateKodiPage = async (id) => (await api.delete(`/kodi/pages/$
 export const listKCComponents = async () => (await api.get('/kodi/kc-components')).data;
 export const createKCComponent = async (payload) => (await api.post('/kodi/kc-components', payload)).data;
 
-export const listPlatformPages = async () => (await api.get('/kodi/platform/pages')).data;
-export const createPlatformPage = async (payload) => (await api.post('/kodi/platform/pages', payload)).data;
+const unwrap = (response) => {
+    if (response?.success && response.data !== undefined) return response.data;
+    return response;
+};
+
+export const listPlatformPages = async () => unwrap((await api.get('/kodi/platform/pages')).data);
+export const createPlatformPage = async (payload) => unwrap((await api.post('/kodi/platform/pages', payload)).data);
 export const updatePlatformLayout = async (pageId, layout) =>
-    (await api.put(`/kodi/platform/pages/${pageId}/layout`, { layout })).data;
+    unwrap((await api.put(`/kodi/platform/pages/${pageId}/layout`, { layout })).data);
 export const activatePlatformPage = async (pageId) =>
-    (await api.post(`/kodi/platform/pages/${pageId}/activate`)).data;
+    unwrap((await api.post(`/kodi/platform/pages/${pageId}/activate`)).data);
 export const linkPlatformPage = async (pageId, appId) =>
-    (await api.post(`/kodi/platform/pages/${pageId}/link`, { appId })).data;
-export const listPlatformApps = async () => (await api.get('/kodi/platform/apps')).data;
-export const createPlatformApp = async (payload) => (await api.post('/kodi/platform/apps', payload)).data;
+    unwrap((await api.post(`/kodi/platform/pages/${pageId}/link`, { appId })).data);
+export const listPlatformApps = async () => unwrap((await api.get('/kodi/platform/apps')).data);
+export const createPlatformApp = async (payload) => unwrap((await api.post('/kodi/platform/apps', payload)).data);
+export const updatePlatformApp = async (appId, payload) =>
+    unwrap((await api.put(`/kodi/platform/apps/${appId}`, payload)).data);
 export const listPagePermissions = async (pageId) =>
-    (await api.get(`/kodi/platform/pages/${pageId}/permissions`)).data;
+    unwrap((await api.get(`/kodi/platform/pages/${pageId}/permissions`)).data);
 export const updatePagePermissions = async (pageId, payload) =>
-    (await api.post(`/kodi/platform/pages/${pageId}/permissions`, payload)).data;
+    unwrap((await api.post(`/kodi/platform/pages/${pageId}/permissions`, payload)).data);
 export const fetchRuntimePage = async (pageId) =>
-    (await api.get(`/kodi/platform/runtime/${pageId}`)).data;
+    unwrap((await api.get(`/kodi/platform/runtime/${pageId}`)).data);
 export const listAppUsers = async (appId) =>
-    (await api.get(`/kodi/platform/apps/${appId}/users`)).data;
+    unwrap((await api.get(`/kodi/platform/apps/${appId}/users`)).data);
 export const assignAppUser = async (appId, payload) =>
-    (await api.post(`/kodi/platform/apps/${appId}/users`, payload)).data;
-export const listPlatformObjects = async () => (await api.get('/kodi/platform/objects')).data;
-export const createPlatformObject = async (payload) => (await api.post('/kodi/platform/objects', payload)).data;
+    unwrap((await api.post(`/kodi/platform/apps/${appId}/users`, payload)).data);
+export const listPageUsers = async (pageId) =>
+    unwrap((await api.get(`/kodi/platform/pages/${pageId}/users`)).data);
+export const assignPageUser = async (pageId, payload) =>
+    unwrap((await api.post(`/kodi/platform/pages/${pageId}/users`, payload)).data);
+export const listPlatformObjects = async () => unwrap((await api.get('/kodi/platform/objects')).data);
+export const createPlatformObject = async (payload) => unwrap((await api.post('/kodi/platform/objects', payload)).data);
 export const listPlatformObjectFields = async (objectId) =>
-    (await api.get(`/kodi/platform/objects/${objectId}/fields`)).data;
+    unwrap((await api.get(`/kodi/platform/objects/${objectId}/fields`)).data);
 export const createPlatformField = async (objectId, payload) =>
-    (await api.post(`/kodi/platform/objects/${objectId}/fields`, payload)).data;
-export const listLeads = async () => (await api.get('/kodi/platform/leads')).data;
-export const createLead = async (payload) => (await api.post('/kodi/platform/leads', payload)).data;
+    unwrap((await api.post(`/kodi/platform/objects/${objectId}/fields`, payload)).data);
+export const listLeads = async () => unwrap((await api.get('/kodi/platform/leads')).data);
+export const createLead = async (payload) => unwrap((await api.post('/kodi/platform/leads', payload)).data);
 export const convertLead = async (leadId, payload) =>
-    (await api.post(`/kodi/platform/leads/${leadId}/convert`, payload)).data;
+    unwrap((await api.post(`/kodi/platform/leads/${leadId}/convert`, payload)).data);
 export const listLeadOpportunities = async (leadId) =>
-    (await api.get(`/kodi/platform/leads/${leadId}/opportunities`)).data;
+    unwrap((await api.get(`/kodi/platform/leads/${leadId}/opportunities`)).data);
+export const listPlatformComponents = async () => unwrap((await api.get('/kodi/platform/components')).data);
