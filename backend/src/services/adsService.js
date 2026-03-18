@@ -126,7 +126,6 @@ const buildAdQueryContext = (tables) => {
 
     const ownerEmailExpr = ownerExpr ? 'owner.email' : 'NULL';
     const ownerNameExpr = ownerExpr ? 'owner.display_name' : 'NULL';
-    const ownerPhoneExpr = ownerExpr ? 'owner.phone_number' : 'NULL';
 
     return {
         joins: joins.join('\n'),
@@ -135,9 +134,40 @@ const buildAdQueryContext = (tables) => {
         subscriptionExpiresExpr,
         ownerEmailExpr,
         ownerNameExpr,
-        ownerPhoneExpr,
         hasOwner: Boolean(ownerExpr)
     };
+};
+
+let cachedOwnerPhoneField;
+const getOwnerPhoneField = async () => {
+    if (cachedOwnerPhoneField !== undefined) {
+        return cachedOwnerPhoneField;
+    }
+    try {
+        const { rows } = await query(
+            `SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'users'
+               AND column_name IN ('phone_number', 'phone')
+             ORDER BY CASE column_name
+                 WHEN 'phone_number' THEN 1
+                 WHEN 'phone' THEN 2
+                 ELSE 3
+             END
+             LIMIT 1`
+        );
+        const column = rows[0]?.column_name;
+        if (column === 'phone_number' || column === 'phone') {
+            cachedOwnerPhoneField = column;
+        } else {
+            cachedOwnerPhoneField = null;
+        }
+    } catch (error) {
+        console.warn('Failed to determine owner phone column:', error.message);
+        cachedOwnerPhoneField = null;
+    }
+    return cachedOwnerPhoneField;
 };
 
 const ensureAdTableMetadata = async (forceRefresh = false) => {
@@ -778,6 +808,9 @@ const adminGetAdDetails = async (adId, options = {}) => {
         const bidRateMinorSelect = schema.hasBidRateMinor ? 'COALESCE(c.bid_rate_minor, 0)' : '0::bigint';
         const overrideSelect = schema.hasOverride ? 'COALESCE(c.override_restrictions, false)' : 'false';
 
+        const ownerPhoneField = await getOwnerPhoneField();
+        const ownerPhoneExpr = ownerPhoneField ? `owner.${ownerPhoneField}` : 'NULL';
+
         const result = await query(
             `
                 SELECT
@@ -789,7 +822,7 @@ const adminGetAdDetails = async (adId, options = {}) => {
                     ${context.hasOwner ? 'owner.id' : 'NULL'} AS owner_user_id,
                     ${context.ownerEmailExpr} AS owner_email,
                     ${context.ownerNameExpr} AS owner_name,
-                    ${context.ownerPhoneExpr} AS owner_phone,
+                    ${ownerPhoneExpr} AS owner_phone,
                     (
                         SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                         FROM ad_placements ap
