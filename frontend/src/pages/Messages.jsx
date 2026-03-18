@@ -42,6 +42,7 @@ const Messages = () => {
     const [callStartedAt, setCallStartedAt] = useState(null);
     const [extendingSession, setExtendingSession] = useState(false);
     const [psychologistDeletedNotice, setPsychologistDeletedNotice] = useState('');
+    const [extendMinutes, setExtendMinutes] = useState(10);
 
     useEffect(() => {
         setPsychologistDeletedNotice('');
@@ -172,8 +173,9 @@ const Messages = () => {
         }
         setExtendingSession(true);
         try {
+            const requestedMinutes = Math.max(5, Math.min(60, Number(extendMinutes) || 10));
             await api.post(`/messages/conversations/${activeConversation.id}/extend`, {
-                extendMinutes: Math.min(10, chatUsage?.remaining || 10)
+                extendMinutes: requestedMinutes
             });
             toast.success('Session extended by a few minutes.');
             await Promise.all([loadChatUsage(), fetchConversations()]);
@@ -985,7 +987,11 @@ const Messages = () => {
                 </div>
             )}
             <div className="messages-container">
-                <div className={`messages-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+                <div
+                    className={`messages-sidebar ${isSidebarOpen ? 'open' : ''}`}
+                    onWheel={(event) => event.stopPropagation()}
+                    onTouchMove={(event) => event.stopPropagation()}
+                >
                     <div className="sidebar-header">
                         <h2>Messages</h2>
                         <button
@@ -1259,6 +1265,25 @@ const Messages = () => {
                                         </button>
                                     )}
                                 </div>
+                                {isConversationExpired && (chatUsage?.remaining ?? 0) > 0 && (
+                                    <div className="conversation-extend-control">
+                                        <label>
+                                            Minutes
+                                            <input
+                                                type="number"
+                                                min="5"
+                                                max="60"
+                                                value={extendMinutes}
+                                                onChange={(event) => {
+                                                    const value = Number(event.target.value);
+                                                    if (Number.isNaN(value)) return;
+                                                    setExtendMinutes(Math.max(5, Math.min(60, value)));
+                                                }}
+                                            />
+                                        </label>
+                                        <span>Choose between 5 and 60 minutes</span>
+                                    </div>
+                                )}
                                   {showUpgradeReminder && (
                                       <div className="upgrade-reminder">
                                           <FaExclamationTriangle />
@@ -1289,20 +1314,26 @@ const Messages = () => {
                         </div>
                     )}
 
-                    <MessageThread
-                        conversation={activeConversation}
-                        messages={messages}
-                        callConfig={psychPermissions}
-                        isExpired={isConversationExpired}
-                        timeRemainingLabel={timeLabel}
-                        sessionLimitMinutes={sessionLimitMinutes}
-                        onSendMessage={handleSendMessage}
-                        onStartVoiceCall={handleVoiceCall}
-                        onStartVideoCall={handleVideoCall}
-                        onOpenSidebar={() => setIsSidebarOpen(true)}
-                        callDisabled={isFreeEmployee}
-                        callDisabledReason={callRestrictionCopy}
-                    />
+                    <div
+                        className="messages-main"
+                        onWheel={(event) => event.stopPropagation()}
+                        onTouchMove={(event) => event.stopPropagation()}
+                    >
+                        <MessageThread
+                            conversation={activeConversation}
+                            messages={messages}
+                            callConfig={psychPermissions}
+                            isExpired={isConversationExpired}
+                            timeRemainingLabel={timeLabel}
+                            sessionLimitMinutes={sessionLimitMinutes}
+                            onSendMessage={handleSendMessage}
+                            onStartVoiceCall={handleVoiceCall}
+                            onStartVideoCall={handleVideoCall}
+                            onOpenSidebar={() => setIsSidebarOpen(true)}
+                            callDisabled={isFreeEmployee}
+                            callDisabledReason={callRestrictionCopy}
+                        />
+                    </div>
                 </div>
             </div>
             {(callState.status === 'calling' || callState.status === 'incoming' || callState.status === 'in-call') && (

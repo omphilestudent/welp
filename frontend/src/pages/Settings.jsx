@@ -377,7 +377,7 @@ const Settings = () => {
                                         )}
                                     </div>
                                     <button
-                                        className="avatar-upload-btn"
+                                        className="avatar-upload-btn avatar-upload-btn--settings"
                                         onClick={() => fileInputRef.current?.click()}
                                         disabled={loading}
                                     >

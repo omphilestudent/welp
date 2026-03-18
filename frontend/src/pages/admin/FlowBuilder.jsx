@@ -14,7 +14,7 @@ import {
 } from '../../services/flowService';
 import './FlowBuilder.css';
 
-const makeId = () => `node-${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`;
+const makeId = () => `node-${Math.random().toString(36).substr(2, 9)}`;
 
 const LIBRARY = [
     {
@@ -86,7 +86,7 @@ const LIBRARY = [
                 label: 'Decision',
                 help: 'Route based on a condition',
                 nodeType: 'condition',
-                config: { field: 'role', value: 'business' }
+                config: { field: 'role', operator: '=', value: 'business' }
             },
             {
                 key: 'loop',
@@ -249,7 +249,7 @@ const fromDefinition = (definition = {}) => {
     const pos = {};
     nodes.forEach((n, i) => {
         const p = positions?.[n.id];
-        pos[n.id] = p && typeof p.x === 'number' ? p : { x: 80 + (i % 3) * 260, y: 80 + Math.floor(i / 3) * 160 };
+        pos[n.id] = p && typeof p.x === 'number' ? p : { x: 200, y: 100 + (i * 120) };
     });
 
     return { nodes, edges, positions: pos, viewport, mode, customLogic };
@@ -434,7 +434,7 @@ export default function FlowBuilder() {
     const [mode, setMode] = useState('draft');
     const [customLogic, setCustomLogic] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
-    const [connecting, setConnecting] = useState(null); // { from, handle }
+    const [connecting, setConnecting] = useState(null);
     const [run, setRun] = useState({ running: false, activeId: null });
     const [addMenu, setAddMenu] = useState({ open: false, x: 0, y: 0, from: null, edge: null, query: '' });
     const [logicModal, setLogicModal] = useState({ open: false, name: '', code: '', from: null, edge: null });
@@ -477,8 +477,8 @@ export default function FlowBuilder() {
                         { id: endId, type: 'end', label: 'End Flow', config: {} }
                     ];
                     nextPositions = {
-                        [startId]: { x: 280, y: 80 },
-                        [endId]: { x: 280, y: 240 }
+                        [startId]: { x: 400, y: 80 },
+                        [endId]: { x: 400, y: 280 }
                     };
                     nextEdges = [{ id: `${startId}-out-${endId}`, from: startId, to: endId, handle: 'out', label: 'NEXT' }];
                 } else if (!nextNodes.some((n) => n.type === 'start')) {
@@ -490,7 +490,7 @@ export default function FlowBuilder() {
                         || null;
                     nextNodes = [{ id: startId, type: 'start', label: 'Start Flow', config: {} }, ...nextNodes];
                     const targetPos = startTarget ? nextPositions?.[startTarget] : null;
-                    nextPositions = { [startId]: { x: targetPos?.x ?? 280, y: (targetPos?.y ?? 240) - 160 }, ...nextPositions };
+                    nextPositions = { [startId]: { x: targetPos?.x ?? 400, y: (targetPos?.y ?? 280) - 160 }, ...nextPositions };
                     if (startTarget) {
                         nextEdges = [...nextEdges, { id: `${startId}-out-${startTarget}`, from: startId, to: String(startTarget), handle: 'out', label: 'NEXT' }];
                     }
@@ -557,23 +557,11 @@ export default function FlowBuilder() {
                 ? nodes.find((n) => n.id === edgeContext.from)
                 : getLastLinearNode();
 
-        const anchorPos = anchorNode ? (positions[anchorNode.id] || { x: 200, y: 120 }) : { x: 200, y: 120 };
-        const verticalSpacing = 160;
+        const anchorPos = anchorNode ? (positions[anchorNode.id] || { x: 400, y: 120 }) : { x: 400, y: 120 };
+        const verticalSpacing = 140;
         const nextPos = {
             x: anchorPos.x,
             y: anchorPos.y + verticalSpacing
-        };
-
-        const shiftNodesDown = (ids, deltaY) => {
-            if (!ids.length) return;
-            setPositions((prev) => {
-                const next = { ...prev };
-                ids.forEach((id) => {
-                    if (!next[id]) return;
-                    next[id] = { ...next[id], y: (next[id].y || 0) + deltaY };
-                });
-                return next;
-            });
         };
 
         const shiftNodesBelowY = (startY, deltaY) => {
@@ -591,12 +579,13 @@ export default function FlowBuilder() {
 
         setNodes((prev) => [...prev, { id: nodeId, type: item.nodeType, label: item.help || item.label, config: item.config || {} }]);
         setPositions((prev) => ({ ...prev, [nodeId]: { x: nextPos.x, y: nextPos.y } }));
+
         if (edgeContext) {
             setEdges((prev) => {
                 const filtered = prev.filter((e) => e.id !== edgeContext.id);
                 const chainEdges = [
                     {
-                        id: `${edgeContext.from}-${edgeContext.handle}-mid-${nodeId}`,
+                        id: `${edgeContext.from}-${edgeContext.handle}-${nodeId}`,
                         from: edgeContext.from,
                         to: nodeId,
                         handle: edgeContext.handle || 'out',
@@ -604,12 +593,9 @@ export default function FlowBuilder() {
                     }
                 ];
                 if (item.nodeType === 'condition') {
-                    const endNode = nodes.find((n) => n.type === 'end');
-                    const yesTarget = edgeContext.to;
-                    const noTarget = endNode?.id || edgeContext.to;
                     chainEdges.push(
-                        { id: `${nodeId}-yes-${yesTarget}`, from: nodeId, to: yesTarget, handle: 'yes', label: 'TRUE' },
-                        { id: `${nodeId}-no-${noTarget}`, from: nodeId, to: noTarget, handle: 'no', label: 'FALSE' }
+                        { id: `${nodeId}-yes-${edgeContext.to}`, from: nodeId, to: edgeContext.to, handle: 'yes', label: 'TRUE' },
+                        { id: `${nodeId}-no-${edgeContext.to}`, from: nodeId, to: edgeContext.to, handle: 'no', label: 'FALSE' }
                     );
                 } else {
                     chainEdges.push({ id: `${nodeId}-out-${edgeContext.to}`, from: nodeId, to: edgeContext.to, handle: 'out', label: 'NEXT' });
@@ -624,29 +610,19 @@ export default function FlowBuilder() {
             if (fromNode?.type === 'end') {
                 toast.error('End nodes cannot connect forward.');
             } else {
-                const wasDirectToEnd = !!(endNode && edges.some((e) => e.from === baseFromId && e.to === endNode.id));
                 setEdges((prev) => {
                     const base = prev.filter((e) => !(endNode && e.from === baseFromId && e.to === endNode.id && e.handle === 'out'));
                     base.push({ id: `${baseFromId}-out-${nodeId}`, from: baseFromId, to: nodeId, handle: 'out', label: 'NEXT' });
-                    if (item.nodeType === 'condition') {
-                        const endNode = nodes.find((n) => n.type === 'end');
-                        const endId = endNode?.id || null;
-                        if (endId) {
-                            base.push(
-                                { id: `${nodeId}-yes-${endId}`, from: nodeId, to: endId, handle: 'yes', label: 'TRUE' },
-                                { id: `${nodeId}-no-${endId}`, from: nodeId, to: endId, handle: 'no', label: 'FALSE' }
-                            );
-                        }
-                    }
-                    if (endNode?.id && item.nodeType !== 'condition') {
+                    if (item.nodeType === 'condition' && endNode?.id) {
+                        base.push(
+                            { id: `${nodeId}-yes-${endNode.id}`, from: nodeId, to: endNode.id, handle: 'yes', label: 'TRUE' },
+                            { id: `${nodeId}-no-${endNode.id}`, from: nodeId, to: endNode.id, handle: 'no', label: 'FALSE' }
+                        );
+                    } else if (endNode?.id && item.nodeType !== 'condition') {
                         base.push({ id: `${nodeId}-out-${endNode.id}`, from: nodeId, to: endNode.id, handle: 'out', label: 'NEXT' });
                     }
                     return base;
                 });
-                if (wasDirectToEnd && endNode?.id) {
-                    const targetY = positions[endNode.id]?.y ?? anchorPos.y + verticalSpacing;
-                    shiftNodesBelowY(targetY, verticalSpacing);
-                }
             }
         }
         setSelectedId(nodeId);
@@ -682,7 +658,6 @@ export default function FlowBuilder() {
         if (fromNode.type === 'end') return toast.error('End nodes cannot connect forward.');
         setEdges((prev) => {
             const filtered = prev.filter((e) => !(e.from === connecting.from && e.handle === connecting.handle));
-            const fromNode = nodes.find((n) => n.id === connecting.from);
             const label = fromNode?.type === 'condition'
                 ? (connecting.handle === 'yes' ? (fromNode.config?.trueLabel || 'TRUE') : (fromNode.config?.falseLabel || 'FALSE'))
                 : 'NEXT';
@@ -718,8 +693,8 @@ export default function FlowBuilder() {
         const entry = { id: logicId, name: logicModal.name.trim(), code: logicModal.code || '' };
         setCustomLogic((prev) => [...prev, entry]);
         const point = selectedId
-            ? { x: (positions[selectedId]?.x || 200) + 260, y: positions[selectedId]?.y || 120 }
-            : { x: 240, y: 140 };
+            ? { x: (positions[selectedId]?.x || 400) + 260, y: positions[selectedId]?.y || 120 }
+            : { x: 400, y: 140 };
         addNodeFromItem(
             { nodeType: 'custom_logic', label: entry.name, help: entry.name, config: { logicId } },
             point,
@@ -802,7 +777,6 @@ export default function FlowBuilder() {
             const { data } = await executeFlow(flow.id, context);
             const results = data?.data?.actions || [];
             for (const step of results) {
-                // eslint-disable-next-line no-await-in-loop
                 await new Promise((r) => setTimeout(r, 300));
                 setRun({ running: true, activeId: step.id });
             }
@@ -812,6 +786,32 @@ export default function FlowBuilder() {
         } finally {
             setRun({ running: false, activeId: null });
         }
+    };
+
+    const getEdgePath = (edge) => {
+        const from = positions[edge.from];
+        const to = positions[edge.to];
+        if (!from || !to) return null;
+
+        // Calculate connection points
+        const startX = from.x + 116; // Center of node horizontally
+        const startY = from.y + 40; // Bottom of node header
+        const endX = to.x + 116; // Center of target node horizontally
+        const endY = to.y + 8; // Top of target node
+
+        // Add offset for decision branches
+        let offsetY = 0;
+        if (edge.handle === 'yes') offsetY = -10;
+        if (edge.handle === 'no') offsetY = 10;
+
+        // Create draw.io style path with smooth curves
+        const controlY1 = startY + (endY - startY) * 0.25 + offsetY;
+        const controlY2 = endY - (endY - startY) * 0.25 + offsetY;
+
+        return `M ${startX} ${startY} 
+                C ${startX} ${controlY1}, 
+                  ${endX} ${controlY2}, 
+                  ${endX} ${endY}`;
     };
 
     if (!canEdit) {
@@ -826,7 +826,7 @@ export default function FlowBuilder() {
     return (
         <div className="fb-page">
             <div className="fb-top">
-                <button type="button" className="secondary" onClick={() => navigate('/admin/flows')}>{'<-'} Back</button>
+                <button type="button" className="secondary" onClick={() => navigate('/admin/flows')}>← Back</button>
                 <div className="fb-title">
                     <div className="fb-name">{flow?.name || 'Flow Builder'}</div>
                     <div className="fb-sub">
@@ -882,8 +882,8 @@ export default function FlowBuilder() {
                                         onDragStart={(e) => onDragStart(e, item)}
                                         onClick={() => {
                                             const point = selectedId
-                                                ? { x: (positions[selectedId]?.x || 200) + 260, y: positions[selectedId]?.y || 120 }
-                                                : { x: 240, y: 140 };
+                                                ? { x: (positions[selectedId]?.x || 400) + 260, y: positions[selectedId]?.y || 120 }
+                                                : { x: 400, y: 140 };
                                             addNodeFromItem(item, point, selectedId);
                                         }}
                                         title={item.help}
@@ -930,173 +930,91 @@ export default function FlowBuilder() {
                         <svg className="fb-edges">
                             <defs>
                                 <marker
-                                    id="fb-arrow"
+                                    id="arrowhead"
                                     markerWidth="10"
                                     markerHeight="10"
-                                    refX="6"
-                                    refY="3"
+                                    refX="9"
+                                    refY="5"
                                     orient="auto"
-                                    markerUnits="strokeWidth"
                                 >
-                                    <path d="M0,0 L6,3 L0,6 Z" className="fb-edge-arrow" />
+                                    <path d="M2,2 L8,5 L2,8 L4,5 L2,2" fill="#2563eb" stroke="none" />
                                 </marker>
-                                <linearGradient id="thread-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stopColor="#94a3b8" />
-                                    <stop offset="50%" stopColor="#cbd5e1" />
-                                    <stop offset="100%" stopColor="#94a3b8" />
-                                </linearGradient>
-                                <filter id="thread-shadow" x="-20%" y="-20%" width="140%" height="140%">
-                                    <feDropShadow dx="1" dy="1" stdDeviation="1" floodOpacity="0.1" />
-                                </filter>
+                                <marker
+                                    id="arrowhead-yes"
+                                    markerWidth="10"
+                                    markerHeight="10"
+                                    refX="9"
+                                    refY="5"
+                                    orient="auto"
+                                >
+                                    <path d="M2,2 L8,5 L2,8 L4,5 L2,2" fill="#10b981" stroke="none" />
+                                </marker>
+                                <marker
+                                    id="arrowhead-no"
+                                    markerWidth="10"
+                                    markerHeight="10"
+                                    refX="9"
+                                    refY="5"
+                                    orient="auto"
+                                >
+                                    <path d="M2,2 L8,5 L2,8 L4,5 L2,2" fill="#ef4444" stroke="none" />
+                                </marker>
                             </defs>
                             {edges.map((edge) => {
-                                const from = positions[edge.from];
-                                const to = positions[edge.to];
-                                if (!from || !to) return null;
+                                const path = getEdgePath(edge);
+                                if (!path) return null;
 
-                                // Calculate connection points
-                                const x1 = from.x + 232;
-                                const y1 = from.y + 40 + (edge.handle === 'yes' ? 0 : edge.handle === 'no' ? 18 : 0);
-                                const x2 = to.x + 8;
-                                const y2 = to.y + 40;
-
-                                // Create natural curve for string effect
-                                const midX = (x1 + x2) / 2;
-                                const midY = (y1 + y2) / 2;
-
-                                // Add slight sag to the string based on distance
-                                const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                                const sag = Math.min(30, distance * 0.15);
-
-                                const isBranch = edge.handle === 'yes' || edge.handle === 'no';
-                                const controlX1 = isBranch ? x1 : x1 + (x2 - x1) * 0.25;
-                                const controlY1 = isBranch ? y1 + sag : y1 + sag;
-                                const controlX2 = isBranch ? x2 : x2 - (x2 - x1) * 0.25;
-                                const controlY2 = isBranch ? y2 + sag : y2 + sag;
-
-                                const path = `M ${x1} ${y1} 
-                                             C ${controlX1} ${controlY1},
-                                               ${controlX2} ${controlY2},
-                                               ${x2} ${y2}`;
-
-                                const label = edge.label || (edge.handle === 'yes' ? 'TRUE' : edge.handle === 'no' ? 'FALSE' : 'NEXT');
                                 const isHovered = hoveredEdge === edge.id;
+                                const markerEnd = edge.handle === 'yes' ? 'url(#arrowhead-yes)' :
+                                    edge.handle === 'no' ? 'url(#arrowhead-no)' :
+                                        'url(#arrowhead)';
 
                                 return (
-                                    <path
-                                        key={edge.id}
-                                        d={path}
-                                        className={`fb-edge-path ${isHovered ? 'hovered' : ''}`}
-                                        data-handle={edge.handle || 'out'}
-                                        markerEnd="url(#fb-arrow)"
-                                        onMouseEnter={() => setHoveredEdge(edge.id)}
-                                        onMouseLeave={() => setHoveredEdge(null)}
-                                    >
-                                        <title>{label}</title>
-                                    </path>
+                                    <g key={edge.id}>
+                                        <path
+                                            d={path}
+                                            className={`fb-edge-path ${isHovered ? 'hovered' : ''}`}
+                                            data-handle={edge.handle || 'out'}
+                                            markerEnd={markerEnd}
+                                            onMouseEnter={() => setHoveredEdge(edge.id)}
+                                            onMouseLeave={() => setHoveredEdge(null)}
+                                        />
+                                        {isHovered && (
+                                            <text className="fb-edge-label">
+                                                <textPath href={`#${edge.id}`} startOffset="50%">
+                                                    {edge.label || (edge.handle === 'yes' ? 'Yes' : edge.handle === 'no' ? 'No' : 'Next')}
+                                                </textPath>
+                                            </text>
+                                        )}
+                                    </g>
                                 );
                             })}
                         </svg>
 
-                        {/* Knots at connection points */}
-                        <div className="fb-knots-layer">
-                            {edges.map((edge) => {
-                                const from = positions[edge.from];
-                                const to = positions[edge.to];
-                                if (!from || !to) return null;
-
-                                const x1 = from.x + 232;
-                                const y1 = from.y + 40 + (edge.handle === 'yes' ? 0 : edge.handle === 'no' ? 18 : 0);
-                                const x2 = to.x + 8;
-                                const y2 = to.y + 40;
-
-                                return (
-                                    <div key={`knots-${edge.id}`}>
-                                        <div
-                                            className="fb-thread-knot"
-                                            style={{
-                                                left: x1 - 4,
-                                                top: y1 - 4,
-                                                backgroundColor: edge.handle === 'yes' ? '#10b981' :
-                                                    edge.handle === 'no' ? '#ef4444' :
-                                                        edge.handle === 'out' ? '#3b82f6' : '#94a3b8'
-                                            }}
-                                        />
-                                        <div
-                                            className="fb-thread-knot"
-                                            style={{
-                                                left: x2 - 4,
-                                                top: y2 - 4,
-                                                backgroundColor: edge.handle === 'yes' ? '#10b981' :
-                                                    edge.handle === 'no' ? '#ef4444' :
-                                                        edge.handle === 'out' ? '#3b82f6' : '#94a3b8'
-                                            }}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Edge add buttons */}
-                        {edges.map((edge) => {
-                            const from = positions[edge.from];
-                            const to = positions[edge.to];
-                            if (!from || !to) return null;
-
-                            const x1 = from.x + 232;
-                            const y1 = from.y + 40 + (edge.handle === 'yes' ? 0 : edge.handle === 'no' ? 18 : 0);
-                            const x2 = to.x + 8;
-                            const y2 = to.y + 40;
-
-                            const midX = (x1 + x2) / 2;
-                            const midY = (y1 + y2) / 2 - 10; // Offset slightly up from the sag
-
-                            const rect = canvasRef.current?.getBoundingClientRect();
-                            const screenX = rect ? rect.left + viewport.x + midX * viewport.zoom : midX;
-                            const screenY = rect ? rect.top + viewport.y + midY * viewport.zoom : midY;
-
-                            return (
-                                <button
-                                    key={`edge-${edge.id}`}
-                                    type="button"
-                                    className="fb-edge-add"
-                                    style={{ left: midX - 10, top: midY - 10 }}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        openAddMenu({ x: screenX, y: screenY, edge: { ...edge, from: edge.from, to: edge.to } });
-                                    }}
-                                    title="Insert step"
-                                >
-                                    +
-                                </button>
-                            );
-                        })}
-
                         <div className="fb-inner" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
                             {nodes.map((node) => {
-                                const pos = positions[node.id] || { x: 80, y: 80 };
+                                const pos = positions[node.id] || { x: 400, y: 100 };
                                 const active = node.id === selectedId;
                                 const running = node.id === run.activeId;
                                 const kind = NODE_KIND[node.type] || 'action';
+                                const isConnecting = connecting && connecting.from === node.id;
+
                                 return (
                                     <div
                                         key={node.id}
-                                        className={`fb-node type-${kind} ${active ? 'active' : ''} ${running ? 'running' : ''}`}
+                                        className={`fb-node type-${kind} ${active ? 'active' : ''} ${running ? 'running' : ''} ${isConnecting ? 'connecting' : ''}`}
                                         style={{ left: pos.x, top: pos.y }}
                                         onMouseDown={(e) => {
-                                            if (e.button !== 0) return;
+                                            if (e.button !== 0 || e.target.closest('.fb-node-add') || e.target.closest('.port')) return;
                                             e.stopPropagation();
                                             setSelectedId(node.id);
                                             const start = { x: e.clientX, y: e.clientY };
                                             const initial = positions[node.id] || { x: 0, y: 0 };
-                                            const startId = nodes.find((n) => n.type === 'start')?.id || null;
-                                            const startX = startId ? (positions[startId]?.x ?? initial.x) : initial.x;
                                             const move = (ev) => {
                                                 const dx = (ev.clientX - start.x) / viewport.zoom;
                                                 const dy = (ev.clientY - start.y) / viewport.zoom;
                                                 const snap = (value) => Math.round(value / 20) * 20;
-                                                const nextX = node.type === 'start' ? snap(initial.x + dx) : snap(startX);
-                                                setPositions((p) => ({ ...p, [node.id]: { x: nextX, y: snap(initial.y + dy) } }));
+                                                setPositions((p) => ({ ...p, [node.id]: { x: snap(initial.x + dx), y: snap(initial.y + dy) } }));
                                             };
                                             const up = () => {
                                                 window.removeEventListener('mousemove', move);
@@ -1120,7 +1038,8 @@ export default function FlowBuilder() {
                                                 title="Add step"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    openAddMenu({ x: e.clientX, y: e.clientY, from: node.id });
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    openAddMenu({ x: rect.right, y: rect.top, from: node.id });
                                                 }}
                                             >
                                                 +
@@ -1128,17 +1047,49 @@ export default function FlowBuilder() {
                                         </div>
                                         <div className="fb-node-ports">
                                             {node.type !== 'trigger' && node.type !== 'start' && (
-                                                <button type="button" className="port in" title="Connect into this step" onClick={(e) => { e.stopPropagation(); connectTo(node.id); }} />
+                                                <button
+                                                    type="button"
+                                                    className="port in"
+                                                    title="Connect into this step"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        connectTo(node.id);
+                                                    }}
+                                                />
                                             )}
                                             <div className="fb-out">
                                                 {node.type === 'condition' && (
                                                     <>
-                                                        <button type="button" className="port out yes" title="Yes" onClick={(e) => { e.stopPropagation(); connectFrom(node.id, 'yes'); }} />
-                                                        <button type="button" className="port out no" title="No" onClick={(e) => { e.stopPropagation(); connectFrom(node.id, 'no'); }} />
+                                                        <button
+                                                            type="button"
+                                                            className="port out yes"
+                                                            title="Yes"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                connectFrom(node.id, 'yes');
+                                                            }}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            className="port out no"
+                                                            title="No"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                connectFrom(node.id, 'no');
+                                                            }}
+                                                        />
                                                     </>
                                                 )}
                                                 {node.type !== 'end' && node.type !== 'condition' && (
-                                                    <button type="button" className="port out" title="Next" onClick={(e) => { e.stopPropagation(); connectFrom(node.id, 'out'); }} />
+                                                    <button
+                                                        type="button"
+                                                        className="port out"
+                                                        title="Next"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            connectFrom(node.id, 'out');
+                                                        }}
+                                                    />
                                                 )}
                                             </div>
                                         </div>
@@ -1182,57 +1133,6 @@ export default function FlowBuilder() {
                                 </>
                             )}
 
-                            {selected.type === 'start' && (
-                                <>
-                                    <label>
-                                        Object
-                                        <select
-                                            value={selected.config.object || 'Login'}
-                                            onChange={(e) => updateSelected({ object: e.target.value })}
-                                        >
-                                            {['Login', 'Profile', 'Review', 'Message', 'Contact', 'Custom'].map((opt) => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                    <label>
-                                        Trigger Event
-                                        <select
-                                            value={selected.config.event || 'created'}
-                                            onChange={(e) => updateSelected({ event: e.target.value })}
-                                        >
-                                            <option value="created">Created</option>
-                                            <option value="updated">Updated</option>
-                                            <option value="created_or_updated">Created or Updated</option>
-                                            <option value="deleted">Deleted</option>
-                                        </select>
-                                    </label>
-                                    <label>
-                                        Scheduling
-                                        <select
-                                            value={selected.config.schedule || 'immediately'}
-                                            onChange={(e) => updateSelected({ schedule: e.target.value })}
-                                        >
-                                            <option value="immediately">Immediately</option>
-                                            <option value="delayed">Delayed</option>
-                                            <option value="recurring">Recurring</option>
-                                        </select>
-                                    </label>
-                                    {selected.config.schedule === 'delayed' && (
-                                        <label>
-                                            Delay
-                                            <input value={selected.config.delay || ''} onChange={(e) => updateSelected({ delay: e.target.value })} placeholder="5m" />
-                                        </label>
-                                    )}
-                                    {selected.config.schedule === 'recurring' && (
-                                        <label>
-                                            Cron
-                                            <input value={selected.config.cron || ''} onChange={(e) => updateSelected({ cron: e.target.value })} placeholder="0 9 * * *" />
-                                        </label>
-                                    )}
-                                </>
-                            )}
-
                             {selected.type === 'email' && (
                                 <>
                                     <label>Send to<input value={selected.config.to || ''} onChange={(e) => updateSelected({ to: e.target.value })} /></label>
@@ -1255,36 +1155,6 @@ export default function FlowBuilder() {
                                         try { updateSelected({ body: text.trim() ? JSON.parse(text) : null }); } catch { updateSelected({ body: text }); }
                                     }} /></label>
                                 </>
-                            )}
-
-                            {selected.type === 'timer' && (
-                                <label>Delay<input value={selected.config.delay || ''} onChange={(e) => updateSelected({ delay: e.target.value })} placeholder="5m" /></label>
-                            )}
-
-                            {selected.type === 'delay' && (
-                                <label>Wait For<input value={selected.config.delay || ''} onChange={(e) => updateSelected({ delay: e.target.value })} placeholder="5m" /></label>
-                            )}
-
-                            {selected.type === 'screen' && (
-                                <>
-                                    <label>Title<input value={selected.config.title || ''} onChange={(e) => updateSelected({ title: e.target.value })} /></label>
-                                    <label>Description<textarea rows={3} value={selected.config.description || ''} onChange={(e) => updateSelected({ description: e.target.value })} /></label>
-                                    <label>Inputs (JSON)<textarea rows={6} value={typeof selected.config.inputs === 'string' ? selected.config.inputs : JSON.stringify(selected.config.inputs ?? [], null, 2)} onChange={(e) => {
-                                        const text = e.target.value;
-                                        try { updateSelected({ inputs: text.trim() ? JSON.parse(text) : [] }); } catch { updateSelected({ inputs: text }); }
-                                    }} /></label>
-                                </>
-                            )}
-
-                            {selected.type === 'get_records' && (
-                                <>
-                                    <label>Source<input value={selected.config.source || ''} onChange={(e) => updateSelected({ source: e.target.value })} /></label>
-                                    <label>Query<textarea rows={4} value={selected.config.query || ''} onChange={(e) => updateSelected({ query: e.target.value })} /></label>
-                                </>
-                            )}
-
-                            {selected.type === 'load_config' && (
-                                <label>Config Key<input value={selected.config.key || ''} onChange={(e) => updateSelected({ key: e.target.value })} /></label>
                             )}
 
                             {selected.type === 'condition' && (
@@ -1313,7 +1183,6 @@ export default function FlowBuilder() {
                                     <label>True Label<input value={selected.config.trueLabel || 'True'} onChange={(e) => updateSelected({ trueLabel: e.target.value })} /></label>
                                     <label>False Label<input value={selected.config.falseLabel || 'False'} onChange={(e) => updateSelected({ falseLabel: e.target.value })} /></label>
                                     <label>Value<input value={selected.config.value || ''} onChange={(e) => updateSelected({ value: e.target.value })} /></label>
-                                    <div className="hint">Connect Yes/No to route.</div>
                                 </>
                             )}
 
@@ -1367,8 +1236,6 @@ export default function FlowBuilder() {
                                 </label>
                             )}
 
-                            {selected.type === 'end' && <div className="hint">End nodes terminate the flow.</div>}
-
                             {selected.type === 'custom_logic' && (
                                 <>
                                     <label>
@@ -1382,31 +1249,24 @@ export default function FlowBuilder() {
                                             ))}
                                         </select>
                                     </label>
-                                    <div className="hint">Custom logic is reusable across flows.</div>
                                 </>
                             )}
 
-                            <button type="button" className="danger" onClick={() => {
-                                if (selected.type === 'start') {
-                                    toast.error('Start node cannot be removed.');
-                                    return;
-                                }
-                                if (selected.type === 'end') {
-                                    toast.error('End node cannot be removed.');
-                                    return;
-                                }
-                                if (!window.confirm(`Delete "${selected.label}"?`)) return;
-                                setNodes((prev) => prev.filter((n) => n.id !== selected.id));
-                                setEdges((prev) => prev.filter((e) => e.from !== selected.id && e.to !== selected.id));
-                                setPositions((prev) => {
-                                    const next = { ...prev };
-                                    delete next[selected.id];
-                                    return next;
-                                });
-                                setSelectedId(null);
-                            }}>
-                                Delete step
-                            </button>
+                            {selected.type !== 'start' && selected.type !== 'end' && (
+                                <button type="button" className="danger" onClick={() => {
+                                    if (!window.confirm(`Delete "${selected.label}"?`)) return;
+                                    setNodes((prev) => prev.filter((n) => n.id !== selected.id));
+                                    setEdges((prev) => prev.filter((e) => e.from !== selected.id && e.to !== selected.id));
+                                    setPositions((prev) => {
+                                        const next = { ...prev };
+                                        delete next[selected.id];
+                                        return next;
+                                    });
+                                    setSelectedId(null);
+                                }}>
+                                    Delete step
+                                </button>
+                            )}
                         </div>
                     )}
                 </aside>
@@ -1418,6 +1278,7 @@ export default function FlowBuilder() {
                         placeholder="Search components..."
                         value={addMenu.query}
                         onChange={(e) => setAddMenu((prev) => ({ ...prev, query: e.target.value }))}
+                        autoFocus
                     />
                     <div className="fb-add-menu-list">
                         {LIBRARY.flatMap((group) => group.items)

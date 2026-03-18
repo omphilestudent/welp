@@ -147,18 +147,6 @@ const Navbar = () => {
                         <span>Welp</span>
                     </Link>
 
-                    <button
-                        type="button"
-                        className="navbar-toggle"
-                        onClick={toggleMobileMenu}
-                        aria-expanded={isMobileMenuOpen}
-                        aria-label="Toggle navigation menu"
-                    >
-                        <span />
-                        <span />
-                        <span />
-                    </button>
-
                     <div className={`navbar-menu ${isMobileMenuOpen ? 'navbar-menu--open' : ''}`}>
                         {renderLink('/', 'Home')}
                         {renderLink('/search', 'Companies')}
@@ -253,14 +241,21 @@ const Navbar = () => {
                                     </div>
                                 )}
 
-                                {renderLink('/settings', 'Settings')}
-
                                 {user.role === 'employee' && (
                                     <Link to="/messages" className="btn btn-primary" onClick={closeMobileMenu}>
                                         <FaComment /> Messages
                                     </Link>
                                 )}
 
+                                <button onClick={handleLogout} className="btn btn-primary">
+                                    Logout
+                                </button>
+                            </>
+                        ) : null}
+                    </div>
+                    <div className="navbar-controls">
+                        {user && (
+                            <>
                                 <div className="nav-notification">
                                     <button
                                         className="notification-btn"
@@ -294,7 +289,6 @@ const Navbar = () => {
                                         </div>
                                     )}
                                 </div>
-
                                 <Link to="/settings" className="navbar-avatar" aria-label="Profile" onClick={closeMobileMenu}>
                                     {user?.avatar_url ? (
                                         <AvatarImage src={user.avatar_url} alt={user.display_name || 'Profile'} />
@@ -304,12 +298,19 @@ const Navbar = () => {
                                         </span>
                                     )}
                                 </Link>
-
-                                <button onClick={handleLogout} className="btn btn-primary">
-                                    Logout
-                                </button>
                             </>
-                        ) : null}
+                        )}
+                        <button
+                            type="button"
+                            className={`navbar-toggle${isMobileMenuOpen ? ' active' : ''}`}
+                            onClick={toggleMobileMenu}
+                            aria-expanded={isMobileMenuOpen}
+                            aria-label="Toggle navigation menu"
+                        >
+                            <span />
+                            <span />
+                            <span />
+                        </button>
                     </div>
                 </div>
             </nav>
