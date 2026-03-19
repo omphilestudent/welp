@@ -1,11 +1,12 @@
 const express = require('express');
-const { authenticate, authorize } = require('../../middleware/auth');
+const { authenticate } = require('../../middleware/auth');
+const { authorizeAdmin } = require('../../middleware/adminAuth');
 const flowController = require('../../controllers/flowController');
 
 const router = express.Router();
 
 router.use(authenticate);
-router.use(authorize('admin', 'super_admin'));
+router.use(authorizeAdmin());
 
 router.get('/meta/events', flowController.listEventsController);
 router.get('/triggers', flowController.listTriggersController);

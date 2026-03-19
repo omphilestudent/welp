@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const repository = require('./kodiPortal.repository');
 const perms = require('./kodiPortal.permissions');
 const { sendKodiAppInviteEmail, sendKodiRoleUpdatedEmail, sendKodiPageAssignedEmail } = require('../../utils/emailService');
+const staff = require('../../utils/welpStaff');
 
 const logServiceError = (context, error, extra = {}) => {
     console.error('❌ Kodi Portal service error:', {
@@ -766,7 +767,8 @@ const getNavigation = async ({ appId, role, userId }) => {
 };
 
 const listUserApps = async ({ userId, role }) => {
-    if (perms.isAdminRole(role)) {
+    const isStaff = userId ? await staff.isWelpStaff(userId) : false;
+    if (perms.isAdminRole(role) || isStaff) {
         const apps = await repository.listApps();
         return apps
             .filter((app) => app.status === 'active')
@@ -785,6 +787,10 @@ const listUserApps = async ({ userId, role }) => {
 const getEffectiveRuntimeRole = async ({ appId, userId, globalRole }) => {
     if (!appId || !userId) {
         return perms.resolveEffectiveRole({ globalRole });
+    }
+    const isStaff = await staff.isWelpStaff(userId);
+    if (isStaff) {
+        return 'admin';
     }
     const membership = await repository.getAppUserMembership(appId, userId);
     if (!membership) return null;

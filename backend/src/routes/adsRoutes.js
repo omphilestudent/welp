@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
+const { authorizeAdmin } = require('../middleware/adminAuth');
 const upload = require('../middleware/upload');
 const adsController = require('../controllers/adsController');
 const { logAdFailure } = require('../services/adsService');
@@ -58,7 +59,7 @@ router.use(authenticate);
 
 // ==================== ADMIN ROUTES ====================
 // IMPORTANT: define these BEFORE any '/:id' routes to avoid route shadowing.
-const adminAuth = [authenticate, authorize('admin', 'super_admin')];
+const adminAuth = [authorizeAdmin()];
 
 router.get('/admin/list', adminAuth, adsController.adminListCampaigns);
 router.get('/admin/stats', adminAuth, adsController.adminGetStats);

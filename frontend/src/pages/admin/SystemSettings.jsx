@@ -51,15 +51,28 @@ const ROLE_OPTIONS = [
     { value: 'admin', label: 'Admin' },
     { value: 'super_admin', label: 'Super Admin' },
     { value: 'hr_admin', label: 'HR Admin' },
+    { value: 'welp_employee', label: 'Welp Employee' },
     { value: 'psychologist', label: 'Psychologist' },
     { value: 'business', label: 'Business' },
     { value: 'employee', label: 'Employee' }
+];
+
+const STAFF_ROLE_OPTIONS = [
+    { value: 'welp_employee', label: 'Welp Employee' },
+    { value: 'admin', label: 'Admin' },
+    { value: 'hr_admin', label: 'HR Admin' },
+    { value: 'developer', label: 'Developer' },
+    { value: 'call_center_agent', label: 'Call Center Agent' },
+    { value: 'kodi_admin', label: 'Kodi Admin' },
+    { value: 'support_agent', label: 'Support Agent' },
+    { value: 'operations', label: 'Operations' }
 ];
 
 const ADMIN_ROLE_SET = new Set(['admin', 'super_admin', 'hr_admin']);
 
 const TAB_OPTIONS = [
     { id: 'admins', label: 'Admin Management' },
+    { id: 'staff', label: 'Welp Staff' },
     { id: 'general', label: 'General' },
     { id: 'security', label: 'Security' },
     { id: 'session', label: 'Session Management' },
@@ -254,6 +267,8 @@ const SystemSettings = () => {
     const [showModal, setShowModal] = useState(false);
     const [adminForm, setAdminForm] = useState(ADMIN_FORM_DEFAULT);
     const [selectedAdmin, setSelectedAdmin] = useState(null);
+    const [staffList, setStaffList] = useState([]);
+    const [staffForm, setStaffForm] = useState({ userId: '', staffRoleKey: 'welp_employee', department: '', isActive: true });
 
     const setLoading = (key, value) => {
         setLoadingStates((prev) => ({ ...prev, [key]: value }));
@@ -300,10 +315,21 @@ const SystemSettings = () => {
         }
     }, []);
 
+    const fetchStaff = useCallback(async () => {
+        try {
+            const { data } = await api.get('/admin/welp-staff');
+            const rows = data?.data || [];
+            setStaffList(rows);
+        } catch (error) {
+            console.error('Staff fetch failed', error);
+        }
+    }, []);
+
     useEffect(() => {
         fetchAdmins();
         fetchSettings();
-    }, [fetchAdmins, fetchSettings]);
+        fetchStaff();
+    }, [fetchAdmins, fetchSettings, fetchStaff]);
 
     const handleSettingChange = (event) => {
         const { name, value, type, checked } = event.target;
@@ -503,6 +529,33 @@ const SystemSettings = () => {
         } catch (error) {
             console.error('Admin mutation failed', error);
             showError(error?.response?.data?.error || 'Unable to process admin request');
+        } finally {
+            setLoading('action', false);
+        }
+    };
+
+    const handleStaffFormChange = (event) => {
+        const { name, value, type, checked } = event.target;
+        setStaffForm((prev) => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const handleStaffSubmit = async (event) => {
+        event.preventDefault();
+        if (!staffForm.userId) {
+            showError('User ID is required');
+            return;
+        }
+        setLoading('action', true);
+        try {
+            await api.post('/admin/welp-staff', staffForm);
+            showSuccess('Welp staff updated');
+            setStaffForm({ userId: '', staffRoleKey: 'welp_employee', department: '', isActive: true });
+            fetchStaff();
+        } catch (error) {
+            showError(error?.response?.data?.error || 'Failed to update staff');
         } finally {
             setLoading('action', false);
         }
@@ -739,6 +792,103 @@ const SystemSettings = () => {
                                             >
                                                 Delete
                                             </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                </section>
+            )}
+            {activeTab === 'staff' && (
+                <section className="settings-card">
+                    <div className="card-header">
+                        <div>
+                            <h2>Welp Staff Management</h2>
+                            <p>Assign internal staff roles separately from client/app roles.</p>
+                        </div>
+                    </div>
+                    <form className="staff-form" onSubmit={handleStaffSubmit}>
+                        <label>
+                            User ID
+                            <input
+                                name="userId"
+                                value={staffForm.userId}
+                                onChange={handleStaffFormChange}
+                                placeholder="UUID of the user"
+                            />
+                        </label>
+                        <label>
+                            Staff Role
+                            <select name="staffRoleKey" value={staffForm.staffRoleKey} onChange={handleStaffFormChange}>
+                                {STAFF_ROLE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
+                            Department
+                            <input
+                                name="department"
+                                value={staffForm.department}
+                                onChange={handleStaffFormChange}
+                                placeholder="e.g. Operations"
+                            />
+                        </label>
+                        <label className="staff-checkbox">
+                            <input
+                                type="checkbox"
+                                name="isActive"
+                                checked={staffForm.isActive}
+                                onChange={handleStaffFormChange}
+                            />
+                            Active
+                        </label>
+                        <button className="btn btn-primary" type="submit" disabled={isBusy}>
+                            Save Staff Role
+                        </button>
+                    </form>
+                    <div className="table-wrapper">
+                        <table className="admins-table">
+                            <thead>
+                            <tr>
+                                <th>Staff Member</th>
+                                <th>Staff Role</th>
+                                <th>Department</th>
+                                <th>Status</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {staffList.length === 0 ? (
+                                <tr>
+                                    <td colSpan="4">
+                                        <div className="empty-state">No staff roles assigned yet.</div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                staffList.map((staffRow) => (
+                                    <tr key={staffRow.id}>
+                                        <td>
+                                            <div className="admin-identity">
+                                                <div className="avatar-ring">
+                                                    <span>{getAdminInitials(staffRow)}</span>
+                                                </div>
+                                                <div>
+                                                    <p className="admin-name">{staffRow.display_name || staffRow.email}</p>
+                                                    <p className="admin-email">{staffRow.email}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{staffRow.staff_role_key}</td>
+                                        <td>{staffRow.department || '—'}</td>
+                                        <td>
+                                            <span className={`status-pill ${staffRow.is_active ? 'status-active' : 'status-inactive'}`}>
+                                                {staffRow.is_active ? 'Active' : 'Inactive'}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))

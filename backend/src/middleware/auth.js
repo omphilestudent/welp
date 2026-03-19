@@ -2,6 +2,7 @@
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
 const { getRoleFlags } = require('./roleFlags');
+const staff = require('../utils/welpStaff');
 const { fetchSessionSettings } = require('../utils/sessionSettings');
 
 const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS || 60_000);
@@ -121,22 +122,25 @@ const authenticate = async (req, res, next) => {
     const fetchPromise = (async () => {
         const result = await query(
             `SELECT
-                 id,
-                 email,
-                 role,
-                 is_anonymous,
-                 display_name,
-                 token_version,
-                 subscription_tier,
-                 subscription_expires,
-                 daily_chat_quota_mins,
-                 used_chat_minutes,
-                 last_chat_reset,
-                 kyc_status,
-                 documents_submitted,
-                 can_use_profile
-             FROM users
-             WHERE id = $1`,
+                 u.id,
+                 u.email,
+                 u.role,
+                 u.is_anonymous,
+                 u.display_name,
+                 u.token_version,
+                 u.subscription_tier,
+                 u.subscription_expires,
+                 u.daily_chat_quota_mins,
+                 u.used_chat_minutes,
+                 u.last_chat_reset,
+                 u.kyc_status,
+                 u.documents_submitted,
+                 u.can_use_profile,
+                 ws.staff_role_key,
+                 ws.department as staff_department
+             FROM users u
+             LEFT JOIN welp_staff ws ON ws.user_id = u.id AND ws.is_active = true
+             WHERE u.id = $1`,
             [decoded.userId]
         );
         if (result.rows.length === 0) {
@@ -146,7 +150,8 @@ const authenticate = async (req, res, next) => {
         }
         const user = result.rows[0];
         const normalizedRole = String(user.role || '').toLowerCase().trim();
-        const isAdminRole = ['super_admin', 'superadmin', 'system_admin', 'admin', 'hr_admin'].includes(normalizedRole);
+        const staffRole = user.staff_role_key;
+        const isAdminRole = staff.isInternalAdminRole(staffRole) || staff.isLegacyAdminRole(normalizedRole);
         const tokenVersion = Number(decoded.tokenVersion ?? 0);
         if (!isAdminRole && tokenVersion !== Number(user.token_version ?? 0)) {
             const err = new Error('Session expired. Please login again.');
@@ -155,6 +160,9 @@ const authenticate = async (req, res, next) => {
         }
         const enrichedUser = {
             ...user,
+            isWelpStaff: Boolean(staffRole),
+            staffRoleKey: staffRole || null,
+            staffDepartment: user.staff_department || null,
             role_flags: getRoleFlags(user.role)
         };
         authCache.set(token, { user: enrichedUser, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });

@@ -1,5 +1,6 @@
 
 const { query } = require('../utils/database');
+const staff = require('../utils/welpStaff');
 
 const tableExists = async (tableName) => {
     try {
@@ -38,16 +39,17 @@ const authorizeAdmin = (requiredPermissions = []) => {
 
             if (adminResult.rows.length === 0) {
                 const normalizedUserRole = req.user.role?.toLowerCase();
-                const isLegacyAdminRole = ['admin', 'super_admin', 'system_admin', 'hr_admin', 'hr'].includes(normalizedUserRole);
+                const staffRole = await staff.getWelpStaffRole(req.user.id);
+                const isInternal = staff.isInternalAdminRole(staffRole) || staff.isLegacyAdminRole(normalizedUserRole);
 
-                if (!isLegacyAdminRole) {
+                if (!isInternal) {
                     return res.status(403).json({ error: 'Admin access required' });
                 }
 
                 req.admin = {
                     id: null,
                     user_id: req.user.id,
-                    role_name: normalizedUserRole,
+                    role_name: staffRole || normalizedUserRole,
                     role_permissions: {}
                 };
 
@@ -106,16 +108,18 @@ const authorizeHR = () => {
 
             if (adminResult.rows.length === 0) {
                 const normalizedUserRole = req.user.role?.toLowerCase();
+                const staffRole = await staff.getWelpStaffRole(req.user.id);
                 const isLegacyHRRole = ['hr', 'hr_admin', 'super_admin', 'admin', 'system_admin'].includes(normalizedUserRole);
+                const isInternalHr = staffRole && ['hr_admin', 'admin', 'super_admin'].includes(staffRole);
 
-                if (!isLegacyHRRole) {
+                if (!isLegacyHRRole && !isInternalHr) {
                     return res.status(403).json({ error: 'HR access required' });
                 }
 
                 req.hrAdmin = {
                     id: null,
                     user_id: req.user.id,
-                    role_name: normalizedUserRole
+                    role_name: staffRole || normalizedUserRole
                 };
 
                 return next();

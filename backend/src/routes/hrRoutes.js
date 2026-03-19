@@ -64,11 +64,12 @@ router.get('/dashboard/stats', hrController.getHRDashboardStats);
 router.get('/users/managers', async (req, res) => {
         try {
                 const result = await dbQuery(
-                    `SELECT id, email, display_name, role
-             FROM users
-             WHERE role IN ('hr_admin', 'admin', 'super_admin', 'system_admin', 'employee')
-               AND (is_active = true OR is_active IS NULL)
-             ORDER BY display_name ASC
+                    `SELECT u.id, u.email, u.display_name, u.role, ws.staff_role_key
+             FROM users u
+             LEFT JOIN welp_staff ws ON ws.user_id = u.id AND ws.is_active = true
+             WHERE (ws.user_id IS NOT NULL OR u.role IN ('hr_admin', 'admin', 'super_admin', 'system_admin', 'welp_employee'))
+               AND (u.is_active = true OR u.is_active IS NULL)
+             ORDER BY u.display_name ASC
              LIMIT 200`
                 );
                 res.json(result.rows);

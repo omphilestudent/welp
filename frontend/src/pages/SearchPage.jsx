@@ -7,6 +7,7 @@ import CompanySearch from '../components/companies/CompanySearch';
 import Loading from '../components/common/Loading';
 import { FaBuilding } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
+import { isWelpStaff } from '../utils/roleUtils';
 import SponsoredCard from '../components/ads/SponsoredCard';
 import CompactSponsoredCard from '../components/ads/CompactSponsoredCard';
 import { usePlacementAds } from '../hooks/usePlacementAds';
@@ -43,8 +44,9 @@ const SearchPage = () => {
     });
     const normalizedRole = String(user?.role || '').toLowerCase();
     const adminRoles = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
+    const isAdminRole = isWelpStaff(user) || adminRoles.has(normalizedRole);
     const canSuggestCompany = user && ['employee', 'business', ...adminRoles].includes(normalizedRole);
-    const isAdminRole = adminRoles.has(normalizedRole);
+    
     const canShowAddCompany = true;
     const { campaigns: placementAds } = usePlacementAds({ placement: 'search_results' });
 
@@ -392,3 +394,4 @@ const SearchPage = () => {
 };
 
 export default SearchPage;
+

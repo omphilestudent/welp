@@ -1981,6 +1981,56 @@ const getPsychologistExternalEvents = async (req, res) => {
     }
 };
 
+const WELP_STAFF_ROLES = ['admin', 'hr_admin', 'developer', 'call_center_agent', 'kodi_admin', 'support_agent', 'operations', 'welp_employee'];
+
+const listWelpStaff = async (_req, res) => {
+    try {
+        const result = await query(
+            `SELECT ws.*, u.email, u.display_name, u.role
+             FROM welp_staff ws
+             JOIN users u ON u.id = ws.user_id
+             WHERE ws.is_active = true
+             ORDER BY ws.created_at DESC`
+        );
+        return res.json({ success: true, data: result.rows });
+    } catch (error) {
+        console.error('List Welp staff error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load staff list' });
+    }
+};
+
+const upsertWelpStaff = async (req, res) => {
+    try {
+        const { userId, staffRoleKey, department, isActive = true } = req.body;
+        if (!userId || !staffRoleKey) {
+            return res.status(400).json({ success: false, error: 'userId and staffRoleKey are required' });
+        }
+        const normalizedRole = String(staffRoleKey).toLowerCase();
+        if (!WELP_STAFF_ROLES.includes(normalizedRole)) {
+            return res.status(400).json({ success: false, error: 'Invalid staff role' });
+        }
+        const userCheck = await query(`SELECT id FROM users WHERE id = $1`, [userId]);
+        if (!userCheck.rows[0]) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+        const result = await query(
+            `INSERT INTO welp_staff (user_id, staff_role_key, department, is_active)
+             VALUES ($1,$2,$3,$4)
+             ON CONFLICT (user_id) DO UPDATE
+               SET staff_role_key = EXCLUDED.staff_role_key,
+                   department = EXCLUDED.department,
+                   is_active = EXCLUDED.is_active,
+                   updated_at = CURRENT_TIMESTAMP
+             RETURNING *`,
+            [userId, normalizedRole, department || null, Boolean(isActive)]
+        );
+        return res.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+        console.error('Upsert Welp staff error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to update staff' });
+    }
+};
+
 module.exports = {
     getAdminProfile,
     getDashboardStats,
@@ -2033,6 +2083,8 @@ module.exports = {
     exportMlInteractions,
     predictMl,
     getAuditLogs,
+    listWelpStaff,
+    upsertWelpStaff,
     getRevenueAnalytics,
     getUserAnalytics,
     getSubscriptionAnalytics,

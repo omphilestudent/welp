@@ -1,13 +1,14 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { authenticate, authorize } = require('../../middleware/auth');
+const { authenticate } = require('../../middleware/auth');
+const { authorizeAdmin } = require('../../middleware/adminAuth');
 const { validate } = require('../../middleware/validation');
 const ticketController = require('../../controllers/ticketController');
 
 const router = express.Router();
 
 router.use(authenticate);
-router.use(authorize('admin', 'super_admin'));
+router.use(authorizeAdmin());
 
 router.get('/', ticketController.listTickets);
 

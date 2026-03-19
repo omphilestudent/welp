@@ -110,7 +110,7 @@ const createTables = async () => {
                 public_id VARCHAR(20) UNIQUE DEFAULT ('USR-' || substring(replace(uuid_generate_v4()::text, '-', ''), 1, 12)),
                 email VARCHAR(255) UNIQUE,
                 password_hash VARCHAR(255),
-                role VARCHAR(50) NOT NULL CHECK (role IN ('employee', 'psychologist', 'business', 'admin', 'super_admin', 'hr_admin')),
+                role VARCHAR(50) NOT NULL CHECK (role IN ('employee', 'psychologist', 'business', 'admin', 'super_admin', 'hr_admin', 'welp_employee')),
                 is_anonymous BOOLEAN DEFAULT false,
                 is_active BOOLEAN DEFAULT true,
                 is_verified BOOLEAN DEFAULT false,
@@ -125,6 +125,19 @@ const createTables = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS welp_staff (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                staff_role_key VARCHAR(50) NOT NULL,
+                department VARCHAR(120),
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_welp_staff_user_id ON welp_staff(user_id);
+            CREATE INDEX IF NOT EXISTS idx_welp_staff_role ON welp_staff(staff_role_key);
 
             -- Pricing & subscription helpers
             CREATE TABLE IF NOT EXISTS currencies (

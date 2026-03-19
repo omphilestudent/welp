@@ -242,8 +242,10 @@ const getHRDashboardStats = async (req, res) => {
 
         const employeeStats = await query(
             `SELECT COUNT(*) as total_employees,
-                    COUNT(CASE WHEN is_active = true OR is_active IS NULL THEN 1 END) as active_employees
-             FROM users WHERE role IN ('employee', 'hr_admin', 'admin', 'super_admin')`
+                    COUNT(CASE WHEN u.is_active = true OR u.is_active IS NULL THEN 1 END) as active_employees
+             FROM users u
+             LEFT JOIN welp_staff ws ON ws.user_id = u.id AND ws.is_active = true
+             WHERE ws.user_id IS NOT NULL OR u.role IN ('admin', 'super_admin', 'hr_admin', 'welp_employee')`
         );
         stats.employees = employeeStats.rows[0];
 
@@ -1742,20 +1744,22 @@ const getEmployeeAnalytics = async (req, res) => {
                         COUNT(CASE WHEN u.is_active = true THEN 1 END) as active_employees,
                         COALESCE(AVG(EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.created_at))), 0) as avg_tenure_years
                  FROM users u
-                 WHERE u.role IN ('employee', 'hr_admin', 'admin', 'super_admin')
+                 LEFT JOIN welp_staff ws ON ws.user_id = u.id AND ws.is_active = true
+                 WHERE ws.user_id IS NOT NULL OR u.role IN ('admin', 'super_admin', 'hr_admin', 'welp_employee')
                  GROUP BY u.department
                  ORDER BY u.department`
             );
             res.json(result.rows);
         } else {
             const result = await query(
-                `SELECT role as department,
+                `SELECT COALESCE(ws.staff_role_key, u.role) as department,
                         COUNT(*) as total_employees,
                         COUNT(*) as active_employees,
                         0 as avg_tenure_years
-                 FROM users
-                 WHERE role IN ('employee', 'hr_admin', 'admin', 'super_admin')
-                 GROUP BY role`
+                 FROM users u
+                 LEFT JOIN welp_staff ws ON ws.user_id = u.id AND ws.is_active = true
+                 WHERE ws.user_id IS NOT NULL OR u.role IN ('admin', 'super_admin', 'hr_admin', 'welp_employee')
+                 GROUP BY COALESCE(ws.staff_role_key, u.role)`
             );
             res.json(result.rows);
         }

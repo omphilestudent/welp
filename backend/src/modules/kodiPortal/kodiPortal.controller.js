@@ -144,11 +144,18 @@ const assignUser = async (req, res) => {
              WHERE LOWER(email) = $1`,
             [String(req.body.email || '').trim().toLowerCase()]
         );
-        if (user.rows[0] && !['admin', 'super_admin', 'hr_admin'].includes(user.rows[0].role)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Client accounts cannot be assigned to Kodi admin apps.'
-            });
+        if (user.rows[0]) {
+            const staffRow = await repository.query(
+                `SELECT 1 FROM welp_staff WHERE user_id = $1 AND is_active = true`,
+                [user.rows[0].id]
+            );
+            const isStaff = staffRow.rows.length > 0;
+            if (!isStaff && !['admin', 'super_admin', 'hr_admin', 'welp_employee'].includes(user.rows[0].role)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Client accounts cannot be assigned to Kodi admin apps.'
+                });
+            }
         }
         if (!user.rows[0]) {
             const email = String(req.body.email || '').trim().toLowerCase();
@@ -156,7 +163,7 @@ const assignUser = async (req, res) => {
                 return res.status(400).json({ success: false, error: 'Email is required' });
             }
             const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(2), 10);
-            const role = 'admin';
+            const role = 'welp_employee';
             const displayName = email.split('@')[0] || 'Kodi User';
 
             const hasIsActive = await repository.query(
@@ -192,6 +199,12 @@ const assignUser = async (req, res) => {
                  VALUES (${placeholders})
                  RETURNING id, email, display_name`,
                 values
+            );
+            await repository.query(
+                `INSERT INTO welp_staff (user_id, staff_role_key, department, is_active)
+                 VALUES ($1, $2, $3, true)
+                 ON CONFLICT (user_id) DO NOTHING`,
+                [user.rows[0].id, 'welp_employee', null]
             );
         }
         const assignment = await service.assignUser({

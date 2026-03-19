@@ -1,10 +1,18 @@
 const { query } = require('../utils/database');
 const { sendTicketNotificationEmail } = require('../utils/emailService');
+const staff = require('../utils/welpStaff');
 
 const STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
 const PRIORITIES = ['low', 'medium', 'high'];
 
-const isAdminRole = (role = '') => ['admin', 'super_admin'].includes(String(role).toLowerCase());
+const getAdminAccess = async (req) => {
+    if (!req?.user?.id) return false;
+    if (typeof req._isWelpAdmin === 'boolean') return req._isWelpAdmin;
+    const staffRole = await staff.getWelpStaffRole(req.user.id);
+    const isAdmin = staff.isInternalAdminRole(staffRole) || staff.isLegacyAdminRole(req.user.role);
+    req._isWelpAdmin = isAdmin;
+    return isAdmin;
+};
 
 const generateTicketNumber = async () => {
     const prefix = 'TCK';
@@ -64,8 +72,8 @@ const fetchTicketById = async (ticketId) => {
     return result.rows[0] || null;
 };
 
-const canAccessTicket = async ({ ticketId, userId, role }) => {
-    if (isAdminRole(role)) return true;
+const canAccessTicket = async ({ ticketId, userId, req }) => {
+    if (await getAdminAccess(req)) return true;
     const access = await query(
         `SELECT 1
          FROM tickets t
@@ -99,7 +107,7 @@ const listTickets = async (req, res) => {
             idx += 1;
         }
 
-        if (isAdminRole(req.user.role)) {
+        if (await getAdminAccess(req)) {
             const result = await query(
                 `SELECT t.*,
                         u.display_name as created_by_name,
@@ -141,7 +149,7 @@ const listTickets = async (req, res) => {
 const getTicket = async (req, res) => {
     try {
         const { id } = req.params;
-        const allowed = await canAccessTicket({ ticketId: id, userId: req.user.id, role: req.user.role });
+        const allowed = await canAccessTicket({ ticketId: id, userId: req.user.id, req });
         if (!allowed) {
             return res.status(403).json({ success: false, error: 'Not authorized' });
         }
@@ -208,7 +216,7 @@ const updateTicket = async (req, res) => {
         if (!ticket) {
             return res.status(404).json({ success: false, error: 'Ticket not found' });
         }
-        const allowed = await canAccessTicket({ ticketId: id, userId: req.user.id, role: req.user.role });
+        const allowed = await canAccessTicket({ ticketId: id, userId: req.user.id, req });
         if (!allowed) {
             return res.status(403).json({ success: false, error: 'Not authorized' });
         }
@@ -218,7 +226,7 @@ const updateTicket = async (req, res) => {
         const values = [];
         let idx = 1;
 
-        const isAdmin = isAdminRole(req.user.role);
+        const isAdmin = await getAdminAccess(req);
         if (status) {
             if (!STATUSES.includes(status)) {
                 return res.status(400).json({ success: false, error: 'Invalid status' });
@@ -310,7 +318,7 @@ const updateTicket = async (req, res) => {
 
 const deleteTicket = async (req, res) => {
     try {
-        if (!isAdminRole(req.user.role)) {
+        if (!await getAdminAccess(req)) {
             return res.status(403).json({ success: false, error: 'Only admins can delete tickets' });
         }
         const { id } = req.params;
@@ -325,7 +333,7 @@ const deleteTicket = async (req, res) => {
 const getTicketHistory = async (req, res) => {
     try {
         const { id } = req.params;
-        const allowed = await canAccessTicket({ ticketId: id, userId: req.user.id, role: req.user.role });
+        const allowed = await canAccessTicket({ ticketId: id, userId: req.user.id, req });
         if (!allowed) {
             return res.status(403).json({ success: false, error: 'Not authorized' });
         }
@@ -352,7 +360,7 @@ const addTicketHistory = async (req, res) => {
         if (!notes) {
             return res.status(400).json({ success: false, error: 'notes is required' });
         }
-        const allowed = await canAccessTicket({ ticketId: id, userId: req.user.id, role: req.user.role });
+        const allowed = await canAccessTicket({ ticketId: id, userId: req.user.id, req });
         if (!allowed) {
             return res.status(403).json({ success: false, error: 'Not authorized' });
         }
@@ -371,7 +379,7 @@ const addTicketHistory = async (req, res) => {
 
 const assignTicket = async (req, res) => {
     try {
-        if (!isAdminRole(req.user.role)) {
+        if (!await getAdminAccess(req)) {
             return res.status(403).json({ success: false, error: 'Only admins can assign tickets' });
         }
         const { id } = req.params;
@@ -417,7 +425,7 @@ const assignTicket = async (req, res) => {
 
 const addTicketAccess = async (req, res) => {
     try {
-        if (!isAdminRole(req.user.role)) {
+        if (!await getAdminAccess(req)) {
             return res.status(403).json({ success: false, error: 'Only admins can grant access' });
         }
         const { id } = req.params;
@@ -446,7 +454,7 @@ const addTicketAccess = async (req, res) => {
 
 const removeTicketAccess = async (req, res) => {
     try {
-        if (!isAdminRole(req.user.role)) {
+        if (!await getAdminAccess(req)) {
             return res.status(403).json({ success: false, error: 'Only admins can revoke access' });
         }
         const { id, userId } = req.params;

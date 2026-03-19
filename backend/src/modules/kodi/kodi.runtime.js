@@ -2,6 +2,7 @@ const service = require('./kodi.service');
 const perms = require('./kodi.permissions');
 const portalService = require('../kodiPortal/kodiPortal.service');
 const portalPerms = require('../kodiPortal/kodiPortal.permissions');
+const staff = require('../../utils/welpStaff');
 
 const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
     const page = await service.getPageById(pageId);
@@ -18,9 +19,13 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
 
     let effectiveRole = role;
     const isAdmin = perms.isAdminRole(role);
+    const isWelpStaff = userId ? await staff.isWelpStaff(userId) : false;
+    if (isWelpStaff && !isAdmin) {
+        effectiveRole = 'admin';
+    }
     const isBuilderManagedPage = perms.isTimesPage(page);
     // Admins always bypass app membership for Times (builder-managed) pages.
-    const adminBypassMembership = isAdmin && isBuilderManagedPage;
+    const adminBypassMembership = (isAdmin || isWelpStaff) && isBuilderManagedPage;
 
     if (appId && !adminBypassMembership) {
         const linkedPages = await portalService.listPages(appId);

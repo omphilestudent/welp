@@ -35,12 +35,15 @@ router.post('/users',
     validate([
         body('email').isEmail(),
         body('password').isLength({ min: 6 }),
-        body('role').isIn(['employee', 'psychologist', 'business', 'admin', 'super_admin', 'hr_admin'])
+        body('role').isIn(['employee', 'psychologist', 'business', 'admin', 'super_admin', 'hr_admin', 'welp_employee'])
     ]),
     adminController.createUser
 );
 router.patch('/users/:id', adminController.updateUser);
 router.delete('/users/:id', adminController.deleteUser);
+
+router.get('/welp-staff', adminController.listWelpStaff);
+router.post('/welp-staff', adminController.upsertWelpStaff);
 
 
 router.get('/companies', adminController.getCompanies);

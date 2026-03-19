@@ -28,6 +28,7 @@ const AppUsersTable = ({ users, onRoleChange, onStatusChange, onResend, onRemove
                         <div className="kodi-portal-user-email">{user.email}</div>
                         <div className="kodi-portal-user-meta">
                             <span>Global role: {user.role || 'n/a'}</span>
+                            <span>Staff role: {user.staff_role_key || user.staffRoleKey || '—'}</span>
                             <span>User ID: {user.user_id || user.id}</span>
                         </div>
                     </div>

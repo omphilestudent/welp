@@ -1,4 +1,5 @@
 const { query } = require('../utils/database');
+const staff = require('../utils/welpStaff');
 
 const respond = (res, { status = 200, success = true, data = null, error = null }) => {
     return res.status(status).json({ success, data, error });
@@ -8,10 +9,11 @@ const normalizeRole = (role) => String(role || '').toLowerCase().trim();
 
 const isAdminRole = (role) => ['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'].includes(normalizeRole(role));
 
-const isEmployeeRole = (role) => normalizeRole(role) === 'employee';
+const isEmployeeRole = (role) => normalizeRole(role) === 'welp_employee';
 
-const requireAdmin = (req, res) => {
-    if (!isAdminRole(req.user?.role)) {
+const requireAdmin = async (req, res) => {
+    const staffRole = req.user?.id ? await staff.getWelpStaffRole(req.user.id) : null;
+    if (!isAdminRole(req.user?.role) && !staff.isInternalAdminRole(staffRole)) {
         respond(res, { status: 403, success: false, error: 'Unauthorized action' });
         return false;
     }
@@ -112,7 +114,7 @@ const getEmployeeById = async (req, res) => {
 };
 
 const createEmployee = async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!(await requireAdmin(req, res))) return;
 
     try {
         const { user_id, first_name, last_name, email, phone, department, job_title, status } = req.body || {};
@@ -147,7 +149,7 @@ const createEmployee = async (req, res) => {
 };
 
 const updateEmployee = async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!(await requireAdmin(req, res))) return;
 
     try {
         const { id } = req.params;
@@ -262,7 +264,7 @@ const createLeave = async (req, res) => {
 };
 
 const updateLeaveStatus = async (req, res, status) => {
-    if (!requireAdmin(req, res)) return;
+    if (!(await requireAdmin(req, res))) return;
 
     try {
         const { id } = req.params;
@@ -406,7 +408,7 @@ const getOnboardingTasks = async (req, res) => {
 };
 
 const createOnboardingTask = async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!(await requireAdmin(req, res))) return;
 
     try {
         const { employee_id, task_name, due_date, status } = req.body || {};
@@ -481,7 +483,7 @@ const updateOnboardingTask = async (req, res) => {
 };
 
 const getSettings = async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!(await requireAdmin(req, res))) return;
 
     try {
         const result = await query('SELECT * FROM hr_settings ORDER BY updated_at DESC LIMIT 1');
@@ -497,7 +499,7 @@ const getSettings = async (req, res) => {
 };
 
 const updateSettings = async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!(await requireAdmin(req, res))) return;
 
     try {
         const { leave_types, approval_rules } = req.body || {};
@@ -543,3 +545,4 @@ module.exports = {
     getSettings,
     updateSettings
 };
+

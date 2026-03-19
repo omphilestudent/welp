@@ -2,9 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { isWelpStaff } from '../../utils/roleUtils';
 import './HRMvp.css';
-
-const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
 
 const Employees = () => {
     const { user } = useAuth();
@@ -22,7 +21,7 @@ const Employees = () => {
         job_title: ''
     });
 
-    const isAdmin = ADMIN_ROLES.has(String(user?.role || '').toLowerCase());
+    const isAdmin = isWelpStaff(user);
 
     const departmentOptions = useMemo(() => {
         const set = new Set();
@@ -199,3 +198,4 @@ const Employees = () => {
 };
 
 export default Employees;
+

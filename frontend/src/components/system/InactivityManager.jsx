@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { isWelpAdmin } from '../../utils/roleUtils';
 
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'touchmove', 'click'];
 const BROADCAST_CHANNEL_NAME = 'welp_session_activity';
@@ -110,9 +111,7 @@ const InactivityManager = () => {
                 }
             } catch (error) {
                 if (error?.response?.status === 404) {
-                    const role = String(user?.role || '').toLowerCase();
-                    const isAdmin = ['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'].includes(role);
-                    if (isAdmin) {
+                    if (isWelpAdmin(user)) {
                         try {
                             const { data } = await api.get('/admin/session-settings');
                             if (!cancelled) {

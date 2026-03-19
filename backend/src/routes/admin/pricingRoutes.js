@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate, authorize } = require('../../middleware/auth');
+const { authenticate } = require('../../middleware/auth');
+const { authorizeAdmin } = require('../../middleware/adminAuth');
 const pricingController = require('../../controllers/pricingController');
 
-router.use(authenticate, authorize('admin', 'super_admin'));
+router.use(authenticate, authorizeAdmin());
 
 router.get('/countries', pricingController.getCountryPricing);
 router.put('/base', pricingController.updateBasePrices);

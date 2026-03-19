@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { isWelpStaff } from '../../utils/roleUtils';
 import './HRMvp.css';
-
-const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
 
 const Leaves = () => {
     const { user } = useAuth();
@@ -13,7 +12,7 @@ const Leaves = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const isAdmin = ADMIN_ROLES.has(String(user?.role || '').toLowerCase());
+    const isAdmin = isWelpStaff(user);
 
     const fetchLeaves = async () => {
         setLoading(true);
@@ -177,3 +176,4 @@ const Leaves = () => {
 };
 
 export default Leaves;
+

@@ -73,11 +73,12 @@ const updateApp = async ({ appId, updates }) => {
 
 const listAppUsers = async (appId) => {
     const result = await query(
-        `SELECT au.*, u.email, u.display_name, u.role
+        `SELECT au.*, u.email, u.display_name, u.role, ws.staff_role_key
          FROM kodi_app_users au
          JOIN users u ON u.id = au.user_id
+         LEFT JOIN welp_staff ws ON ws.user_id = u.id AND ws.is_active = true
          WHERE au.app_id = $1
-           AND u.role IN ('admin', 'super_admin', 'hr_admin')
+           AND (ws.user_id IS NOT NULL OR u.role IN ('admin', 'super_admin', 'hr_admin', 'welp_employee'))
          ORDER BY au.created_at DESC`,
         [appId]
     );

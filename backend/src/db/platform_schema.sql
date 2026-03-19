@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email                CITEXT UNIQUE NOT NULL,
     password_hash        TEXT NOT NULL,
-    role                 VARCHAR(32) NOT NULL CHECK (role IN ('user','psychologist','business','admin','super_admin')),
+    role                 VARCHAR(32) NOT NULL CHECK (role IN ('user','psychologist','business','admin','super_admin','welp_employee')),
     is_anonymous         BOOLEAN DEFAULT false,
     subscription_tier    subscription_tier_user DEFAULT 'free',
     subscription_expires TIMESTAMP WITH TIME ZONE,

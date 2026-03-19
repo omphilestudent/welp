@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { isWelpStaff } from '../../utils/roleUtils';
 import './HRMvp.css';
-
-const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
 
 const Onboarding = () => {
     const { user } = useAuth();
@@ -14,7 +13,7 @@ const Onboarding = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const isAdmin = ADMIN_ROLES.has(String(user?.role || '').toLowerCase());
+    const isAdmin = isWelpStaff(user);
 
     const fetchEmployees = async () => {
         try {
@@ -168,3 +167,4 @@ const Onboarding = () => {
 };
 
 export default Onboarding;
+

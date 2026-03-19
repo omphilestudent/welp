@@ -6,6 +6,7 @@ const { emitFlowEvent } = require('../services/flowEngine');
 const { enqueueMarketingForUser } = require('../services/marketingEmailService');
 const { getTokenFromRequest } = require('../middleware/auth');
 const { fetchSessionSettings } = require('../utils/sessionSettings');
+const { enrichUserWithStaff } = require('../utils/welpStaff');
 const {
     createSubscriptionRecord,
     updateUserSubscriptionTier,
@@ -1096,18 +1097,29 @@ const login = async (req, res) => {
         });
         res.cookie('token', token, cookieOptions);
 
+        const enrichedUser = await enrichUserWithStaff({
+            id: user.id,
+            email: user.email,
+            display_name: user.display_name,
+            role: user.role,
+            avatar_url: user.avatar_url,
+            status: user.status
+        });
         return res.json({
             success: true,
             token,
             user: {
-                id: user.id,
-                email: user.email,
-                displayName: user.display_name,
-                display_name: user.display_name,
-                role: user.role,
-                avatarUrl: user.avatar_url,
-                avatar_url: user.avatar_url,
-                status: user.status,
+                id: enrichedUser.id,
+                email: enrichedUser.email,
+                displayName: enrichedUser.display_name,
+                display_name: enrichedUser.display_name,
+                role: enrichedUser.role,
+                avatarUrl: enrichedUser.avatar_url,
+                avatar_url: enrichedUser.avatar_url,
+                status: enrichedUser.status,
+                isWelpStaff: enrichedUser.isWelpStaff,
+                staffRoleKey: enrichedUser.staffRoleKey,
+                staffDepartment: enrichedUser.staffDepartment,
                 subscription: subscriptionPayload,
                 applicationStatus
             }
@@ -1133,21 +1145,25 @@ const getMe = async (req, res) => {
         const subscriptionPayload = await getPlanPayload(planRecord, ownerType);
         const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
 
+        const enriched = await enrichUserWithStaff(user);
         return res.json({
             success: true,
             user: {
-                id: user.id,
-                email: user.email,
-                displayName: user.display_name,
-                role: user.role,
-                isAnonymous: user.is_anonymous,
-                isActive: user.is_active,
-                createdAt: user.created_at,
-                avatarUrl: user.avatar_url,
-                avatar_url: user.avatar_url,
-                kyc_status: user.kyc_status,
-                documents_submitted: user.documents_submitted,
-                can_use_profile: user.can_use_profile,
+                id: enriched.id,
+                email: enriched.email,
+                displayName: enriched.display_name,
+                role: enriched.role,
+                isAnonymous: enriched.is_anonymous,
+                isActive: enriched.is_active,
+                createdAt: enriched.created_at,
+                avatarUrl: enriched.avatar_url,
+                avatar_url: enriched.avatar_url,
+                kyc_status: enriched.kyc_status,
+                documents_submitted: enriched.documents_submitted,
+                can_use_profile: enriched.can_use_profile,
+                isWelpStaff: enriched.isWelpStaff,
+                staffRoleKey: enriched.staffRoleKey,
+                staffDepartment: enriched.staffDepartment,
                 subscription: subscriptionPayload,
                 applicationStatus
             }

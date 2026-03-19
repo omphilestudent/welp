@@ -8,24 +8,6 @@ import './UserManagement.css';
 
 // ─── Permission sets available to assign ────────────────────────────────────
 const PERMISSION_SETS = {
-    super_admin: {
-        label: 'Super Admin',
-        color: '#7c3aed',
-        permissions: ['*'],
-        description: 'Full system access'
-    },
-    admin: {
-        label: 'Admin',
-        color: '#dc2626',
-        permissions: ['users:read', 'users:write', 'users:delete', 'companies:read', 'companies:write', 'reviews:read', 'reviews:write', 'analytics:read'],
-        description: 'Manage users, companies and reviews'
-    },
-    hr_admin: {
-        label: 'HR Admin',
-        color: '#059669',
-        permissions: ['users:read', 'users:write', 'hr:read', 'hr:write', 'analytics:read'],
-        description: 'HR and employee management'
-    },
     business: {
         label: 'Business',
         color: '#d97706',
@@ -45,6 +27,8 @@ const PERMISSION_SETS = {
         description: 'Submit and view reviews'
     }
 };
+
+const CLIENT_ROLES = ['employee', 'psychologist', 'business'];
 
 const ALL_PERMISSIONS = [
     { key: 'users:read',      label: 'View Users',         group: 'Users' },
@@ -354,13 +338,15 @@ const UserManagement = () => {
             const { data } = await api.get(`/admin/users?${params}`);
             // Support both { success, data: { users, total } } and { users, pagination }
             const usersArr = data?.data?.users ?? data?.users ?? [];
-            const total    = data?.data?.total ?? data?.pagination?.total ?? usersArr.length;
+            const clientUsers = usersArr.filter((userRow) =>
+                CLIENT_ROLES.includes(String(userRow.role || '').toLowerCase())
+            );
 
-            setUsers(usersArr);
+            setUsers(clientUsers);
             setPagination(p => ({
                 ...p,
-                total,
-                totalPages: Math.ceil(total / p.limit)
+                total: clientUsers.length,
+                totalPages: Math.ceil(clientUsers.length / p.limit)
             }));
         } catch (err) {
             toast.error('Failed to load users');
@@ -462,7 +448,7 @@ const UserManagement = () => {
                     className="um-search-input"
                 />
                 <select name="role" value={filters.role} onChange={handleFilterChange} className="um-select">
-                    <option value="">All Roles</option>
+                    <option value="">All Client Types</option>
                     {roleKeys.map(k => (
                         <option key={k} value={k}>{PERMISSION_SETS[k].label}</option>
                     ))}
@@ -507,7 +493,7 @@ const UserManagement = () => {
                                 />
                             </th>
                             <th>User</th>
-                            <th>Role</th>
+                            <th>Client Type</th>
                             <th>Permissions</th>
                             <th>Status</th>
                             <th>Joined</th>
