@@ -152,7 +152,7 @@ const MessageThread = ({
                     onClick={() => onOpenSidebar?.()}
                     aria-label="Open conversations"
                 >
-                    Back
+                    Conversations
                 </button>
                 <div className="thread-participant">
                     <button

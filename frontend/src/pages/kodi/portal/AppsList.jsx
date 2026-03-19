@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Loading from '../../../components/common/Loading';
 import AppForm from '../../../components/kodi/portal/AppForm';
+import PortalNav from '../../../components/kodi/portal/PortalNav';
 import { activatePortalApp, createPortalApp, deactivatePortalApp, listPortalApps } from '../../../services/kodiPortalService';
 
 const AppsList = () => {
@@ -72,6 +73,7 @@ const AppsList = () => {
                 </div>
                 <button className="btn-primary" onClick={() => setFormOpen(true)}>Create App</button>
             </header>
+            <PortalNav />
             {loading ? (
                 <Loading />
             ) : (

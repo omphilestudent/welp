@@ -32,6 +32,8 @@ const Messages = () => {
     const [employeeFavorites, setEmployeeFavorites] = useState([]);
     const [subscription, setSubscription] = useState(null);
     const [chatUsage, setChatUsage] = useState(null);
+    const [showSupportPanel, setShowSupportPanel] = useState(true);
+    const [isMobileView, setIsMobileView] = useState(false);
     const [allocationModal, setAllocationModal] = useState({ open: false, psychologist: null, loading: false });
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [now, setNow] = useState(Date.now());
@@ -47,6 +49,27 @@ const Messages = () => {
     useEffect(() => {
         setPsychologistDeletedNotice('');
     }, [activeConversation?.id]);
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(max-width: 768px)');
+        const handleChange = () => setIsMobileView(mediaQuery.matches);
+        handleChange();
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener('change', handleChange);
+            return () => mediaQuery.removeEventListener('change', handleChange);
+        }
+        mediaQuery.addListener(handleChange);
+        return () => mediaQuery.removeListener(handleChange);
+    }, []);
+
+    useEffect(() => {
+        setShowSupportPanel(!isMobileView);
+    }, [isMobileView]);
+
+    useEffect(() => {
+        if (!isMobileView && isSidebarOpen) {
+            setIsSidebarOpen(false);
+        }
+    }, [isMobileView, isSidebarOpen]);
     const [callDurationSec, setCallDurationSec] = useState(0);
     const hasFetchedConversations = React.useRef(false);
     const localVideoRef = React.useRef(null);
@@ -1109,6 +1132,17 @@ const Messages = () => {
                         </div>
                     )}
                     {user?.role === 'employee' && (
+                        <div className="employee-support-toggle">
+                            <button
+                                type="button"
+                                className="btn btn-outline btn-small"
+                                onClick={() => setShowSupportPanel((prev) => !prev)}
+                            >
+                                {showSupportPanel ? 'Hide support insights' : 'Show support insights'}
+                            </button>
+                        </div>
+                    )}
+                    {user?.role === 'employee' && showSupportPanel && (
                         <div className="employee-support-panel">
                             {chatUsage && (
                                 <section className="chat-usage-card">
@@ -1315,7 +1349,7 @@ const Messages = () => {
                     )}
 
                     <div
-                        className="messages-main"
+                        className="messages-thread-wrapper"
                         onWheel={(event) => event.stopPropagation()}
                         onTouchMove={(event) => event.stopPropagation()}
                     >
@@ -1336,6 +1370,15 @@ const Messages = () => {
                     </div>
                 </div>
             </div>
+            {!isSidebarOpen && isMobileView && (
+                <button
+                    type="button"
+                    className="messages-sidebar-fab"
+                    onClick={() => setIsSidebarOpen(true)}
+                >
+                    Conversations
+                </button>
+            )}
             {(callState.status === 'calling' || callState.status === 'incoming' || callState.status === 'in-call') && (
                 <div className="call-overlay">
                     <div className="call-modal">
@@ -1375,7 +1418,7 @@ const Messages = () => {
                     </div>
                 </div>
             )}
-            {isSidebarOpen && (
+            {isSidebarOpen && isMobileView && (
                 <div
                     className="messages-sidebar-overlay"
                     onClick={() => setIsSidebarOpen(false)}

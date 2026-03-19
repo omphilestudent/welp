@@ -1,8 +1,8 @@
 .kodi-portal {
-    padding: 2.5rem;
+    padding: clamp(20px, 3vw, 36px);
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1.5rem;
     background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
     min-height: 100vh;
 }
@@ -12,6 +12,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .kodi-portal__eyebrow {
@@ -43,6 +44,7 @@
     display: flex;
     justify-content: space-between;
     gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .kodi-portal__card-header h2 {
@@ -61,6 +63,7 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    gap: 0.35rem;
 }
 
 .kodi-portal__card-status {
@@ -69,6 +72,8 @@
     align-items: center;
     font-size: 0.9rem;
     color: #4a4a4a;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
 .kodi-portal__status-pill {
@@ -94,6 +99,7 @@
     border-bottom: 1px solid rgba(15, 23, 42, 0.07);
     padding: 0.75rem 0;
     gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
 .kodi-portal__linked-row:last-child {
@@ -142,17 +148,20 @@
     justify-content: center;
     padding: 1rem;
     z-index: 100;
+    backdrop-filter: blur(4px);
 }
 
 .kodi-portal__modal-content {
     background: #fff;
     padding: 2rem;
     border-radius: 1.2rem;
-    width: min(480px, 100%);
+    width: min(520px, 100%);
     box-shadow: 0 25px 70px rgba(15, 23, 42, 0.25);
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    max-height: 90vh;
+    overflow: auto;
 }
 
 .kodi-portal__modal-header {
@@ -233,6 +242,7 @@
     justify-content: space-between;
     gap: 0.5rem;
     font-size: 0.95rem;
+    flex-wrap: wrap;
 }
 
 .kodi-portal__assigned-users {
@@ -250,6 +260,7 @@
     gap: 0.5rem;
     border-bottom: 1px solid rgba(15, 23, 42, 0.05);
     padding-bottom: 0.5rem;
+    flex-wrap: wrap;
 }
 
 .kodi-portal__object-grid {
@@ -357,6 +368,7 @@
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .kodi-portal__lead-actions {
@@ -378,9 +390,16 @@
 
 /* New portal screens */
 .kodi-portal-screen {
-    padding: 28px;
+    padding: clamp(20px, 3vw, 36px);
     display: grid;
     gap: 20px;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    min-height: 100vh;
+}
+
+.kodi-portal-section {
+    display: grid;
+    gap: 12px;
 }
 
 .kodi-portal-header {
@@ -388,11 +407,43 @@
     justify-content: space-between;
     align-items: center;
     gap: 16px;
+    flex-wrap: wrap;
 }
 
 .kodi-portal-header-actions {
     display: flex;
     gap: 10px;
+}
+
+.kodi-portal-nav {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 6px;
+    width: fit-content;
+}
+
+.kodi-portal-nav__link {
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    color: #475569;
+    text-decoration: none;
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+.kodi-portal-nav__link:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.kodi-portal-nav__link.active {
+    background: #2563eb;
+    color: #fff;
 }
 
 .kodi-portal-eyebrow {
@@ -428,6 +479,7 @@
 .kodi-portal-card-actions {
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .kodi-portal-table {
@@ -437,6 +489,7 @@
     padding: 12px;
     display: grid;
     gap: 10px;
+    overflow: hidden;
 }
 
 .kodi-portal-table__row {
@@ -459,6 +512,7 @@
 .kodi-portal-table__actions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .kodi-portal-empty {
@@ -473,6 +527,8 @@
     align-items: center;
     justify-content: center;
     z-index: 50;
+    padding: 16px;
+    backdrop-filter: blur(4px);
 }
 
 .kodi-portal-modal__content {
@@ -482,6 +538,38 @@
     width: min(520px, 90vw);
     display: grid;
     gap: 12px;
+    max-height: 90vh;
+    overflow: auto;
+}
+
+.kodi-portal-modal__content label {
+    font-size: 0.85rem;
+    color: #374151;
+    display: grid;
+    gap: 6px;
+}
+
+.kodi-portal-modal__content input,
+.kodi-portal-modal__content select,
+.kodi-portal-modal__content textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #d8dde6;
+    background: #fff;
+    font-size: 0.95rem;
+}
+
+.kodi-portal-modal__content input:focus,
+.kodi-portal-modal__content select:focus,
+.kodi-portal-modal__content textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.kodi-portal-modal__content .kodi-portal-checkboxes {
+    gap: 16px;
 }
 
 .kodi-portal-modal__header {
@@ -513,6 +601,7 @@
 .kodi-portal-checkboxes {
     display: flex;
     gap: 12px;
+    flex-wrap: wrap;
 }
 
 .kodi-portal-summary-card {
@@ -537,6 +626,55 @@
     margin: 0;
     display: grid;
     gap: 6px;
+}
+
+.kodi-portal-object-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.kodi-portal-object-card {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.kodi-portal-object-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.kodi-portal-object-card__header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: #0f172a;
+}
+
+.kodi-portal-object-card__header p {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.kodi-portal-object-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.kodi-portal-object-chip {
+    padding: 6px 10px;
+    background: rgba(37, 99, 235, 0.08);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: #1d4ed8;
 }
 
 .kodi-portal-role-grid {
@@ -597,4 +735,56 @@
     padding: 10px 12px;
     border-radius: 10px;
     border: 1px solid #d8dde6;
+}
+
+@media (max-width: 768px) {
+    .kodi-portal {
+        padding: 20px 16px 32px;
+    }
+
+    .kodi-portal__header {
+        align-items: flex-start;
+    }
+
+    .kodi-portal__card-actions {
+        align-items: flex-start;
+    }
+
+    .kodi-portal__modal-content {
+        padding: 1.5rem;
+    }
+
+    .kodi-portal-table__row {
+        grid-template-columns: 1fr 1fr;
+        row-gap: 8px;
+    }
+
+    .kodi-portal-table__row.header {
+        display: none;
+    }
+
+    .kodi-portal-table__row.user {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .kodi-portal__grid,
+    .kodi-portal-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .kodi-portal__card {
+        padding: 1.25rem;
+    }
+
+    .kodi-portal__linked-row,
+    .kodi-portal__assigned-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .kodi-portal__lead-actions {
+        align-items: flex-start;
+    }
 }

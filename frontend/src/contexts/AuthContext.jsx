@@ -77,7 +77,12 @@ const normalizeUserPayload = (user = null) => {
 
 const getStoredToken = () => {
     if (typeof window === "undefined") return null;
-    return localStorage.getItem("token") || sessionStorage.getItem("token");
+    const candidateKeys = ["token", "admin_access", "hr_access", "access_token"];
+    for (const key of candidateKeys) {
+        const value = localStorage.getItem(key) || sessionStorage.getItem(key);
+        if (value) return value;
+    }
+    return null;
 };
 
 const setRequestToken = (token) => {
@@ -150,6 +155,26 @@ export const AuthProvider = ({ children }) => {
             }
 
             if (error.response?.status === 401) {
+                const adminToken = localStorage.getItem("admin_access") || sessionStorage.getItem("admin_access");
+                const hrToken = localStorage.getItem("hr_access") || sessionStorage.getItem("hr_access");
+                if (adminToken || hrToken) {
+                    try {
+                        const { data } = await api.get("/admin/profile");
+                        const profile = data?.data || {};
+                        const fallbackUser = {
+                            id: profile.user_id || profile.id,
+                            email: profile.email,
+                            display_name: profile.display_name,
+                            role: profile.role_name || "admin",
+                            avatar_url: profile.avatar_url
+                        };
+                        setUser(normalizeUserPayload(fallbackUser));
+                        setRateLimitInfo(null);
+                        return;
+                    } catch (adminError) {
+                        // fall through to clear auth
+                    }
+                }
                 localStorage.removeItem("token");
                 sessionStorage.removeItem("token");
                 setRequestToken(null);

@@ -293,7 +293,7 @@ const RegistrationApplications = () => {
                                             {selectedApplication.verificationProgress}% checklist complete
                                         </p>
                                         <p style={{ marginTop: '0.25rem', fontSize: '0.8rem', color: '#64748b' }}>
-                                            KYC: {selectedApplication.kyc_status || 'unknown'} â€¢ Docs {selectedApplication.documents_submitted ? 'submitted' : 'missing'}
+                                            KYC: {selectedApplication.kyc_status || 'unknown'} • Docs {selectedApplication.documents_submitted ? 'submitted' : 'missing'}
                                         </p>
                                     </div>
                                 </header>

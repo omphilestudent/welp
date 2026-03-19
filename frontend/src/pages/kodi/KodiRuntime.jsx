@@ -197,7 +197,7 @@ const KodiRuntime = () => {
             <header className="kodi-runtime__header">
                 <div className="kodi-page-header">
                     <button className="kodi-back-button" onClick={() => navigate('/kodi/times')}>
-                        â† Back
+                        ← Back
                     </button>
                     <div>
                         <h1>{payload?.metadata?.label || 'Kodi Page'}</h1>

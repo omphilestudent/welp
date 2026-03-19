@@ -53,7 +53,11 @@ const AssignUserModal = ({ open, onClose, onSubmit }) => {
                         Can use
                     </label>
                 </div>
-                <button className="btn-primary" onClick={() => onSubmit({ email, roleKey, permissions })}>
+                <button
+                    className="btn-primary"
+                    onClick={() => onSubmit({ email, roleKey, permissions })}
+                    disabled={!email.trim()}
+                >
                     Send invite
                 </button>
             </div>

@@ -5,7 +5,7 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, confirmText
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={title} size="medium">
             <p>{message}</p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={onClose}>{cancelText}</button>
                 <button type="button" className={`btn ${type === 'danger' ? 'btn-danger' : 'btn-primary'}`} onClick={onConfirm}>{confirmText}</button>
             </div>

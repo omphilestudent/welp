@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Loading from '../../../components/common/Loading';
 import AppSummaryCard from '../../../components/kodi/portal/AppSummaryCard';
+import PortalNav from '../../../components/kodi/portal/PortalNav';
 import { getPortalApp } from '../../../services/kodiPortalService';
 
 const AppDetail = () => {
@@ -43,6 +44,7 @@ const AppDetail = () => {
                     <button className="btn-secondary" onClick={() => navigate(`/kodi/portal/apps/${app.id}/settings`)}>Settings</button>
                 </div>
             </header>
+            <PortalNav />
 
             <AppSummaryCard app={app} />
 

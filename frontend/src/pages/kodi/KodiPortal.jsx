@@ -482,7 +482,7 @@ const KodiPortal = () => {
             <header className="kodi-portal__header">
                 <div className="kodi-page-header">
                     <button className="kodi-back-button" onClick={() => navigate('/kodi/times')}>
-                        â† Back
+                        ← Back
                     </button>
                     <div>
                     <p className="kodi-portal__eyebrow">Kodi Portal</p>

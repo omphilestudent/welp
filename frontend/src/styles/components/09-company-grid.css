@@ -217,6 +217,11 @@
   .company-list-skeleton {
     grid-template-columns: 1fr;
   }
+
+  .companies-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
 }
 
 @media (prefers-color-scheme: dark) {

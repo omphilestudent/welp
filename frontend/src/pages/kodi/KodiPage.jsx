@@ -209,7 +209,7 @@ const KodiPage = () => {
             <nav className="kodi-navbar">
                 <div className="navbar-left">
                     <button className="kodi-back-button" onClick={() => navigate('/kodi/times')} type="button">
-                        â† Back
+                        ← Back
                     </button>
                     <button className="nav-icon" onClick={() => setSidebarOpen((p) => !p)} type="button">
                         {sidebarOpen ? <FiX /> : <FiMenu />}

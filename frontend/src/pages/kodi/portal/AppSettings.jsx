@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Loading from '../../../components/common/Loading';
 import AppSettingsForm from '../../../components/kodi/portal/AppSettingsForm';
+import PortalNav from '../../../components/kodi/portal/PortalNav';
 import { getPortalSettings, listPortalPages, updatePortalSettings } from '../../../services/kodiPortalService';
 
 const AppSettings = () => {
@@ -67,6 +68,7 @@ const AppSettings = () => {
                     <h1>App Settings</h1>
                 </div>
             </header>
+            <PortalNav />
             <AppSettingsForm value={settings} pages={pages} onChange={setSettings} onSubmit={handleSave} saving={saving} />
         </div>
     );

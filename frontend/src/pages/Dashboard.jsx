@@ -1213,7 +1213,7 @@ const Dashboard = () => {
                                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>KYC status</p>
                                 <h3 style={{ margin: '0.25rem 0' }}>{kycStatus || 'not_submitted'}</h3>
                                 <p style={{ margin: 0, color: '#475569' }}>
-                                    Documents {user?.documents_submitted ? 'submitted' : 'not submitted'} â€¢ Profile {user?.can_use_profile ? 'active' : 'restricted'}
+                                    Documents {user?.documents_submitted ? 'submitted' : 'not submitted'} • Profile {user?.can_use_profile ? 'active' : 'restricted'}
                                 </p>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -1666,7 +1666,7 @@ const Dashboard = () => {
                                                     <label>
                                                         <span className="form-label-text"><FaImage size={11} /> Upload logo</span>
                                                         <input type="file" accept="image/*" onChange={handleCompanyLogoUpload} disabled={companyLogoUploading} />
-                                                        {companyLogoUploading && <span className="form-hint">Uploadingâ€¦</span>}
+                                                        {companyLogoUploading && <span className="form-hint">Uploading…</span>}
                                                     </label>
                                                     <label>
                                                         <span className="form-label-text"><FaShieldAlt size={11} /> Registration number</span>
@@ -1726,11 +1726,11 @@ const Dashboard = () => {
                                             </form>
                                         )}
 
-                                        {/* â”€â”€â”€ API Keys Tab â”€â”€â”€ */}
+                                        {/* — API Keys Tab — */}
                                         {companyPanelTab === 'api' && (
                                             <div className="business-api-panel">
                                                 <p className="business-edit-intro">
-                                                    Generate API keys to connect your CRM or BI tools. Keep keys private â€” they grant access to your business data.
+                                                    Generate API keys to connect your CRM or BI tools. Keep keys private — they grant access to your business data.
                                                 </p>
 
                                                 {newApiKey && (
@@ -1738,7 +1738,7 @@ const Dashboard = () => {
                                                         <div>
                                                             <strong>New API key</strong>
                                                             <p className="api-key-value">{newApiKey}</p>
-                                                            <p className="form-hint">Copy and store this key now. You wonâ€™t see it again.</p>
+                                                            <p className="form-hint">Copy and store this key now. You won’t see it again.</p>
                                                         </div>
                                                         <button
                                                             type="button"
@@ -1758,7 +1758,7 @@ const Dashboard = () => {
                                                         placeholder="Key label (e.g., HubSpot, Salesforce)"
                                                     />
                                                     <button type="submit" className="btn btn-primary" disabled={apiKeyCreating}>
-                                                        {apiKeyCreating ? 'Creatingâ€¦' : 'Create key'}
+                                                        {apiKeyCreating ? 'Creating…' : 'Create key'}
                                                     </button>
                                                 </form>
 
@@ -1773,7 +1773,7 @@ const Dashboard = () => {
                                                                 <div>
                                                                     <strong>{key.name || `Key ${key.key_prefix}`}</strong>
                                                                     <p className="api-key-meta">
-                                                                        Prefix: {key.key_prefix} â€¢ Created {new Date(key.created_at).toLocaleDateString()}
+                                                                        Prefix: {key.key_prefix} • Created {new Date(key.created_at).toLocaleDateString()}
                                                                     </p>
                                                                     {key.revoked_at && (
                                                                         <span className="api-key-revoked">Revoked</span>

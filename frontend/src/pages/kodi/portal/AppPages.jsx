@@ -5,6 +5,7 @@ import Loading from '../../../components/common/Loading';
 import AppPagesTable from '../../../components/kodi/portal/AppPagesTable';
 import AssignPageModal from '../../../components/kodi/portal/AssignPageModal';
 import NavigationOrderEditor from '../../../components/kodi/portal/NavigationOrderEditor';
+import PortalNav from '../../../components/kodi/portal/PortalNav';
 import {
     deletePortalPage,
     linkPortalPage,
@@ -104,6 +105,7 @@ const AppPages = () => {
                 </div>
                 <button className="btn-primary" onClick={() => setAssignOpen(true)}>Assign Page</button>
             </header>
+            <PortalNav />
             <NavigationOrderEditor />
             {loading ? (
                 <Loading />

@@ -161,3 +161,53 @@
   border: 2px dashed var(--border-color);
 }
 
+@media (max-width: 768px) {
+  .company-header {
+    padding: 2rem 0;
+  }
+
+  .company-info {
+    flex-direction: column;
+    text-align: center;
+    gap: 1.5rem;
+  }
+
+  .company-name {
+    font-size: 2.2rem;
+  }
+
+  .company-rating {
+    margin: 0 auto 1rem;
+  }
+
+  .company-meta {
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .company-description {
+    padding: 1.5rem;
+  }
+
+  .reviews-section {
+    margin: 2rem 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .company-logo,
+  .company-logo-placeholder {
+    width: 96px;
+    height: 96px;
+  }
+
+  .company-name {
+    font-size: 1.9rem;
+  }
+
+  .company-meta span,
+  .company-meta a {
+    font-size: 0.9rem;
+  }
+}
+

@@ -151,6 +151,10 @@
     margin-top: 0.75rem;
     box-shadow: none;
   }
+
+  .settings-content {
+    padding: 1.25rem;
+  }
 }
 
 .password-section {

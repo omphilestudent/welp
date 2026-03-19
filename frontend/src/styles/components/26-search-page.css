@@ -1,11 +1,11 @@
 
 .search-page {
-  padding: 2rem 0;
+  padding: 2rem 0 3rem;
   min-height: 100vh;
 }
 
 .search-title {
-  font-size: 2rem;
+  font-size: clamp(1.6rem, 2vw, 2.2rem);
   margin-bottom: 1rem;
   color: var(--text-primary);
 }
@@ -13,6 +13,24 @@
 .search-count {
   color: var(--text-muted);
   margin-bottom: 2rem;
+}
+
+.company-create-form {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: var(--card-shadow);
+}
+
+@media (max-width: 768px) {
+  .search-page {
+    padding: 1.5rem 0 2.5rem;
+  }
+
+  .search-count {
+    margin-bottom: 1.25rem;
+  }
 }
 
 .error-container {

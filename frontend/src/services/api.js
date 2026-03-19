@@ -60,10 +60,15 @@ api.interceptors.response.use(
             }
             localStorage.removeItem('token');
             sessionStorage.removeItem('token');
-            if (window.location.pathname.startsWith('/kodi')) {
-                window.location.href = '/kodi-auth/sign-in';
-            } else {
-                window.location.href = '/login';
+            const path = window.location.pathname;
+            const isKodiAuth = path.startsWith('/kodi-auth');
+            const isLogin = path === '/login' || isKodiAuth;
+            if (!isLogin) {
+                if (path.startsWith('/kodi')) {
+                    window.location.href = '/kodi-auth/sign-in';
+                } else {
+                    window.location.href = '/login';
+                }
             }
         }
 

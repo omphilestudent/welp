@@ -33,6 +33,7 @@ const AdminMarketing = () => {
     const [logFilters, setLogFilters] = useState({ status: '', audience: '' });
     const [settings, setSettings] = useState({});
     const [error, setError] = useState('');
+    const [bulkUpdating, setBulkUpdating] = useState(false);
 
     const load = async () => {
         setLoading(true);
@@ -155,6 +156,40 @@ const AdminMarketing = () => {
         setSettings(saved);
     };
 
+    const handleEnableMarketing = async () => {
+        setBulkUpdating(true);
+        try {
+            const saved = await updateSettings({
+                ...settings,
+                employee_marketing_enabled: true,
+                psychologist_marketing_enabled: true
+            });
+            setSettings(saved);
+        } finally {
+            setBulkUpdating(false);
+        }
+    };
+
+    const handleActivateAllCampaigns = async () => {
+        setBulkUpdating(true);
+        try {
+            const updates = await Promise.all(
+                (campaigns || []).map((campaign) =>
+                    campaign.is_active ? campaign : updateCampaign(campaign.id, { is_active: true })
+                )
+            );
+            const normalized = updates.map((item, index) => item || campaigns[index]);
+            setCampaigns(normalized);
+        } finally {
+            setBulkUpdating(false);
+        }
+    };
+
+    const activeCampaigns = campaigns.filter((c) => c.is_active);
+    const inactiveCampaigns = campaigns.filter((c) => !c.is_active);
+    const inactiveTemplates = templates.filter((t) => t.is_active === false);
+    const marketingDisabled = settings.employee_marketing_enabled === false || settings.psychologist_marketing_enabled === false;
+
     if (loading) {
         return <Loading />;
     }
@@ -168,6 +203,32 @@ const AdminMarketing = () => {
                 </div>
             </div>
             {error && <div className="marketing-error">{error}</div>}
+            {(marketingDisabled || inactiveCampaigns.length || inactiveTemplates.length) && (
+                <div className="marketing-error" style={{ background: '#fef3c7', color: '#92400e' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div>
+                            <strong>Delivery is paused or partially disabled.</strong>
+                            <div style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                                {marketingDisabled && 'Global marketing settings are disabled. '}
+                                {inactiveCampaigns.length > 0 && `${inactiveCampaigns.length} campaign(s) are inactive. `}
+                                {inactiveTemplates.length > 0 && `${inactiveTemplates.length} template(s) are inactive.`}
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {marketingDisabled && (
+                                <button className="btn-secondary" onClick={handleEnableMarketing} disabled={bulkUpdating}>
+                                    Enable marketing
+                                </button>
+                            )}
+                            {inactiveCampaigns.length > 0 && (
+                                <button className="btn-secondary" onClick={handleActivateAllCampaigns} disabled={bulkUpdating}>
+                                    Activate all campaigns
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="marketing-grid">
                 <MarketingTemplateList
                     templates={templates}

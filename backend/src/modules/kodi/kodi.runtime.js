@@ -44,7 +44,10 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
         }
     }
 
-    const hasView = perms.userHasViewAccess(permissionMap, effectiveRole);
+    const hasExplicitPermissions = permissionRows.length > 0;
+    const hasView = hasExplicitPermissions
+        ? perms.userHasViewAccess(permissionMap, effectiveRole)
+        : (Boolean(userId) && isBuilderManagedPage);
     if (!hasView) {
         throw new Error('Access denied');
     }

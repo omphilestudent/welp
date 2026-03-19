@@ -315,12 +315,14 @@ const Navbar = () => {
                 </div>
             </nav>
 
-            <div
-                className={overlayClass}
-                onClick={closeMobileMenu}
-                aria-hidden="true"
-                role="presentation"
-            />
+            {isMobileMenuOpen && (
+                <div
+                    className={overlayClass}
+                    onClick={closeMobileMenu}
+                    aria-hidden="true"
+                    role="presentation"
+                />
+            )}
 
         </>
     );

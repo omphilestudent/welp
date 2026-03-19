@@ -143,7 +143,7 @@ const KodiTimes = () => {
             <header className="kodi-times__header">
                 <div className="kodi-page-header">
                     <button className="kodi-back-button" onClick={() => navigate('/admin/dashboard')}>
-                        â† Back
+                        ← Back
                     </button>
                     <div>
                     <p className="kodi-times__eyebrow">Times Builder</p>

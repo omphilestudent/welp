@@ -95,6 +95,7 @@
 
   .navbar-mobile-overlay {
     display: none;
+    z-index: 1080;
   }
 
   .navbar-mobile-overlay.navbar-mobile-overlay--visible {
@@ -416,6 +417,24 @@
 
   .verification-actions {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 360px) {
+  .hero-title {
+    font-size: 1.75rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.35rem;
+  }
+
+  .navbar-logo {
+    font-size: 1.3rem;
+  }
+
+  .btn {
+    width: 100%;
   }
 }
 

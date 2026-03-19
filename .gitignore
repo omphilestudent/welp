@@ -27,3 +27,8 @@ yarn-error.log*
 # uploads and temp
 backend/uploads/
 tmp/
+
+# Build artifacts
+frontend/dist/
+# Reports
+reports/

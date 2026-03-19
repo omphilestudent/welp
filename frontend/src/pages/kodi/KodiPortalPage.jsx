@@ -5,6 +5,8 @@ import AppDetail from './portal/AppDetail';
 import AppUsers from './portal/AppUsers';
 import AppPages from './portal/AppPages';
 import AppSettings from './portal/AppSettings';
+import PortalObjects from './portal/PortalObjects';
+import './KodiPortal.css';
 
 const KodiPortalPage = () => (
     <Routes>
@@ -14,6 +16,7 @@ const KodiPortalPage = () => (
         <Route path="apps/:appId/users" element={<AppUsers />} />
         <Route path="apps/:appId/pages" element={<AppPages />} />
         <Route path="apps/:appId/settings" element={<AppSettings />} />
+        <Route path="objects" element={<PortalObjects />} />
     </Routes>
 );
 

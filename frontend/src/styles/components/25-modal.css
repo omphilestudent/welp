@@ -61,6 +61,24 @@
   gap: 1rem;
 }
 
+@media (max-width: 480px) {
+  .modal-content {
+    width: 100%;
+    border-radius: 16px;
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 
 .chat-request-modal .psychologists-list {
   margin-bottom: 1.5rem;

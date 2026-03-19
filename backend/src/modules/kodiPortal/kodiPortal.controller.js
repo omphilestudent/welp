@@ -1,6 +1,7 @@
 const service = require('./kodiPortal.service');
 const repository = require('./kodiPortal.repository');
 const validators = require('./kodiPortal.validators');
+const bcrypt = require('bcryptjs');
 
 const baseUrl = () => process.env.FRONTEND_URL || process.env.SITE_URL || 'https://welphub.onrender.com';
 
@@ -133,14 +134,66 @@ const listUsers = async (req, res) => {
 
 const assignUser = async (req, res) => {
     try {
-        const user = await repository.query(
+        const app = await repository.getAppById(req.params.id);
+        if (!app) {
+            return res.status(404).json({ success: false, error: 'App not found' });
+        }
+        let user = await repository.query(
             `SELECT id, email, display_name
              FROM users
              WHERE LOWER(email) = $1`,
             [String(req.body.email || '').trim().toLowerCase()]
         );
         if (!user.rows[0]) {
-            return res.status(404).json({ success: false, error: 'User not found' });
+            const email = String(req.body.email || '').trim().toLowerCase();
+            if (!email) {
+                return res.status(400).json({ success: false, error: 'Email is required' });
+            }
+            const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(2), 10);
+            const roleKey = String(req.body.roleKey || 'employee').toLowerCase();
+            const roleMap = {
+                admin: 'admin',
+                employee: 'employee',
+                business_user: 'business',
+                psychologist: 'psychologist'
+            };
+            const role = roleMap[roleKey] || 'employee';
+            const displayName = email.split('@')[0] || 'Kodi User';
+
+            const hasIsActive = await repository.query(
+                `SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'is_active'
+                ) AS exists`
+            );
+            const hasIsVerified = await repository.query(
+                `SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'is_verified'
+                ) AS exists`
+            );
+
+            const columns = ['email', 'password_hash', 'role', 'display_name'];
+            const values = [email, passwordHash, role, displayName];
+            let idx = values.length;
+            if (hasIsActive.rows[0]?.exists) {
+                columns.push('is_active');
+                values.push(true);
+                idx += 1;
+            }
+            if (hasIsVerified.rows[0]?.exists) {
+                columns.push('is_verified');
+                values.push(true);
+                idx += 1;
+            }
+
+            const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
+            user = await repository.query(
+                `INSERT INTO users (${columns.join(', ')})
+                 VALUES (${placeholders})
+                 RETURNING id, email, display_name`,
+                values
+            );
         }
         const assignment = await service.assignUser({
             appId: req.params.id,

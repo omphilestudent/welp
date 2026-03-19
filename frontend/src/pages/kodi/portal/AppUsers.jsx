@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import Loading from '../../../components/common/Loading';
 import AppUsersTable from '../../../components/kodi/portal/AppUsersTable';
 import AssignUserModal from '../../../components/kodi/portal/AssignUserModal';
+import PortalNav from '../../../components/kodi/portal/PortalNav';
 import {
     assignPortalUser,
     listPortalUsers,
@@ -92,6 +93,7 @@ const AppUsers = () => {
                 </div>
                 <button className="btn-primary" onClick={() => setAssignOpen(true)}>Assign User</button>
             </header>
+            <PortalNav />
             {loading ? (
                 <Loading />
             ) : (

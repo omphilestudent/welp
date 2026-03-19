@@ -10,6 +10,15 @@ body {
     line-height: 1.6;
     transition: background-color 0.3s, color 0.3s;
     overflow-x: hidden;
+    min-width: 320px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+.app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 a {
@@ -21,14 +30,44 @@ button {
     font-family: inherit;
 }
 
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+input,
+select,
+textarea {
+    font-family: inherit;
+    max-width: 100%;
+}
+
+img,
+svg,
+video {
+    max-width: 100%;
+    height: auto;
+}
+
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 clamp(16px, 2vw, 24px);
 }
 
 .main-content {
     min-height: calc(100vh - 64px - 300px);
+    padding: clamp(16px, 2vw, 32px);
+    flex: 1;
+}
+
+.main-content > * {
+    width: 100%;
+}
+
+.main-content .full-bleed {
+    margin-left: calc(-1 * clamp(16px, 2vw, 32px));
+    margin-right: calc(-1 * clamp(16px, 2vw, 32px));
 }
 
 

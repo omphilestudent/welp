@@ -26,6 +26,7 @@
 
 .messages-sidebar-overlay {
   display: none;
+  pointer-events: none;
 }
 
 .call-overlay {
@@ -123,6 +124,36 @@
 
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.messages-thread-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.employee-support-toggle {
+  padding: 0.75rem 1rem 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.messages-sidebar-fab {
+  display: none;
+  position: fixed;
+  left: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 30;
+  background: var(--accent-color);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.25);
 }
 
 
@@ -304,6 +335,7 @@
   flex-direction: column;
   gap: 1rem;
   background: var(--bg-secondary);
+  -webkit-overflow-scrolling: touch;
 }
 
 .message-date-divider {
@@ -853,6 +885,7 @@
     inset: 0;
     background: rgba(0, 0, 0, 0.4);
     z-index: 15;
+    pointer-events: auto;
   }
 
   .messages-main {
@@ -866,6 +899,17 @@
 
   .thread-back-button {
     display: inline-flex;
+  }
+
+  .messages-sidebar-fab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .employee-support-toggle {
+    justify-content: flex-start;
+    padding: 0.75rem 1rem 0.25rem;
   }
 
   .thread-actions {

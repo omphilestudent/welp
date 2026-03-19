@@ -563,6 +563,7 @@ const listPageUsers = async (pageId) => {
 };
 
 const listObjects = async () => {
+    await ensureStandardObjects();
     const result = await database.query(
         `SELECT o.*,
                 COALESCE(f.fields, '[]') AS fields
@@ -689,6 +690,50 @@ const listApps = async () => {
          ORDER BY a.name`
     );
     return result.rows;
+};
+
+const ensureStandardObjects = async () => {
+    const standardObjects = [
+        { name: 'case', label: 'Case', description: 'Customer service cases' },
+        { name: 'account', label: 'Account', description: 'Business accounts' },
+        { name: 'contact', label: 'Contact', description: 'People and contacts' },
+        { name: 'lead', label: 'Lead', description: 'Prospective leads' },
+        { name: 'opportunity', label: 'Opportunity', description: 'Sales opportunities' },
+        { name: 'user', label: 'User', description: 'System users' }
+    ];
+    const existing = await database.query(`SELECT id, name FROM kodi_objects`);
+    const existingMap = new Map(existing.rows.map((row) => [row.name, row.id]));
+
+    for (const obj of standardObjects) {
+        let objectId = existingMap.get(obj.name);
+        if (!objectId) {
+            const created = await database.query(
+                `INSERT INTO kodi_objects (name, label, description, metadata)
+                 VALUES ($1, $2, $3, '{}'::jsonb)
+                 RETURNING id`,
+                [obj.name, obj.label, obj.description]
+            );
+            objectId = created.rows[0]?.id;
+            if (!objectId) continue;
+        }
+        const defaultFields = [
+            { field_name: 'name', field_type: 'string', is_required: true, is_readonly: false }
+        ];
+        if (obj.name === 'contact' || obj.name === 'user') {
+            defaultFields.push({ field_name: 'email', field_type: 'string', is_required: false, is_readonly: false });
+        }
+        if (obj.name === 'lead' || obj.name === 'opportunity' || obj.name === 'case') {
+            defaultFields.push({ field_name: 'status', field_type: 'string', is_required: false, is_readonly: false });
+        }
+        for (const field of defaultFields) {
+            await database.query(
+                `INSERT INTO kodi_fields (object_id, field_name, field_type, is_required, is_readonly)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (object_id, field_name) DO NOTHING`,
+                [objectId, field.field_name, field.field_type, field.is_required, field.is_readonly]
+            );
+        }
+    }
 };
 
 const createApp = async ({ name, description }) => {
@@ -930,6 +975,7 @@ module.exports = {
     listObjectFields,
     createObject,
     createField,
+    ensureStandardObjects,
     insertPermission,
     listComponentRegistry,
     DEFAULT_LAYOUT,

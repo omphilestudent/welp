@@ -9,6 +9,7 @@ const AppTopBar = () => {
     const [nav, setNav] = useState([]);
     const [appMeta, setAppMeta] = useState(null);
     const [switcherOpen, setSwitcherOpen] = useState(false);
+    const [search, setSearch] = useState('');
 
     const appId = useMemo(() => {
         const match = location.pathname.match(/\/kodi\/app\/([^/]+)/);
@@ -50,14 +51,42 @@ const AppTopBar = () => {
 
     return (
         <div className={`kodi-topbar kodi-topbar--${navbarStyle}`} style={styleVars}>
-            <button className="kodi-topbar__switcher" onClick={() => setSwitcherOpen(!switcherOpen)}>
-                â˜°
+            <button
+                className="kodi-topbar__switcher"
+                onClick={() => setSwitcherOpen(!switcherOpen)}
+                aria-label="Open app switcher"
+            >
+                ☰
             </button>
             {logoUrl && <img className="kodi-topbar__logo" src={logoUrl} alt="App logo" />}
             <div className="kodi-topbar__appname">
                 {settings.titleDisplay === 'compact'
                     ? (appMeta?.label || 'App').slice(0, 14)
                     : (appMeta?.label || 'App')}
+            </div>
+            <div className="kodi-topbar__search">
+                <input
+                    type="search"
+                    value={search}
+                    placeholder="Search..."
+                    onChange={(event) => setSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key !== 'Enter') return;
+                        const query = search.trim();
+                        if (!query) return;
+                        navigate(`/search?q=${encodeURIComponent(query)}`);
+                    }}
+                />
+                <button
+                    type="button"
+                    onClick={() => {
+                        const query = search.trim();
+                        if (!query) return;
+                        navigate(`/search?q=${encodeURIComponent(query)}`);
+                    }}
+                >
+                    Search
+                </button>
             </div>
             <nav className="kodi-topbar__tabs">
                 {nav.map((item) => (

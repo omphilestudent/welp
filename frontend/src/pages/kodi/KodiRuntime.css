@@ -295,6 +295,7 @@
     align-items: center;
     gap: 16px;
     padding: 8px 16px;
+    flex-wrap: wrap;
 }
 
 .kodi-topbar__switcher {
@@ -315,6 +316,44 @@
     gap: 10px;
     flex: 1;
     overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.kodi-topbar__search {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 16px;
+    min-width: 180px;
+}
+
+.kodi-topbar__search input {
+    width: min(320px, 100%);
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.6);
+    background: rgba(255, 255, 255, 0.1);
+    color: inherit;
+}
+
+.kodi-topbar--light .kodi-topbar__search input {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.kodi-topbar__search button {
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.6);
+    background: rgba(15, 23, 42, 0.2);
+    color: inherit;
+    font-weight: 600;
+}
+
+.kodi-topbar--light .kodi-topbar__search button {
+    background: #f1f5f9;
+    color: #0f172a;
 }
 
 .kodi-topbar__tabs a {
@@ -377,6 +416,33 @@
 
 .kodi-app-shell--top {
     grid-template-columns: 1fr;
+}
+
+@media (max-width: 640px) {
+    .kodi-topbar {
+        gap: 10px;
+        padding: 8px 12px 10px;
+    }
+
+    .kodi-topbar__appname {
+        flex: 1 1 100%;
+    }
+
+    .kodi-topbar__tabs {
+        flex: 1 1 100%;
+        order: 3;
+    }
+
+    .kodi-topbar__search {
+        order: 2;
+        width: 100%;
+        margin: 0;
+        justify-content: flex-start;
+    }
+
+    .kodi-topbar__search input {
+        width: 100%;
+    }
 }
 
 @media (max-width: 900px) {
