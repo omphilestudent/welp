@@ -25,12 +25,14 @@ const updateAppValidators = validate([
     body('icon').optional().trim()
 ]);
 
+const isUuidOrInt = (value) => isUuid(value) || /^\d+$/.test(String(value));
+
 const settingsValidators = validate([
     param('id').custom(isUuid),
     body('themeConfig').optional().isObject(),
     body('navigationMode').optional().isIn(['sidebar', 'top', 'compact']),
     body('landingBehavior').optional().isIn(['default_page', 'last_visited']),
-    body('defaultPageId').optional().custom(isUuid),
+    body('defaultPageId').optional().custom(isUuidOrInt),
     body('settings').optional().isObject()
 ]);
 
@@ -71,7 +73,7 @@ const acceptInviteValidators = validate([
 
 const linkPageValidators = validate([
     param('id').custom(isUuid),
-    body('pageId').custom(isUuid),
+    body('pageId').custom(isUuidOrInt),
     body('navLabel').optional().trim(),
     body('navOrder').optional().isInt({ min: 1 }),
     body('isDefault').optional().isBoolean(),

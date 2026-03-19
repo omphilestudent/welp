@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { kodiAuthFirstLogin } from '../../../services/kodiAuthService';
+import { useAuth } from '../../../hooks/useAuth';
 
 const KodiFirstLogin = () => {
     const navigate = useNavigate();
+    const { refreshUser } = useAuth();
     const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
     const [loading, setLoading] = useState(false);
@@ -30,6 +32,9 @@ const KodiFirstLogin = () => {
             const payload = res.data || res;
             localStorage.setItem('token', payload.token);
             sessionStorage.removeItem('kodi_first_login_token');
+            if (refreshUser) {
+                await refreshUser().catch(() => {});
+            }
             navigate('/kodi/apps');
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to set password');

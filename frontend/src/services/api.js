@@ -15,7 +15,15 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         const candidateKeys = ['token', 'admin_access', 'hr_access', 'access_token'];
-        const token = candidateKeys.map((key) => localStorage.getItem(key) || sessionStorage.getItem(key)).find(Boolean);
+        const rawToken = candidateKeys.map((key) => localStorage.getItem(key) || sessionStorage.getItem(key)).find(Boolean);
+        const isJwt = typeof rawToken === 'string' && rawToken.split('.').length === 3;
+        if (rawToken && !isJwt) {
+            candidateKeys.forEach((key) => {
+                localStorage.removeItem(key);
+                sessionStorage.removeItem(key);
+            });
+        }
+        const token = isJwt ? rawToken : null;
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }

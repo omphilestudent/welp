@@ -75,12 +75,24 @@ const normalizeUserPayload = (user = null) => {
     return normalized;
 };
 
+const isValidToken = (value) => {
+    if (!value || typeof value !== 'string') return false;
+    const trimmed = value.trim();
+    if (trimmed.toLowerCase() === 'true' || trimmed.toLowerCase() === 'false') return false;
+    return trimmed.split('.').length === 3;
+};
+
 const getStoredToken = () => {
     if (typeof window === "undefined") return null;
     const candidateKeys = ["token", "admin_access", "hr_access", "access_token"];
     for (const key of candidateKeys) {
         const value = localStorage.getItem(key) || sessionStorage.getItem(key);
-        if (value) return value;
+        if (value && !isValidToken(value)) {
+            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
+            continue;
+        }
+        if (isValidToken(value)) return value;
     }
     return null;
 };
@@ -214,6 +226,16 @@ export const AuthProvider = ({ children }) => {
     }, [checkBackendHealth, checkAuth]);
 
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            const candidateKeys = ["token", "admin_access", "hr_access", "access_token"];
+            candidateKeys.forEach((key) => {
+                const value = localStorage.getItem(key) || sessionStorage.getItem(key);
+                if (value && !isValidToken(value)) {
+                    localStorage.removeItem(key);
+                    sessionStorage.removeItem(key);
+                }
+            });
+        }
         if (initializedRef.current) return;
         initializedRef.current = true;
         initializeAuth();

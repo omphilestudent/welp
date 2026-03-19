@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { kodiAuthSignIn } from '../../../services/kodiAuthService';
+import { useAuth } from '../../../hooks/useAuth';
 
 const KodiSignIn = () => {
     const navigate = useNavigate();
+    const { refreshUser } = useAuth();
     const [form, setForm] = useState({ username: '', password: '', otp: '' });
     const [loading, setLoading] = useState(false);
 
@@ -20,6 +22,9 @@ const KodiSignIn = () => {
                 navigate('/kodi-auth/first-login');
             } else {
                 localStorage.setItem('token', payload.token);
+                if (refreshUser) {
+                    await refreshUser().catch(() => {});
+                }
                 navigate('/kodi/apps');
             }
         } catch (error) {

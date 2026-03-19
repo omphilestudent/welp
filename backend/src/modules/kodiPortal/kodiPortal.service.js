@@ -61,6 +61,8 @@ const logEmailDelivery = async ({ triggerKey, recipientEmail, recipientUserId, s
     }
 };
 
+const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value));
+
 const ensureDefaultPageConsistency = async (appId) => {
     const app = await repository.getAppById(appId);
     if (!app) throw new Error('App not found');
@@ -76,7 +78,7 @@ const ensureDefaultPageConsistency = async (appId) => {
         throw new Error('App has multiple default pages. Resolve defaults before continuing.');
     }
     const defaultPageId = defaults[0].page_id;
-    if (String(app.default_page_id || '') !== String(defaultPageId)) {
+    if (isUuid(defaultPageId) && String(app.default_page_id || '') !== String(defaultPageId)) {
         await repository.updateApp({ appId, updates: { default_page_id: defaultPageId } });
     }
     return { hasDefault: true, defaultPageId, mappings };
@@ -94,7 +96,7 @@ const validateActivationEligibility = async (appId) => {
         throw new Error('App must have exactly one default page before activation.');
     }
     const defaultPageId = defaults[0].page_id;
-    if (!app.default_page_id || String(app.default_page_id) !== String(defaultPageId)) {
+    if (isUuid(defaultPageId) && (!app.default_page_id || String(app.default_page_id) !== String(defaultPageId))) {
         throw new Error('App default page is not set correctly.');
     }
 };
@@ -307,7 +309,7 @@ const updateSettings = async (appId, payload) => {
         navigation_mode: payload.navigationMode,
         landing_behavior: payload.landingBehavior,
         settings: payload.settings,
-        default_page_id: payload.defaultPageId
+        default_page_id: isUuid(payload.defaultPageId) ? payload.defaultPageId : undefined
     };
     if (payload.defaultPageId) {
         await repository.updateAppPageMapping({
@@ -315,7 +317,9 @@ const updateSettings = async (appId, payload) => {
                 .find((m) => String(m.page_id) === String(payload.defaultPageId)).mapping_id,
             updates: { is_default: true }
         });
-        await repository.updateApp({ appId, updates: { default_page_id: payload.defaultPageId } });
+        if (isUuid(payload.defaultPageId)) {
+            await repository.updateApp({ appId, updates: { default_page_id: payload.defaultPageId } });
+        }
     }
     return repository.updateApp({ appId, updates });
 };
@@ -602,8 +606,20 @@ const linkPage = async ({ appId, pageId, navLabel, navOrder, isDefault, isVisibl
     }
 };
 
+const resolveMappingId = async ({ appId, mappingId }) => {
+    if (!mappingId) return null;
+    if (/^\d+$/.test(String(mappingId))) {
+        const pages = await repository.listAppPages(appId);
+        const match = pages.find((row) => Number(row.nav_order) === Number(mappingId));
+        return match?.mapping_id || null;
+    }
+    return mappingId;
+};
+
 const updatePage = async ({ appId, mappingId, updates }) => {
-    const existing = await repository.getAppPageMappingById(mappingId);
+    const resolvedMappingId = await resolveMappingId({ appId, mappingId });
+    if (!resolvedMappingId) return null;
+    const existing = await repository.getAppPageMappingById(resolvedMappingId);
     if (!existing) return null;
     if (updates.is_default === false && existing.is_default) {
         const app = await repository.getAppById(appId);
@@ -623,8 +639,8 @@ const updatePage = async ({ appId, mappingId, updates }) => {
                     await repository.updateAppPageMapping({ mappingId: m.mapping_id, updates: { is_default: false } });
                 }
             }
-            const updated = await repository.updateAppPageMapping({ mappingId, updates });
-            if (updates.is_default === true && updated) {
+            const updated = await repository.updateAppPageMapping({ mappingId: resolvedMappingId, updates });
+            if (updates.is_default === true && updated && isUuid(updated.page_id)) {
                 await repository.updateApp({ appId, updates: { default_page_id: updated.page_id } });
             }
             await ensureDefaultPageConsistency(appId);
@@ -636,14 +652,16 @@ const updatePage = async ({ appId, mappingId, updates }) => {
             throw error;
         }
     }
-    const updated = await repository.updateAppPageMapping({ mappingId, updates });
+    const updated = await repository.updateAppPageMapping({ mappingId: resolvedMappingId, updates });
     await ensureDefaultPageConsistency(appId);
     await ensureActiveAppHasVisiblePage(appId);
     return updated;
 };
 
 const removePage = async ({ appId, mappingId }) => {
-    const mapping = await repository.getAppPageMappingById(mappingId);
+    const resolvedMappingId = await resolveMappingId({ appId, mappingId });
+    if (!resolvedMappingId) return;
+    const mapping = await repository.getAppPageMappingById(resolvedMappingId);
     if (!mapping) return;
     const app = await repository.getAppById(appId);
     if (mapping.is_default && app.status === 'active') {
@@ -651,7 +669,7 @@ const removePage = async ({ appId, mappingId }) => {
     }
     await repository.query('BEGIN');
     try {
-        await repository.deleteAppPageMapping(mappingId);
+        await repository.deleteAppPageMapping(resolvedMappingId);
         await ensureDefaultPageConsistency(appId);
         await ensureActiveAppHasVisiblePage(appId);
         await repository.query('COMMIT');
