@@ -231,3 +231,160 @@
     text-align: center;
     color: #64748b;
 }
+
+.kodi-app-shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+    background: #f8fafc;
+}
+
+.kodi-app-shell__nav {
+    background: var(--kodi-app-surface, #0f172a);
+    color: var(--kodi-app-text, #e2e8f0);
+    padding: 20px;
+    display: grid;
+    gap: 16px;
+}
+
+.kodi-app-shell__header {
+    display: grid;
+    gap: 8px;
+}
+
+.kodi-app-shell__header select {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.6);
+    color: var(--kodi-app-text, #e2e8f0);
+}
+
+.kodi-app-shell__menu {
+    display: grid;
+    gap: 8px;
+}
+
+.kodi-app-shell__menu a {
+    color: var(--kodi-app-text, #e2e8f0);
+    text-decoration: none;
+    padding: 8px 10px;
+    border-radius: 8px;
+}
+
+.kodi-app-shell__menu a.active {
+    background: var(--kodi-app-primary, #2563eb);
+}
+
+.kodi-app-shell__content {
+    padding: 20px;
+}
+
+.kodi-app-shell--compact .kodi-app-shell__content {
+    padding: 12px;
+}
+
+.kodi-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--kodi-app-surface, #0b1120);
+    color: var(--kodi-app-text, #e2e8f0);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+}
+
+.kodi-topbar__switcher {
+    background: transparent;
+    color: inherit;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 8px;
+    width: 34px;
+    height: 34px;
+}
+
+.kodi-topbar__appname {
+    font-weight: 700;
+}
+
+.kodi-topbar__tabs {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    overflow-x: auto;
+}
+
+.kodi-topbar__tabs a {
+    color: var(--kodi-app-text, #cbd5f5);
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.kodi-topbar__tabs a.active {
+    background: var(--kodi-app-primary, #2563eb);
+    color: #fff;
+}
+
+.kodi-topbar__menu {
+    position: absolute;
+    top: 48px;
+    left: 16px;
+    background: #111827;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 12px;
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+}
+
+.kodi-topbar__menu button {
+    background: transparent;
+    color: #e2e8f0;
+    border: none;
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.kodi-topbar__menu button.active {
+    background: #1f2937;
+    border-radius: 8px;
+}
+
+.kodi-topbar--light {
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.kodi-topbar--light .kodi-topbar__menu {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.kodi-topbar--light .kodi-topbar__menu button {
+    color: #0f172a;
+}
+
+.kodi-topbar__logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.kodi-app-shell--top {
+    grid-template-columns: 1fr;
+}
+
+@media (max-width: 900px) {
+    .kodi-app-shell {
+        grid-template-columns: 1fr;
+    }
+    .kodi-app-shell__nav {
+        position: sticky;
+        top: 0;
+    }
+}

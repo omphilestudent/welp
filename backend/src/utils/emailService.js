@@ -950,6 +950,117 @@ const sendAppAccessEmail = async ({ to, name, appName, loginUrl, pageUrl, pageNa
     return sendEmail({ to, subject, html, text });
 };
 
+const sendKodiAppInviteEmail = async ({ to, name, appName, role, loginUrl, inviteUrl, pageUrl, pageName, username, otp }) => {
+    if (!to || !appName || !inviteUrl) {
+        return { success: false, error: 'Missing invitation details' };
+    }
+    const greeting = name ? `Hi ${name}` : 'Hello';
+    const subject = `Invitation to ${appName}`;
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <h2>${greeting},</h2>
+            <p>You have been invited to the <strong>${appName}</strong> app in Kodi Portal.</p>
+            <p><strong>Role:</strong> ${role || 'member'}</p>
+            <p><strong>Username:</strong> ${username || 'assigned separately'}</p>
+            <p><strong>One-time password:</strong> ${otp || 'available in your invite'}</p>
+            <p>
+              <a href="${inviteUrl}" style="display: inline-block; background: #2563eb; color: #fff; padding: 10px 18px; border-radius: 999px; text-decoration: none;">
+                قبول الدعوة / Accept Invitation
+              </a>
+            </p>
+            ${pageUrl ? `<p>Default page: <a href="${pageUrl}">${pageName || 'Open page'}</a></p>` : ''}
+            <p>Login: ${loginUrl}</p>
+            <p style="margin-top: 24px;">If you did not expect this invitation, ignore this email.</p>
+            <p>— The Kodi Portal Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+    const text = [
+        `${greeting},`,
+        '',
+        `You have been invited to ${appName}.`,
+        `Role: ${role || 'member'}`,
+        username ? `Username: ${username}` : '',
+        otp ? `One-time password: ${otp}` : '',
+        `Accept invitation: ${inviteUrl}`,
+        loginUrl ? `Login: ${loginUrl}` : '',
+        pageUrl ? `Default page: ${pageName || 'Open page'} - ${pageUrl}` : '',
+        '',
+        '— The Kodi Portal Team'
+    ].filter(Boolean).join('\n');
+    return sendEmail({ to, subject, html, text });
+};
+
+const sendKodiRoleUpdatedEmail = async ({ to, name, appName, role, loginUrl }) => {
+    if (!to || !appName) {
+        return { success: false, error: 'Missing recipient or app name' };
+    }
+    const greeting = name ? `Hi ${name}` : 'Hello';
+    const subject = `Role updated in ${appName}`;
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <h2>${greeting},</h2>
+            <p>Your role in <strong>${appName}</strong> has been updated.</p>
+            <p><strong>New role:</strong> ${role || 'member'}</p>
+            <p>Login: <a href="${loginUrl}">${loginUrl}</a></p>
+            <p>— The Kodi Portal Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+    const text = [
+        `${greeting},`,
+        '',
+        `Your role in ${appName} has been updated.`,
+        `New role: ${role || 'member'}`,
+        loginUrl ? `Login: ${loginUrl}` : '',
+        '',
+        '— The Kodi Portal Team'
+    ].filter(Boolean).join('\n');
+    return sendEmail({ to, subject, html, text });
+};
+
+const sendKodiPageAssignedEmail = async ({ to, name, appName, pageName, pageUrl, loginUrl }) => {
+    if (!to || !appName || !pageName) {
+        return { success: false, error: 'Missing recipient or page details' };
+    }
+    const greeting = name ? `Hi ${name}` : 'Hello';
+    const subject = `New page assigned in ${appName}`;
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <div style="max-width: 560px; margin: 0 auto; padding: 24px;">
+            <h2>${greeting},</h2>
+            <p>A new page has been assigned in <strong>${appName}</strong>.</p>
+            <p><strong>Page:</strong> ${pageName}</p>
+            ${pageUrl ? `<p>Open: <a href="${pageUrl}">${pageUrl}</a></p>` : ''}
+            <p>Login: <a href="${loginUrl}">${loginUrl}</a></p>
+            <p>— The Kodi Portal Team</p>
+          </div>
+        </body>
+        </html>
+    `;
+    const text = [
+        `${greeting},`,
+        '',
+        `A new page has been assigned in ${appName}.`,
+        `Page: ${pageName}`,
+        pageUrl ? `Open: ${pageUrl}` : '',
+        loginUrl ? `Login: ${loginUrl}` : '',
+        '',
+        '— The Kodi Portal Team'
+    ].filter(Boolean).join('\n');
+    return sendEmail({ to, subject, html, text });
+};
+
 module.exports = {
     sendClaimInvitation,
     sendVerificationEmail,
@@ -965,5 +1076,8 @@ module.exports = {
     sendConversationRequestEmail,
     sendConversationAcceptedEmail,
     sendTicketNotificationEmail,
-    sendAppAccessEmail
+    sendAppAccessEmail,
+    sendKodiAppInviteEmail,
+    sendKodiRoleUpdatedEmail,
+    sendKodiPageAssignedEmail
 };

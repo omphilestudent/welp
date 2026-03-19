@@ -94,6 +94,12 @@ const KodiBuilderPage = () => {
     const [selectedAppId, setSelectedAppId] = useState('');
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [previewRole, setPreviewRole] = useState('admin');
+    const [previewObjectId, setPreviewObjectId] = useState('');
+    const [previewSampleIndex, setPreviewSampleIndex] = useState(0);
+    const [previewRecords, setPreviewRecords] = useState({});
+    const [previewRecord, setPreviewRecord] = useState({});
+    const [previewAppId, setPreviewAppId] = useState('');
+    const [previewApps, setPreviewApps] = useState([]);
 
     const currentPage = useMemo(() => pages.find((page) => String(page.id) === String(pageId)), [pages, pageId]);
 
@@ -120,6 +126,72 @@ const KodiBuilderPage = () => {
     useEffect(() => {
         loadData();
     }, [pageId]);
+
+    useEffect(() => {
+        const first = objects[0];
+        if (first && !previewObjectId) {
+            setPreviewObjectId(first.id);
+        }
+    }, [objects, previewObjectId]);
+
+    useEffect(() => {
+        if (!objects.length) return;
+        const names = ['Ava', 'Liam', 'Mia', 'Noah', 'Sofia', 'Ethan'];
+        const surnames = ['Thompson', 'Ramos', 'Patel', 'Okafor', 'Chen', 'Rivera'];
+        const companies = ['BlueNova', 'Futura', 'Nimbus', 'Atlas', 'Koru', 'Solara'];
+        const statuses = ['Active', 'Pending', 'In Progress', 'New', 'Qualified'];
+        const buildValue = (field, seed) => {
+            const key = field.field_name.toLowerCase();
+            if (field.field_type === 'date') {
+                const date = new Date(Date.now() - seed * 86400000);
+                return date.toISOString().split('T')[0];
+            }
+            if (field.field_type === 'boolean') return seed % 2 === 0;
+            if (field.field_type === 'number') return 40 + seed * 3;
+            if (key.includes('email')) return `${names[seed % names.length].toLowerCase()}@kodi.app`;
+            if (key.includes('phone')) return `+1 (555) 10${seed} ${200 + seed}`;
+            if (key.includes('name')) return `${names[seed % names.length]} ${surnames[seed % surnames.length]}`;
+            if (key.includes('company') || key.includes('business')) return companies[seed % companies.length];
+            if (key.includes('status') || key.includes('stage')) return statuses[seed % statuses.length];
+            return `${field.field_name}_${seed + 1}`;
+        };
+        const recordMap = objects.reduce((acc, obj) => {
+            const samples = Array.from({ length: 3 }).map((_, index) => {
+                const record = {};
+                (obj.fields || []).forEach((field) => {
+                    record[field.field_name] = buildValue(field, index);
+                });
+                record.id = record.id || `${obj.name}_${index + 1}`;
+                return record;
+            });
+            acc[obj.name] = samples;
+            return acc;
+        }, {});
+        setPreviewRecords(recordMap);
+    }, [objects]);
+
+    useEffect(() => {
+        if (!previewObjectId) return;
+        const target = objects.find((obj) => String(obj.id) === String(previewObjectId)) || objects[0];
+        if (!target) return;
+        const samples = previewRecords[target.name] || [];
+        setPreviewRecord(samples[previewSampleIndex] || samples[0] || {});
+    }, [objects, previewObjectId, previewSampleIndex, previewRecords]);
+
+    useEffect(() => {
+        const loadApps = async () => {
+            try {
+                const data = await listPlatformApps();
+                setPreviewApps(data || []);
+                if (!previewAppId && data?.length) {
+                    setPreviewAppId(data[0].id);
+                }
+            } catch (error) {
+                // ignore preview app load errors
+            }
+        };
+        loadApps();
+    }, [previewAppId]);
 
     const updateLayout = (updater) => {
         setLayout((prev) => {
@@ -298,9 +370,36 @@ const KodiBuilderPage = () => {
                         <option value="psychologist">Psychologist</option>
                         <option value="business_user">Business User</option>
                     </select>
+                    <select value={previewObjectId} onChange={(e) => setPreviewObjectId(e.target.value)}>
+                        {objects.map((obj) => (
+                            <option key={obj.id} value={obj.id}>
+                                {obj.label || obj.name}
+                            </option>
+                        ))}
+                    </select>
+                    <select value={previewSampleIndex} onChange={(e) => setPreviewSampleIndex(Number(e.target.value))}>
+                        <option value={0}>Sample A</option>
+                        <option value={1}>Sample B</option>
+                        <option value={2}>Sample C</option>
+                    </select>
+                    <select value={previewAppId} onChange={(e) => setPreviewAppId(e.target.value)}>
+                        {previewApps.map((app) => (
+                            <option key={app.id} value={app.id}>
+                                {app.label || app.name}
+                            </option>
+                        ))}
+                    </select>
                     <button className="btn-secondary" onClick={() => navigate('/kodi/times')}>Back to Times</button>
                     <button className="btn-secondary" onClick={() => setCreateModalOpen(true)}>Create Page</button>
                     <button className="btn-secondary" onClick={() => window.open(`/kodi/runtime/${pageId}`, '_blank')}>Preview Runtime</button>
+                    {currentPage?.linked_app_id && (
+                        <button
+                            className="btn-secondary"
+                            onClick={() => navigate(`/kodi/portal/apps/${currentPage.linked_app_id}/settings`)}
+                        >
+                            App Shell Settings
+                        </button>
+                    )}
                     <button className="btn-secondary" onClick={openLinkModal}>Link to App</button>
                     <button className="btn-secondary" onClick={handleActivate}>Activate Page</button>
                     <button className="btn-primary" onClick={handleSave} disabled={saving}>
@@ -331,6 +430,14 @@ const KodiBuilderPage = () => {
                     onComponentDrop={handleComponentDrop}
                     onRemoveComponent={handleRemoveComponent}
                     previewRole={previewRole}
+                    previewContext={{
+                        record: previewRecord,
+                        records: previewRecords,
+                        object: objects.find((obj) => String(obj.id) === String(previewObjectId)),
+                        objects,
+                        app: previewApps.find((app) => String(app.id) === String(previewAppId)),
+                        role: previewRole
+                    }}
                 />
                 <ConfigSidebar
                     component={selectedComponent}

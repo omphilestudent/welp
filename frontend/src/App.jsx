@@ -37,6 +37,7 @@ import UserProfile from './pages/UserProfile';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
+import AppTopBar from './components/kodi/AppTopBar';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -63,6 +64,12 @@ import KodiTimes from './pages/kodi/KodiTimes';
 import KodiBuilderPage from './pages/kodi/KodiBuilderPage';
 import KodiRuntimePage from './pages/kodi/KodiRuntimePage';
 import KodiPortalPage from './pages/kodi/KodiPortalPage';
+import KodiAppShell from './pages/kodi/KodiAppShell';
+import KodiAppRuntimePage from './pages/kodi/KodiAppRuntimePage';
+import KodiInviteAccept from './pages/kodi/KodiInviteAccept';
+import KodiAppsList from './pages/kodi/KodiAppsList';
+import KodiSignIn from './pages/kodi/auth/KodiSignIn';
+import KodiFirstLogin from './pages/kodi/auth/KodiFirstLogin';
 
 // HR Pages
 import Employees from './pages/hr/Employees';
@@ -101,6 +108,7 @@ function App() {
                         }}
                     >
                         <div className="app">
+                            <AppTopBar />
                             <Navbar />
                             <main className="main-content">
                                 <Routes>
@@ -202,7 +210,7 @@ function App() {
                                     }
                                 />
                                 <Route
-                                    path="/kodi/portal"
+                                    path="/kodi/portal/*"
                                     element={
                                         <PrivateRoute>
                                             <KodiPortalPage />
@@ -233,10 +241,41 @@ function App() {
                                         </PrivateRoute>
                                     }
                                 />
+                                <Route
+                                    path="/kodi/apps"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiAppsList />
+                                        </PrivateRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/kodi/app/:appId"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiAppShell />
+                                        </PrivateRoute>
+                                    }
+                                >
+                                    <Route path="page/:pageId" element={<KodiAppRuntimePage />} />
+                                </Route>
 
                                 {/* Public Kodi Record Pages */}
                                 <Route path="/kodi/page/:slug/login" element={<KodiLogin />} />
                                 <Route path="/kodi/page/:slug" element={<KodiPage />} />
+                                <Route
+                                    path="/kodi/invitations/accept"
+                                    element={<KodiInviteAccept />}
+                                />
+                                <Route path="/kodi-auth/sign-in" element={<KodiSignIn />} />
+                                <Route
+                                    path="/kodi-auth/first-login"
+                                    element={
+                                        <PrivateRoute>
+                                            <KodiFirstLogin />
+                                        </PrivateRoute>
+                                    }
+                                />
 
                                 {/* Admin Routes */}
                                 <Route

@@ -612,9 +612,17 @@ const createTables = async () => {
             CREATE TABLE IF NOT EXISTS kodi_apps (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 name VARCHAR(255) NOT NULL,
+                label VARCHAR(255),
                 description TEXT,
-                is_active BOOLEAN DEFAULT true,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                status VARCHAR(50) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','inactive')),
+                icon VARCHAR(255),
+                theme_config JSONB DEFAULT '{}'::jsonb,
+                settings JSONB DEFAULT '{}'::jsonb,
+                navigation_mode VARCHAR(50) DEFAULT 'sidebar',
+                landing_behavior VARCHAR(50) DEFAULT 'default_page',
+                default_page_id UUID,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS kodi_pages (
@@ -638,6 +646,7 @@ const createTables = async () => {
                 nav_order INTEGER DEFAULT 0,
                 is_default BOOLEAN DEFAULT false,
                 is_visible BOOLEAN DEFAULT true,
+                role_visibility JSONB DEFAULT '{}'::jsonb,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (app_id, page_id)
             );
@@ -697,10 +706,29 @@ const createTables = async () => {
                 user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 permissions JSONB DEFAULT '{}'::jsonb,
                 role_key VARCHAR(50),
+                status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                invite_token VARCHAR(64),
+                invited_at TIMESTAMP,
+                accepted_at TIMESTAMP,
+                disabled_at TIMESTAMP,
                 assigned_by UUID REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (app_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS kodi_portal_identities (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                password_hash TEXT,
+                otp_hash TEXT,
+                otp_expires_at TIMESTAMP,
+                first_login_required BOOLEAN DEFAULT true,
+                first_login_token VARCHAR(80),
+                first_login_expires_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS kodi_page_users (
@@ -1095,6 +1123,8 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_app_page_mapping_app            ON app_page_mapping(app_id);
             CREATE INDEX IF NOT EXISTS idx_app_page_mapping_page           ON app_page_mapping(page_id);
             CREATE INDEX IF NOT EXISTS idx_kodi_app_users_app              ON kodi_app_users(app_id);
+            CREATE INDEX IF NOT EXISTS idx_kodi_app_users_status           ON kodi_app_users(status);
+            CREATE INDEX IF NOT EXISTS idx_kodi_app_users_invite           ON kodi_app_users(invite_token);
             CREATE INDEX IF NOT EXISTS idx_kodi_audit_entity               ON kodi_audit_logs(entity_type, entity_id);
         `;
 
@@ -1420,7 +1450,24 @@ const runMigrations = async () => {
             "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false;",
             "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true;",
             "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+            "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS role_visibility JSONB DEFAULT '{}'::jsonb;",
             "ALTER TABLE kodi_app_users ADD COLUMN IF NOT EXISTS role_key VARCHAR(50);",
+            "ALTER TABLE kodi_app_users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending';",
+            "ALTER TABLE kodi_app_users ADD COLUMN IF NOT EXISTS invite_token VARCHAR(64);",
+            "ALTER TABLE kodi_app_users ADD COLUMN IF NOT EXISTS invited_at TIMESTAMP;",
+            "ALTER TABLE kodi_app_users ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP;",
+            "ALTER TABLE kodi_app_users ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMP;",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS label VARCHAR(255);",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'draft';",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS icon VARCHAR(255);",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS theme_config JSONB DEFAULT '{}'::jsonb;",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS settings JSONB DEFAULT '{}'::jsonb;",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS navigation_mode VARCHAR(50) DEFAULT 'sidebar';",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS landing_behavior VARCHAR(50) DEFAULT 'default_page';",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS default_page_id UUID;",
+            "ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+            "CREATE TABLE IF NOT EXISTS kodi_portal_identities (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, username VARCHAR(80) UNIQUE NOT NULL, password_hash TEXT, otp_hash TEXT, otp_expires_at TIMESTAMP, first_login_required BOOLEAN DEFAULT true, first_login_token VARCHAR(80), first_login_expires_at TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
+            "CREATE INDEX IF NOT EXISTS idx_kodi_portal_identities_username ON kodi_portal_identities(username);",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;",

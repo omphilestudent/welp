@@ -6,7 +6,10 @@ const { validate } = require('../middleware/validation');
 const kodiController = require('../controllers/kodiController');
 const kodiPages = require('../modules/kodi/kodiPages.controller');
 const kodiPlatform = require('../modules/kodi/kodi.controller');
+const kodiPortal = require('../modules/kodiPortal/kodiPortal.controller');
 const { authenticateKodiPageSession } = require('../modules/kodi/kodiPageSession.middleware');
+const { authenticateOptional } = require('../middleware/auth');
+const { requireKodiFirstLoginComplete } = require('../middleware/kodiPortalAuth');
 
 const router = express.Router();
 
@@ -203,7 +206,13 @@ router.get('/platform/pages/:id/users', authenticate, authorizeAdmin(), kodiPlat
 router.post('/platform/pages/:id/users', authenticate, authorizeAdmin(), kodiPlatform.assignPageUserValidators, kodiPlatform.assignPageUser);
 router.post('/platform/apps', authenticate, authorizeAdmin(), kodiPlatform.createAppValidators, kodiPlatform.createApp);
 router.put('/platform/apps/:id', authenticate, authorizeAdmin(), kodiPlatform.updateAppValidators, kodiPlatform.updateApp);
-router.get('/platform/runtime/:pageId', authenticate, kodiPlatform.getRuntimeValidator, kodiPlatform.runtimeLoader);
+router.get(
+    '/platform/runtime/:pageId',
+    authenticate,
+    requireKodiFirstLoginComplete,
+    kodiPlatform.getRuntimeValidator,
+    kodiPlatform.runtimeLoader
+);
 router.get('/platform/apps/:id/navigation', authenticate, kodiPlatform.appIdValidator, kodiPlatform.getAppNavigation);
 router.get('/platform/apps', authenticate, authorizeAdmin(), kodiPlatform.listApps);
 router.get('/platform/objects', authenticate, authorizeAdmin(), kodiPlatform.listObjects);
@@ -228,51 +237,35 @@ router.get('/platform/leads/:id/opportunities', authenticate, authorizeAdmin(), 
 router.get('/platform/pages/:id/permissions', authenticate, authorizeAdmin(), kodiPlatform.pageIdValidator, kodiPlatform.getPagePermissions);
 router.post('/platform/pages/:id/permissions', authenticate, authorizeAdmin(), kodiPlatform.pagePermissionValidators, kodiPlatform.updatePagePermissions);
 
-// Kodi Portal aliases (admin console)
-router.get('/portal/apps', authenticate, authorizeAdmin(), kodiPlatform.listApps);
-router.post('/portal/apps', authenticate, authorizeAdmin(), kodiPlatform.createAppValidators, kodiPlatform.createApp);
-router.get('/portal/apps/:id', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.getApp);
-router.patch('/portal/apps/:id', authenticate, authorizeAdmin(), kodiPlatform.updateAppValidators, kodiPlatform.updateApp);
-router.post('/portal/apps/:id/activate', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.activateApp);
-router.post('/portal/apps/:id/deactivate', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.deactivateApp);
-router.get('/portal/apps/:id/users', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.listAppUsers);
-router.post('/portal/apps/:id/users', authenticate, authorizeAdmin(), kodiPlatform.assignAppUserValidators, kodiPlatform.assignAppUser);
-router.delete('/portal/apps/:id/users/:userId', authenticate, authorizeAdmin(), kodiPlatform.removeAppUser);
-router.get('/portal/apps/:id/pages', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.listAppPages);
-router.post('/portal/apps/:id/pages', authenticate, authorizeAdmin(), validate([body('pageId').custom((val) => {
-    if (val === undefined || val === null) return false;
-    const str = String(val);
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(str) || /^\d+$/.test(str);
-})]), kodiPlatform.linkAppPage);
-router.patch('/portal/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), validate([
-    param('id').custom((val) => {
-        if (val === undefined || val === null) return false;
-        const str = String(val);
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        return uuidRegex.test(str) || /^\d+$/.test(str);
-    }),
-    param('mappingId').custom((val) => {
-        if (val === undefined || val === null) return false;
-        const str = String(val);
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
-        return uuidRegex.test(str) || /^\d+$/.test(str);
-    })
-]), kodiPlatform.updateAppPage);
-router.delete('/portal/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), validate([
-    param('id').custom((val) => {
-        if (val === undefined || val === null) return false;
-        const str = String(val);
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        return uuidRegex.test(str) || /^\d+$/.test(str);
-    }),
-    param('mappingId').custom((val) => {
-        if (val === undefined || val === null) return false;
-        const str = String(val);
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
-        return uuidRegex.test(str) || /^\d+$/.test(str);
-    })
-]), kodiPlatform.deleteAppPage);
-router.get('/portal/apps/:id/navigation', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.getAppNavigation);
+// Kodi Portal (admin console)
+router.get('/portal/apps', authenticate, authorizeAdmin(), kodiPortal.listApps);
+router.post('/portal/apps', authenticate, authorizeAdmin(), kodiPortal.createAppValidators, kodiPortal.createApp);
+router.get('/portal/apps/:id', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.getApp);
+router.patch('/portal/apps/:id', authenticate, authorizeAdmin(), kodiPortal.updateAppValidators, kodiPortal.updateApp);
+router.post('/portal/apps/:id/activate', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.activateApp);
+router.post('/portal/apps/:id/deactivate', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.deactivateApp);
+router.get('/portal/apps/:id/settings', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.getSettings);
+router.patch('/portal/apps/:id/settings', authenticate, authorizeAdmin(), kodiPortal.settingsValidators, kodiPortal.updateSettings);
+router.get('/portal/apps/:id/users', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.listUsers);
+router.post('/portal/apps/:id/users', authenticate, authorizeAdmin(), kodiPortal.assignUserValidators, kodiPortal.assignUser);
+router.patch('/portal/apps/:id/users/:userId', authenticate, authorizeAdmin(), kodiPortal.updateUserValidators, kodiPortal.updateUser);
+router.patch('/portal/apps/:id/users/:userId/status', authenticate, authorizeAdmin(), kodiPortal.updateUserStatusValidators, kodiPortal.updateUserStatus);
+router.post('/portal/apps/:id/users/:userId/resend-invite', authenticate, authorizeAdmin(), kodiPortal.resendInviteValidators, kodiPortal.resendInvite);
+router.delete('/portal/apps/:id/users/:userId', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.deleteUser);
+router.get('/portal/apps/:id/pages', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.listPages);
+router.get('/portal/pages/activated', authenticate, authorizeAdmin(), kodiPortal.listActivatedPages);
+router.post('/portal/apps/:id/pages', authenticate, authorizeAdmin(), kodiPortal.linkPageValidators, kodiPortal.linkPage);
+router.patch('/portal/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), kodiPortal.updatePageValidators, kodiPortal.updatePage);
+router.delete('/portal/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.deletePage);
+router.post('/portal/apps/:id/pages/reorder', authenticate, authorizeAdmin(), kodiPortal.reorderValidators, kodiPortal.reorderPages);
+router.get(
+    '/portal/apps/:id/navigation',
+    authenticate,
+    requireKodiFirstLoginComplete,
+    kodiPortal.appIdValidator,
+    kodiPortal.getNavigation
+);
+router.post('/portal/invitations/accept', authenticateOptional, kodiPortal.acceptInviteValidators, kodiPortal.acceptInvite);
+router.get('/portal/user/apps', authenticate, requireKodiFirstLoginComplete, kodiPortal.listUserApps);
 
 module.exports = router;

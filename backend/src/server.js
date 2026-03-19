@@ -34,6 +34,7 @@ const flowRuntimeRoutes = require('./routes/flowRuntimeRoutes');
 const adsRoutes = require('./routes/adsRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
 const kodiRoutes = require('./routes/kodiRoutes');
+const kodiAuthRoutes = require('./routes/kodiAuthRoutes');
 const kodiPlatformRoutes = require('./modules/kodi/kodi.routes');
 const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
 const { startScheduler: startMarketingCampaignScheduler } = require('./modules/marketing/marketing.scheduler');
@@ -187,6 +188,7 @@ app.use('/api/ads', adsRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/kodi/platform', kodiPlatformRoutes);
 app.use('/api/kodi', kodiRoutes);
+app.use('/api/kodi-auth', kodiAuthRoutes);
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {

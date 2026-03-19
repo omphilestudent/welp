@@ -60,7 +60,11 @@ api.interceptors.response.use(
             }
             localStorage.removeItem('token');
             sessionStorage.removeItem('token');
-            window.location.href = '/login';
+            if (window.location.pathname.startsWith('/kodi')) {
+                window.location.href = '/kodi-auth/sign-in';
+            } else {
+                window.location.href = '/login';
+            }
         }
 
         return Promise.reject(error);

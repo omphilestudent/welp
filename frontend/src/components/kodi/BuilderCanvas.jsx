@@ -5,148 +5,6 @@ const GRID_COLUMNS = 12;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-const SAMPLE_PREVIEWS = {
-    RecordDetails: {
-        title: 'Record Details',
-        fields: [
-            { label: 'Name', value: 'Ava Thompson' },
-            { label: 'Email', value: 'ava@kodi.app' },
-            { label: 'Status', value: 'Active' },
-            { label: 'Last Touch', value: '2 hours ago' }
-        ]
-    },
-    RelatedList: {
-        title: 'Related List',
-        headers: ['Type', 'Status', 'Owner'],
-        rows: [
-            ['Case', 'Open', 'J. Rivers'],
-            ['Task', 'In Progress', 'T. Patel'],
-            ['Note', 'Logged', 'System']
-        ]
-    },
-    ActivityTimeline: {
-        title: 'Activity Timeline',
-        items: ['Email sent - 10m', 'Call scheduled - 1h', 'Lead converted - 1d']
-    },
-    HighlightsPanel: {
-        title: 'Highlights Panel',
-        pills: ['Open Cases: 4', 'ARR: $48k', 'Health: Good']
-    },
-    DataTable: {
-        title: 'Data Table',
-        headers: ['Account', 'Stage', 'Value'],
-        rows: [
-            ['BlueNova', 'Proposal', '$12k'],
-            ['Futura', 'Qualified', '$7k'],
-            ['Nimbus', 'Discovery', '$4k']
-        ]
-    },
-    CardList: {
-        title: 'Card List',
-        cards: [
-            { title: 'Psychologist Onboard', meta: 'Due in 2 days' },
-            { title: 'Business Review', meta: 'Priority: High' }
-        ]
-    },
-    KeyValueFields: {
-        title: 'Key Value Fields',
-        fields: [
-            { label: 'Industry', value: 'Healthcare' },
-            { label: 'Seats', value: '128' },
-            { label: 'Tier', value: 'Enterprise' }
-        ]
-    },
-    ContactProfile: {
-        title: 'Contact Profile',
-        subtitle: 'Primary decision maker',
-        fields: [
-            { label: 'Name', value: 'Luis Chen' },
-            { label: 'Role', value: 'HR Director' },
-            { label: 'Phone', value: '+1 (555) 221-8844' }
-        ]
-    },
-    SubscriptionOverview: {
-        title: 'Subscription Overview',
-        pills: ['Plan: Growth', 'Renewal: Jul 14', 'Status: Active']
-    },
-    EmployeePanel: {
-        title: 'Employee Panel',
-        fields: [
-            { label: 'Employee', value: 'Sofia Ramos' },
-            { label: 'Role', value: 'People Ops' },
-            { label: 'Status', value: 'Onboarding' }
-        ]
-    },
-    PsychologistProfile: {
-        title: 'Psychologist Profile',
-        fields: [
-            { label: 'Specialty', value: 'Trauma' },
-            { label: 'Availability', value: 'Tue - Thu' },
-            { label: 'Rating', value: '4.9' }
-        ]
-    },
-    BusinessInfoPanel: {
-        title: 'Business Info',
-        fields: [
-            { label: 'Industry', value: 'Fintech' },
-            { label: 'Region', value: 'EMEA' },
-            { label: 'Tier', value: 'Premium' }
-        ]
-    },
-    AccountSummary: {
-        title: 'Account Summary',
-        pills: ['NPS 52', 'Usage up 18%', 'Churn risk: Low']
-    },
-    ApplicationStatusPanel: {
-        title: 'Application Status',
-        steps: ['Lead', 'Qualified', 'Under Review', 'Approved']
-    },
-    LeadSummary: {
-        title: 'Lead Summary',
-        fields: [
-            { label: 'Score', value: '82' },
-            { label: 'Source', value: 'Referral' },
-            { label: 'Stage', value: 'Qualified' }
-        ]
-    },
-    OpportunitySummary: {
-        title: 'Opportunity Summary',
-        fields: [
-            { label: 'Pipeline', value: '$96k' },
-            { label: 'Close Date', value: 'Aug 02' },
-            { label: 'Probability', value: '68%' }
-        ]
-    },
-    ActionButton: {
-        title: 'Primary Action',
-        actions: ['Launch Workflow']
-    },
-    QuickActionsBar: {
-        title: 'Quick Actions',
-        actions: ['Send Email', 'Assign Psychologist', 'Approve']
-    },
-    LinkList: {
-        title: 'Link List',
-        links: ['Open Profile', 'View Subscription', 'Audit Log']
-    },
-    FormPanel: {
-        title: 'Form Panel',
-        fields: ['First name', 'Email', 'Role']
-    },
-    SendEmailButton: {
-        title: 'Send Email',
-        actions: ['Compose']
-    },
-    AssignPsychologistButton: {
-        title: 'Assign Psychologist',
-        actions: ['Assign']
-    },
-    ApproveRejectPanel: {
-        title: 'Approve / Reject',
-        actions: ['Approve', 'Reject']
-    }
-};
-
 const resolvePreviewKey = (component) =>
     component?.component_type
     || component?.componentName
@@ -161,7 +19,8 @@ const BuilderCanvas = ({
     onLayoutChange,
     onComponentDrop,
     onRemoveComponent,
-    previewRole
+    previewRole,
+    previewContext
 }) => {
     const canvasRef = useRef(null);
     const [dragOver, setDragOver] = useState(null);
@@ -239,113 +98,266 @@ const BuilderCanvas = ({
         return roles.includes(previewRole);
     };
 
+    const getRecordValue = (record, field) => {
+        if (!record || !field) return null;
+        return field.split('.').reduce((acc, part) => (acc ? acc[part] : null), record);
+    };
+
+    const formatValue = (value) => {
+        if (value === null || value === undefined) return '—';
+        if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+        return String(value);
+    };
+
+    const resolveRecord = (component) => {
+        const bindingObject = component?.binding?.object;
+        const recordMap = previewContext?.records || {};
+        if (bindingObject && recordMap[bindingObject]) {
+            return recordMap[bindingObject][0] || previewContext?.record || {};
+        }
+        return previewContext?.record || {};
+    };
+
+    const resolveFields = (component, record) => {
+        const bindingField = component?.binding?.field;
+        const bindingObject = component?.binding?.object;
+        const objectList = previewContext?.objects || [];
+        const objectFields = bindingObject
+            ? objectList.find((obj) => obj.name === bindingObject)?.fields || []
+            : previewContext?.object?.fields || [];
+        const propsFields = component?.props?.fields;
+        let fields = [];
+        if (Array.isArray(propsFields) && propsFields.length) {
+            fields = propsFields;
+        } else if (bindingField) {
+            fields = [bindingField];
+        } else {
+            fields = Object.keys(record || {}).filter((key) => key !== 'id').slice(0, 5);
+        }
+        return fields.map((field) => {
+            const fieldMeta = objectFields.find((item) => item.field_name === field);
+            return {
+                label: fieldMeta?.label || fieldMeta?.field_name || field,
+                value: formatValue(getRecordValue(record, field))
+            };
+        });
+    };
+
+    const resolveTable = (component, record) => {
+        const items = component?.props?.items;
+        if (Array.isArray(items) && items.length) {
+            const headers = Object.keys(items[0]).slice(0, 3);
+            const rows = items.slice(0, 4).map((item) => headers.map((header) => formatValue(item[header])));
+            return { headers, rows };
+        }
+        const keys = Object.keys(record || {}).filter((key) => key !== 'id').slice(0, 3);
+        const headers = keys.length ? keys : ['Item', 'Status', 'Owner'];
+        const rows = Array.from({ length: 3 }).map((_, index) =>
+            headers.map((header) => `${formatValue(getRecordValue(record, header))}` || `${header} ${index + 1}`)
+        );
+        return { headers, rows };
+    };
+
     const renderPreview = (component) => {
         const previewKey = resolvePreviewKey(component);
-        const preview = SAMPLE_PREVIEWS[previewKey] || null;
+        const record = resolveRecord(component);
+        const fields = resolveFields(component, record);
+        const bindingObject = component?.binding?.object;
+        const objectList = previewContext?.objects || [];
+        const objectLabel = bindingObject
+            ? (objectList.find((obj) => obj.name === bindingObject)?.label || bindingObject)
+            : (previewContext?.object?.label || previewContext?.object?.name || 'Record');
+        const actions = component?.actions?.length ? component.actions : component?.props?.actions || [];
+        const table = resolveTable(component, record);
 
-        if (!preview) {
-            return (
-                <div className="kodi-builder__preview kodi-builder__preview--placeholder">
-                    <div className="kodi-builder__preview-title">{previewKey || 'Component'} Preview</div>
-                    <div className="kodi-builder__preview-text">Drop in live data bindings to render.</div>
-                </div>
-            );
-        }
-
-        return (
-            <div className="kodi-builder__preview">
-                <div className="kodi-builder__preview-title">{preview.title}</div>
-
-                {preview.fields && (
-                    <div className="kodi-builder__preview-fields">
-                        {preview.fields.map((field) => (
-                            <div key={field.label} className="kodi-builder__preview-field">
-                                <span>{field.label}</span>
-                                <strong>{field.value}</strong>
+        switch (previewKey) {
+            case 'RecordDetails':
+            case 'KeyValueFields':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--record">
+                        <div className="kodi-builder__preview-header">
+                            <div>
+                                <p className="kodi-builder__preview-eyebrow">{objectLabel}</p>
+                                <h4>{component.label || 'Record Details'}</h4>
                             </div>
-                        ))}
-                    </div>
-                )}
-
-                {preview.items && (
-                    <ul className="kodi-builder__preview-list">
-                        {preview.items.map((item) => (
-                            <li key={item}>{item}</li>
-                        ))}
-                    </ul>
-                )}
-
-                {preview.pills && (
-                    <div className="kodi-builder__preview-pills">
-                        {preview.pills.map((pill) => (
-                            <span key={pill}>{pill}</span>
-                        ))}
-                    </div>
-                )}
-
-                {preview.steps && (
-                    <div className="kodi-builder__preview-steps">
-                        {preview.steps.map((step, index) => (
-                            <div key={step} className={`kodi-builder__preview-step ${index === 1 ? 'active' : ''}`}>
-                                {step}
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {preview.headers && preview.rows && (
-                    <div className="kodi-builder__preview-table">
-                        <div className="kodi-builder__preview-table-head">
-                            {preview.headers.map((header) => (
-                                <span key={header}>{header}</span>
+                            <span className="kodi-builder__preview-badge">Live</span>
+                        </div>
+                        <div className="kodi-builder__preview-grid">
+                            {fields.map((field) => (
+                                <div key={field.label} className="kodi-builder__preview-row">
+                                    <span>{field.label}</span>
+                                    <strong>{field.value}</strong>
+                                </div>
                             ))}
                         </div>
-                        {preview.rows.map((row, idx) => (
-                            <div key={`${row[0]}-${idx}`} className="kodi-builder__preview-table-row">
-                                {row.map((cell) => (
-                                    <span key={cell}>{cell}</span>
+                    </div>
+                );
+            case 'HighlightsPanel':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--highlights">
+                        <div className="kodi-builder__preview-header">
+                            <h4>{component.label || 'Highlights'}</h4>
+                            <span className="kodi-builder__preview-pill">Today</span>
+                        </div>
+                        <div className="kodi-builder__preview-pills">
+                            {fields.slice(0, 3).map((field) => (
+                                <span key={field.label}>{field.label}: {field.value}</span>
+                            ))}
+                        </div>
+                        <div className="kodi-builder__preview-actions">
+                            {(actions.length ? actions : ['Send Email', 'Assign', 'Review']).map((action) => (
+                                <button key={action} type="button">{action}</button>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'RelatedList':
+            case 'DataTable':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--table">
+                        <div className="kodi-builder__preview-header">
+                            <h4>{component.label || 'Related Records'}</h4>
+                            <span className="kodi-builder__preview-badge">{table.rows.length} rows</span>
+                        </div>
+                        <div className="kodi-builder__preview-table">
+                            <div className="kodi-builder__preview-table-head">
+                                {table.headers.map((header) => (
+                                    <span key={header}>{header}</span>
                                 ))}
                             </div>
-                        ))}
+                            {table.rows.map((row, idx) => (
+                                <div key={`${row[0]}-${idx}`} className="kodi-builder__preview-table-row">
+                                    {row.map((cell) => (
+                                        <span key={cell}>{cell}</span>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                )}
-
-                {preview.cards && (
-                    <div className="kodi-builder__preview-cards">
-                        {preview.cards.map((card) => (
-                            <div key={card.title} className="kodi-builder__preview-card">
-                                <strong>{card.title}</strong>
-                                <span>{card.meta}</span>
+                );
+            case 'ActivityTimeline':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--timeline">
+                        <div className="kodi-builder__preview-header">
+                            <h4>{component.label || 'Activity Timeline'}</h4>
+                            <span className="kodi-builder__preview-pill">Last 7 days</span>
+                        </div>
+                        <ul className="kodi-builder__preview-timeline">
+                            {(component.props?.items || [
+                                `Updated ${fields[0]?.value || 'record'}`,
+                                `Follow-up scheduled`,
+                                `Note added to account`
+                            ]).map((item) => (
+                                <li key={item}>{item}</li>
+                            ))}
+                        </ul>
+                    </div>
+                );
+            case 'ContactProfile':
+            case 'EmployeePanel':
+            case 'PsychologistProfile':
+            case 'BusinessInfoPanel':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--profile">
+                        <div className="kodi-builder__preview-header">
+                            <h4>{component.label || 'Profile'}</h4>
+                            <span className="kodi-builder__preview-badge">Active</span>
+                        </div>
+                        <div className="kodi-builder__preview-profile">
+                            <div className="kodi-builder__preview-avatar">{(fields[0]?.value || 'A')[0]}</div>
+                            <div>
+                                <strong>{fields[0]?.value || 'Profile Name'}</strong>
+                                <span>{fields[1]?.value || 'Role'}</span>
                             </div>
-                        ))}
+                        </div>
+                        <div className="kodi-builder__preview-grid">
+                            {fields.slice(2, 5).map((field) => (
+                                <div key={field.label} className="kodi-builder__preview-row">
+                                    <span>{field.label}</span>
+                                    <strong>{field.value}</strong>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                )}
-
-                {preview.links && (
-                    <div className="kodi-builder__preview-links">
-                        {preview.links.map((link) => (
-                            <div key={link} className="kodi-builder__preview-link">{link}</div>
-                        ))}
+                );
+            case 'SubscriptionOverview':
+            case 'AccountSummary':
+            case 'LeadSummary':
+            case 'OpportunitySummary':
+            case 'ApplicationStatusPanel':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--summary">
+                        <div className="kodi-builder__preview-header">
+                            <h4>{component.label || 'Summary'}</h4>
+                            <span className="kodi-builder__preview-badge">On Track</span>
+                        </div>
+                        <div className="kodi-builder__preview-pills">
+                            {fields.slice(0, 3).map((field) => (
+                                <span key={field.label}>{field.label}: {field.value}</span>
+                            ))}
+                        </div>
+                        <div className="kodi-builder__preview-actions">
+                            {(actions.length ? actions : ['View', 'Update']).map((action) => (
+                                <button key={action} type="button">{action}</button>
+                            ))}
+                        </div>
                     </div>
-                )}
-
-                {preview.actions && (
-                    <div className="kodi-builder__preview-actions">
-                        {preview.actions.map((action) => (
-                            <button key={action} type="button">{action}</button>
-                        ))}
+                );
+            case 'QuickActionsBar':
+            case 'ActionButton':
+            case 'SendEmailButton':
+            case 'AssignPsychologistButton':
+            case 'ApproveRejectPanel':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--actions">
+                        <div className="kodi-builder__preview-header">
+                            <h4>{component.label || 'Actions'}</h4>
+                            <span className="kodi-builder__preview-pill">Ready</span>
+                        </div>
+                        <div className="kodi-builder__preview-actions">
+                            {(actions.length ? actions : ['Primary Action']).map((action) => (
+                                <button key={action} type="button">{action}</button>
+                            ))}
+                        </div>
                     </div>
-                )}
-
-                {preview.subtitle && (
-                    <div className="kodi-builder__preview-subtitle">{preview.subtitle}</div>
-                )}
-
-                {preview.fields == null && preview.items == null && preview.pills == null && preview.headers == null && preview.cards == null && preview.links == null && preview.actions == null && (
-                    <div className="kodi-builder__preview-text">Preview data is ready.</div>
-                )}
-            </div>
-        );
+                );
+            case 'LinkList':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--links">
+                        <div className="kodi-builder__preview-header">
+                            <h4>{component.label || 'Links'}</h4>
+                        </div>
+                        <div className="kodi-builder__preview-links">
+                            {(component.props?.links || fields.slice(0, 3).map((f) => f.label)).map((link) => (
+                                <div key={link} className="kodi-builder__preview-link">{link}</div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'CardList':
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--cards">
+                        <div className="kodi-builder__preview-header">
+                            <h4>{component.label || 'Cards'}</h4>
+                        </div>
+                        <div className="kodi-builder__preview-cards">
+                            {(component.props?.cards || fields.slice(0, 2)).map((card) => (
+                                <div key={card.title || card.label} className="kodi-builder__preview-card">
+                                    <strong>{card.title || card.label}</strong>
+                                    <span>{card.meta || card.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            default:
+                return (
+                    <div className="kodi-builder__preview kodi-builder__preview--placeholder">
+                        <div className="kodi-builder__preview-title">{component.label || previewKey || 'Component'}</div>
+                        <div className="kodi-builder__preview-text">Bind fields to preview live data.</div>
+                    </div>
+                );
+        }
     };
 
     return (

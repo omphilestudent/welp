@@ -13,6 +13,10 @@ const formatPermissions = (rows) => {
 const normalizeRole = (value) => String(value || '').toLowerCase().trim();
 const ADMIN_ALIASES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
 
+const isAdminRole = (role) => ADMIN_ALIASES.has(normalizeRole(role));
+
+const isTimesPage = (page) => ['record', 'app', 'home'].includes(page?.page_type);
+
 const resolveRole = (role) => {
     const normalized = normalizeRole(role);
     if (ADMIN_ALIASES.has(normalized)) return 'admin';
@@ -31,5 +35,7 @@ const userHasViewAccess = (permissionMap, role) => {
 
 module.exports = {
     formatPermissions,
-    userHasViewAccess
+    userHasViewAccess,
+    isAdminRole,
+    isTimesPage
 };

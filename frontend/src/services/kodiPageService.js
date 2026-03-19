@@ -55,8 +55,8 @@ export const listPagePermissions = async (pageId) =>
     unwrap((await api.get(`/kodi/platform/pages/${pageId}/permissions`)).data);
 export const updatePagePermissions = async (pageId, payload) =>
     unwrap((await api.post(`/kodi/platform/pages/${pageId}/permissions`, payload)).data);
-export const fetchRuntimePage = async (pageId) =>
-    unwrap((await api.get(`/kodi/platform/runtime/${pageId}`)).data);
+export const fetchRuntimePage = async (pageId, { appId } = {}) =>
+    unwrap((await api.get(`/kodi/platform/runtime/${pageId}`, { params: appId ? { appId } : {} })).data);
 export const listAppUsers = async (appId) =>
     unwrap((await api.get(`/kodi/platform/apps/${appId}/users`)).data);
 export const assignAppUser = async (appId, payload) =>

@@ -6,9 +6,9 @@ import {
     activatePlatformPage,
     createPlatformPage,
     linkPlatformPage,
-    listPlatformApps,
     listPlatformPages
 } from '../../services/kodiPageService';
+import { listPortalApps } from '../../services/kodiPortalService';
 import './KodiTimes.css';
 
 const PAGE_TYPES = [
@@ -58,7 +58,7 @@ const KodiTimes = () => {
     const fetchApps = async () => {
         setLoadingApps(true);
         try {
-            const data = await listPlatformApps();
+            const data = await listPortalApps();
             setApps(data);
         } catch (error) {
             toast.error('Cannot load Kodi apps');

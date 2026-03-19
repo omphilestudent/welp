@@ -375,3 +375,226 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
+
+/* New portal screens */
+.kodi-portal-screen {
+    padding: 28px;
+    display: grid;
+    gap: 20px;
+}
+
+.kodi-portal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.kodi-portal-header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.kodi-portal-eyebrow {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.kodi-portal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.kodi-portal-card {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.kodi-portal-card-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.kodi-portal-card-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.kodi-portal-table {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.kodi-portal-table__row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 0.6fr 0.6fr 0.6fr 2fr 1fr;
+    gap: 12px;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.kodi-portal-table__row.user {
+    grid-template-columns: 1.5fr 1fr 0.8fr 1fr;
+}
+
+.kodi-portal-table__row.header {
+    font-weight: 700;
+    color: #475569;
+}
+
+.kodi-portal-table__actions {
+    display: flex;
+    gap: 8px;
+}
+
+.kodi-portal-empty {
+    color: #94a3b8;
+}
+
+.kodi-portal-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.kodi-portal-modal__content {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    width: min(520px, 90vw);
+    display: grid;
+    gap: 12px;
+}
+
+.kodi-portal-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kodi-portal-form {
+    display: grid;
+    gap: 12px;
+}
+
+.kodi-portal-form__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.kodi-portal-form input,
+.kodi-portal-form textarea,
+.kodi-portal-form select {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #d8dde6;
+}
+
+.kodi-portal-checkboxes {
+    display: flex;
+    gap: 12px;
+}
+
+.kodi-portal-summary-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    border: 1px solid #e2e8f0;
+    display: grid;
+    gap: 10px;
+}
+
+.kodi-portal-summary-meta {
+    display: flex;
+    gap: 14px;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.kodi-portal-nav-preview {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.kodi-portal-role-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    font-size: 0.72rem;
+}
+
+.status-pill.pending {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+}
+
+.status-pill.active {
+    background: #dcfce7;
+    color: #166534;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+}
+
+.status-pill.disabled {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+}
+
+.kodi-auth {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at top, #e2e8f0, #f8fafc);
+}
+
+.kodi-auth__card {
+    background: #ffffff;
+    padding: 28px;
+    border-radius: 16px;
+    width: min(420px, 90vw);
+    display: grid;
+    gap: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+}
+
+.kodi-auth__card h1 {
+    margin: 0 0 8px;
+}
+
+.kodi-auth__card input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #d8dde6;
+}

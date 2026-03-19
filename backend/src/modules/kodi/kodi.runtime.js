@@ -1,10 +1,7 @@
 const service = require('./kodi.service');
 const perms = require('./kodi.permissions');
-
-const normalizeRole = (value) => String(value || '').toLowerCase().trim();
-const ADMIN_ALIASES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
-
-const isAdminRole = (role) => ADMIN_ALIASES.has(normalizeRole(role));
+const portalService = require('../kodiPortal/kodiPortal.service');
+const portalPerms = require('../kodiPortal/kodiPortal.permissions');
 
 const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
     const page = await service.getPageById(pageId);
@@ -19,22 +16,35 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
     const appContextId = appId || page.linked_app_id;
     const app = appContextId ? await service.getAppById(appContextId) : null;
 
-    if (appId) {
-        const linkedPages = await service.listAppPages(appId);
-        const isLinked = linkedPages.some((row) => String(row.page_id) === String(pageId));
-        if (!isLinked) {
+    let effectiveRole = role;
+    const isAdmin = perms.isAdminRole(role);
+    const isBuilderManagedPage = perms.isTimesPage(page);
+    // Admins always bypass app membership for Times (builder-managed) pages.
+    const adminBypassMembership = isAdmin && isBuilderManagedPage;
+
+    if (appId && !adminBypassMembership) {
+        const linkedPages = await portalService.listPages(appId);
+        const mapping = linkedPages.find((row) => String(row.page_id) === String(pageId));
+        if (!mapping) {
             throw new Error('Access denied');
         }
-        if (!isAdminRole(role)) {
-            const appUsers = await service.listAppUsers(appId);
-            const isMember = appUsers.some((row) => String(row.user_id) === String(userId));
-            if (!isMember) {
+        if (app && app.status !== 'active' && !isAdmin) {
+            throw new Error('Access denied');
+        }
+        const membership = await portalService.getEffectiveRuntimeRole({ appId, userId, globalRole: role });
+        if (!membership) {
+            throw new Error('Access denied');
+        }
+        effectiveRole = membership;
+        if (mapping.role_visibility) {
+            const allowed = mapping.role_visibility?.[portalPerms.normalizeRole(effectiveRole)];
+            if (allowed === false) {
                 throw new Error('Access denied');
             }
         }
     }
 
-    const hasView = perms.userHasViewAccess(permissionMap, role);
+    const hasView = perms.userHasViewAccess(permissionMap, effectiveRole);
     if (!hasView) {
         throw new Error('Access denied');
     }
@@ -56,6 +66,7 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
         permissions: permissionMap,
         registry: componentRegistry,
         objects,
+        effectiveRole,
         fields: objects.reduce((acc, obj) => {
             acc[obj.name] = obj.fields || [];
             return acc;
