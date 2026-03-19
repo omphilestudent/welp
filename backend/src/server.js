@@ -17,6 +17,7 @@ const userRoutes = require('./routes/userRoutes');
 const psychologistRoutes = require('./routes/psychologistRoutes');
 const pricingRoutes = require('./routes/pricingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const adminController = require('./controllers/adminController');
 const marketingAdminRoutes = require('./modules/marketing/marketing.routes');
 const { authenticate } = require('./middleware/auth');
 const { authorizeAdmin } = require('./middleware/adminAuth');
@@ -177,6 +178,9 @@ app.use('/api/admin/flows', adminFlowRoutes);
 app.use('/api/admin/tickets', adminTicketRoutes);
 app.use('/api/flows', flowRuntimeRoutes);
 app.use('/api/admin', adminRoutes);
+// Explicit Welp staff routes (in case adminRoutes not updated in deployment)
+app.get('/api/admin/welp-staff', authenticate, authorizeAdmin(), adminController.listWelpStaff);
+app.post('/api/admin/welp-staff', authenticate, authorizeAdmin(), adminController.upsertWelpStaff);
 app.use('/api/admin/marketing', authenticate, authorizeAdmin(), marketingAdminRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/hr', hrRoutes);
