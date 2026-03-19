@@ -833,7 +833,7 @@ const KodiBuilder = () => {
                                 <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
                         </select>
-                            <button className="btn-icon" onClick={openAddPageModal} title="Create new page">
+                        <button className="btn-icon" onClick={openAddPageModal} title="Create new page">
                             <span>+</span>
                         </button>
                     </div>
@@ -1033,17 +1033,17 @@ const KodiBuilder = () => {
 
                                             <div className="row-columns">
                                                 {row.columns.map((col, colIndex) => (
-                                            <div
-                                                key={col.id || colIndex}
-                                                className={`builder-column ${dropTarget === `${rowIndex}-${colIndex}` ? 'drop-active' : ''}`}
-                                                style={{ width: `${(col.width / 12) * 100}%` }}
-                                                onDragOver={(e) => {
-                                                    e.preventDefault();
-                                                    handleColumnDragEnter(rowIndex, colIndex, e);
-                                                }}
-                                                onDragLeave={handleColumnDragLeave}
-                                                onDrop={(e) => handleColumnDrop(rowIndex, colIndex, e)}
-                                            >
+                                                    <div
+                                                        key={col.id || colIndex}
+                                                        className={`builder-column ${dropTarget === `${rowIndex}-${colIndex}` ? 'drop-active' : ''}`}
+                                                        style={{ width: `${(col.width / 12) * 100}%` }}
+                                                        onDragOver={(e) => {
+                                                            e.preventDefault();
+                                                            handleColumnDragEnter(rowIndex, colIndex, e);
+                                                        }}
+                                                        onDragLeave={handleColumnDragLeave}
+                                                        onDrop={(e) => handleColumnDrop(rowIndex, colIndex, e)}
+                                                    >
                                                         <div className="column-header">
                                                             <span className="column-width">{col.width}/12</span>
                                                             <button
@@ -1062,14 +1062,14 @@ const KodiBuilder = () => {
                                                                 </div>
                                                             ) : (
                                                                 col.components.map((comp, compIndex) => (
-                                                        <div
-                                                            key={comp.instanceId || compIndex}
-                                                            className={`component-preview ${selectedComponent?.instanceId === comp.instanceId ? 'selected' : ''}`}
-                                                            draggable
-                                                            onDragStart={(e) => handleComponentDragStart(e, rowIndex, colIndex, compIndex)}
-                                                            onDragEnd={() => setIsDragging(false)}
-                                                            onClick={() => selectComponent(rowIndex, colIndex, compIndex, comp)}
-                                                        >
+                                                                    <div
+                                                                        key={comp.instanceId || compIndex}
+                                                                        className={`component-preview ${selectedComponent?.instanceId === comp.instanceId ? 'selected' : ''}`}
+                                                                        draggable
+                                                                        onDragStart={(e) => handleComponentDragStart(e, rowIndex, colIndex, compIndex)}
+                                                                        onDragEnd={() => setIsDragging(false)}
+                                                                        onClick={() => selectComponent(rowIndex, colIndex, compIndex, comp)}
+                                                                    >
                                                                         <div className="preview-header">
                                                                             <span className="preview-name">{getComponentLabel(comp)}</span>
                                                                             {selectedComponent?.instanceId === comp.instanceId && (

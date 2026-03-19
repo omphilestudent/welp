@@ -4,6 +4,7 @@ const AssignUserModal = ({ open, onClose, onSubmit }) => {
     const [email, setEmail] = useState('');
     const [roleKey, setRoleKey] = useState('employee');
     const [permissions, setPermissions] = useState({ canView: true, canEdit: false, canUse: false });
+    const [submitting, setSubmitting] = useState(false);
 
     if (!open) return null;
 
@@ -21,10 +22,8 @@ const AssignUserModal = ({ open, onClose, onSubmit }) => {
                 <label>
                     Role
                     <select value={roleKey} onChange={(e) => setRoleKey(e.target.value)}>
-                        <option value="admin">admin</option>
-                        <option value="employee">employee</option>
-                        <option value="business_user">business_user</option>
-                        <option value="psychologist">psychologist</option>
+                        <option value="employee">Internal employee</option>
+                        <option value="business_user">External user</option>
                     </select>
                 </label>
                 <div className="kodi-portal-checkboxes">
@@ -55,10 +54,18 @@ const AssignUserModal = ({ open, onClose, onSubmit }) => {
                 </div>
                 <button
                     className="btn-primary"
-                    onClick={() => onSubmit({ email, roleKey, permissions })}
-                    disabled={!email.trim()}
+                    onClick={async () => {
+                        if (!email.trim() || submitting) return;
+                        setSubmitting(true);
+                        try {
+                            await onSubmit({ email, roleKey, permissions });
+                        } finally {
+                            setSubmitting(false);
+                        }
+                    }}
+                    disabled={!email.trim() || submitting}
                 >
-                    Send invite
+                    {submitting ? 'Sending…' : 'Send invite'}
                 </button>
             </div>
         </div>

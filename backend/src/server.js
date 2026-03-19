@@ -36,6 +36,7 @@ const ticketRoutes = require('./routes/ticketRoutes');
 const kodiRoutes = require('./routes/kodiRoutes');
 const kodiAuthRoutes = require('./routes/kodiAuthRoutes');
 const kodiPlatformRoutes = require('./modules/kodi/kodi.routes');
+const { getEmailProviderStatus } = require('./utils/emailService');
 const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
 const { startScheduler: startMarketingCampaignScheduler } = require('./modules/marketing/marketing.scheduler');
 const { initEmailMarketingTables, startEmailCampaignScheduler } = require('./services/emailMarketingService');
@@ -189,6 +190,9 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/kodi/platform', kodiPlatformRoutes);
 app.use('/api/kodi', kodiRoutes);
 app.use('/api/kodi-auth', kodiAuthRoutes);
+app.get('/api/email/health', (_req, res) => {
+    return res.json({ success: true, data: getEmailProviderStatus() });
+});
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {

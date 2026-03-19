@@ -37,6 +37,9 @@ const AppUsers = () => {
     }, [appId]);
 
     const handleAssign = async (payload) => {
+        const slowToastId = setTimeout(() => {
+            toast.loading('Assigning user… this is taking longer than usual.', { id: 'assign-user-slow' });
+        }, 15000);
         try {
             await assignPortalUser(appId, payload);
             toast.success('Invitation sent');
@@ -44,6 +47,9 @@ const AppUsers = () => {
             load();
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to assign user');
+        } finally {
+            clearTimeout(slowToastId);
+            toast.dismiss('assign-user-slow');
         }
     };
 

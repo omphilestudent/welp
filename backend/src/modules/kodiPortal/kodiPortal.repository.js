@@ -77,6 +77,7 @@ const listAppUsers = async (appId) => {
          FROM kodi_app_users au
          JOIN users u ON u.id = au.user_id
          WHERE au.app_id = $1
+           AND u.role IN ('admin', 'super_admin', 'hr_admin')
          ORDER BY au.created_at DESC`,
         [appId]
     );

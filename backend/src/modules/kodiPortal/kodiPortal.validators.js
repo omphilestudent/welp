@@ -39,7 +39,7 @@ const settingsValidators = validate([
 const assignUserValidators = validate([
     param('id').custom(isUuid),
     body('email').isEmail().normalizeEmail(),
-    body('roleKey').isIn(['admin', 'employee', 'business_user', 'psychologist']),
+    body('roleKey').isIn(['employee', 'business_user']),
     body('permissions').optional().isObject(),
     body('permissions.canView').optional().isBoolean(),
     body('permissions.canEdit').optional().isBoolean(),
@@ -49,7 +49,7 @@ const assignUserValidators = validate([
 const updateUserValidators = validate([
     param('id').custom(isUuid),
     param('userId').custom(isUuid),
-    body('roleKey').optional().isIn(['admin', 'employee', 'business_user', 'psychologist']),
+    body('roleKey').optional().isIn(['employee', 'business_user']),
     body('permissions').optional().isObject(),
     body('permissions.canView').optional().isBoolean(),
     body('permissions.canEdit').optional().isBoolean(),

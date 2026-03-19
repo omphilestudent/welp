@@ -510,6 +510,212 @@
     grid-template-columns: 1.5fr 1fr 0.8fr 1fr;
 }
 
+.kodi-portal-users-table .kodi-portal-table__row.user.expanded,
+.kodi-portal-users-table .kodi-portal-table__row.header.user.expanded {
+    grid-template-columns: 2.4fr 1.1fr 1.1fr 1.1fr 1.2fr 1fr;
+    gap: 16px;
+}
+
+.kodi-portal-users-table .kodi-portal-table__row.user.expanded {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
+}
+
+.kodi-portal-users-table .kodi-portal-table__row.user.expanded:hover {
+    border-color: #c7d2fe;
+    box-shadow: 0 16px 28px rgba(37, 99, 235, 0.12);
+}
+
+.kodi-portal-user-cell {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.kodi-portal-user-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: #e0e7ff;
+    color: #1e3a8a;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+.kodi-portal-user-avatar::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 18px;
+    border: 1px dashed rgba(99, 102, 241, 0.25);
+    pointer-events: none;
+}
+
+.kodi-portal-user-cell {
+    position: relative;
+}
+
+.kodi-portal-user-name {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.kodi-portal-user-email {
+    font-size: 0.85rem;
+    color: #475569;
+    margin-top: 2px;
+}
+
+.kodi-portal-user-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 6px;
+}
+
+.kodi-portal-user-role {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kodi-portal-user-role select {
+    background: #fff;
+    border: 1px solid #cbd5f5;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.kodi-portal-user-role select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.kodi-portal-role-pill {
+    align-self: flex-start;
+    background: #eef2ff;
+    color: #3730a3;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.kodi-portal-user-status {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kodi-portal-user-status .status-pill {
+    align-self: flex-start;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.kodi-portal-user-invite,
+.kodi-portal-user-perms,
+.kodi-portal-user-status {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.kodi-portal-user-invite {
+    font-size: 0.8rem;
+    color: #475569;
+}
+
+.kodi-portal-user-perms {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.kodi-portal-perm-row span:first-child {
+    font-weight: 600;
+    color: #475569;
+}
+
+.kodi-portal-perm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #475569;
+}
+
+.pill-good,
+.pill-muted {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.kodi-portal-table__actions .btn-text {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.kodi-portal-table__actions .btn-text.danger {
+    border-color: #fecaca;
+    color: #b91c1c;
+    background: #fff;
+}
+
+.kodi-portal-table__actions .btn-text.danger:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
+.pill-good {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.pill-muted {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+@media (max-width: 980px) {
+    .kodi-portal-users-table .kodi-portal-table__row.user.expanded,
+    .kodi-portal-users-table .kodi-portal-table__row.header.user.expanded {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .kodi-portal-users-table .kodi-portal-table__row.header.user.expanded {
+        display: none;
+    }
+    .kodi-portal-user-role,
+    .kodi-portal-user-status,
+    .kodi-portal-user-invite,
+    .kodi-portal-user-perms {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px;
+    }
+    .kodi-portal-table__actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
+
 .kodi-portal-table__row.header {
     font-weight: 700;
     color: #475569;
@@ -546,6 +752,11 @@
     gap: 12px;
     max-height: 90vh;
     overflow: auto;
+}
+
+.kodi-portal-modal__content .btn-primary[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .kodi-portal-modal__content label {

@@ -139,25 +139,24 @@ const assignUser = async (req, res) => {
             return res.status(404).json({ success: false, error: 'App not found' });
         }
         let user = await repository.query(
-            `SELECT id, email, display_name
+            `SELECT id, email, display_name, role
              FROM users
              WHERE LOWER(email) = $1`,
             [String(req.body.email || '').trim().toLowerCase()]
         );
+        if (user.rows[0] && !['admin', 'super_admin', 'hr_admin'].includes(user.rows[0].role)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Client accounts cannot be assigned to Kodi admin apps.'
+            });
+        }
         if (!user.rows[0]) {
             const email = String(req.body.email || '').trim().toLowerCase();
             if (!email) {
                 return res.status(400).json({ success: false, error: 'Email is required' });
             }
             const passwordHash = await bcrypt.hash(Math.random().toString(36).slice(2), 10);
-            const roleKey = String(req.body.roleKey || 'employee').toLowerCase();
-            const roleMap = {
-                admin: 'admin',
-                employee: 'employee',
-                business_user: 'business',
-                psychologist: 'psychologist'
-            };
-            const role = roleMap[roleKey] || 'employee';
+            const role = 'admin';
             const displayName = email.split('@')[0] || 'Kodi User';
 
             const hasIsActive = await repository.query(

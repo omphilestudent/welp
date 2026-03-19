@@ -1,8 +1,21 @@
 
 const nodemailer = require('nodemailer');
-require('dotenv').config();
-const { getAudiencePricing } = require('../services/pricingService');
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+let sendgridMail = null;
+const baseEnvPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: baseEnvPath });
+const sendgridEnvPath = path.resolve(process.cwd(), 'sendgrid.env');
+if (fs.existsSync(sendgridEnvPath)) {
+    dotenv.config({ path: sendgridEnvPath, override: false });
+}
+let getAudiencePricing = null;
 
+
+const isSendgridConfigured = () => {
+    return process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY !== '';
+};
 
 const isEmailConfigured = () => {
     return process.env.EMAIL_USER &&
@@ -11,9 +24,25 @@ const isEmailConfigured = () => {
         process.env.EMAIL_PASSWORD !== '';
 };
 
+const isProviderSendgrid = () => {
+    return String(process.env.EMAIL_PROVIDER || '').toLowerCase() === 'sendgrid';
+};
+
 
 let transporter = null;
-if (isEmailConfigured()) {
+if (isProviderSendgrid() && isSendgridConfigured()) {
+    try {
+        sendgridMail = require('@sendgrid/mail');
+        sendgridMail.setApiKey(process.env.SENDGRID_API_KEY);
+        if (String(process.env.SENDGRID_DATA_RESIDENCY || '').toLowerCase() === 'eu') {
+            sendgridMail.setDataResidency('eu');
+        }
+        console.log('✅ SendGrid email provider configured');
+    } catch (error) {
+        console.log('⚠️ Failed to initialize SendGrid:', error.message);
+        sendgridMail = null;
+    }
+} else if (isEmailConfigured()) {
     try {
         transporter = nodemailer.createTransport({
             host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -23,6 +52,9 @@ if (isEmailConfigured()) {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASSWORD
             },
+            ...(process.env.EMAIL_FORCE_IPV4 === 'true'
+                ? { family: 4 }
+                : {}),
             tls: {
                 rejectUnauthorized: false
             }
@@ -126,6 +158,9 @@ const detectBusinessTier = (plan) => {
 
 const buildBusinessPricingOverview = async (countryCode = 'ZA') => {
     try {
+        if (!getAudiencePricing) {
+            ({ getAudiencePricing } = require('../services/pricingService'));
+        }
         const result = await getAudiencePricing('business', { country: countryCode });
         if (!result || !Array.isArray(result.plans) || !result.plans.length) {
             throw new Error('No pricing catalog found for business audience');
@@ -573,7 +608,31 @@ const sendKYCRejectionEmail = async (email, companyName, reason) => {
     }
 };
 
+const getEmailProviderStatus = () => ({
+    provider: sendgridMail ? 'sendgrid' : transporter ? 'smtp' : 'none',
+    sendgridConfigured: Boolean(sendgridMail),
+    smtpConfigured: Boolean(transporter),
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER || null
+});
+
 const sendEmail = async ({ to, subject, html, text }) => {
+    if (sendgridMail) {
+        try {
+            const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+            await sendgridMail.send({
+                to,
+                from,
+                subject,
+                text,
+                html
+            });
+            return { success: true, provider: 'sendgrid' };
+        } catch (error) {
+            console.error('❌ Failed to send SendGrid email:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
     if (!transporter) {
         console.log('\n=== EMAIL NOTIFICATION (DEV MODE) ===');
         console.log(`To: ${to}`);
@@ -1068,6 +1127,7 @@ module.exports = {
     sendKYCApprovalEmail,
     sendKYCRejectionEmail,
     sendEmail,
+    getEmailProviderStatus,
     sendMarketingEmail,
     sendSubscriptionCancellationEmail,
     sendApplicationStatusEmail,
