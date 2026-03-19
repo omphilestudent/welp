@@ -27,6 +27,7 @@ const logAudit = async ({ entityType, entityId, action, userId, notes }) => {
 const buildInviteToken = () => crypto.randomBytes(16).toString('hex');
 const getBaseUrl = () => process.env.FRONTEND_URL || process.env.SITE_URL || 'https://welphub.onrender.com';
 const buildOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
+const OTP_TTL_MINUTES = Number(process.env.KODI_OTP_TTL_MINUTES || 30);
 
 const buildUsername = async (email) => {
     const base = String(email || '').split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase() || 'kodiuser';
@@ -489,6 +490,19 @@ const resendInvite = async ({ appId, user, roleKey, baseUrl }) => {
         username: identity?.username,
         otp
     });
+    if (email?.success === false || email?.devMode) {
+        const errorMessage = email?.error || (email?.devMode ? 'Email service not configured' : 'Email delivery failed');
+        await logEmailDelivery({
+            triggerKey: 'kodi_invite_resend',
+            recipientEmail: user.email,
+            recipientUserId: user.id,
+            subject: `Invitation to ${app.label || app.name}`,
+            status: 'failed',
+            errorMessage,
+            metadata: { appId, inviteToken: token }
+        });
+        throw new Error(errorMessage);
+    }
     await logEmailDelivery({
         triggerKey: 'kodi_invite_resend',
         recipientEmail: user.email,
@@ -543,8 +557,19 @@ const acceptInvite = async ({ token, userId }) => {
 const listPages = async (appId) => repository.listAppPages(appId);
 const listActivatedPages = async () => repository.listActivatedPages();
 
+const resolvePageId = async (pageId) => {
+    if (isUuid(pageId)) return String(pageId);
+    if (/^\d+$/.test(String(pageId))) {
+        const indexed = await repository.getActivatedPageByIndex(Number(pageId));
+        return indexed?.id || null;
+    }
+    return null;
+};
+
 const linkPage = async ({ appId, pageId, navLabel, navOrder, isDefault, isVisible, roleVisibility }) => {
-    const page = await repository.getPageById(pageId);
+    const resolvedPageId = await resolvePageId(pageId);
+    if (!resolvedPageId) throw new Error('Page not found');
+    const page = await repository.getPageById(resolvedPageId);
     if (!page) throw new Error('Page not found');
     if (page.status !== 'activated') throw new Error('Only activated pages can be linked to apps');
     const mappings = await repository.listAppPages(appId);
@@ -565,7 +590,7 @@ const linkPage = async ({ appId, pageId, navLabel, navOrder, isDefault, isVisibl
         }
         const mapping = await repository.addAppPageMapping({
             appId,
-            pageId,
+            pageId: resolvedPageId,
             navLabel: navLabel || page.label,
             navOrder: order,
             isDefault: finalDefault,
@@ -573,7 +598,7 @@ const linkPage = async ({ appId, pageId, navLabel, navOrder, isDefault, isVisibl
             roleVisibility
         });
         if (finalDefault) {
-            await repository.updateApp({ appId, updates: { default_page_id: pageId } });
+            await repository.updateApp({ appId, updates: { default_page_id: resolvedPageId } });
         }
         await ensureDefaultPageConsistency(appId);
         await repository.query('COMMIT');

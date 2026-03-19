@@ -250,6 +250,19 @@ const listActivatedPages = async () => {
     return result.rows;
 };
 
+const getActivatedPageByIndex = async (index) => {
+    if (!Number.isFinite(Number(index)) || Number(index) <= 0) return null;
+    const result = await query(
+        `SELECT id, label, page_type, status
+         FROM kodi_pages
+         WHERE status = 'activated'
+         ORDER BY created_at DESC
+         OFFSET $1 LIMIT 1`,
+        [Number(index) - 1]
+    );
+    return result.rows[0] || null;
+};
+
 const getPageById = async (pageId) => {
     const result = await query(
         `SELECT *
@@ -348,6 +361,7 @@ module.exports = {
     reorderAppPages,
     listActivatedPages,
     getPageById,
+    getActivatedPageByIndex,
     listAppMembershipsForUser
     ,getIdentityByUsername
     ,getIdentityByUserId

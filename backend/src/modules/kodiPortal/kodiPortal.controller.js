@@ -309,6 +309,10 @@ const listActivatedPages = async (_req, res) => {
 
 const linkPage = async (req, res) => {
     try {
+        console.log('Kodi Portal linkPage payload:', {
+            appId: req.params.id,
+            body: req.body
+        });
         const mapping = await service.linkPage({
             appId: req.params.id,
             pageId: req.body.pageId,
@@ -327,6 +331,11 @@ const linkPage = async (req, res) => {
 
 const updatePage = async (req, res) => {
     try {
+        console.log('Kodi Portal updatePage payload:', {
+            appId: req.params.id,
+            mappingId: req.params.mappingId,
+            body: req.body
+        });
         const mapping = await service.updatePage({
             appId: req.params.id,
             mappingId: req.params.mappingId,

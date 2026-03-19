@@ -83,7 +83,7 @@ const linkPageValidators = validate([
 
 const updatePageValidators = validate([
     param('id').custom(isUuid),
-    param('mappingId').custom(isUuid),
+    param('mappingId').custom(isUuidOrInt),
     body('navLabel').optional().trim(),
     body('navOrder').optional().isInt({ min: 1 }),
     body('isDefault').optional().isBoolean(),
