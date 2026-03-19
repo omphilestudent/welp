@@ -634,6 +634,11 @@ const createTables = async () => {
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 app_id UUID REFERENCES kodi_apps(id) ON DELETE CASCADE,
                 page_id UUID REFERENCES kodi_pages(id) ON DELETE CASCADE,
+                nav_label VARCHAR(255),
+                nav_order INTEGER DEFAULT 0,
+                is_default BOOLEAN DEFAULT false,
+                is_visible BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (app_id, page_id)
             );
 
@@ -691,6 +696,7 @@ const createTables = async () => {
                 app_id UUID NOT NULL REFERENCES kodi_apps(id) ON DELETE CASCADE,
                 user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 permissions JSONB DEFAULT '{}'::jsonb,
+                role_key VARCHAR(50),
                 assigned_by UUID REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1087,6 +1093,7 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_kodi_pages_status                ON kodi_pages(status);
             CREATE INDEX IF NOT EXISTS idx_kodi_pages_app                  ON kodi_pages(linked_app_id);
             CREATE INDEX IF NOT EXISTS idx_app_page_mapping_app            ON app_page_mapping(app_id);
+            CREATE INDEX IF NOT EXISTS idx_app_page_mapping_page           ON app_page_mapping(page_id);
             CREATE INDEX IF NOT EXISTS idx_kodi_app_users_app              ON kodi_app_users(app_id);
             CREATE INDEX IF NOT EXISTS idx_kodi_audit_entity               ON kodi_audit_logs(entity_type, entity_id);
         `;
@@ -1408,6 +1415,12 @@ const runMigrations = async () => {
             "ALTER TABLE leads ADD COLUMN IF NOT EXISTS source VARCHAR(120);",
             "ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS owner VARCHAR(120);",
             "ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS value NUMERIC;",
+            "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS nav_label VARCHAR(255);",
+            "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS nav_order INTEGER DEFAULT 0;",
+            "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false;",
+            "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true;",
+            "ALTER TABLE app_page_mapping ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+            "ALTER TABLE kodi_app_users ADD COLUMN IF NOT EXISTS role_key VARCHAR(50);",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;",

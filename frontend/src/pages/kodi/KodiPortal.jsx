@@ -68,6 +68,7 @@ const KodiPortal = () => {
         open: false,
         app: null,
         email: '',
+        roleKey: 'employee',
         permissions: { canView: true, canEdit: false, canUse: false },
         assigning: false
     });
@@ -183,7 +184,7 @@ const KodiPortal = () => {
 
     const availablePagesForApp = (app) => {
         const linkedIds = new Set((app.linked_pages || []).map((page) => page.id));
-        return pages.filter((page) => !linkedIds.has(page.id));
+        return pages.filter((page) => !linkedIds.has(page.id) && page.status === 'activated');
     };
 
     const handleCreateApp = async (event) => {
@@ -270,6 +271,7 @@ const KodiPortal = () => {
             open: true,
             app,
             email: '',
+            roleKey: 'employee',
             permissions: { canView: true, canEdit: false, canUse: false },
             assigning: false
         });
@@ -301,6 +303,7 @@ const KodiPortal = () => {
         try {
             await assignAppUser(assignUserModal.app.id, {
                 email: assignUserModal.email.trim(),
+                roleKey: assignUserModal.roleKey,
                 permissions: assignUserModal.permissions
             });
             toast.success('User assigned to app');
@@ -308,6 +311,7 @@ const KodiPortal = () => {
                 open: false,
                 app: null,
                 email: '',
+                roleKey: 'employee',
                 permissions: { canView: true, canEdit: false, canUse: false },
                 assigning: false
             });
@@ -556,7 +560,7 @@ const KodiPortal = () => {
                                         <div key={user.id} className="kodi-portal__assigned-row">
                                             <div>
                                                 <strong>{user.display_name || user.email}</strong>
-                                                <span>{user.role || 'role not set'}</span>
+                                                <span>{user.role_key || user.role || 'role not set'}</span>
                                             </div>
                                             <span className="kodi-portal__status-chip">Invite sent</span>
                                         </div>
@@ -893,6 +897,7 @@ const KodiPortal = () => {
                                         open: false,
                                         app: null,
                                         email: '',
+                                        roleKey: 'employee',
                                         permissions: { canView: true, canEdit: false, canUse: false },
                                         assigning: false
                                     })
@@ -910,6 +915,21 @@ const KodiPortal = () => {
                                     onChange={(event) => setAssignUserModal((prev) => ({ ...prev, email: event.target.value }))}
                                     placeholder="user@example.com"
                                 />
+                            </label>
+                            <label>
+                                App role
+                                <select
+                                    value={assignUserModal.roleKey}
+                                    onChange={(event) =>
+                                        setAssignUserModal((prev) => ({ ...prev, roleKey: event.target.value }))
+                                    }
+                                >
+                                    {PLATFORM_ROLES.map((role) => (
+                                        <option key={role} value={role}>
+                                            {role}
+                                        </option>
+                                    ))}
+                                </select>
                             </label>
                             <div className="kodi-portal__checkbox-group">
                                 <label>

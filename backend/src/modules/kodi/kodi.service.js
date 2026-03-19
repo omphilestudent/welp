@@ -212,13 +212,49 @@ const activatePage = async ({ pageId }) => {
     }
 };
 
-const linkPageToApp = async ({ pageId, appId }) => {
+const getNextNavOrder = async (appId) => {
+    const result = await database.query(
+        `SELECT COALESCE(MAX(nav_order), 0) AS max_order
+         FROM app_page_mapping
+         WHERE app_id = $1`,
+        [appId]
+    );
+    return Number(result.rows[0]?.max_order || 0) + 1;
+};
+
+const linkPageToApp = async ({ pageId, appId, navLabel, navOrder, isDefault, isVisible }) => {
     try {
+        const page = await getPageById(pageId);
+        if (!page) throw new Error('Page not found');
+        if (page.status !== 'activated') {
+            throw new Error('Only activated pages can be linked to apps');
+        }
+        const app = await getAppById(appId);
+        if (!app) throw new Error('App not found');
+
+        const nextOrder = navOrder ?? await getNextNavOrder(appId);
+        const label = navLabel || page.label;
+        const visible = isVisible === undefined ? true : Boolean(isVisible);
+        const defaultFlag = Boolean(isDefault);
+
+        await database.query('BEGIN');
+        if (defaultFlag) {
+            await database.query(
+                `UPDATE app_page_mapping
+                 SET is_default = false
+                 WHERE app_id = $1`,
+                [appId]
+            );
+        }
         await database.query(
-            `INSERT INTO app_page_mapping (app_id, page_id)
-             VALUES ($1, $2)
-             ON CONFLICT (app_id, page_id) DO NOTHING`,
-            [appId, pageId]
+            `INSERT INTO app_page_mapping (app_id, page_id, nav_label, nav_order, is_default, is_visible)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (app_id, page_id) DO UPDATE
+                 SET nav_label = EXCLUDED.nav_label,
+                     nav_order = EXCLUDED.nav_order,
+                     is_default = EXCLUDED.is_default,
+                     is_visible = EXCLUDED.is_visible`,
+            [appId, pageId, label, nextOrder, defaultFlag, visible]
         );
         await database.query(
             `UPDATE kodi_pages
@@ -226,7 +262,9 @@ const linkPageToApp = async ({ pageId, appId }) => {
              WHERE id = $1 AND (linked_app_id IS NULL OR linked_app_id <> $2)`,
             [pageId, appId]
         );
+        await database.query('COMMIT');
     } catch (error) {
+        await database.query('ROLLBACK').catch(() => null);
         logServiceError('linkPageToApp', error, { pageId, appId });
         throw error;
     }
@@ -256,18 +294,18 @@ const getAppById = async (appId) => {
 
 const getAppPrimaryPage = async (appId) => {
     const result = await database.query(
-        `SELECT p.id, p.label, p.page_type, p.status
+        `SELECT p.id, p.label, p.page_type, p.status, m.is_default
          FROM kodi_pages p
          JOIN app_page_mapping m ON p.id = m.page_id
          WHERE m.app_id = $1 AND p.status = 'activated'
-         ORDER BY p.activated_at DESC NULLS LAST
+         ORDER BY m.is_default DESC, m.nav_order ASC NULLS LAST, p.activated_at DESC NULLS LAST
          LIMIT 1`,
         [appId]
     );
     return result.rows[0] || null;
 };
 
-const assignUserToApp = async ({ appId, email, permissions = {}, assignedBy }) => {
+const assignUserToApp = async ({ appId, email, permissions = {}, roleKey, assignedBy }) => {
     const app = await getAppById(appId);
     if (!app) {
         throw new Error('App not found');
@@ -277,14 +315,15 @@ const assignUserToApp = async ({ appId, email, permissions = {}, assignedBy }) =
         throw new Error('User not found');
     }
     const assignment = await database.query(
-        `INSERT INTO kodi_app_users (app_id, user_id, permissions, assigned_by)
-         VALUES ($1, $2, $3::jsonb, $4)
+        `INSERT INTO kodi_app_users (app_id, user_id, permissions, role_key, assigned_by)
+         VALUES ($1, $2, $3::jsonb, $4, $5)
          ON CONFLICT (app_id, user_id) DO UPDATE
              SET permissions = EXCLUDED.permissions,
+                 role_key = COALESCE(EXCLUDED.role_key, kodi_app_users.role_key),
                  updated_at = CURRENT_TIMESTAMP,
                  assigned_by = COALESCE(EXCLUDED.assigned_by, kodi_app_users.assigned_by)
          RETURNING *`,
-        [appId, user.id, permissions, assignedBy || null]
+        [appId, user.id, permissions, roleKey || null, assignedBy || null]
     );
     const page = await getAppPrimaryPage(appId);
     const baseUrl = process.env.FRONTEND_URL || process.env.SITE_URL || 'https://welphub.onrender.com';
@@ -345,6 +384,103 @@ const listAppUsers = async (appId) => {
         [appId]
     );
     return result.rows;
+};
+
+const listAppPages = async (appId) => {
+    const result = await database.query(
+        `SELECT m.id AS mapping_id,
+                m.app_id,
+                m.page_id,
+                m.nav_label,
+                m.nav_order,
+                m.is_default,
+                m.is_visible,
+                p.label,
+                p.page_type,
+                p.status,
+                p.activated_at
+         FROM app_page_mapping m
+         JOIN kodi_pages p ON p.id = m.page_id
+         WHERE m.app_id = $1
+         ORDER BY m.nav_order ASC NULLS LAST, p.label`,
+        [appId]
+    );
+    return result.rows;
+};
+
+const updateAppPageMapping = async ({ mappingId, appId, navLabel, navOrder, isDefault, isVisible }) => {
+    const updates = [];
+    const values = [];
+    let idx = 1;
+    if (navLabel !== undefined) {
+        updates.push(`nav_label = $${idx++}`);
+        values.push(navLabel);
+    }
+    if (navOrder !== undefined) {
+        updates.push(`nav_order = $${idx++}`);
+        values.push(navOrder);
+    }
+    if (isVisible !== undefined) {
+        updates.push(`is_visible = $${idx++}`);
+        values.push(Boolean(isVisible));
+    }
+    if (isDefault !== undefined) {
+        updates.push(`is_default = $${idx++}`);
+        values.push(Boolean(isDefault));
+    }
+    if (!updates.length) return null;
+    values.push(mappingId);
+
+    await database.query('BEGIN');
+    try {
+        if (isDefault) {
+            await database.query(
+                `UPDATE app_page_mapping
+                 SET is_default = false
+                 WHERE app_id = $1`,
+                [appId]
+            );
+        }
+        const result = await database.query(
+            `UPDATE app_page_mapping
+             SET ${updates.join(', ')}
+             WHERE id = $${idx}
+             RETURNING *`,
+            values
+        );
+        await database.query('COMMIT');
+        return result.rows[0] || null;
+    } catch (error) {
+        await database.query('ROLLBACK').catch(() => null);
+        throw error;
+    }
+};
+
+const removeAppPageMapping = async ({ mappingId }) => {
+    await database.query(
+        `DELETE FROM app_page_mapping
+         WHERE id = $1`,
+        [mappingId]
+    );
+};
+
+const listAppNavigation = async (appId) => {
+    const app = await getAppById(appId);
+    if (!app) return null;
+    const pages = await listAppPages(appId);
+    const navigation = pages
+        .filter((page) => page.is_visible)
+        .map((page) => ({
+            pageId: page.page_id,
+            label: page.nav_label || page.label,
+            type: page.page_type,
+            isDefault: Boolean(page.is_default),
+            order: page.nav_order
+        }));
+    return {
+        app: { id: app.id, label: app.name, status: app.is_active ? 'active' : 'inactive' },
+        navigation
+    };
 };
 
 const assignUserToPage = async ({ pageId, email, permissions = {}, assignedBy }) => {
@@ -524,7 +660,12 @@ const listApps = async () => {
                         'label', p.label,
                         'page_type', p.page_type,
                         'status', p.status,
-                        'activated_at', p.activated_at
+                        'activated_at', p.activated_at,
+                        'nav_label', m.nav_label,
+                        'nav_order', m.nav_order,
+                        'is_default', m.is_default,
+                        'is_visible', m.is_visible,
+                        'mapping_id', m.id
                     ) ORDER BY p.created_at DESC) AS linked_pages
              FROM app_page_mapping m
              JOIN kodi_pages p ON p.id = m.page_id
@@ -537,6 +678,7 @@ const listApps = async () => {
                         'email', u.email,
                         'display_name', u.display_name,
                         'role', u.role,
+                        'role_key', au.role_key,
                         'permissions', au.permissions,
                         'assigned_at', au.created_at
                     ) ORDER BY au.created_at DESC) AS assigned_users
@@ -773,6 +915,10 @@ module.exports = {
     updateApp,
     assignUserToApp,
     listAppUsers,
+    listAppPages,
+    updateAppPageMapping,
+    removeAppPageMapping,
+    listAppNavigation,
     assignUserToPage,
     listPageUsers,
     createLead,

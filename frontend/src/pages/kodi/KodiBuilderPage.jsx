@@ -172,6 +172,16 @@ const KodiBuilderPage = () => {
         });
     };
 
+    const handleRemoveComponent = ({ rowIndex, colIndex, compIndex }) => {
+        updateLayout((draft) => {
+            const targetCol = draft.rows[rowIndex]?.columns[colIndex];
+            if (!targetCol) return;
+            targetCol.components.splice(compIndex, 1);
+        });
+        setSelectedComponent(null);
+        setSelectedPosition(null);
+    };
+
     const handleSelectComponent = (component, position) => {
         setSelectedComponent(component);
         setSelectedPosition(position);
@@ -319,6 +329,7 @@ const KodiBuilderPage = () => {
                     onSelectComponent={handleSelectComponent}
                     onLayoutChange={updateLayout}
                     onComponentDrop={handleComponentDrop}
+                    onRemoveComponent={handleRemoveComponent}
                     previewRole={previewRole}
                 />
                 <ConfigSidebar

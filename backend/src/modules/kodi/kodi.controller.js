@@ -66,7 +66,8 @@ const assignAppUserValidators = validate([
     body('permissions').optional().isObject(),
     body('permissions.canView').optional().isBoolean(),
     body('permissions.canEdit').optional().isBoolean(),
-    body('permissions.canUse').optional().isBoolean()
+    body('permissions.canUse').optional().isBoolean(),
+    body('roleKey').optional().isIn(['admin', 'employee', 'business_user', 'psychologist'])
 ]);
 const assignPageUserValidators = validate([
     param('id').custom(isUuidOrInt),
@@ -178,7 +179,9 @@ const runtimeLoader = async (req, res) => {
     try {
         const payload = await runtime.buildRuntimePayload({
             pageId: req.params.pageId,
-            role: req.user?.role
+            role: req.user?.role,
+            userId: req.user?.id,
+            appId: req.query?.appId
         });
         if (!payload) return res.status(404).json({ success: false, error: 'Page not found' });
         return res.json({ success: true, data: payload });
@@ -201,6 +204,25 @@ const linkPageToApp = async (req, res) => {
     }
 };
 
+const linkAppPage = async (req, res) => {
+    try {
+        const appId = req.params.id;
+        const pageId = req.body.pageId;
+        await service.linkPageToApp({
+            pageId,
+            appId,
+            navLabel: req.body.navLabel,
+            navOrder: req.body.navOrder,
+            isDefault: req.body.isDefault,
+            isVisible: req.body.isVisible
+        });
+        return res.json({ success: true });
+    } catch (error) {
+        logControllerError('linkAppPage', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to link page to app' });
+    }
+};
+
 const listApps = async (req, res) => {
     try {
         const apps = await service.listApps();
@@ -208,6 +230,18 @@ const listApps = async (req, res) => {
     } catch (error) {
         logControllerError('listApps', error);
         return res.status(500).json({ success: false, error: error.message || 'Failed to load apps' });
+    }
+};
+
+const getApp = async (req, res) => {
+    try {
+        const apps = await service.listApps();
+        const app = apps.find((item) => String(item.id) === String(req.params.id));
+        if (!app) return res.status(404).json({ success: false, error: 'App not found' });
+        return res.json({ success: true, data: app });
+    } catch (error) {
+        logControllerError('getApp', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load app' });
     }
 };
 
@@ -252,12 +286,62 @@ const assignAppUser = async (req, res) => {
             appId: req.params.id,
             email: req.body.email,
             permissions: req.body.permissions || {},
+            roleKey: req.body.roleKey,
             assignedBy: req.user?.id
         });
         return res.json({ success: true, data: payload });
     } catch (error) {
         logControllerError('assignAppUser', error);
         return res.status(400).json({ success: false, error: error.message || 'Failed to assign user to app' });
+    }
+};
+
+const listAppPages = async (req, res) => {
+    try {
+        const pages = await service.listAppPages(req.params.id);
+        return res.json({ success: true, data: pages });
+    } catch (error) {
+        logControllerError('listAppPages', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load app pages' });
+    }
+};
+
+const updateAppPage = async (req, res) => {
+    try {
+        const mapping = await service.updateAppPageMapping({
+            mappingId: req.params.mappingId,
+            appId: req.params.id,
+            navLabel: req.body.navLabel,
+            navOrder: req.body.navOrder,
+            isDefault: req.body.isDefault,
+            isVisible: req.body.isVisible
+        });
+        if (!mapping) return res.status(404).json({ success: false, error: 'Mapping not found' });
+        return res.json({ success: true, data: mapping });
+    } catch (error) {
+        logControllerError('updateAppPage', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to update app page' });
+    }
+};
+
+const deleteAppPage = async (req, res) => {
+    try {
+        await service.removeAppPageMapping({ mappingId: req.params.mappingId });
+        return res.json({ success: true });
+    } catch (error) {
+        logControllerError('deleteAppPage', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to remove page from app' });
+    }
+};
+
+const getAppNavigation = async (req, res) => {
+    try {
+        const payload = await service.listAppNavigation(req.params.id);
+        if (!payload) return res.status(404).json({ success: false, error: 'App not found' });
+        return res.json({ success: true, data: payload });
+    } catch (error) {
+        logControllerError('getAppNavigation', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load app navigation' });
     }
 };
 
@@ -464,6 +548,34 @@ const updateApp = async (req, res) => {
     }
 };
 
+const activateApp = async (req, res) => {
+    try {
+        const app = await service.updateApp({
+            appId: req.params.id,
+            isActive: true
+        });
+        if (!app) return res.status(404).json({ success: false, error: 'App not found' });
+        return res.json({ success: true, data: app });
+    } catch (error) {
+        logControllerError('activateApp', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to activate app' });
+    }
+};
+
+const deactivateApp = async (req, res) => {
+    try {
+        const app = await service.updateApp({
+            appId: req.params.id,
+            isActive: false
+        });
+        if (!app) return res.status(404).json({ success: false, error: 'App not found' });
+        return res.json({ success: true, data: app });
+    } catch (error) {
+        logControllerError('deactivateApp', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to deactivate app' });
+    }
+};
+
 const getPagePermissions = async (req, res) => {
     try {
         const pageId = req.params.id;
@@ -509,14 +621,22 @@ module.exports = {
     activatePage,
     runtimeLoader,
     linkPageToApp,
+    linkAppPage,
     listApps,
+    getApp,
     createApp,
     updateApp,
+    activateApp,
+    deactivateApp,
     pagePermissionValidators,
     getPagePermissions,
     updatePagePermissions,
     listAppUsers,
     assignAppUser,
+    listAppPages,
+    updateAppPage,
+    deleteAppPage,
+    getAppNavigation,
     removeAppUser,
     listPageUsers,
     assignPageUser,

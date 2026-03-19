@@ -170,11 +170,41 @@ router.post(
 );
 router.get('/platform/apps/:id/users', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.listAppUsers);
 router.post('/platform/apps/:id/users', authenticate, authorizeAdmin(), kodiPlatform.assignAppUserValidators, kodiPlatform.assignAppUser);
+router.get('/platform/apps/:id/pages', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.listAppPages);
+router.patch('/platform/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), validate([
+    param('id').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    }),
+    param('mappingId').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    })
+]), kodiPlatform.updateAppPage);
+router.delete('/platform/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), validate([
+    param('id').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    }),
+    param('mappingId').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    })
+]), kodiPlatform.deleteAppPage);
 router.get('/platform/pages/:id/users', authenticate, authorizeAdmin(), kodiPlatform.pageIdValidator, kodiPlatform.listPageUsers);
 router.post('/platform/pages/:id/users', authenticate, authorizeAdmin(), kodiPlatform.assignPageUserValidators, kodiPlatform.assignPageUser);
 router.post('/platform/apps', authenticate, authorizeAdmin(), kodiPlatform.createAppValidators, kodiPlatform.createApp);
 router.put('/platform/apps/:id', authenticate, authorizeAdmin(), kodiPlatform.updateAppValidators, kodiPlatform.updateApp);
 router.get('/platform/runtime/:pageId', authenticate, kodiPlatform.getRuntimeValidator, kodiPlatform.runtimeLoader);
+router.get('/platform/apps/:id/navigation', authenticate, kodiPlatform.appIdValidator, kodiPlatform.getAppNavigation);
 router.get('/platform/apps', authenticate, authorizeAdmin(), kodiPlatform.listApps);
 router.get('/platform/objects', authenticate, authorizeAdmin(), kodiPlatform.listObjects);
 router.get('/platform/components', authenticate, authorizeAdmin(), kodiPlatform.listComponentRegistry);
@@ -197,5 +227,52 @@ router.get('/platform/leads/:id/opportunities', authenticate, authorizeAdmin(), 
 })]), kodiPlatform.listOpportunities);
 router.get('/platform/pages/:id/permissions', authenticate, authorizeAdmin(), kodiPlatform.pageIdValidator, kodiPlatform.getPagePermissions);
 router.post('/platform/pages/:id/permissions', authenticate, authorizeAdmin(), kodiPlatform.pagePermissionValidators, kodiPlatform.updatePagePermissions);
+
+// Kodi Portal aliases (admin console)
+router.get('/portal/apps', authenticate, authorizeAdmin(), kodiPlatform.listApps);
+router.post('/portal/apps', authenticate, authorizeAdmin(), kodiPlatform.createAppValidators, kodiPlatform.createApp);
+router.get('/portal/apps/:id', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.getApp);
+router.patch('/portal/apps/:id', authenticate, authorizeAdmin(), kodiPlatform.updateAppValidators, kodiPlatform.updateApp);
+router.post('/portal/apps/:id/activate', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.activateApp);
+router.post('/portal/apps/:id/deactivate', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.deactivateApp);
+router.get('/portal/apps/:id/users', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.listAppUsers);
+router.post('/portal/apps/:id/users', authenticate, authorizeAdmin(), kodiPlatform.assignAppUserValidators, kodiPlatform.assignAppUser);
+router.delete('/portal/apps/:id/users/:userId', authenticate, authorizeAdmin(), kodiPlatform.removeAppUser);
+router.get('/portal/apps/:id/pages', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.listAppPages);
+router.post('/portal/apps/:id/pages', authenticate, authorizeAdmin(), validate([body('pageId').custom((val) => {
+    if (val === undefined || val === null) return false;
+    const str = String(val);
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str) || /^\d+$/.test(str);
+})]), kodiPlatform.linkAppPage);
+router.patch('/portal/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), validate([
+    param('id').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    }),
+    param('mappingId').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    })
+]), kodiPlatform.updateAppPage);
+router.delete('/portal/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), validate([
+    param('id').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    }),
+    param('mappingId').custom((val) => {
+        if (val === undefined || val === null) return false;
+        const str = String(val);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+        return uuidRegex.test(str) || /^\d+$/.test(str);
+    })
+]), kodiPlatform.deleteAppPage);
+router.get('/portal/apps/:id/navigation', authenticate, authorizeAdmin(), kodiPlatform.appIdValidator, kodiPlatform.getAppNavigation);
 
 module.exports = router;

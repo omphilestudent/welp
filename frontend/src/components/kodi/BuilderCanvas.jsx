@@ -5,12 +5,162 @@ const GRID_COLUMNS = 12;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+const SAMPLE_PREVIEWS = {
+    RecordDetails: {
+        title: 'Record Details',
+        fields: [
+            { label: 'Name', value: 'Ava Thompson' },
+            { label: 'Email', value: 'ava@kodi.app' },
+            { label: 'Status', value: 'Active' },
+            { label: 'Last Touch', value: '2 hours ago' }
+        ]
+    },
+    RelatedList: {
+        title: 'Related List',
+        headers: ['Type', 'Status', 'Owner'],
+        rows: [
+            ['Case', 'Open', 'J. Rivers'],
+            ['Task', 'In Progress', 'T. Patel'],
+            ['Note', 'Logged', 'System']
+        ]
+    },
+    ActivityTimeline: {
+        title: 'Activity Timeline',
+        items: ['Email sent - 10m', 'Call scheduled - 1h', 'Lead converted - 1d']
+    },
+    HighlightsPanel: {
+        title: 'Highlights Panel',
+        pills: ['Open Cases: 4', 'ARR: $48k', 'Health: Good']
+    },
+    DataTable: {
+        title: 'Data Table',
+        headers: ['Account', 'Stage', 'Value'],
+        rows: [
+            ['BlueNova', 'Proposal', '$12k'],
+            ['Futura', 'Qualified', '$7k'],
+            ['Nimbus', 'Discovery', '$4k']
+        ]
+    },
+    CardList: {
+        title: 'Card List',
+        cards: [
+            { title: 'Psychologist Onboard', meta: 'Due in 2 days' },
+            { title: 'Business Review', meta: 'Priority: High' }
+        ]
+    },
+    KeyValueFields: {
+        title: 'Key Value Fields',
+        fields: [
+            { label: 'Industry', value: 'Healthcare' },
+            { label: 'Seats', value: '128' },
+            { label: 'Tier', value: 'Enterprise' }
+        ]
+    },
+    ContactProfile: {
+        title: 'Contact Profile',
+        subtitle: 'Primary decision maker',
+        fields: [
+            { label: 'Name', value: 'Luis Chen' },
+            { label: 'Role', value: 'HR Director' },
+            { label: 'Phone', value: '+1 (555) 221-8844' }
+        ]
+    },
+    SubscriptionOverview: {
+        title: 'Subscription Overview',
+        pills: ['Plan: Growth', 'Renewal: Jul 14', 'Status: Active']
+    },
+    EmployeePanel: {
+        title: 'Employee Panel',
+        fields: [
+            { label: 'Employee', value: 'Sofia Ramos' },
+            { label: 'Role', value: 'People Ops' },
+            { label: 'Status', value: 'Onboarding' }
+        ]
+    },
+    PsychologistProfile: {
+        title: 'Psychologist Profile',
+        fields: [
+            { label: 'Specialty', value: 'Trauma' },
+            { label: 'Availability', value: 'Tue - Thu' },
+            { label: 'Rating', value: '4.9' }
+        ]
+    },
+    BusinessInfoPanel: {
+        title: 'Business Info',
+        fields: [
+            { label: 'Industry', value: 'Fintech' },
+            { label: 'Region', value: 'EMEA' },
+            { label: 'Tier', value: 'Premium' }
+        ]
+    },
+    AccountSummary: {
+        title: 'Account Summary',
+        pills: ['NPS 52', 'Usage up 18%', 'Churn risk: Low']
+    },
+    ApplicationStatusPanel: {
+        title: 'Application Status',
+        steps: ['Lead', 'Qualified', 'Under Review', 'Approved']
+    },
+    LeadSummary: {
+        title: 'Lead Summary',
+        fields: [
+            { label: 'Score', value: '82' },
+            { label: 'Source', value: 'Referral' },
+            { label: 'Stage', value: 'Qualified' }
+        ]
+    },
+    OpportunitySummary: {
+        title: 'Opportunity Summary',
+        fields: [
+            { label: 'Pipeline', value: '$96k' },
+            { label: 'Close Date', value: 'Aug 02' },
+            { label: 'Probability', value: '68%' }
+        ]
+    },
+    ActionButton: {
+        title: 'Primary Action',
+        actions: ['Launch Workflow']
+    },
+    QuickActionsBar: {
+        title: 'Quick Actions',
+        actions: ['Send Email', 'Assign Psychologist', 'Approve']
+    },
+    LinkList: {
+        title: 'Link List',
+        links: ['Open Profile', 'View Subscription', 'Audit Log']
+    },
+    FormPanel: {
+        title: 'Form Panel',
+        fields: ['First name', 'Email', 'Role']
+    },
+    SendEmailButton: {
+        title: 'Send Email',
+        actions: ['Compose']
+    },
+    AssignPsychologistButton: {
+        title: 'Assign Psychologist',
+        actions: ['Assign']
+    },
+    ApproveRejectPanel: {
+        title: 'Approve / Reject',
+        actions: ['Approve', 'Reject']
+    }
+};
+
+const resolvePreviewKey = (component) =>
+    component?.component_type
+    || component?.componentName
+    || component?.component_name
+    || component?.name
+    || '';
+
 const BuilderCanvas = ({
     layout,
     selected,
     onSelectComponent,
     onLayoutChange,
     onComponentDrop,
+    onRemoveComponent,
     previewRole
 }) => {
     const canvasRef = useRef(null);
@@ -89,6 +239,115 @@ const BuilderCanvas = ({
         return roles.includes(previewRole);
     };
 
+    const renderPreview = (component) => {
+        const previewKey = resolvePreviewKey(component);
+        const preview = SAMPLE_PREVIEWS[previewKey] || null;
+
+        if (!preview) {
+            return (
+                <div className="kodi-builder__preview kodi-builder__preview--placeholder">
+                    <div className="kodi-builder__preview-title">{previewKey || 'Component'} Preview</div>
+                    <div className="kodi-builder__preview-text">Drop in live data bindings to render.</div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="kodi-builder__preview">
+                <div className="kodi-builder__preview-title">{preview.title}</div>
+
+                {preview.fields && (
+                    <div className="kodi-builder__preview-fields">
+                        {preview.fields.map((field) => (
+                            <div key={field.label} className="kodi-builder__preview-field">
+                                <span>{field.label}</span>
+                                <strong>{field.value}</strong>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {preview.items && (
+                    <ul className="kodi-builder__preview-list">
+                        {preview.items.map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                )}
+
+                {preview.pills && (
+                    <div className="kodi-builder__preview-pills">
+                        {preview.pills.map((pill) => (
+                            <span key={pill}>{pill}</span>
+                        ))}
+                    </div>
+                )}
+
+                {preview.steps && (
+                    <div className="kodi-builder__preview-steps">
+                        {preview.steps.map((step, index) => (
+                            <div key={step} className={`kodi-builder__preview-step ${index === 1 ? 'active' : ''}`}>
+                                {step}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {preview.headers && preview.rows && (
+                    <div className="kodi-builder__preview-table">
+                        <div className="kodi-builder__preview-table-head">
+                            {preview.headers.map((header) => (
+                                <span key={header}>{header}</span>
+                            ))}
+                        </div>
+                        {preview.rows.map((row, idx) => (
+                            <div key={`${row[0]}-${idx}`} className="kodi-builder__preview-table-row">
+                                {row.map((cell) => (
+                                    <span key={cell}>{cell}</span>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {preview.cards && (
+                    <div className="kodi-builder__preview-cards">
+                        {preview.cards.map((card) => (
+                            <div key={card.title} className="kodi-builder__preview-card">
+                                <strong>{card.title}</strong>
+                                <span>{card.meta}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {preview.links && (
+                    <div className="kodi-builder__preview-links">
+                        {preview.links.map((link) => (
+                            <div key={link} className="kodi-builder__preview-link">{link}</div>
+                        ))}
+                    </div>
+                )}
+
+                {preview.actions && (
+                    <div className="kodi-builder__preview-actions">
+                        {preview.actions.map((action) => (
+                            <button key={action} type="button">{action}</button>
+                        ))}
+                    </div>
+                )}
+
+                {preview.subtitle && (
+                    <div className="kodi-builder__preview-subtitle">{preview.subtitle}</div>
+                )}
+
+                {preview.fields == null && preview.items == null && preview.pills == null && preview.headers == null && preview.cards == null && preview.links == null && preview.actions == null && (
+                    <div className="kodi-builder__preview-text">Preview data is ready.</div>
+                )}
+            </div>
+        );
+    };
+
     return (
         <section className="kodi-builder__canvas" ref={canvasRef}>
             {(layout?.rows || []).map((row, rowIndex) => {
@@ -128,10 +387,25 @@ const BuilderCanvas = ({
                                             >
                                                 <div className="kodi-builder__component-header">
                                                     <strong>{component.label || component.name}</strong>
-                                                    <span>{component.component_type}</span>
+                                                    <div className="kodi-builder__component-actions">
+                                                        <span>{component.component_type}</span>
+                                                        <button
+                                                            type="button"
+                                                            className="kodi-builder__component-delete"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                onRemoveComponent?.({ rowIndex, colIndex, compIndex });
+                                                            }}
+                                                            title="Remove component"
+                                                        >
+                                                            x
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <div className="kodi-builder__component-body">
-                                                    <p>{hasPermission(component) ? (component.description || 'Drag to reorder or resize.') : 'Hidden by permissions'}</p>
+                                                    {hasPermission(component)
+                                                        ? renderPreview(component)
+                                                        : <p>Hidden by permissions</p>}
                                                 </div>
                                                 <ResizeHandle
                                                     direction="width"

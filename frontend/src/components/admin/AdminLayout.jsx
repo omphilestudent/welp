@@ -185,7 +185,7 @@ const AdminLayout = () => {
             color: '#f59e0b'
         },
         {
-            path: '/kodi',
+            path: '/kodi/portal',
             icon: <FaProjectDiagram />,
             label: 'Kodi Portal',
             color: '#7c3aed'
