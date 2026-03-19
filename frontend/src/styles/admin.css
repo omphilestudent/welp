@@ -42,22 +42,62 @@
 .admin-marketing {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+.admin-marketing h1 {
+    font-size: 1.75rem;
+    margin: 0;
+    color: #0f172a;
+}
+
+.marketing-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.marketing-page-header p {
+    margin: 0.25rem 0 0;
+    color: #64748b;
 }
 
 .marketing-grid {
     display: grid;
-    grid-template-columns: 260px 1fr 1fr;
-    gap: 16px;
+    grid-template-columns: 280px 1fr 1fr;
+    gap: 18px;
     align-items: start;
+}
+@media (max-width: 1200px) {
+    .marketing-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .marketing-panel {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+}
+
+.marketing-panel__footer {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.marketing-panel__title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
 }
 
 .marketing-panel__header {
@@ -77,14 +117,27 @@
     align-items: center;
     justify-content: space-between;
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 8px 10px;
+    border-radius: 10px;
+    padding: 10px 12px;
     background: #f8fafc;
     gap: 8px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    text-align: left;
+}
+.marketing-list__item:hover {
+    border-color: #2563eb;
+    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12);
 }
 
 .marketing-list__item.active {
     border-color: #2563eb;
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.12);
+}
+
+.marketing-list__item strong {
+    display: block;
+    font-size: 0.95rem;
+    color: #0f172a;
 }
 
 .marketing-form {
@@ -96,19 +149,43 @@
 .marketing-form textarea,
 .marketing-form select {
     width: 100%;
-    padding: 8px 10px;
-    border-radius: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
     border: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+.marketing-form .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: #334155;
+}
+.marketing-form textarea {
+    min-height: 140px;
 }
 
 .marketing-card {
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 12px;
+    border-radius: 12px;
+    padding: 14px;
     margin-top: 10px;
     display: grid;
     gap: 8px;
     background: #f8fafc;
+}
+
+.marketing-card label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #334155;
+}
+
+.marketing-card strong {
+    font-size: 1rem;
+    color: #0f172a;
 }
 
 .marketing-card__actions {
@@ -133,9 +210,24 @@
     display: flex;
     justify-content: space-between;
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 8px 10px;
+    border-radius: 10px;
+    padding: 10px 12px;
     background: #ffffff;
+}
+
+.marketing-log .status-chip {
+    text-transform: capitalize;
+}
+
+.marketing-log__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.marketing-log__meta span {
+    font-size: 0.8rem;
+    color: #64748b;
 }
 
 .marketing-error {
@@ -158,9 +250,50 @@
 
 .marketing-preview__html {
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 10px;
+    padding: 12px;
     background: #f8fafc;
+}
+
+.marketing-preview pre {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.marketing-preview__html iframe {
+    width: 100%;
+    border: none;
+    min-height: 320px;
+}
+
+.marketing-section {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    padding: 18px;
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+}
+
+.marketing-section__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.marketing-section__header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #0f172a;
+}
+
+.marketing-section .marketing-panel,
+.marketing-section .marketing-card {
+    box-shadow: none;
+    border-color: #e2e8f0;
 }
 
 

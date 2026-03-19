@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Loading from '../../components/common/Loading';
 import {
@@ -40,6 +41,7 @@ const buildPermissionForm = (map, role) => {
 };
 
 const KodiPortal = () => {
+    const navigate = useNavigate();
     const [apps, setApps] = useState([]);
     const [pages, setPages] = useState([]);
     const [loadingApps, setLoadingApps] = useState(false);
@@ -474,9 +476,14 @@ const KodiPortal = () => {
     return (
         <div className="kodi-portal">
             <header className="kodi-portal__header">
-                <div>
+                <div className="kodi-page-header">
+                    <button className="kodi-back-button" onClick={() => navigate('/kodi/times')}>
+                        â† Back
+                    </button>
+                    <div>
                     <p className="kodi-portal__eyebrow">Kodi Portal</p>
                     <h1>App Manager</h1>
+                    </div>
                 </div>
                 <button className="btn-primary" onClick={() => setCreateModalOpen(true)}>
                     + Create App

@@ -4,7 +4,12 @@ const MarketingTemplatePreview = ({ preview }) => {
     if (!preview) return null;
     return (
         <div className="marketing-panel">
-            <h3>Preview</h3>
+            <div className="marketing-panel__header">
+                <div>
+                    <div className="marketing-panel__title">Preview</div>
+                    <p className="text-xs text-secondary">Live rendering with sample variables.</p>
+                </div>
+            </div>
             <div className="marketing-preview">
                 <h4>Subject</h4>
                 <p>{preview.subject}</p>

@@ -161,7 +161,12 @@ const AdminMarketing = () => {
 
     return (
         <div className="admin-marketing">
-            <h1>Admin Marketing</h1>
+            <div className="marketing-page-header">
+                <div>
+                    <h1>Admin Marketing</h1>
+                    <p>Manage campaigns, templates, triggers, and delivery performance.</p>
+                </div>
+            </div>
             {error && <div className="marketing-error">{error}</div>}
             <div className="marketing-grid">
                 <MarketingTemplateList
@@ -190,26 +195,46 @@ const AdminMarketing = () => {
                 <MarketingTemplatePreview preview={preview} />
             </div>
 
-            <MarketingCampaignScheduler
-                campaigns={campaigns}
-                onUpdate={handleUpdateCampaign}
-                onRun={handleRunCampaign}
-            />
+            <div className="marketing-section">
+                <div className="marketing-section__header">
+                    <h2>Campaign Scheduler</h2>
+                </div>
+                <MarketingCampaignScheduler
+                    campaigns={campaigns}
+                    onUpdate={handleUpdateCampaign}
+                    onRun={handleRunCampaign}
+                />
+            </div>
 
-            <MarketingTriggerList
-                triggers={triggers}
-                onUpdate={handleUpdateTrigger}
-            />
+            <div className="marketing-section">
+                <div className="marketing-section__header">
+                    <h2>Trigger Emails</h2>
+                </div>
+                <MarketingTriggerList
+                    triggers={triggers}
+                    onUpdate={handleUpdateTrigger}
+                />
+            </div>
 
-            <MarketingDeliveryLogs
-                logs={logs}
-                filters={logFilters}
-                onFilter={handleLogsFilter}
-                campaigns={campaigns}
-                triggers={triggers}
-            />
+            <div className="marketing-section">
+                <div className="marketing-section__header">
+                    <h2>Delivery Logs</h2>
+                </div>
+                <MarketingDeliveryLogs
+                    logs={logs}
+                    filters={logFilters}
+                    onFilter={handleLogsFilter}
+                    campaigns={campaigns}
+                    triggers={triggers}
+                />
+            </div>
 
-            <MarketingSettingsPanel settings={settings} onSave={handleSaveSettings} />
+            <div className="marketing-section">
+                <div className="marketing-section__header">
+                    <h2>Settings</h2>
+                </div>
+                <MarketingSettingsPanel settings={settings} onSave={handleSaveSettings} />
+            </div>
         </div>
     );
 };

@@ -1,10 +1,7 @@
 import React from 'react';
 
 const MarketingDeliveryLogs = ({ logs = [], onFilter, filters, campaigns = [], triggers = [] }) => (
-    <div className="marketing-panel">
-        <div className="marketing-panel__header">
-            <h3>Delivery Logs</h3>
-        </div>
+    <div>
         <div className="marketing-filters">
             <select value={filters.status || ''} onChange={(e) => onFilter({ ...filters, status: e.target.value })}>
                 <option value="">All statuses</option>
@@ -38,7 +35,7 @@ const MarketingDeliveryLogs = ({ logs = [], onFilter, filters, campaigns = [], t
         <div className="marketing-log-list">
             {logs.map((log) => (
                 <div key={log.id} className="marketing-log">
-                    <div>
+                    <div className="marketing-log__meta">
                         <strong>{log.recipient_email}</strong>
                         <div className="text-xs text-secondary">{log.subject}</div>
                         <div className="text-xs text-secondary">

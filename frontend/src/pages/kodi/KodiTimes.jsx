@@ -141,9 +141,14 @@ const KodiTimes = () => {
     return (
         <div className="kodi-times">
             <header className="kodi-times__header">
-                <div>
+                <div className="kodi-page-header">
+                    <button className="kodi-back-button" onClick={() => navigate('/admin/dashboard')}>
+                        â† Back
+                    </button>
+                    <div>
                     <p className="kodi-times__eyebrow">Times Builder</p>
                     <h1>Kodi Pages</h1>
+                    </div>
                 </div>
                 <button className="btn-primary" onClick={openCreateModal}>
                     + Add New Kodi Page

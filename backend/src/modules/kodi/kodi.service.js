@@ -1,6 +1,37 @@
 const database = require('../../utils/database');
 const { sendAppAccessEmail } = require('../../utils/emailService');
 
+const logServiceError = (context, error, extra = {}) => {
+    const payload = {
+        context,
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail,
+        stack: error?.stack,
+        ...extra
+    };
+    console.error('❌ Kodi service error:', payload);
+};
+
+const tableExists = async (tableName) => {
+    const result = await database.query(
+        `SELECT to_regclass($1) as table_name`,
+        [`public.${tableName}`]
+    );
+    return Boolean(result.rows[0]?.table_name);
+};
+
+const columnExists = async (tableName, columnName) => {
+    const result = await database.query(
+        `SELECT 1
+         FROM information_schema.columns
+         WHERE table_name = $1 AND column_name = $2
+         LIMIT 1`,
+        [tableName, columnName]
+    );
+    return result.rows.length > 0;
+};
+
 const DEFAULT_LAYOUT = {
     type: '1-column',
     orientation: 'horizontal',
@@ -56,88 +87,149 @@ const COMPONENT_REGISTRY = [
 ];
 
 const createPage = async ({ label, pageType, linkedAppId, createdBy }) => {
-    const values = [
-        label,
-        pageType,
-        linkedAppId || null,
-        DEFAULT_LAYOUT,
-        {},
-        createdBy || null
-    ];
+    try {
+        const values = [
+            label,
+            pageType,
+            linkedAppId || null,
+            DEFAULT_LAYOUT,
+            {},
+            createdBy || null
+        ];
 
-    const result = await database.query(
-        `INSERT INTO kodi_pages (label, page_type, status, linked_app_id, layout, settings, created_by)
-         VALUES ($1, $2, 'draft', $3, $4, $5, $6)
-         RETURNING *`,
-        values
-    );
-    return result.rows[0];
+        const result = await database.query(
+            `INSERT INTO kodi_pages (label, page_type, status, linked_app_id, layout, settings, created_by)
+             VALUES ($1, $2, 'draft', $3, $4, $5, $6)
+             RETURNING *`,
+            values
+        );
+        return result.rows[0];
+    } catch (error) {
+        logServiceError('createPage', error, { label, pageType, linkedAppId, createdBy });
+        throw error;
+    }
 };
 
 const listPages = async () => {
-    const result = await database.query(
-        `SELECT p.*,
-                a.name AS app_name,
-                COALESCE(u.display_name, u.email, 'System') AS created_by_name
-         FROM kodi_pages p
-         LEFT JOIN kodi_apps a ON a.id = p.linked_app_id
-         LEFT JOIN users u ON u.id = p.created_by
-         ORDER BY p.created_at DESC`
-    );
-    return result.rows;
+    try {
+        const hasKodiPages = await tableExists('kodi_pages');
+        if (hasKodiPages) {
+            const result = await database.query(
+                `SELECT p.*,
+                        a.name AS app_name,
+                        COALESCE(u.display_name, u.email, 'System') AS created_by_name
+                 FROM kodi_pages p
+                 LEFT JOIN kodi_apps a ON a.id = p.linked_app_id
+                 LEFT JOIN users u ON u.id = p.created_by
+                 ORDER BY p.created_at DESC`
+            );
+            return result.rows;
+        }
+        const hasRecordPages = await tableExists('kodi_record_pages');
+        if (hasRecordPages) {
+            const result = await database.query(
+                `SELECT p.id,
+                        p.name AS label,
+                        'record' AS page_type,
+                        CASE WHEN p.is_active THEN 'activated' ELSE 'draft' END AS status,
+                        NULL::uuid AS linked_app_id,
+                        p.layout,
+                        NULL::jsonb AS settings,
+                        p.created_by_user_id AS created_by,
+                        p.created_at,
+                        p.updated_at,
+                        NULL::timestamp AS activated_at,
+                        NULL::text AS app_name,
+                        COALESCE(u.display_name, u.email, 'System') AS created_by_name
+                 FROM kodi_record_pages p
+                 LEFT JOIN users u ON u.id = p.created_by_user_id
+                 ORDER BY p.created_at DESC`
+            );
+            return result.rows;
+        }
+        return [];
+    } catch (error) {
+        logServiceError('listPages', error);
+        const msg = String(error?.message || '');
+        if (msg.includes('relation') && msg.includes('kodi_pages')) {
+            return [];
+        }
+        throw error;
+    }
 };
 
 const getPageById = async (id) => {
-    const result = await database.query(
-        `SELECT *
-         FROM kodi_pages
-         WHERE id = $1`,
-        [id]
-    );
-    return result.rows[0] || null;
+    try {
+        const hasKodiPages = await tableExists('kodi_pages');
+        if (!hasKodiPages) return null;
+        const result = await database.query(
+            `SELECT *
+             FROM kodi_pages
+             WHERE id = $1`,
+            [id]
+        );
+        return result.rows[0] || null;
+    } catch (error) {
+        logServiceError('getPageById', error, { id });
+        throw error;
+    }
 };
 
 const updateLayout = async ({ pageId, layout }) => {
-    const result = await database.query(
-        `UPDATE kodi_pages
-         SET layout = $2,
-             status = 'built',
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
-        [pageId, layout]
-    );
-    return result.rows[0] || null;
+    try {
+        const hasUpdatedAt = await columnExists('kodi_pages', 'updated_at');
+        const result = await database.query(
+            `UPDATE kodi_pages
+             SET layout = $2,
+                 status = 'built'${hasUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''}
+             WHERE id = $1
+             RETURNING *`,
+            [pageId, layout]
+        );
+        return result.rows[0] || null;
+    } catch (error) {
+        logServiceError('updateLayout', error, { pageId });
+        throw error;
+    }
 };
 
 const activatePage = async ({ pageId }) => {
-    const page = await getPageById(pageId);
-    if (!page) return null;
-
-    const result = await database.query(
-        `UPDATE kodi_pages
-         SET status = 'activated',
-             activated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
-        [pageId]
-    );
-    return result.rows[0] || null;
+    try {
+        const page = await getPageById(pageId);
+        if (!page) return null;
+        const hasActivatedAt = await columnExists('kodi_pages', 'activated_at');
+        const result = await database.query(
+            `UPDATE kodi_pages
+             SET status = 'activated'${hasActivatedAt ? ', activated_at = CURRENT_TIMESTAMP' : ''}
+             WHERE id = $1
+             RETURNING *`,
+            [pageId]
+        );
+        return result.rows[0] || null;
+    } catch (error) {
+        logServiceError('activatePage', error, { pageId });
+        throw error;
+    }
 };
 
 const linkPageToApp = async ({ pageId, appId }) => {
-    await database.query(
-        `INSERT INTO app_page_mapping (app_id, page_id)
-         VALUES ($1, $2)
-         ON CONFLICT (app_id, page_id) DO NOTHING`,
-        [appId, pageId]
-    );
-    await database.query(
-        `UPDATE kodi_pages
-         SET linked_app_id = $2
-         WHERE id = $1 AND (linked_app_id IS NULL OR linked_app_id <> $2)`,
-        [pageId, appId]
-    );
+    try {
+        await database.query(
+            `INSERT INTO app_page_mapping (app_id, page_id)
+             VALUES ($1, $2)
+             ON CONFLICT (app_id, page_id) DO NOTHING`,
+            [appId, pageId]
+        );
+        await database.query(
+            `UPDATE kodi_pages
+             SET linked_app_id = $2
+             WHERE id = $1 AND (linked_app_id IS NULL OR linked_app_id <> $2)`,
+            [pageId, appId]
+        );
+    } catch (error) {
+        logServiceError('linkPageToApp', error, { pageId, appId });
+        throw error;
+    }
 };
 
 const findUserByEmail = async (email) => {
@@ -377,11 +469,47 @@ const listPermissions = async (pageId) => {
     return result.rows;
 };
 
-const listComponentRegistry = async () => COMPONENT_REGISTRY.map((component) => ({
-    ...component,
-    defaultLayout: { width: 6, height: 2, minWidth: 2, maxWidth: 12 },
-    defaultProps: { title: component.label }
-}));
+const listComponentRegistry = async () => {
+    try {
+        const hasKodiComponents = await tableExists('kodi_components');
+        const hasKcComponents = await tableExists('kc_kodi_components');
+        if (hasKodiComponents || hasKcComponents) {
+            const tableName = hasKodiComponents ? 'kodi_components' : 'kc_kodi_components';
+            const result = await database.query(
+                `SELECT id,
+                        COALESCE(component_name, name) AS name,
+                        COALESCE(component_name, name) AS label,
+                        COALESCE(component_type, type, 'custom') AS category,
+                        COALESCE(description, '') AS description,
+                        config
+                 FROM ${tableName}
+                 ORDER BY COALESCE(component_name, name)`
+            );
+            return result.rows.map((component) => ({
+                id: component.id,
+                name: component.name,
+                label: component.label || component.name,
+                category: component.category || 'Custom',
+                description: component.description || '',
+                config: component.config || {},
+                defaultLayout: { width: 6, height: 2, minWidth: 2, maxWidth: 12 },
+                defaultProps: { title: component.label || component.name }
+            }));
+        }
+        return COMPONENT_REGISTRY.map((component) => ({
+            ...component,
+            defaultLayout: { width: 6, height: 2, minWidth: 2, maxWidth: 12 },
+            defaultProps: { title: component.label }
+        }));
+    } catch (error) {
+        logServiceError('listComponentRegistry', error);
+        return COMPONENT_REGISTRY.map((component) => ({
+            ...component,
+            defaultLayout: { width: 6, height: 2, minWidth: 2, maxWidth: 12 },
+            defaultProps: { title: component.label }
+        }));
+    }
+};
 
 const listApps = async () => {
     const result = await database.query(
@@ -544,6 +672,94 @@ const insertPermission = async ({ role, pageId, canView, canEdit, canUse }) => {
     );
 };
 
+const removeAppUser = async ({ appId, userId }) => {
+    try {
+        await database.query(
+            `DELETE FROM kodi_app_users WHERE app_id = $1 AND user_id = $2`,
+            [appId, userId]
+        );
+        return true;
+    } catch (error) {
+        logServiceError('removeAppUser', error, { appId, userId });
+        throw error;
+    }
+};
+
+const removePageUser = async ({ pageId, userId }) => {
+    try {
+        await database.query(
+            `DELETE FROM kodi_page_users WHERE page_id = $1 AND user_id = $2`,
+            [pageId, userId]
+        );
+        return true;
+    } catch (error) {
+        logServiceError('removePageUser', error, { pageId, userId });
+        throw error;
+    }
+};
+
+const createComponent = async ({ name, type, description, config }) => {
+    try {
+        const tableName = (await tableExists('kodi_components')) ? 'kodi_components' : 'kc_kodi_components';
+        const result = await database.query(
+            `INSERT INTO ${tableName} (component_name, component_type, code, config)
+             VALUES ($1, $2, $3, $4::jsonb)
+             RETURNING *`,
+            [name, type, description || '', JSON.stringify(config || {})]
+        );
+        return result.rows[0];
+    } catch (error) {
+        logServiceError('createComponent', error, { name, type });
+        throw error;
+    }
+};
+
+const updateComponent = async ({ id, name, type, description, config }) => {
+    try {
+        const tableName = (await tableExists('kodi_components')) ? 'kodi_components' : 'kc_kodi_components';
+        const updates = [];
+        const values = [];
+        let idx = 1;
+        if (name !== undefined) {
+            updates.push(`component_name = $${idx++}`);
+            values.push(name);
+        }
+        if (type !== undefined) {
+            updates.push(`component_type = $${idx++}`);
+            values.push(type);
+        }
+        if (description !== undefined) {
+            updates.push(`code = $${idx++}`);
+            values.push(description);
+        }
+        if (config !== undefined) {
+            updates.push(`config = $${idx++}::jsonb`);
+            values.push(JSON.stringify(config));
+        }
+        if (!updates.length) return null;
+        values.push(id);
+        const result = await database.query(
+            `UPDATE ${tableName} SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx} RETURNING *`,
+            values
+        );
+        return result.rows[0] || null;
+    } catch (error) {
+        logServiceError('updateComponent', error, { id });
+        throw error;
+    }
+};
+
+const deleteComponent = async ({ id }) => {
+    try {
+        const tableName = (await tableExists('kodi_components')) ? 'kodi_components' : 'kc_kodi_components';
+        await database.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
+        return true;
+    } catch (error) {
+        logServiceError('deleteComponent', error, { id });
+        throw error;
+    }
+};
+
 module.exports = {
     createPage,
     listPages,
@@ -571,5 +787,10 @@ module.exports = {
     insertPermission,
     listComponentRegistry,
     DEFAULT_LAYOUT,
-    getAppById
+    getAppById,
+    removeAppUser,
+    removePageUser,
+    createComponent,
+    updateComponent,
+    deleteComponent
 };

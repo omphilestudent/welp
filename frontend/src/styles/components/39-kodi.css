@@ -32,6 +32,33 @@
   margin-bottom: 12px;
 }
 
+.kodi-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #1e293b;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.kodi-back-button:hover {
+  border-color: #6366f1;
+  color: #4338ca;
+  box-shadow: 0 8px 16px rgba(67, 56, 202, 0.12);
+}
+
+.kodi-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .kodi-row {
   display: flex;
   justify-content: space-between;

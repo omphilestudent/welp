@@ -25,8 +25,7 @@ const MarketingTriggerList = ({ triggers = [], onUpdate }) => {
     };
 
     return (
-        <div className="marketing-panel">
-            <h3>Trigger Emails</h3>
+        <div>
             {triggers.map((trigger) => (
                 <div key={trigger.trigger_key} className="marketing-card">
                     <div>

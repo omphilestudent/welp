@@ -16,6 +16,11 @@ const KodiRuntimePage = () => {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        if (!pageId) {
+            setError('Missing page id.');
+            setLoading(false);
+            return;
+        }
         const load = async () => {
             setLoading(true);
             try {

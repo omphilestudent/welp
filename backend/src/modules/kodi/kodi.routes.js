@@ -6,6 +6,13 @@ const controller = require('./kodi.controller');
 
 const router = express.Router();
 
+const isUuidOrInt = (value) => {
+    if (value === undefined || value === null) return false;
+    const str = String(value);
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str) || /^\d+$/.test(str);
+};
+
 router.use(authenticate);
 
 router.post('/pages', controller.createPageValidators, controller.createPage);
@@ -25,8 +32,16 @@ router.post('/apps', controller.createAppValidators, controller.createApp);
 router.put('/apps/:id', controller.updateAppValidators, controller.updateApp);
 router.get('/apps/:id/users', controller.appIdValidator, controller.listAppUsers);
 router.post('/apps/:id/users', controller.assignAppUserValidators, controller.assignAppUser);
+router.delete('/apps/:id/users/:userId', validate([
+    param('id').custom(isUuidOrInt),
+    param('userId').custom(isUuidOrInt)
+]), controller.removeAppUser);
 router.get('/pages/:id/users', controller.pageIdValidator, controller.listPageUsers);
 router.post('/pages/:id/users', controller.assignPageUserValidators, controller.assignPageUser);
+router.delete('/pages/:id/users/:userId', validate([
+    param('id').custom(isUuidOrInt),
+    param('userId').custom(isUuidOrInt)
+]), controller.removePageUser);
 
 router.get('/objects', controller.listObjects);
 router.post('/objects', controller.objectValidators, controller.createObject);
@@ -38,6 +53,9 @@ router.get('/objects/:id/fields', validate([param('id').custom((val) => {
 })]), controller.listObjectFields);
 router.post('/objects/:id/fields', controller.fieldValidators, controller.createObjectField);
 router.get('/components', controller.listComponentRegistry);
+router.post('/components', controller.createComponentValidators, controller.createComponent);
+router.put('/components/:id', controller.updateComponentValidators, controller.updateComponent);
+router.delete('/components/:id', validate([param('id').custom(isUuidOrInt)]), controller.deleteComponent);
 
 router.get('/leads', controller.listLeads);
 router.post('/leads', controller.leadValidators, controller.createLead);

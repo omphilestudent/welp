@@ -195,8 +195,15 @@ const KodiRuntime = () => {
     return (
         <div className="kodi-runtime">
             <header className="kodi-runtime__header">
-                <h1>{payload?.metadata?.label || 'Kodi Page'}</h1>
-                <p>Type: {payload?.metadata?.pageType || 'record'}</p>
+                <div className="kodi-page-header">
+                    <button className="kodi-back-button" onClick={() => navigate('/kodi/times')}>
+                        â† Back
+                    </button>
+                    <div>
+                        <h1>{payload?.metadata?.label || 'Kodi Page'}</h1>
+                        <p>Type: {payload?.metadata?.pageType || 'record'}</p>
+                    </div>
+                </div>
             </header>
             <div className="kodi-runtime__layout">
                 {(payload?.layout?.rows || []).map((row, rowIndex) => (

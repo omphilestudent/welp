@@ -718,6 +718,8 @@ const createTables = async () => {
                 preheader TEXT,
                 html_body TEXT NOT NULL,
                 text_body TEXT,
+                body_html TEXT DEFAULT '',
+                body_text TEXT DEFAULT '',
                 logo_asset_path TEXT DEFAULT 'logo-1.png',
                 is_active BOOLEAN DEFAULT true,
                 created_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -725,6 +727,19 @@ const createTables = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            ALTER TABLE marketing_email_templates
+                ADD COLUMN IF NOT EXISTS body_html TEXT DEFAULT '',
+                ADD COLUMN IF NOT EXISTS body_text TEXT DEFAULT '';
+
+            UPDATE marketing_email_templates
+            SET body_html = COALESCE(body_html, html_body, ''),
+                body_text = COALESCE(body_text, text_body, '')
+            WHERE body_html IS NULL OR body_text IS NULL;
+
+            ALTER TABLE marketing_email_templates
+                ALTER COLUMN body_html SET DEFAULT '',
+                ALTER COLUMN body_html SET NOT NULL;
 
             CREATE TABLE IF NOT EXISTS marketing_campaigns (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1194,42 +1209,60 @@ const insertDefaultData = async () => {
           `);
 
         await pool.query(`
-            INSERT INTO marketing_email_templates (key, name, category, audience, subject, preheader, html_body, text_body, logo_asset_path, is_active)
+            INSERT INTO marketing_email_templates (key, name, category, audience, subject, preheader, html_body, text_body, body_html, body_text, logo_asset_path, is_active)
             VALUES
               ('employee_subscription_campaign','Employee Subscription Campaign','marketing','employee',
                'Your employee support updates','Weekly updates from Welp',
+               '<p>Hi {{first_name}},</p><p>Here are the latest updates for your employee support plan.</p><p><a class="cta" href="{{register_link}}">View your dashboard</a></p>',
+               'Hi {{first_name}}, Here are the latest updates for your employee support plan.',
                '<p>Hi {{first_name}},</p><p>Here are the latest updates for your employee support plan.</p><p><a class="cta" href="{{register_link}}">View your dashboard</a></p>',
                'Hi {{first_name}}, Here are the latest updates for your employee support plan.','logo-1.png',true),
               ('psychologist_subscription_campaign','Psychologist Subscription Campaign','marketing','psychologist',
                'Psychologist partner updates','Weekly updates from Welp',
                '<p>Hi {{first_name}},</p><p>Here are the latest updates for your psychologist partner plan.</p><p><a class="cta" href="{{register_link}}">Open your dashboard</a></p>',
+               'Hi {{first_name}}, Here are the latest updates for your psychologist partner plan.',
+               '<p>Hi {{first_name}},</p><p>Here are the latest updates for your psychologist partner plan.</p><p><a class="cta" href="{{register_link}}">Open your dashboard</a></p>',
                'Hi {{first_name}}, Here are the latest updates for your psychologist partner plan.','logo-1.png',true),
               ('employee_product_participation','Employee Participation Campaign','marketing','employee',
                'Join {{product_name}}','New participation campaign',
+               '<p>Hi {{first_name}},</p><p>We are inviting you to join {{product_name}}.</p><p><strong>Subscription:</strong> {{subscription_name}}</p><p><a class="cta" href="{{register_link}}">Get started</a></p>',
+               'Hi {{first_name}}, Join {{product_name}}. Subscription: {{subscription_name}}. Start here: {{register_link}}',
                '<p>Hi {{first_name}},</p><p>We are inviting you to join {{product_name}}.</p><p><strong>Subscription:</strong> {{subscription_name}}</p><p><a class="cta" href="{{register_link}}">Get started</a></p>',
                'Hi {{first_name}}, Join {{product_name}}. Subscription: {{subscription_name}}. Start here: {{register_link}}','logo-1.png',true),
               ('employee_internal_offers','Employee Internal Offers','marketing','employee',
                'Internal offers from Welp','Limited-time offers',
                '<p>Hi {{first_name}},</p><p>We have internal offers available for you.</p><p><a class="cta" href="{{register_link}}">View offers</a></p>',
+               'Hi {{first_name}}, We have internal offers available. View offers: {{register_link}}',
+               '<p>Hi {{first_name}},</p><p>We have internal offers available for you.</p><p><a class="cta" href="{{register_link}}">View offers</a></p>',
                'Hi {{first_name}}, We have internal offers available. View offers: {{register_link}}','logo-1.png',true),
               ('psychologist_product_participation','Psychologist Participation Campaign','marketing','psychologist',
                'Participate in {{product_name}}','New participation campaign',
+               '<p>Hi {{first_name}},</p><p>We would love your participation in {{product_name}}.</p><p><strong>Program:</strong> {{subscription_name}}</p><p><a class="cta" href="{{register_link}}">Participate now</a></p>',
+               'Hi {{first_name}}, Participate in {{product_name}}. Program: {{subscription_name}}. Join: {{register_link}}',
                '<p>Hi {{first_name}},</p><p>We would love your participation in {{product_name}}.</p><p><strong>Program:</strong> {{subscription_name}}</p><p><a class="cta" href="{{register_link}}">Participate now</a></p>',
                'Hi {{first_name}}, Participate in {{product_name}}. Program: {{subscription_name}}. Join: {{register_link}}','logo-1.png',true),
               ('psychologist_internal_offers','Psychologist Internal Offers','marketing','psychologist',
                'Internal partner offers','Latest partner incentives',
                '<p>Hi {{first_name}},</p><p>Here are your latest partner incentives.</p><p><a class="cta" href="{{register_link}}">View incentives</a></p>',
+               'Hi {{first_name}}, Here are your latest partner incentives. View: {{register_link}}',
+               '<p>Hi {{first_name}},</p><p>Here are your latest partner incentives.</p><p><a class="cta" href="{{register_link}}">View incentives</a></p>',
                'Hi {{first_name}}, Here are your latest partner incentives. View: {{register_link}}','logo-1.png',true),
               ('business_unregistered_review_trigger','Business review outreach','trigger','business',
                'A new review mentions {{company_name}}','Claim your business profile',
+               '<p>Hello,</p><p>A review was recently submitted for {{company_name}} on Welp.</p><p><a class="cta" href="{{register_link}}">Claim your business profile</a></p>',
+               'A review was submitted for {{company_name}}. Claim your profile: {{register_link}}',
                '<p>Hello,</p><p>A review was recently submitted for {{company_name}} on Welp.</p><p><a class="cta" href="{{register_link}}">Claim your business profile</a></p>',
                'A review was submitted for {{company_name}}. Claim your profile: {{register_link}}','logo-1.png',true),
               ('chat_notification_user_recipient','Chat reply notification (user)','trigger','employee',
                'You have a new chat reply','New message waiting',
                '<p>Hi {{first_name}},</p><p>You have a new chat reply waiting in Welp.</p><p><a class="cta" href="{{chat_link}}">Open chat</a></p>',
+               'You have a new chat reply. Open chat: {{chat_link}}',
+               '<p>Hi {{first_name}},</p><p>You have a new chat reply waiting in Welp.</p><p><a class="cta" href="{{chat_link}}">Open chat</a></p>',
                'You have a new chat reply. Open chat: {{chat_link}}','logo-1.png',true),
               ('chat_notification_psychologist_recipient','Chat reply notification (psychologist)','trigger','psychologist',
                'You have a new chat reply','New message waiting',
+               '<p>Hi {{first_name}},</p><p>You have a new chat reply waiting in Welp.</p><p><a class="cta" href="{{chat_link}}">Open chat</a></p>',
+               'You have a new chat reply. Open chat: {{chat_link}}',
                '<p>Hi {{first_name}},</p><p>You have a new chat reply waiting in Welp.</p><p><a class="cta" href="{{chat_link}}">Open chat</a></p>',
                'You have a new chat reply. Open chat: {{chat_link}}','logo-1.png',true)
             ON CONFLICT (key) DO NOTHING;

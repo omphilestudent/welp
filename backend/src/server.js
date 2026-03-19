@@ -185,8 +185,8 @@ app.use('/api/marketing', marketingRoutes);
 app.use('/api/admin/emailCampaigns', emailMarketingRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/tickets', ticketRoutes);
-app.use('/api/kodi', kodiRoutes);
 app.use('/api/kodi/platform', kodiPlatformRoutes);
+app.use('/api/kodi', kodiRoutes);
 
 // RBAC Routes (if available)
 if (authV2Routes && rbacUserRoutes && roleRoutes) {

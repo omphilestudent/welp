@@ -10,8 +10,7 @@ const MarketingSettingsPanel = ({ settings, onSave }) => {
     }, [settings]);
 
     return (
-        <div className="marketing-panel">
-            <h3>Settings</h3>
+        <div>
             <div className="marketing-form">
                 <label>
                     Sender name

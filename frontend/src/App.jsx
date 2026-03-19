@@ -189,7 +189,7 @@ function App() {
                                     path="/kodi"
                                     element={
                                         <PrivateRoute>
-                                            <KodiDashboard />
+                                            <Navigate to="/kodi/times" replace />
                                         </PrivateRoute>
                                     }
                                 />
@@ -221,7 +221,7 @@ function App() {
                                     path="/kodi/builder"
                                     element={
                                         <AdminRoute requiredRole="admin">
-                                            <KodiBuilderPage />
+                                            <Navigate to="/kodi/times" replace />
                                         </AdminRoute>
                                     }
                                 />
@@ -263,7 +263,7 @@ function App() {
                                     <Route path="flows" element={<FlowAdmin />} />
                                     <Route path="flows/advanced" element={<FlowManagement />} />
                                     <Route path="flows/:id/builder" element={<FlowBuilder />} />
-                                    <Route path="kodi/builder" element={<KodiBuilderPage />} />
+                                    <Route path="kodi/builder" element={<Navigate to="/kodi/times" replace />} />
                                     <Route path="calendar" element={<CalendarTroubleshoot />} />
                                     <Route path="subscriptions" element={<SubscriptionManagement />} />
                                     <Route path="settings" element={<SystemSettings />} />

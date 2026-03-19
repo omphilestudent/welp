@@ -5,6 +5,18 @@ const builder = require('./kodi.builder');
 const runtime = require('./kodi.runtime');
 const perms = require('./kodi.permissions');
 
+const logControllerError = (route, error, extra = {}) => {
+    const payload = {
+        route,
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail,
+        stack: error?.stack,
+        ...extra
+    };
+    console.error('❌ Kodi controller error:', payload);
+};
+
 const isUuidOrInt = (value) => {
     if (value === undefined || value === null) return false;
     const str = String(value);
@@ -76,6 +88,19 @@ const fieldValidators = validate([
     body('isRequired').optional().isBoolean(),
     body('isReadonly').optional().isBoolean()
 ]);
+const createComponentValidators = validate([
+    body('name').trim().isLength({ min: 2 }),
+    body('type').optional().trim(),
+    body('description').optional().trim(),
+    body('config').optional().isObject()
+]);
+const updateComponentValidators = validate([
+    param('id').custom(isUuidOrInt),
+    body('name').optional().trim(),
+    body('type').optional().trim(),
+    body('description').optional().trim(),
+    body('config').optional().isObject()
+]);
 const leadValidators = validate([
     body('name').trim().isLength({ min: 2 }),
     body('email').optional().isEmail(),
@@ -99,7 +124,8 @@ const createPage = async (req, res) => {
         });
         return res.status(201).json({ success: true, data: page });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to create page' });
+        logControllerError('createPage', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to create page' });
     }
 };
 
@@ -108,7 +134,8 @@ const listPages = async (req, res) => {
         const pages = await service.listPages();
         return res.json({ success: true, data: pages });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to list pages' });
+        logControllerError('listPages', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to list pages' });
     }
 };
 
@@ -119,7 +146,8 @@ const updateLayout = async (req, res) => {
         if (!page) return res.status(404).json({ success: false, error: 'Page not found' });
         return res.json({ success: true, data: page });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to update layout' });
+        logControllerError('updateLayout', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to update layout' });
     }
 };
 
@@ -141,6 +169,7 @@ const activatePage = async (req, res) => {
 
         return res.json({ success: true, data: activated });
     } catch (error) {
+        logControllerError('activatePage', error);
         return res.status(400).json({ success: false, error: error.message || 'Failed to activate page' });
     }
 };
@@ -155,6 +184,7 @@ const runtimeLoader = async (req, res) => {
         return res.json({ success: true, data: payload });
     } catch (error) {
         const status = error.message === 'Access denied' ? 403 : 500;
+        logControllerError('runtimeLoader', error);
         return res.status(status).json({ success: false, error: error.message || 'Failed to load runtime page' });
     }
 };
@@ -166,7 +196,8 @@ const linkPageToApp = async (req, res) => {
         await service.linkPageToApp({ pageId, appId });
         return res.json({ success: true });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to link page to app' });
+        logControllerError('linkPageToApp', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to link page to app' });
     }
 };
 
@@ -175,7 +206,8 @@ const listApps = async (req, res) => {
         const apps = await service.listApps();
         return res.json({ success: true, data: apps });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load apps' });
+        logControllerError('listApps', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load apps' });
     }
 };
 
@@ -184,7 +216,8 @@ const listAppUsers = async (req, res) => {
         const users = await service.listAppUsers(req.params.id);
         return res.json({ success: true, data: users });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load app users' });
+        logControllerError('listAppUsers', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load app users' });
     }
 };
 
@@ -193,7 +226,8 @@ const listPageUsers = async (req, res) => {
         const users = await service.listPageUsers(req.params.id);
         return res.json({ success: true, data: users });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load page users' });
+        logControllerError('listPageUsers', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load page users' });
     }
 };
 
@@ -207,6 +241,7 @@ const assignPageUser = async (req, res) => {
         });
         return res.json({ success: true, data: payload });
     } catch (error) {
+        logControllerError('assignPageUser', error);
         return res.status(400).json({ success: false, error: error.message || 'Failed to assign user to page' });
     }
 };
@@ -221,7 +256,28 @@ const assignAppUser = async (req, res) => {
         });
         return res.json({ success: true, data: payload });
     } catch (error) {
+        logControllerError('assignAppUser', error);
         return res.status(400).json({ success: false, error: error.message || 'Failed to assign user to app' });
+    }
+};
+
+const removeAppUser = async (req, res) => {
+    try {
+        await service.removeAppUser({ appId: req.params.id, userId: req.params.userId });
+        return res.json({ success: true });
+    } catch (error) {
+        logControllerError('removeAppUser', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to remove app user' });
+    }
+};
+
+const removePageUser = async (req, res) => {
+    try {
+        await service.removePageUser({ pageId: req.params.id, userId: req.params.userId });
+        return res.json({ success: true });
+    } catch (error) {
+        logControllerError('removePageUser', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to remove page user' });
     }
 };
 
@@ -230,7 +286,8 @@ const listObjects = async (req, res) => {
         const objects = await service.listObjects();
         return res.json({ success: true, data: objects });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load objects' });
+        logControllerError('listObjects', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load objects' });
     }
 };
 
@@ -239,7 +296,8 @@ const listComponentRegistry = async (req, res) => {
         const components = await service.listComponentRegistry();
         return res.json({ success: true, data: components });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load components' });
+        logControllerError('listComponentRegistry', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load components' });
     }
 };
 
@@ -253,7 +311,8 @@ const createObject = async (req, res) => {
         });
         return res.status(201).json({ success: true, data: object });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to create object' });
+        logControllerError('createObject', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to create object' });
     }
 };
 
@@ -262,7 +321,8 @@ const listObjectFields = async (req, res) => {
         const fields = await service.listObjectFields(req.params.id);
         return res.json({ success: true, data: fields });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load object fields' });
+        logControllerError('listObjectFields', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load object fields' });
     }
 };
 
@@ -277,7 +337,50 @@ const createObjectField = async (req, res) => {
         });
         return res.status(201).json({ success: true, data: field });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to create field' });
+        logControllerError('createObjectField', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to create field' });
+    }
+};
+
+const createComponent = async (req, res) => {
+    try {
+        const component = await service.createComponent({
+            name: req.body.name,
+            type: req.body.type || 'custom',
+            description: req.body.description,
+            config: req.body.config
+        });
+        return res.status(201).json({ success: true, data: component });
+    } catch (error) {
+        logControllerError('createComponent', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to create component' });
+    }
+};
+
+const updateComponent = async (req, res) => {
+    try {
+        const component = await service.updateComponent({
+            id: req.params.id,
+            name: req.body.name,
+            type: req.body.type,
+            description: req.body.description,
+            config: req.body.config
+        });
+        if (!component) return res.status(404).json({ success: false, error: 'Component not found' });
+        return res.json({ success: true, data: component });
+    } catch (error) {
+        logControllerError('updateComponent', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to update component' });
+    }
+};
+
+const deleteComponent = async (req, res) => {
+    try {
+        await service.deleteComponent({ id: req.params.id });
+        return res.json({ success: true });
+    } catch (error) {
+        logControllerError('deleteComponent', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to delete component' });
     }
 };
 
@@ -286,7 +389,8 @@ const listLeads = async (req, res) => {
         const leads = await service.listLeads();
         return res.json({ success: true, data: leads });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load leads' });
+        logControllerError('listLeads', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load leads' });
     }
 };
 
@@ -301,7 +405,8 @@ const createLead = async (req, res) => {
         });
         return res.status(201).json({ success: true, data: lead });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to create lead' });
+        logControllerError('createLead', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to create lead' });
     }
 };
 
@@ -310,7 +415,8 @@ const listOpportunities = async (req, res) => {
         const opportunities = await service.listOpportunities(req.params.id);
         return res.json({ success: true, data: opportunities });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load opportunities' });
+        logControllerError('listOpportunities', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load opportunities' });
     }
 };
 
@@ -324,7 +430,8 @@ const convertLead = async (req, res) => {
         });
         return res.json({ success: true, data: opportunity });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to convert lead' });
+        logControllerError('convertLead', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to convert lead' });
     }
 };
 
@@ -336,7 +443,8 @@ const createApp = async (req, res) => {
         });
         return res.status(201).json({ success: true, data: app });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to create app' });
+        logControllerError('createApp', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to create app' });
     }
 };
 
@@ -351,7 +459,8 @@ const updateApp = async (req, res) => {
         if (!app) return res.status(404).json({ success: false, error: 'App not found' });
         return res.json({ success: true, data: app });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to update app' });
+        logControllerError('updateApp', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to update app' });
     }
 };
 
@@ -361,7 +470,8 @@ const getPagePermissions = async (req, res) => {
         const rows = await service.listPermissions(pageId);
         return res.json({ success: true, data: perms.formatPermissions(rows) });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Failed to load permissions' });
+        logControllerError('getPagePermissions', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load permissions' });
     }
 };
 
@@ -378,7 +488,8 @@ const updatePagePermissions = async (req, res) => {
         const rows = await service.listPermissions(pageId);
         return res.json({ success: true, data: perms.formatPermissions(rows) });
     } catch (error) {
-        return res.status(400).json({ success: false, error: 'Failed to update permissions' });
+        logControllerError('updatePagePermissions', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to update permissions' });
     }
 };
 
@@ -406,15 +517,22 @@ module.exports = {
     updatePagePermissions,
     listAppUsers,
     assignAppUser,
+    removeAppUser,
     listPageUsers,
     assignPageUser,
+    removePageUser,
     objectValidators,
     fieldValidators,
+    createComponentValidators,
+    updateComponentValidators,
     listObjects,
     listComponentRegistry,
     createObject,
     listObjectFields,
     createObjectField,
+    createComponent,
+    updateComponent,
+    deleteComponent,
     leadValidators,
     convertLeadValidators,
     listLeads,

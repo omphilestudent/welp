@@ -412,6 +412,9 @@ const KodiDashboard = () => {
         <div className="kodi-dashboard">
             <div className="dashboard-header">
                 <div className="header-left">
+                    <button className="kodi-back-button" onClick={() => navigate('/kodi/times')}>
+                        â† Back
+                    </button>
                     <h1>
                         <FiLayout className="header-icon" />
                         Kodi Portal

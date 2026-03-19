@@ -208,6 +208,9 @@ const KodiPage = () => {
         <div className={`kodi-page-container theme-${theme} ${fullscreen ? 'fullscreen' : ''}`}>
             <nav className="kodi-navbar">
                 <div className="navbar-left">
+                    <button className="kodi-back-button" onClick={() => navigate('/kodi/times')} type="button">
+                        â† Back
+                    </button>
                     <button className="nav-icon" onClick={() => setSidebarOpen((p) => !p)} type="button">
                         {sidebarOpen ? <FiX /> : <FiMenu />}
                     </button>
@@ -457,4 +460,3 @@ const KodiPage = () => {
 };
 
 export default KodiPage;
-

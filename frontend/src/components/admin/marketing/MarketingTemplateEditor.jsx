@@ -8,13 +8,16 @@ const MarketingTemplateEditor = ({ template, onSave }) => {
     }, [template]);
 
     if (!template) {
-        return <div className="marketing-panel">Select a template to edit.</div>;
+        return <div className="marketing-panel"><p>Select a template to edit.</p></div>;
     }
 
     return (
         <div className="marketing-panel">
             <div className="marketing-panel__header">
-                <h3>Edit Template</h3>
+                <div>
+                    <div className="marketing-panel__title">Edit Template</div>
+                    <p className="text-xs text-secondary">Update subject lines and content blocks.</p>
+                </div>
                 <button className="btn-primary" onClick={() => onSave(form)}>Save</button>
             </div>
             <div className="marketing-form">

@@ -3,8 +3,7 @@ import React from 'react';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
 const MarketingCampaignScheduler = ({ campaigns = [], onUpdate, onRun }) => (
-    <div className="marketing-panel">
-        <h3>Campaign Scheduler</h3>
+    <div>
         {campaigns.map((campaign) => (
             <div key={campaign.id} className="marketing-card">
                 <div>
