@@ -3,9 +3,15 @@ const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const { createServer } = require('http');
+const dns = require('dns');
 const { Server } = require('socket.io');
 const path = require('path');
 require('dotenv').config();
+
+// Prefer IPv4 to avoid IPv6 DNS reachability issues (ENETUNREACH/ENOTFOUND).
+if (typeof dns.setDefaultResultOrder === 'function') {
+    dns.setDefaultResultOrder('ipv4first');
+}
 
 const { apiLimiter } = require('./middleware/rateLimiter');
 const authRoutes = require('./routes/authRoutes');
