@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FaComment, FaShieldAlt, FaBriefcase, FaBell } from 'react-icons/fa';
+import { FaComment, FaShieldAlt, FaBriefcase, FaBell, FaChevronDown } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import socketService from '../../services/socket';
@@ -18,6 +17,7 @@ const Navbar = () => {
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [openDropdown, setOpenDropdown] = useState(null);
 
     const userId = user?.id || null;
     const userRole = String(user?.role || '').toLowerCase();
@@ -40,7 +40,20 @@ const Navbar = () => {
     useEffect(() => {
         setIsMobileMenuOpen(false);
         setShowNotifications(false);
+        setOpenDropdown(null);
     }, [location.pathname]);
+
+    // Close mobile menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (isMobileMenuOpen && !event.target.closest('.navbar-menu') && !event.target.closest('.navbar-toggle')) {
+                setIsMobileMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [isMobileMenuOpen]);
 
     const checkAdminStatus = async (roleValue) => {
         if (!roleValue) {
@@ -75,17 +88,22 @@ const Navbar = () => {
     };
 
     const handleLogout = async () => {
-        closeMobileMenu();
+        setIsMobileMenuOpen(false);
+        setOpenDropdown(null);
         await logout();
         navigate('/');
     };
 
     const toggleMobileMenu = () => {
-        setIsMobileMenuOpen((prev) => !prev);
+        setIsMobileMenuOpen(!isMobileMenuOpen);
+        if (!isMobileMenuOpen) {
+            setShowNotifications(false);
+            setOpenDropdown(null);
+        }
     };
 
-    const closeMobileMenu = () => {
-        setIsMobileMenuOpen(false);
+    const toggleDropdown = (dropdownName) => {
+        setOpenDropdown(openDropdown === dropdownName ? null : dropdownName);
     };
 
     const fetchNotifications = async () => {
@@ -108,7 +126,6 @@ const Navbar = () => {
                 const exists = prev.some((item) => item.id === notification.id);
                 return exists ? prev : [notification, ...prev].slice(0, 20);
             });
-            void presentNotificationFromPayload(notification);
         });
     };
 
@@ -130,201 +147,291 @@ const Navbar = () => {
         }
     };
 
-    const overlayClass = `navbar-mobile-overlay${isMobileMenuOpen ? ' navbar-mobile-overlay--visible' : ''}`;
+    const closeMobileMenu = () => {
+        setIsMobileMenuOpen(false);
+    };
 
     const renderLink = (to, label, extraClass = '') => (
-        <Link to={to} className={`navbar-link ${extraClass}`.trim()} onClick={closeMobileMenu}>
+        <Link
+            to={to}
+            className={`navbar-link ${extraClass}`.trim()}
+            onClick={closeMobileMenu}
+        >
             {label}
         </Link>
     );
 
     return (
-        <>
-            <nav className="navbar">
-                <div className="navbar-container">
-                    <Link to="/" className="navbar-logo" onClick={closeMobileMenu}>
-                        <img src="/logo-1.png" alt="Welp" className="navbar-logo-image" />
-                        <span>Welp</span>
-                    </Link>
+        <nav className="navbar">
+            <div className="navbar-container">
+                <Link to="/" className="navbar-logo" onClick={closeMobileMenu}>
+                    <img src="/logo-1.png" alt="Welp" className="navbar-logo-image" />
+                    <span>Welp</span>
+                </Link>
 
-                    <div className={`navbar-menu ${isMobileMenuOpen ? 'navbar-menu--open' : ''}`}>
+                {/* Desktop Menu */}
+                <div className="navbar-menu-desktop">
+                    {renderLink('/', 'Home')}
+                    {renderLink('/search', 'Companies')}
+                    {!user && renderLink('/pricing', 'Pricing')}
+                    {!user && renderLink('/register/psychologist', 'Join as Psychologist')}
+
+                    {user && user.role === 'psychologist' && (
+                        renderLink('/messages', 'Messages')
+                    )}
+
+                    {user && user.role === 'business' && (
+                        renderLink('/search', 'Search Companies')
+                    )}
+                </div>
+
+                {/* Desktop Controls */}
+                <div className="navbar-controls">
+                    {!user && (
+                        <div className="navbar-auth-desktop">
+                            <Link to="/login" className="btn btn-primary navbar-auth-btn">
+                                Login
+                            </Link>
+                            <Link to="/register" className="btn btn-secondary navbar-auth-btn">
+                                Sign Up
+                            </Link>
+                        </div>
+                    )}
+
+                    {user && (
+                        <>
+                            <div className="nav-notification">
+                                <button
+                                    className="notification-btn"
+                                    onClick={() => setShowNotifications(!showNotifications)}
+                                    aria-label="Notifications"
+                                >
+                                    <FaBell />
+                                    {notifications.filter((n) => !n.is_read).length > 0 && (
+                                        <span className="notification-badge">
+                                            {notifications.filter((n) => !n.is_read).length}
+                                        </span>
+                                    )}
+                                </button>
+                                {showNotifications && (
+                                    <div className="notification-menu">
+                                        <h4>Notifications</h4>
+                                        {notifications.length === 0 ? (
+                                            <div className="notification-empty">No notifications yet.</div>
+                                        ) : (
+                                            notifications.map((notification) => (
+                                                <div
+                                                    key={notification.id}
+                                                    className={`notification-item ${notification.is_read ? 'read' : 'unread'}`}
+                                                    onClick={() => handleNotificationClick(notification)}
+                                                >
+                                                    <p>{notification.message}</p>
+                                                    <small>{new Date(notification.created_at).toLocaleString()}</small>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Desktop Dropdowns */}
+                            {isAdmin && (
+                                <div className="nav-dropdown">
+                                    <button
+                                        className="nav-dropdown-btn"
+                                        onClick={() => toggleDropdown('admin')}
+                                    >
+                                        <FaShieldAlt /> Admin <FaChevronDown />
+                                    </button>
+                                    {openDropdown === 'admin' && (
+                                        <div className="nav-dropdown-content">
+                                            <Link to="/admin/dashboard" onClick={() => setOpenDropdown(null)}>Dashboard</Link>
+                                            <Link to="/admin/users" onClick={() => setOpenDropdown(null)}>Users</Link>
+                                            <Link to="/admin/pricing" onClick={() => setOpenDropdown(null)}>Pricing</Link>
+                                            <Link to="/admin/companies" onClick={() => setOpenDropdown(null)}>Companies</Link>
+                                            <Link to="/admin/reviews" onClick={() => setOpenDropdown(null)}>Reviews</Link>
+                                            <Link to="/admin/subscriptions" onClick={() => setOpenDropdown(null)}>Subscriptions</Link>
+                                            {user.role === 'super_admin' && (
+                                                <Link to="/admin/settings" onClick={() => setOpenDropdown(null)}>Settings</Link>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {isHR && (
+                                <div className="nav-dropdown">
+                                    <button
+                                        className="nav-dropdown-btn"
+                                        onClick={() => toggleDropdown('hr')}
+                                    >
+                                        <FaBriefcase /> HR <FaChevronDown />
+                                    </button>
+                                    {openDropdown === 'hr' && (
+                                        <div className="nav-dropdown-content">
+                                            <Link to="/hr/dashboard" onClick={() => setOpenDropdown(null)}>Dashboard</Link>
+                                            <Link to="/hr/jobs" onClick={() => setOpenDropdown(null)}>Job Postings</Link>
+                                            <Link to="/hr/applications" onClick={() => setOpenDropdown(null)}>Applications</Link>
+                                            <Link to="/hr/interviews" onClick={() => setOpenDropdown(null)}>Interviews</Link>
+                                            <Link to="/hr/employees" onClick={() => setOpenDropdown(null)}>Employee Relations</Link>
+                                            <Link to="/hr/departments" onClick={() => setOpenDropdown(null)}>Departments</Link>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <Link to="/settings" className="navbar-avatar" aria-label="Profile">
+                                {user?.avatar_url ? (
+                                    <AvatarImage src={user.avatar_url} alt={user.display_name || 'Profile'} />
+                                ) : (
+                                    <span className="navbar-avatar-placeholder">
+                                        {(user?.display_name || user?.email || 'U').charAt(0).toUpperCase()}
+                                    </span>
+                                )}
+                            </Link>
+
+                            <button onClick={handleLogout} className="btn btn-primary navbar-logout-btn">
+                                Logout
+                            </button>
+                        </>
+                    )}
+
+                    <button
+                        type="button"
+                        className={`navbar-toggle ${isMobileMenuOpen ? 'active' : ''}`}
+                        onClick={toggleMobileMenu}
+                        aria-expanded={isMobileMenuOpen}
+                        aria-label="Toggle navigation menu"
+                    >
+                        <span />
+                        <span />
+                        <span />
+                    </button>
+                </div>
+
+                {/* Mobile Menu - No Overlay */}
+                <div className={`navbar-menu-mobile ${isMobileMenuOpen ? 'open' : ''}`}>
+                    <div className="mobile-menu-header">
+                        {user ? (
+                            <div className="mobile-user-info">
+                                <div className="mobile-avatar">
+                                    {user?.avatar_url ? (
+                                        <AvatarImage src={user.avatar_url} alt={user.display_name || 'Profile'} />
+                                    ) : (
+                                        <span className="mobile-avatar-placeholder">
+                                            {(user?.display_name || user?.email || 'U').charAt(0).toUpperCase()}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="mobile-user-details">
+                                    <div className="mobile-user-name">{user?.display_name || user?.email}</div>
+                                    <div className="mobile-user-role">{user?.role || 'User'}</div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mobile-auth-buttons">
+                                <Link to="/login" className="mobile-auth-btn primary" onClick={closeMobileMenu}>
+                                    Login
+                                </Link>
+                                <Link to="/register" className="mobile-auth-btn secondary" onClick={closeMobileMenu}>
+                                    Sign Up
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mobile-menu-links">
                         {renderLink('/', 'Home')}
                         {renderLink('/search', 'Companies')}
+
                         {!user && (
                             <>
                                 {renderLink('/pricing', 'Pricing')}
-                                <Link
-                                    to="/login"
-                                    className="btn btn-primary navbar-auth-btn"
-                                    onClick={closeMobileMenu}
-                                >
-                                    Login
-                                </Link>
-                                <Link
-                                    to="/register"
-                                    className="btn btn-secondary navbar-auth-btn"
-                                    onClick={closeMobileMenu}
-                                >
-                                    Sign Up
-                                </Link>
+                                {renderLink('/register/psychologist', 'Join as Psychologist')}
                             </>
                         )}
 
-                        {!user && renderLink('/register/psychologist', 'Join as Psychologist')}
-
-                        {user ? (
+                        {user && (
                             <>
                                 {user.role === 'employee' && (
                                     <>
-                                        <Link to="/dashboard" className="btn btn-primary navbar-dashboard-btn" onClick={closeMobileMenu}>
-                                            Dashboard
-                                        </Link>
+                                        {renderLink('/dashboard', 'Dashboard')}
+                                        {renderLink('/messages', 'Messages')}
                                     </>
                                 )}
 
                                 {user.role === 'psychologist' && (
                                     <>
-                                        <Link to="/dashboard" className="btn btn-secondary" onClick={closeMobileMenu}>
-                                            Dashboard
-                                        </Link>
-                                        <Link to="/messages" className="navbar-link" onClick={closeMobileMenu}>
-                                            Messages
-                                        </Link>
+                                        {renderLink('/dashboard', 'Dashboard')}
+                                        {renderLink('/messages', 'Messages')}
                                     </>
                                 )}
 
                                 {user.role === 'business' && (
                                     <>
-                                        <Link to="/search" className="navbar-link" onClick={closeMobileMenu}>
-                                            Search Companies
-                                        </Link>
-                                        <Link to="/dashboard" className="navbar-link" onClick={closeMobileMenu}>
-                                            Business Dashboard
-                                        </Link>
+                                        {renderLink('/search', 'Search Companies')}
+                                        {renderLink('/dashboard', 'Business Dashboard')}
                                     </>
                                 )}
 
-                                {}
                                 {isAdmin && (
-                                    <div className="nav-dropdown">
-                                        <button className="nav-dropdown-btn">
-                                            <FaShieldAlt /> Admin
+                                    <div className="mobile-dropdown">
+                                        <button
+                                            className="mobile-dropdown-btn"
+                                            onClick={() => toggleDropdown('admin-mobile')}
+                                        >
+                                            <FaShieldAlt /> Admin <FaChevronDown />
                                         </button>
-                                        <div className="nav-dropdown-content">
-                                            <Link to="/admin/dashboard" onClick={closeMobileMenu}>Dashboard</Link>
-                                            <Link to="/admin/users" onClick={closeMobileMenu}>Users</Link>
-                                            <Link to="/admin/pricing" onClick={closeMobileMenu}>Pricing</Link>
-                                            <Link to="/admin/companies" onClick={closeMobileMenu}>Companies</Link>
-                                            <Link to="/admin/reviews" onClick={closeMobileMenu}>Reviews</Link>
-                                            <Link to="/admin/subscriptions" onClick={closeMobileMenu}>Subscriptions</Link>
-                                            {user.role === 'super_admin' && (
-                                                <Link to="/admin/settings" onClick={closeMobileMenu}>Settings</Link>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {}
-                                {isHR && (
-                                    <div className="nav-dropdown">
-                                        <button className="nav-dropdown-btn">
-                                            <FaBriefcase /> HR
-                                        </button>
-                                        <div className="nav-dropdown-content">
-                                            <Link to="/hr/dashboard" onClick={closeMobileMenu}>Dashboard</Link>
-                                            <Link to="/hr/jobs" onClick={closeMobileMenu}>Job Postings</Link>
-                                            <Link to="/hr/applications" onClick={closeMobileMenu}>Applications</Link>
-                                            <Link to="/hr/interviews" onClick={closeMobileMenu}>Interviews</Link>
-                                            <Link to="/hr/employees" onClick={closeMobileMenu}>Employee Relations</Link>
-                                            <Link to="/hr/departments" onClick={closeMobileMenu}>Departments</Link>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {user.role === 'employee' && (
-                                    <Link to="/messages" className="btn btn-primary" onClick={closeMobileMenu}>
-                                        <FaComment /> Messages
-                                    </Link>
-                                )}
-
-                                <button onClick={handleLogout} className="btn btn-primary">
-                                    Logout
-                                </button>
-                            </>
-                        ) : null}
-                    </div>
-                    <div className="navbar-controls">
-                        {user && (
-                            <>
-                                <div className="nav-notification">
-                                    <button
-                                        className="notification-btn"
-                                        onClick={() => setShowNotifications(!showNotifications)}
-                                        aria-label="Notifications"
-                                    >
-                                        <FaBell />
-                                        {notifications.filter((n) => !n.is_read).length > 0 && (
-                                            <span className="notification-badge">
-                                                {notifications.filter((n) => !n.is_read).length}
-                                            </span>
+                                        {openDropdown === 'admin-mobile' && (
+                                            <div className="mobile-dropdown-content">
+                                                <Link to="/admin/dashboard" onClick={closeMobileMenu}>Dashboard</Link>
+                                                <Link to="/admin/users" onClick={closeMobileMenu}>Users</Link>
+                                                <Link to="/admin/pricing" onClick={closeMobileMenu}>Pricing</Link>
+                                                <Link to="/admin/companies" onClick={closeMobileMenu}>Companies</Link>
+                                                <Link to="/admin/reviews" onClick={closeMobileMenu}>Reviews</Link>
+                                                <Link to="/admin/subscriptions" onClick={closeMobileMenu}>Subscriptions</Link>
+                                                {user.role === 'super_admin' && (
+                                                    <Link to="/admin/settings" onClick={closeMobileMenu}>Settings</Link>
+                                                )}
+                                            </div>
                                         )}
-                                    </button>
-                                    {showNotifications && (
-                                        <div className="notification-menu">
-                                            <h4>Notifications</h4>
-                                            {notifications.length === 0 ? (
-                                                <div className="notification-empty">No notifications yet.</div>
-                                            ) : (
-                                                notifications.map((notification) => (
-                                                    <div
-                                                        key={notification.id}
-                                                        className={`notification-item ${notification.is_read ? 'read' : 'unread'}`}
-                                                        onClick={() => handleNotificationClick(notification)}
-                                                    >
-                                                        <p>{notification.message}</p>
-                                                        <small>{new Date(notification.created_at).toLocaleString()}</small>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                                <Link to="/settings" className="navbar-avatar" aria-label="Profile" onClick={closeMobileMenu}>
-                                    {user?.avatar_url ? (
-                                        <AvatarImage src={user.avatar_url} alt={user.display_name || 'Profile'} />
-                                    ) : (
-                                        <span className="navbar-avatar-placeholder">
-                                            {(user?.display_name || user?.email || 'U').charAt(0).toUpperCase()}
-                                        </span>
-                                    )}
-                                </Link>
+                                    </div>
+                                )}
+
+                                {isHR && (
+                                    <div className="mobile-dropdown">
+                                        <button
+                                            className="mobile-dropdown-btn"
+                                            onClick={() => toggleDropdown('hr-mobile')}
+                                        >
+                                            <FaBriefcase /> HR <FaChevronDown />
+                                        </button>
+                                        {openDropdown === 'hr-mobile' && (
+                                            <div className="mobile-dropdown-content">
+                                                <Link to="/hr/dashboard" onClick={closeMobileMenu}>Dashboard</Link>
+                                                <Link to="/hr/jobs" onClick={closeMobileMenu}>Job Postings</Link>
+                                                <Link to="/hr/applications" onClick={closeMobileMenu}>Applications</Link>
+                                                <Link to="/hr/interviews" onClick={closeMobileMenu}>Interviews</Link>
+                                                <Link to="/hr/employees" onClick={closeMobileMenu}>Employee Relations</Link>
+                                                <Link to="/hr/departments" onClick={closeMobileMenu}>Departments</Link>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </>
                         )}
-                        <button
-                            type="button"
-                            className={`navbar-toggle${isMobileMenuOpen ? ' active' : ''}`}
-                            onClick={toggleMobileMenu}
-                            aria-expanded={isMobileMenuOpen}
-                            aria-label="Toggle navigation menu"
-                        >
-                            <span />
-                            <span />
-                            <span />
-                        </button>
                     </div>
+
+                    {user && (
+                        <div className="mobile-menu-footer">
+                            <button onClick={handleLogout} className="mobile-logout-btn">
+                                Logout
+                            </button>
+                        </div>
+                    )}
                 </div>
-            </nav>
-
-            {isMobileMenuOpen && (
-                <div
-                    className={overlayClass}
-                    onClick={closeMobileMenu}
-                    aria-hidden="true"
-                    role="presentation"
-                />
-            )}
-
-        </>
+            </div>
+        </nav>
     );
 };
 
