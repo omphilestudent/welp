@@ -441,6 +441,43 @@ const Navbar = () => {
                     </div>
 
                     {user && (
+                        <div className="mobile-notifications">
+                            <button
+                                type="button"
+                                className="notification-btn mobile-notification-btn"
+                                onClick={() => setShowNotifications((prev) => !prev)}
+                                aria-label="Notifications"
+                            >
+                                <FaBell />
+                                {notifications.filter((n) => !n.is_read).length > 0 && (
+                                    <span className="notification-badge">
+                                        {notifications.filter((n) => !n.is_read).length}
+                                    </span>
+                                )}
+                            </button>
+                            {showNotifications && (
+                                <div className="notification-menu mobile-notification-menu">
+                                    <h4>Notifications</h4>
+                                    {notifications.length === 0 ? (
+                                        <div className="notification-empty">No notifications yet.</div>
+                                    ) : (
+                                        notifications.map((notification) => (
+                                            <div
+                                                key={notification.id}
+                                                className={`notification-item ${notification.is_read ? 'read' : 'unread'}`}
+                                                onClick={() => handleNotificationClick(notification)}
+                                            >
+                                                <p>{notification.message}</p>
+                                                <small>{new Date(notification.created_at).toLocaleString()}</small>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {user && (
                         <div className="mobile-menu-footer">
                             <button onClick={handleLogout} className="mobile-logout-btn">
                                 Logout

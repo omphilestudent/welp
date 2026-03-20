@@ -4,7 +4,8 @@ import { useAuth } from '../hooks/useAuth';
 import LoginForm from '../components/auth/LoginForm';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import './Login.css';
+import './Login.layout.css';
+import './Login.card.css';
 
 const Login = () => {
     const navigate = useNavigate();

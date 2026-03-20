@@ -899,6 +899,10 @@ const Messages = () => {
 
     const handleSelectConversation = (conversation) => {
         setActiveConversation(conversation);
+        if (conversation?.id) {
+            setSearchParams({ conversation: conversation.id });
+            fetchMessages(conversation.id);
+        }
         setIsSidebarOpen(false);
     };
 

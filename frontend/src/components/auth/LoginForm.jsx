@@ -213,6 +213,7 @@ const LoginForm = ({
     };
 
     const passwordStrength = getPasswordStrength(formData.password);
+    const strengthClass = `strength-${passwordStrength.strength}`;
 
     // Determine which errors to display
     const displayErrors = Object.keys(propErrors).length > 0 ? propErrors : localErrors;
@@ -343,15 +344,9 @@ const LoginForm = ({
                 {formData.password && !displayErrors.password && (
                     <div className="password-strength" id="password-strength">
                         <div className="strength-bar">
-                            <div
-                                className="strength-fill"
-                                style={{
-                                    width: `${(passwordStrength.strength / 5) * 100}%`,
-                                    backgroundColor: passwordStrength.color
-                                }}
-                            />
+                            <div className={`strength-fill ${strengthClass}`} />
                         </div>
-                        <span className="strength-text" style={{ color: passwordStrength.color }}>
+                        <span className={`strength-text ${strengthClass}`}>
                             {passwordStrength.label}
                         </span>
                     </div>

@@ -665,6 +665,7 @@
   white-space: nowrap;
 }
 
+/* Messages thread container with independent scroll */
 .messages-thread-container {
   flex: 1;
   overflow-y: auto;
@@ -754,6 +755,7 @@
   }
 }
 
+/* WhatsApp-like message bubbles */
 .message-bubble {
   max-width: 65%;
   padding: 0.75rem 1.25rem;
@@ -853,6 +855,7 @@
   color: #34b7f1;
 }
 
+/* WhatsApp-like input form */
 .message-input-form {
   padding: 1.25rem 1.5rem;
   border-top: 1px solid var(--border-color);
@@ -972,15 +975,28 @@
   color: var(--accent-color);
 }
 
+/* WhatsApp-like send button */
 .send-btn {
   background: var(--accent-color);
   color: white;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
 .send-btn:hover {
   background: var(--accent-hover);
   color: white;
   transform: scale(1.05);
+}
+
+.send-btn:active {
+  transform: scale(0.95);
 }
 
 .pending-message {
@@ -1387,7 +1403,7 @@
   }
 }
 
-/* Mobile Responsive */
+/* Mobile Responsive - Enhanced with independent scrolling */
 @media (max-width: 900px) {
   .employee-support-panel {
     grid-template-columns: 1fr;
@@ -1538,8 +1554,11 @@
     font-size: 1rem;
   }
 
+  /* Independent scroll for messages */
   .messages-thread-container {
     padding: 1rem 1rem 6rem;
+    height: calc(100vh - 140px);
+    overflow-y: auto;
   }
 
   .message-bubble {
@@ -1552,6 +1571,7 @@
     font-size: 0.6rem;
   }
 
+  /* WhatsApp-like input on mobile */
   .message-input-form {
     flex-direction: column;
     gap: 0.75rem;
@@ -1569,6 +1589,11 @@
   .message-input {
     min-height: 52px;
     border-radius: 18px;
+  }
+
+  .send-btn {
+    width: 44px;
+    height: 44px;
   }
 
   .employee-support-panel {
@@ -1637,7 +1662,7 @@
 }
 
 /* Extra small devices */
-@media (max-width: 380px) {
+@media (max-width: 480px) {
   .conversation-avatar {
     width: 44px;
     height: 44px;
@@ -1661,6 +1686,16 @@
     width: 36px;
     height: 36px;
   }
+
+  .send-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .message-mic-btn {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 /* Safe area support */
@@ -1679,11 +1714,70 @@
   }
 
   .messages-sidebar-fab {
-    bottom: calc(1rem + env(safe-area-inset-bottom));
+    bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
 
 /* Prevent body scroll when sidebar open */
 body.sidebar-open {
   overflow: hidden;
+}
+
+/* Smooth scroll behavior */
+@media (prefers-reduced-motion: no-preference) {
+  .messages-thread-container {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .messages-thread-container,
+  .conversation-item,
+  .message-bubble,
+  .send-btn,
+  .message-mic-btn {
+    transition: none;
+    animation: none;
+    scroll-behavior: auto;
+  }
+}
+
+/* Typing indicator */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.5rem 1rem;
+  background: var(--card-bg);
+  border-radius: 18px;
+  width: fit-content;
+  margin-bottom: 0.5rem;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typingAnimation 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingAnimation {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
 }

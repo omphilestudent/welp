@@ -15,7 +15,8 @@ import {
 
 import { kodiPageLogin, setKodiPageToken } from '../../services/kodiPageService';
 
-import './KodiLogin.css';
+import './KodiLogin.layout.css';
+import './KodiLogin.form.css';
 
 const KodiLogin = () => {
     const { slug } = useParams();
@@ -42,8 +43,7 @@ const KodiLogin = () => {
         if (!pageSlug) return;
         setPageInfo({
             name: pageSlug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-            description: 'Secure access to Kodi page content',
-            bgColor: '#4361ee'
+            description: 'Secure access to Kodi page content'
         });
     }, [pageSlug]);
 
@@ -136,7 +136,7 @@ const KodiLogin = () => {
                     </p>
                 </div>
 
-                <div className="page-info-banner" style={{ background: pageInfo?.bgColor }}>
+                <div className="page-info-banner">
                     <FiKey className="banner-icon" />
                     <div className="banner-content">
                         <span className="banner-title">{pageInfo?.name || pageSlug}</span>
@@ -242,4 +242,3 @@ const KodiLogin = () => {
 };
 
 export default KodiLogin;
-

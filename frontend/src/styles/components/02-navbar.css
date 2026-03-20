@@ -647,6 +647,25 @@
     animation: slideUp 0.3s ease;
   }
 
+  .mobile-notifications {
+    padding: 16px;
+  }
+
+  .mobile-notification-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .mobile-notification-menu {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 12px;
+    border-radius: 16px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
   @keyframes slideUp {
     from {
       transform: translateY(100%);
