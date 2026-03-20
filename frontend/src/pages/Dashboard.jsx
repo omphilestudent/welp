@@ -404,6 +404,8 @@ const Dashboard = () => {
     const advertisingUnlocked = user?.role === 'business' && (planPermissions.adsEnabled || planTierIsPremium || isBusinessPremiumCode || premiumExceptionActive);
     const analyticsUnlocked = user?.role === 'business' && (planPermissions.analytics || planTierIsPremium || isBusinessPremiumCode || premiumExceptionActive);
     const [userReviews, setUserReviews] = useState([]);
+    const [dailyChecklist, setDailyChecklist] = useState(null);
+    const [dailyChecklistLoading, setDailyChecklistLoading] = useState(false);
     const [pendingRequests, setPendingRequests] = useState([]);
     const [myCompanies, setMyCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -848,6 +850,7 @@ const Dashboard = () => {
                 ]);
                 setUserReviews(reviewsRes.data?.reviews || []);
                 setPendingRequests(requestsRes.data || []);
+                await fetchDailyChecklist();
             } else if (user?.role === 'business') {
                 const companiesRes = await api.get('/companies/my-companies');
                 const companies = companiesRes.data || [];
@@ -876,6 +879,28 @@ const Dashboard = () => {
             console.error(err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchDailyChecklist = async () => {
+        setDailyChecklistLoading(true);
+        try {
+            const { data } = await api.get('/reviews/daily-checklist');
+            setDailyChecklist(data);
+        } catch (error) {
+            console.error('Failed to load daily checklist', error);
+            setDailyChecklist(null);
+        } finally {
+            setDailyChecklistLoading(false);
+        }
+    };
+
+    const openDailyReview = () => {
+        const workplaceId = user?.workplace?.id || user?.workplace_id || dailyChecklist?.workplaceId;
+        if (workplaceId) {
+            window.location.href = `/companies/${workplaceId}?reviewTab=daily_work_review`;
+        } else {
+            toast.error('Add a workplace in your profile to submit daily reviews.');
         }
     };
 
@@ -1336,6 +1361,47 @@ const Dashboard = () => {
                     {/* ── Employee: Reviews ── */}
                     {user?.role === 'employee' && activeTab === 'reviews' && (
                         <div className="my-reviews-section">
+                            <div className="daily-checklist-card">
+                                <div className="daily-checklist-header">
+                                    <div>
+                                        <h3>Daily work review checklist</h3>
+                                        <p>Track your daily work experience submissions for this week.</p>
+                                    </div>
+                                    <button type="button" className="btn btn-outline btn-small" onClick={openDailyReview}>
+                                        Submit daily review
+                                    </button>
+                                </div>
+                                {dailyChecklistLoading ? (
+                                    <p className="empty-message">Loading checklistâ€¦</p>
+                                ) : dailyChecklist?.days?.length ? (
+                                    <div className="daily-checklist-grid">
+                                        {dailyChecklist.days.map((day) => (
+                                            <button
+                                                key={day.date || day.label}
+                                                type="button"
+                                                className={`daily-checklist-day ${day.completed ? 'is-complete' : ''} ${day.isToday ? 'is-today' : ''}`}
+                                                onClick={() => {
+                                                    if (!day.completed) {
+                                                        openDailyReview();
+                                                    }
+                                                }}
+                                            >
+                                                <span className="daily-checklist-label">{day.label}</span>
+                                                <span className="daily-checklist-date">
+                                                    {day.date ? format(new Date(day.date), 'MMM d') : '--'}
+                                                </span>
+                                                <span className="daily-checklist-status">
+                                                    {day.completed ? 'Done' : 'Missing'}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="empty-message">
+                                        Add your workplace to unlock daily review tracking.
+                                    </p>
+                                )}
+                            </div>
                             <h3>My Reviews</h3>
                             {userReviews.length > 0
                                 ? <ReviewList reviews={userReviews} />

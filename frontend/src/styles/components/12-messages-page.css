@@ -1562,7 +1562,8 @@
     top: 0;
     z-index: 20;
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .thread-back-button {
@@ -1595,8 +1596,8 @@
 
   /* Independent scroll for messages */
   .messages-thread-container {
-    padding: 1rem 1rem 6rem;
-    height: calc(100vh - 140px);
+    padding: 0.75rem 1rem 6rem;
+    height: calc(100vh - 150px);
     overflow-y: auto;
   }
 
@@ -1649,8 +1650,22 @@
 
   .thread-actions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
     flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .thread-actions .btn {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    border-radius: 10px;
+  }
+
+  .thread-call-limit {
+    width: 100%;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
   }
 
   .messages-sidebar-fab {

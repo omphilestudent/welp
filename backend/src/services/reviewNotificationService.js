@@ -1,5 +1,6 @@
 const { query } = require('../utils/database');
 const { sendReviewNotificationEmail } = require('../utils/emailService');
+const { resolveReviewTypeLabel } = require('../utils/reviewTypes');
 
 const APP_BASE_URL = process.env.APP_BASE_URL
     || process.env.FRONTEND_URL
@@ -109,6 +110,9 @@ const fetchReviewContext = async (reviewId) => {
     const result = await query(
         `SELECT
             r.*,
+            r.review_type,
+            r.review_stage,
+            r.review_date,
             c.name          AS company_name,
             c.email         AS company_email,
             c.website       AS company_website,
@@ -162,7 +166,10 @@ const formatReviewMetadata = (context) => {
     return {
         reviewerName,
         reviewDate,
-        location
+        location,
+        reviewTypeLabel: resolveReviewTypeLabel(context.review_type),
+        reviewStage: context.review_stage || null,
+        reviewDateValue: context.review_date || null
     };
 };
 
@@ -251,6 +258,9 @@ const triggerReviewNotification = async (reviewId, { force = false, adminId = nu
         reviewerName,
         reviewLocation,
         companyCountry: context.company_country,
+        reviewType: context.review_type,
+        reviewStage: context.review_stage,
+        reviewTypeLabel: metadata.reviewTypeLabel,
         dashboardUrl,
         respondUrl,
         claimUrl,
@@ -284,6 +294,8 @@ const triggerReviewNotification = async (reviewId, { force = false, adminId = nu
             reviewExcerpt: context.content?.slice(0, 280) || '',
             reviewDate: reviewDateReadable,
             type: emailPayload.type,
+            reviewType: context.review_type,
+            reviewStage: context.review_stage,
             location: reviewLocation
         },
         triggeredBy: adminId,

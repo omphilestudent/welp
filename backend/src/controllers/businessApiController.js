@@ -1,5 +1,6 @@
 const { query } = require('../utils/database');
 const { businessHasFeature } = require('../utils/businessPlan');
+const { REVIEW_TYPES, normalizeReviewType } = require('../utils/reviewTypes');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -27,16 +28,16 @@ const getBusinessApiAnalytics = async (req, res) => {
                  COUNT(CASE WHEN NOT COALESCE(r.is_anonymous, u.is_anonymous, false) THEN 1 END) as employee_reviews
              FROM reviews r
                       LEFT JOIN users u ON r.author_id = u.id
-             WHERE r.company_id = $1`,
-            [companyId]
+             WHERE r.company_id = $1 AND r.review_type = $2`,
+            [companyId, REVIEW_TYPES.COMPANY]
         );
 
         const distributionResult = await query(
             `SELECT rating, COUNT(*) as count
              FROM reviews
-             WHERE company_id = $1
+             WHERE company_id = $1 AND review_type = $2
              GROUP BY rating`,
-            [companyId]
+            [companyId, REVIEW_TYPES.COMPANY]
         );
 
         const metrics = metricsResult.rows[0] || {};
@@ -75,15 +76,17 @@ const getBusinessApiReviews = async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
         const offset = (page - 1) * limit;
 
+        const reviewType = req.query.type ? normalizeReviewType(req.query.type) : REVIEW_TYPES.COMPANY;
         const result = await query(
             `SELECT r.*, u.display_name as author_name
              FROM reviews r
                       LEFT JOIN users u ON r.author_id = u.id
              WHERE r.company_id = $1
                AND r.is_public = true
+               AND r.review_type = $4
              ORDER BY r.created_at DESC
              LIMIT $2 OFFSET $3`,
-            [companyId, limit, offset]
+            [companyId, limit, offset, reviewType]
         );
 
         res.json({ reviews: result.rows, page, limit });

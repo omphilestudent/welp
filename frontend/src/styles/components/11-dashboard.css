@@ -1502,3 +1502,74 @@
   }
 }
 
+/* Daily review checklist */
+.daily-checklist-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--card-shadow);
+}
+
+.daily-checklist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.daily-checklist-header h3 {
+  margin: 0 0 0.25rem 0;
+}
+
+.daily-checklist-header p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.daily-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.daily-checklist-day {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 0.75rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.daily-checklist-day.is-complete {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.daily-checklist-day.is-today {
+  border-color: var(--accent-color);
+}
+
+.daily-checklist-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.daily-checklist-date {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.daily-checklist-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}

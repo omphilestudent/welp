@@ -378,6 +378,10 @@ const createTables = async () => {
                 author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
                 content TEXT NOT NULL,
+                review_type VARCHAR(32) DEFAULT 'company_review',
+                review_stage VARCHAR(32),
+                review_date DATE,
+                review_week_start DATE,
                 is_public BOOLEAN DEFAULT true,
                 is_anonymous BOOLEAN DEFAULT false,
                 moderated_by UUID REFERENCES users(id),
@@ -409,6 +413,16 @@ const createTables = async () => {
                 trigger_source VARCHAR(32) DEFAULT 'system',
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS review_daily_reminder_logs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                reminder_date DATE NOT NULL,
+                status VARCHAR(24) DEFAULT 'sent',
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, reminder_date)
             );
 
             -- Replies table
@@ -1117,6 +1131,11 @@ const createTables = async () => {
             CREATE INDEX IF NOT EXISTS idx_users_workplace                  ON users(workplace_id);
             CREATE INDEX IF NOT EXISTS idx_reviews_company_id               ON reviews(company_id);
             CREATE INDEX IF NOT EXISTS idx_reviews_author_id                ON reviews(author_id);
+            CREATE INDEX IF NOT EXISTS idx_reviews_company_type            ON reviews(company_id, review_type);
+            CREATE INDEX IF NOT EXISTS idx_reviews_author_type             ON reviews(author_id, review_type);
+            CREATE INDEX IF NOT EXISTS idx_reviews_type_date               ON reviews(review_type, review_date);
+            CREATE INDEX IF NOT EXISTS idx_reviews_author_date             ON reviews(author_id, review_date);
+            CREATE INDEX IF NOT EXISTS idx_review_reminders_user_date      ON review_daily_reminder_logs(user_id, reminder_date);
             CREATE INDEX IF NOT EXISTS idx_companies_name                   ON companies(name);
             CREATE INDEX IF NOT EXISTS idx_companies_industry               ON companies(industry);
             CREATE INDEX IF NOT EXISTS idx_conversations_employee           ON conversations(employee_id);
@@ -1661,6 +1680,11 @@ const runMigrations = async () => {
             "ALTER TABLE reviews ALTER COLUMN notification_status SET DEFAULT 'pending';",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS notification_notes TEXT;",
             "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS notification_last_sent_at TIMESTAMP;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS review_type VARCHAR(32) DEFAULT 'company_review';",
+            "ALTER TABLE reviews ALTER COLUMN review_type SET DEFAULT 'company_review';",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS review_stage VARCHAR(32);",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS review_date DATE;",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS review_week_start DATE;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS time_limit_minutes INTEGER DEFAULT 120;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS started_at TIMESTAMP;",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;",

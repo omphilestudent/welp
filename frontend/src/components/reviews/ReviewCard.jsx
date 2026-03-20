@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import StarRating from './StarRating';
 import toast from 'react-hot-toast';
+import { REVIEW_TYPES, REVIEW_TYPE_LABELS } from '../../utils/reviewTypes';
 
 const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
     const { user } = useAuth();
@@ -36,6 +37,9 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
     const reviewerRole = !isAuthorAnonymous && reviewerRoleRaw
         ? reviewerRoleRaw.replace(/_/g, ' ')
         : null;
+    const reviewType = review.review_type || review.reviewType || REVIEW_TYPES.COMPANY;
+    const reviewStage = review.review_stage || review.reviewStage;
+    const reviewDate = review.review_date || review.reviewDate;
     const canEdit = user && user.id === review.author_id &&
         new Date() - new Date(reviewCreatedAt) < 24 * 60 * 60 * 1000;
 
@@ -128,6 +132,21 @@ const ReviewCard = ({ review, onReplyAdded, replyEndpoint }) => {
                     <span className="review-date">
             {formatDistanceToNow(new Date(reviewCreatedAt))} ago
           </span>
+                    {reviewType && reviewType !== REVIEW_TYPES.COMPANY && (
+                        <span className="review-badge review-badge--type">
+                            {REVIEW_TYPE_LABELS[reviewType] || 'Review'}
+                        </span>
+                    )}
+                    {reviewStage && (
+                        <span className="review-badge review-badge--stage">
+                            {String(reviewStage).replace(/^\w/, (c) => c.toUpperCase())}
+                        </span>
+                    )}
+                    {reviewType === REVIEW_TYPES.DAILY && reviewDate && (
+                        <span className="review-badge review-badge--date">
+                            {new Date(reviewDate).toLocaleDateString()}
+                        </span>
+                    )}
                     {review.isNew && (
                         <span className="review-badge">New</span>
                     )}

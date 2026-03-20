@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import ReviewCard from '../components/reviews/ReviewCard';
@@ -9,24 +9,46 @@ import StarRating from '../components/reviews/StarRating';
 import Loading from '../components/common/Loading';
 import toast from 'react-hot-toast';
 import { buildLogoUrls } from '../utils/companyLogos';
+import { REVIEW_TYPES, REVIEW_TYPE_LABELS } from '../utils/reviewTypes';
 
 const CompanyPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     const [company, setCompany] = useState(null);
-    const [reviews, setReviews] = useState([]);
+    const [reviewBuckets, setReviewBuckets] = useState({
+        [REVIEW_TYPES.COMPANY]: { list: [], total: 0, loading: false },
+        [REVIEW_TYPES.ONBOARDING]: { list: [], total: 0, loading: false },
+        [REVIEW_TYPES.DAILY]: { list: [], total: 0, loading: false }
+    });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showReviewForm, setShowReviewForm] = useState(false);
     const [showClaimButton, setShowClaimButton] = useState(false);
     const [logoIndex, setLogoIndex] = useState(0);
+    const [activeReviewTab, setActiveReviewTab] = useState(REVIEW_TYPES.COMPANY);
 
     useEffect(() => {
         if (id) {
             fetchCompanyData();
         }
     }, [id]);
+
+    useEffect(() => {
+        if (id) {
+            fetchReviewsByType(activeReviewTab);
+        }
+    }, [id, activeReviewTab]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tabParam = params.get('reviewTab');
+        if (tabParam && Object.values(REVIEW_TYPES).includes(tabParam)) {
+            setActiveReviewTab(tabParam);
+            setShowReviewForm(true);
+        }
+    }, [location.search]);
 
     useEffect(() => {
         setLogoIndex(0);
@@ -59,31 +81,15 @@ const CompanyPage = () => {
         try {
             console.log('Fetching company with ID:', id);
 
-            const [companyRes, reviewsRes] = await Promise.all([
-                api.get(`/companies/${id}`).catch(err => {
-                    console.error('Company fetch error:', err);
-                    throw err;
-                }),
-                api.get(`/reviews/company/${id}`).catch(err => {
-                    console.error('Reviews fetch error:', err);
-                    throw err;
-                })
-            ]);
+            const companyRes = await api.get(`/companies/${id}`).catch(err => {
+                console.error('Company fetch error:', err);
+                throw err;
+            });
 
             console.log('Company data:', companyRes.data);
-            console.log('Reviews data:', reviewsRes.data);
 
             setCompany(companyRes.data);
-            const reviewsPayload = reviewsRes.data;
-            const normalizedReviews = Array.isArray(reviewsPayload)
-                ? reviewsPayload
-                : Array.isArray(reviewsPayload?.reviews)
-                    ? reviewsPayload.reviews
-                    : Array.isArray(reviewsPayload?.data)
-                        ? reviewsPayload.data
-                        : [];
-
-            setReviews(normalizedReviews);
+            await fetchReviewsByType(activeReviewTab);
         } catch (error) {
             console.error('Failed to fetch company data:', error);
             if (error.response?.status === 404) {
@@ -96,6 +102,37 @@ const CompanyPage = () => {
         }
     };
 
+    const fetchReviewsByType = async (reviewType) => {
+        if (!id) return;
+        setReviewBuckets((prev) => ({
+            ...prev,
+            [reviewType]: { ...prev[reviewType], loading: true }
+        }));
+        try {
+            const { data } = await api.get(`/reviews/company/${id}`, {
+                params: { type: reviewType }
+            });
+            const normalized = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.reviews)
+                    ? data.reviews
+                    : Array.isArray(data?.data)
+                        ? data.data
+                        : [];
+            const total = data?.pagination?.total ?? normalized.length;
+            setReviewBuckets((prev) => ({
+                ...prev,
+                [reviewType]: { list: normalized, total, loading: false }
+            }));
+        } catch (error) {
+            console.error('Failed to load reviews', error);
+            setReviewBuckets((prev) => ({
+                ...prev,
+                [reviewType]: { ...prev[reviewType], loading: false }
+            }));
+        }
+    };
+
     const handleReviewSubmit = async (reviewData) => {
         try {
             await api.post('/reviews', {
@@ -104,12 +141,15 @@ const CompanyPage = () => {
             });
             setShowReviewForm(false);
             toast.success('Review posted successfully!');
-            fetchCompanyData();
+            await fetchCompanyData();
+            await fetchReviewsByType(reviewData.reviewType || activeReviewTab);
         } catch (error) {
             console.error('Failed to post review:', error);
             toast.error(error.response?.data?.error || 'Failed to post review');
         }
     };
+
+    const activeBucket = reviewBuckets[activeReviewTab] || { list: [], total: 0, loading: false };
 
     if (loading) return <Loading />;
 
@@ -222,10 +262,26 @@ const CompanyPage = () => {
                 <div className="company-content">
                     {showReviewForm && (
                         <div className="review-form-section">
+                            <div className="review-tab-header">
+                                {Object.values(REVIEW_TYPES).map((type) => (
+                                    <button
+                                        key={type}
+                                        type="button"
+                                        className={`tab-btn ${activeReviewTab === type ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setActiveReviewTab(type);
+                                            fetchReviewsByType(type);
+                                        }}
+                                    >
+                                        {REVIEW_TYPE_LABELS[type]}
+                                    </button>
+                                ))}
+                            </div>
                             <ReviewForm
                                 onSubmit={handleReviewSubmit}
                                 onCancel={() => setShowReviewForm(false)}
                                 companyId={id}
+                                reviewType={activeReviewTab}
                             />
                         </div>
                     )}
@@ -238,13 +294,29 @@ const CompanyPage = () => {
                     )}
 
                     <div className="reviews-section">
-                        <h2>Employee Reviews</h2>
-                        {reviews.length > 0 ? (
-                            reviews.map(review => (
+                        <div className="review-tab-header">
+                            {Object.values(REVIEW_TYPES).map((type) => (
+                                <button
+                                    key={type}
+                                    type="button"
+                                    className={`tab-btn ${activeReviewTab === type ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setActiveReviewTab(type);
+                                        fetchReviewsByType(type);
+                                    }}
+                                >
+                                    {REVIEW_TYPE_LABELS[type]} ({reviewBuckets[type]?.total || 0})
+                                </button>
+                            ))}
+                        </div>
+                        {activeBucket.loading ? (
+                            <Loading />
+                        ) : activeBucket.list.length > 0 ? (
+                            activeBucket.list.map(review => (
                                 <ReviewCard
                                     key={review.id}
                                     review={review}
-                                    onReplyAdded={fetchCompanyData}
+                                    onReplyAdded={() => fetchReviewsByType(activeReviewTab)}
                                 />
                             ))
                         ) : (

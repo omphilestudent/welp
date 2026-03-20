@@ -133,6 +133,34 @@
   margin: 3rem 0;
 }
 
+.review-tab-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.review-tab-header .tab-btn {
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.review-tab-header .tab-btn.active {
+  background: var(--accent-color);
+  color: #fff;
+  border-color: var(--accent-color);
+}
+
+.review-tab-header .tab-btn:hover {
+  transform: translateY(-1px);
+}
+
 .reviews-section h2 {
   font-size: 2rem;
   margin-bottom: 2rem;

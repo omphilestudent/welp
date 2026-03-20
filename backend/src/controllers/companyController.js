@@ -7,6 +7,7 @@ const { enrichCompanyWithOSM } = require('../services/companyEnrichmentService')
 const { generateAutoReview } = require('../services/autoReviewService');
 const { getBusinessPlanSnapshotByBusinessId, getBusinessDailyApiLimit } = require('../utils/businessPlan');
 const { getUsageRecord } = require('../services/businessApiUsageService');
+const { REVIEW_TYPES, normalizeReviewType } = require('../utils/reviewTypes');
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
 const OWNER_ACCESS_ROLES = new Set(['business', ...ADMIN_ROLES]);
@@ -132,7 +133,7 @@ const COMPANY_SELECT_SQL = `
         COUNT(r.id) as review_count,
         json_agg(DISTINCT jsonb_build_object('id', u.id, 'displayName', u.display_name)) FILTER (WHERE u.id IS NOT NULL) as owners
     FROM companies c
-    LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
+    LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true AND r.review_type = '${REVIEW_TYPES.COMPANY}'
     LEFT JOIN company_owners co ON c.id = co.company_id
     LEFT JOIN users u ON co.user_id = u.id
     WHERE c.id = $1
@@ -206,9 +207,10 @@ const fetchRecentPublicReviews = async (companyId, limit = 5) => {
          ) AS replies_data ON true
          WHERE r.company_id = $1
            AND r.is_public = true
+           AND r.review_type = $2
          ORDER BY r.created_at DESC
-         LIMIT $2`,
-        [companyId, Math.max(1, limit)]
+         LIMIT $3`,
+        [companyId, REVIEW_TYPES.COMPANY, Math.max(1, limit)]
     );
 
     return result.rows.map((row) => ({
@@ -359,7 +361,7 @@ const searchCompanies = async (req, res) => {
             + 'COALESCE(AVG(r.rating), 0) as avg_rating, '
             + 'COUNT(r.id) as review_count '
             + 'FROM companies c '
-            + 'LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true '
+            + `LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true AND r.review_type = '${REVIEW_TYPES.COMPANY}' `
             + whereClause
             + ' GROUP BY c.id '
             + 'ORDER BY c.name '
@@ -761,7 +763,7 @@ const getMyCompanies = async (req, res) => {
              FROM companies c
                       LEFT JOIN company_owners co ON c.id = co.company_id
                       LEFT JOIN users u ON co.user_id = u.id
-                      LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true
+                      LEFT JOIN reviews r ON c.id = r.company_id AND r.is_public = true AND r.review_type = '${REVIEW_TYPES.COMPANY}'
              WHERE co.user_id = $1
              GROUP BY c.id
              ORDER BY c.name`,
@@ -868,7 +870,7 @@ const getCompanyReviewsForBusiness = async (req, res) => {
         if (!companyId || !UUID_REGEX.test(companyId)) {
             return res.status(400).json({ error: 'Invalid company ID format' });
         }
-        const { page = 1, limit = 20, rating, type, sort } = req.query;
+        const { page = 1, limit = 20, rating, type, reviewType, sort } = req.query;
 
         const validPage = Math.max(1, parseInt(page) || 1);
         const validLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
@@ -891,6 +893,13 @@ const getCompanyReviewsForBusiness = async (req, res) => {
             conditions.push('COALESCE(r.is_anonymous, u.is_anonymous, false) = true');
         } else if (type === 'employee') {
             conditions.push('COALESCE(r.is_anonymous, u.is_anonymous, false) = false');
+        }
+
+        if (reviewType) {
+            const normalized = normalizeReviewType(reviewType);
+            conditions.push(`r.review_type = $${paramIndex}`);
+            params.push(normalized);
+            paramIndex += 1;
         }
 
         const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -997,16 +1006,16 @@ const getCompanyAnalytics = async (req, res) => {
                  COUNT(CASE WHEN NOT COALESCE(r.is_anonymous, u.is_anonymous, false) THEN 1 END) as employee_reviews
              FROM reviews r
                       LEFT JOIN users u ON r.author_id = u.id
-             WHERE r.company_id = $1`,
-            [companyId]
+             WHERE r.company_id = $1 AND r.review_type = $2`,
+            [companyId, REVIEW_TYPES.COMPANY]
         );
 
         const distributionResult = await query(
             `SELECT rating, COUNT(*) as count
              FROM reviews
-             WHERE company_id = $1
+             WHERE company_id = $1 AND review_type = $2
              GROUP BY rating`,
-            [companyId]
+            [companyId, REVIEW_TYPES.COMPANY]
         );
 
         const trendResult = await query(
@@ -1014,11 +1023,11 @@ const getCompanyAnalytics = async (req, res) => {
                  DATE_TRUNC('month', created_at) as bucket,
                  COUNT(*) as count
              FROM reviews
-             WHERE company_id = $1
+             WHERE company_id = $1 AND review_type = $2
                AND created_at >= NOW() - INTERVAL '12 months'
              GROUP BY bucket
              ORDER BY bucket`,
-            [companyId]
+            [companyId, REVIEW_TYPES.COMPANY]
         );
 
         const responseResult = await query(
@@ -1026,8 +1035,9 @@ const getCompanyAnalytics = async (req, res) => {
              FROM reviews r
                       JOIN replies rp ON rp.review_id = r.id
              WHERE r.company_id = $1
+               AND r.review_type = $2
                AND rp.author_role = 'business'`,
-            [companyId]
+            [companyId, REVIEW_TYPES.COMPANY]
         );
 
         const metrics = metricsResult.rows[0] || {};

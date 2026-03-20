@@ -454,6 +454,21 @@
   white-space: nowrap;
 }
 
+.review-badge--type {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+.review-badge--stage {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+
+.review-badge--date {
+  background: rgba(148, 163, 184, 0.2);
+  color: #475569;
+}
+
 /* Mobile responsive badge */
 @media (max-width: 768px) {
   .review-badge {
@@ -707,4 +722,12 @@
   .vote-button {
     display: none;
   }
+}
+.review-form .form-select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--text-primary);
 }

@@ -22,6 +22,12 @@ router.get('/my-reviews',
     reviewController.getMyReviews
 );
 
+router.get('/daily-checklist',
+    authenticate,
+    authorize('employee'),
+    reviewController.getDailyReviewChecklist
+);
+
 
 router.get('/company/:companyId', reviewController.getCompanyReviews);
 router.get('/company/:companyId/stats', reviewController.getCompanyReviewStats);

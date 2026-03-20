@@ -1,6 +1,7 @@
 const { query } = require('../utils/database');
 const { analyzeSentiment } = require('./mlServices');
 const { createAdminNotification } = require('../utils/adminNotifications');
+const { REVIEW_TYPES } = require('../utils/reviewTypes');
 
 const clampRating = (value) => Math.max(1, Math.min(5, value));
 
@@ -39,6 +40,7 @@ const generateAutoReview = async ({ companyId, userId, companyName, description 
             author_id,
             rating,
             content,
+            review_type,
             is_public,
             sentiment_label,
             sentiment_score,
@@ -46,12 +48,13 @@ const generateAutoReview = async ({ companyId, userId, companyName, description 
             moderation_reason,
             is_flagged,
             flag_reason
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
         [
             companyId,
             userId,
             rating,
             reviewSource,
+            REVIEW_TYPES.COMPANY,
             false,
             sentiment.sentiment,
             sentiment.score,

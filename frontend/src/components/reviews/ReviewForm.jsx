@@ -4,8 +4,9 @@ import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import StarRating from './StarRating';
 import { FaBuilding, FaBriefcase, FaUser } from 'react-icons/fa';
+import { REVIEW_TYPES, REVIEW_STAGES } from '../../utils/reviewTypes';
 
-const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
+const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId, reviewType = REVIEW_TYPES.COMPANY }) => {
     const { user } = useAuth();
     const [formData, setFormData] = useState({
         rating: initialData.rating || 0,
@@ -13,7 +14,8 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
         isPublic: initialData.isPublic !== undefined ? initialData.isPublic : true,
         isAnonymous: initialData.isAnonymous !== undefined ? initialData.isAnonymous : false,
         occupation: user?.occupation || '',
-        workplaceId: user?.workplace_id || null
+        workplaceId: user?.workplace_id || null,
+        reviewStage: initialData.reviewStage || ''
     });
 
     const [userProfile, setUserProfile] = useState(null);
@@ -54,6 +56,9 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
         if (!formData.workplaceId) {
             newErrors.workplace = 'Please add your workplace in your profile';
         }
+        if (reviewType === REVIEW_TYPES.ONBOARDING && !formData.reviewStage) {
+            newErrors.reviewStage = 'Please select which stage you are reviewing';
+        }
         return newErrors;
     };
 
@@ -61,7 +66,11 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
         e.preventDefault();
         const newErrors = validate();
         if (Object.keys(newErrors).length === 0) {
-            onSubmit(formData);
+            onSubmit({
+                ...formData,
+                reviewType,
+                reviewStage: formData.reviewStage || undefined
+            });
         } else {
             setErrors(newErrors);
         }
@@ -100,6 +109,23 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
                 </div>
             </div>
 
+            {reviewType === REVIEW_TYPES.ONBOARDING && (
+                <div className="form-group">
+                    <label className="form-label">Stage *</label>
+                    <select
+                        value={formData.reviewStage}
+                        onChange={(e) => setFormData({ ...formData, reviewStage: e.target.value })}
+                        className="form-select"
+                    >
+                        <option value="">Select stage</option>
+                        {REVIEW_STAGES.map((stage) => (
+                            <option key={stage.value} value={stage.value}>{stage.label}</option>
+                        ))}
+                    </select>
+                    {errors.reviewStage && <span className="error-text">{errors.reviewStage}</span>}
+                </div>
+            )}
+
             <div className="form-group">
                 <label className="form-label">Rating *</label>
                 <StarRating
@@ -111,13 +137,17 @@ const ReviewForm = ({ onSubmit, onCancel, initialData = {}, companyId }) => {
 
             <div className="form-group">
                 <label htmlFor="content" className="form-label">
-                    Your Review *
+                    {reviewType === REVIEW_TYPES.DAILY ? 'Daily Work Review *' : 'Your Review *'}
                 </label>
                 <textarea
                     id="content"
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    placeholder="Share your experience working here..."
+                    placeholder={
+                        reviewType === REVIEW_TYPES.DAILY
+                            ? 'Share how today went at work...'
+                            : 'Share your experience working here...'
+                    }
                     className="form-textarea"
                     rows="6"
                 />

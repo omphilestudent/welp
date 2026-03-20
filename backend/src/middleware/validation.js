@@ -89,7 +89,9 @@ const companyUpdateValidation = [
 const reviewValidation = [
     body('rating').isInt({ min: 1, max: 5 }),
     body('content').trim().isLength({ min: 10, max: 2000 }),
-    body('isPublic').optional().isBoolean()
+    body('isPublic').optional().isBoolean(),
+    body('reviewType').optional().isIn(['company_review', 'onboarding_review', 'daily_work_review']),
+    body('reviewStage').optional().isIn(['application', 'assessment', 'interview', 'onboarding'])
 ];
 
 const replyValidation = [

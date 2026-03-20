@@ -206,6 +206,8 @@ const buildReviewEmailHtml = ({
     reviewDate,
     reviewerName,
     reviewLocation,
+    reviewTypeLabel,
+    reviewStage,
     dashboardUrl,
     respondUrl,
     claimUrl,
@@ -276,6 +278,8 @@ const buildReviewEmailHtml = ({
                     <h3>Review Details</h3>
                     <div class="details">
                         <p><strong>Rating:</strong> ${rating ?? 'N/A'} / 5</p>
+                        <p><strong>Review Type:</strong> ${reviewTypeLabel || 'Company Review'}</p>
+                        ${reviewStage ? `<p><strong>Stage:</strong> ${reviewStage}</p>` : ''}
                         <p><strong>Reviewer:</strong> ${reviewerName || 'Anonymous reviewer'}</p>
                         <p><strong>Location:</strong> ${reviewLocation || 'Not specified'}</p>
                         <p><strong>Date:</strong> ${reviewDate || 'Today'}</p>
@@ -307,13 +311,15 @@ const buildReviewEmailText = (payload, pricingOverview = FALLBACK_BUSINESS_PRICI
     const lines = [
         `Company: ${payload.companyName || 'your business'}`,
         `Rating: ${payload.rating ?? 'N/A'} / 5`,
+        `Review Type: ${payload.reviewTypeLabel || 'Company Review'}`,
+        payload.reviewStage ? `Stage: ${payload.reviewStage}` : null,
         `Reviewer: ${payload.reviewerName || 'Anonymous reviewer'}`,
         `Location: ${payload.reviewLocation || 'Not specified'}`,
         `Date: ${payload.reviewDate || 'Today'}`,
         '',
         `Review: ${payload.reviewContent || 'No review text supplied.'}`,
         ''
-    ];
+    ].filter(Boolean);
     if (payload.type === 'claimed') {
         if (payload.dashboardUrl) lines.push(`Open dashboard: ${payload.dashboardUrl}`);
         if (payload.respondUrl) lines.push(`Respond to review: ${payload.respondUrl}`);
@@ -373,6 +379,57 @@ const sendReviewNotificationEmail = async (payload = {}) => {
         return { success: true, info, subject };
     } catch (error) {
         console.error('❌ Failed to send review notification email:', error.message);
+        return { success: false, error: error.message, subject };
+    }
+};
+
+const sendDailyReviewReminderEmail = async (payload = {}) => {
+    const to = toArray(payload.to).filter(Boolean);
+    if (!to.length) {
+        return { success: false, error: 'No recipient provided' };
+    }
+
+    const subject = payload.subject || 'Reminder: Share today’s work experience';
+    const companyName = payload.companyName || 'your workplace';
+    const checklistUrl = payload.checklistUrl || payload.dashboardUrl || (process.env.FRONTEND_URL || 'http://localhost:5173') + '/dashboard';
+    const html = `
+    <html>
+    <body style="font-family: Arial, sans-serif; background:#f3f4f6; color:#111827; padding:24px;">
+        <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
+            <h2 style="margin-top:0;">Daily work review reminder</h2>
+            <p>Help ${companyName} improve by sharing today’s work experience.</p>
+            <p style="margin:16px 0;">
+                <a href="${checklistUrl}" style="display:inline-block;padding:12px 20px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;">
+                    Open Daily Review Checklist
+                </a>
+            </p>
+            <p style="color:#6b7280;font-size:13px;">If you already submitted today, thank you!</p>
+        </div>
+    </body>
+    </html>`;
+
+    const text = `Daily work review reminder\n\nShare today’s work experience for ${companyName}.\nOpen checklist: ${checklistUrl}\n\nIf you already submitted today, thank you!`;
+
+    if (!transporter) {
+        console.log('\n=== DAILY REVIEW REMINDER (DEV MODE) ===');
+        console.log(`To: ${to.join(', ')}`);
+        console.log(`Subject: ${subject}`);
+        console.log(text);
+        console.log('========================================\n');
+        return { success: true, subject, devMode: true };
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to,
+            subject,
+            html,
+            text
+        });
+        return { success: true, info, subject };
+    } catch (error) {
+        console.error('❌ Failed to send daily review reminder:', error.message);
         return { success: false, error: error.message, subject };
     }
 };
@@ -1144,6 +1201,7 @@ module.exports = {
     sendSubscriptionCancellationEmail,
     sendApplicationStatusEmail,
     sendReviewNotificationEmail,
+    sendDailyReviewReminderEmail,
     sendMessageNotificationEmail,
     sendConversationRequestEmail,
     sendConversationAcceptedEmail,
