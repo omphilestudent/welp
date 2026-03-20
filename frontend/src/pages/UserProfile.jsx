@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import Loading from '../components/common/Loading';
 import AvatarImage from '../components/common/AvatarImage';
+import { useAuth } from '../hooks/useAuth';
 
 const formatDateTime = (value) => {
     if (!value) return '';
@@ -15,9 +16,11 @@ const UserProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { user: currentUser } = useAuth();
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [messaging, setMessaging] = useState(false);
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -49,6 +52,28 @@ const UserProfile = () => {
         }
     };
 
+    const handleMessageUser = async () => {
+        if (!user?.id || currentUser?.role !== 'psychologist') return;
+        setMessaging(true);
+        try {
+            const { data } = await api.post('/messages/conversations/request', {
+                employeeId: user.id,
+                initialMessage: 'Hello, I am available to support you whenever you are ready to talk.'
+            });
+            const conversationId = data?.id || data?.conversation?.id || null;
+            if (conversationId) {
+                navigate(`/messages?conversation=${conversationId}`);
+            } else {
+                navigate(`/messages?employee=${user.id}`);
+            }
+        } catch (err) {
+            const msg = err?.response?.data?.error || 'Failed to start a conversation';
+            setError(msg);
+        } finally {
+            setMessaging(false);
+        }
+    };
+
     return (
         <div className="user-profile-page">
             <button type="button" className="profile-back-btn" onClick={handleBack}>
@@ -70,6 +95,16 @@ const UserProfile = () => {
                     {user.occupation && <p>{user.occupation}</p>}
                     {user.workplace?.name && <p>{user.workplace.name}</p>}
                     {user.location && <p>{user.location}</p>}
+                    {currentUser?.role === 'psychologist' && user.role === 'employee' && (
+                        <button
+                            type="button"
+                            className="btn btn-primary btn-small"
+                            onClick={handleMessageUser}
+                            disabled={messaging}
+                        >
+                            {messaging ? 'Opening chat...' : 'Message'}
+                        </button>
+                    )}
                 </div>
             </div>
 

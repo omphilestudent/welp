@@ -129,13 +129,37 @@ const MessageThread = ({
         }
     };
 
+    const getAudioDuration = (blob) => new Promise((resolve) => {
+        if (!blob) return resolve(null);
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio();
+        audio.preload = 'metadata';
+        audio.src = url;
+        const cleanup = () => {
+            URL.revokeObjectURL(url);
+        };
+        audio.onloadedmetadata = () => {
+            const seconds = Number.isFinite(audio.duration) ? Math.ceil(audio.duration) : null;
+            cleanup();
+            resolve(seconds && seconds > 0 ? seconds : null);
+        };
+        audio.onerror = () => {
+            cleanup();
+            resolve(null);
+        };
+    });
+
     const sendVoiceNoteBlob = async ({ blob, mimeType, duration }) => {
         if (!blob || !onSendVoiceNote) return;
         setSending(true);
         setError('');
         try {
             const file = new File([blob], 'voice-note.webm', { type: mimeType || 'audio/webm' });
-            await onSendVoiceNote({ file, duration });
+            let safeDuration = Number.isFinite(duration) ? duration : null;
+            if (!safeDuration || safeDuration <= 0) {
+                safeDuration = await getAudioDuration(blob);
+            }
+            await onSendVoiceNote({ file, duration: safeDuration || undefined });
             setVoiceNote(null);
             setRecordDuration(0);
         } catch (err) {
@@ -408,6 +432,13 @@ const MessageThread = ({
             {conversation.status === 'accepted' && !isExpired && (
                 <form onSubmit={handleSend} className="message-input-form">
                     <div className="message-input-controls">
+                        {isRecording && (
+                            <div className="voice-recording-bar">
+                                <span className="voice-recording-dot" />
+                                <span className="voice-recording-text">Recording</span>
+                                <span className="voice-recording-time">{recordDuration}s</span>
+                            </div>
+                        )}
                         {recordingError && (
                             <span className="message-input-error">{recordingError}</span>
                         )}

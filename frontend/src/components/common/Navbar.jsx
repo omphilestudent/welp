@@ -198,6 +198,10 @@ const Navbar = () => {
                         renderLink('/messages', 'Messages')
                     )}
 
+                    {user && user.role === 'employee' && (
+                        renderLink('/messages', 'Messages')
+                    )}
+
                     {user && user.role === 'business' && (
                         renderLink('/search', 'Search Companies')
                     )}

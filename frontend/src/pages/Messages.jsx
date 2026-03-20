@@ -276,9 +276,16 @@ const Messages = () => {
     const fetchMessages = useCallback(async (conversationId) => {
         try {
             const { data } = await api.get(`/messages/conversations/${conversationId}/messages`);
-            setMessages(data || []);
+            if (Array.isArray(data)) {
+                setMessages(data);
+            } else if (Array.isArray(data?.messages)) {
+                setMessages(data.messages);
+            } else {
+                setMessages([]);
+            }
         } catch (error) {
             console.error('Failed to fetch messages:', error);
+            setMessages([]);
         }
     }, []);
 
@@ -355,8 +362,10 @@ const Messages = () => {
 
     useEffect(() => {
         if (visibleConversations.length === 0) {
-            setActiveConversation(null);
-            setMessages([]);
+            if (!activeConversation) {
+                setActiveConversation(null);
+                setMessages([]);
+            }
             return;
         }
 
@@ -373,6 +382,19 @@ const Messages = () => {
             setMessages([]);
         }
     }, [activeConversation, fetchMessages]);
+
+    useEffect(() => {
+        if (!isMobileView) return;
+        if (!activeConversation && visibleConversations.length > 0) {
+            const firstConversation = visibleConversations[0];
+            setActiveConversation(firstConversation);
+            fetchMessages(firstConversation.id);
+            if (searchParams.get('conversation') !== firstConversation.id) {
+                setSearchParams({ conversation: firstConversation.id });
+            }
+            setIsSidebarOpen(false);
+        }
+    }, [isMobileView, activeConversation, visibleConversations, fetchMessages, searchParams, setSearchParams]);
 
     useEffect(() => {
         return () => {
@@ -898,9 +920,12 @@ const Messages = () => {
 
 
     const handleSelectConversation = (conversation) => {
-        setActiveConversation(conversation);
+        const nextConversation = visibleConversations.find((item) => item.id === conversation?.id) || conversation;
+        setActiveConversation(nextConversation || null);
         if (conversation?.id) {
-            setSearchParams({ conversation: conversation.id });
+            if (searchParams.get('conversation') !== conversation.id) {
+                setSearchParams({ conversation: conversation.id });
+            }
             fetchMessages(conversation.id);
         }
         setIsSidebarOpen(false);
