@@ -11,6 +11,18 @@ const api = axios.create({
     withCredentials: true
 });
 
+const AUTH_FREE_PATHS = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/auth/verify-email',
+    '/auth/resend-verification',
+    '/health'
+];
+
+const shouldSkipAuthHeader = (url = '') => AUTH_FREE_PATHS.some((path) => url.startsWith(path));
+
 // Request interceptor to add token
 api.interceptors.request.use(
     (config) => {
@@ -24,7 +36,7 @@ api.interceptors.request.use(
             });
         }
         const token = isJwt ? rawToken : null;
-        if (token) {
+        if (token && !shouldSkipAuthHeader(config.url || '')) {
             config.headers.Authorization = `Bearer ${token}`;
         }
 
@@ -66,8 +78,10 @@ api.interceptors.response.use(
             if (message.toLowerCase().includes('inactivity')) {
                 localStorage.setItem(INACTIVITY_LOGOUT_FLAG, JSON.stringify({ reason: 'timeout', at: Date.now() }));
             }
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            ['token', 'admin_access', 'hr_access', 'access_token'].forEach((key) => {
+                localStorage.removeItem(key);
+                sessionStorage.removeItem(key);
+            });
             const path = window.location.pathname;
             const isKodiAuth = path.startsWith('/kodi-auth');
             const isLogin = path === '/login' || isKodiAuth;
