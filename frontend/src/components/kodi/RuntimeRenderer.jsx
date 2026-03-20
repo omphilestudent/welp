@@ -72,6 +72,7 @@ const normalizeFields = (fields) => {
                     type: field.type || 'text',
                     editable: field.editable ?? false,
                     required: field.required ?? false,
+                    visible: field.visible ?? true,
                     placeholder: field.placeholder,
                     options: field.options || [],
                     helpText: field.helpText,
@@ -95,7 +96,7 @@ const FieldRow = ({ field, value, canEdit, onChange }) => {
     if (!isEditable) {
         return (
             <div className="kodi-runtime__field">
-                <span>{field.label}</span>
+                <span>{field.label}{field.required ? ' *' : ''}</span>
                 <strong>{renderFieldValue(value, field.type)}</strong>
             </div>
         );
@@ -104,11 +105,12 @@ const FieldRow = ({ field, value, canEdit, onChange }) => {
     if (field.type === 'checkbox') {
         return (
             <div className="kodi-runtime__field">
-                <span>{field.label}</span>
+                <span>{field.label}{field.required ? ' *' : ''}</span>
                 <label className="kodi-runtime__checkbox">
                     <input
                         type="checkbox"
                         checked={Boolean(value)}
+                        required={field.required}
                         onChange={(event) => onChange(event.target.checked)}
                     />
                     <span>{field.helpText || (value ? 'Enabled' : 'Disabled')}</span>
@@ -121,10 +123,11 @@ const FieldRow = ({ field, value, canEdit, onChange }) => {
         const options = Array.isArray(field.options) ? field.options : [];
         return (
             <div className="kodi-runtime__field">
-                <span>{field.label}</span>
+                <span>{field.label}{field.required ? ' *' : ''}</span>
                 <select
                     value={value || ''}
                     multiple={field.type === 'multi-select'}
+                    required={field.required}
                     onChange={(event) => {
                         if (field.type === 'multi-select') {
                             const selected = Array.from(event.target.selectedOptions).map((opt) => opt.value);
@@ -151,7 +154,7 @@ const FieldRow = ({ field, value, canEdit, onChange }) => {
 
     return (
         <div className="kodi-runtime__field">
-            <span>{field.label}</span>
+            <span>{field.label}{field.required ? ' *' : ''}</span>
             <input
                 type={(() => {
                     if (field.type === 'number' || field.type === 'currency') return 'number';
@@ -162,6 +165,7 @@ const FieldRow = ({ field, value, canEdit, onChange }) => {
                     return 'text';
                 })()}
                 value={value ?? ''}
+                required={field.required}
                 placeholder={field.placeholder || ''}
                 onChange={(event) => onChange(event.target.value)}
             />
@@ -183,9 +187,12 @@ const renderDetails = (component, context) => {
                     const sectionFields = normalizeFields(section.fields || []);
                     return (
                         <div key={section.title || index} className="kodi-runtime__details-section">
-                            <h4>{section.title || `Section ${index + 1}`}</h4>
+                            <div className="kodi-runtime__details-section-header">
+                                <h4>{section.title || `Section ${index + 1}`}</h4>
+                                {section.collapsible && <span className="kodi-runtime__details-toggle">▾</span>}
+                            </div>
                             <div className="kodi-runtime__details-grid">
-                                {sectionFields.map((field) => (
+                                {sectionFields.filter((field) => field.visible !== false).map((field) => (
                                     <FieldRow
                                         key={field.key}
                                         field={field}
@@ -200,7 +207,7 @@ const renderDetails = (component, context) => {
                 })
             ) : (
                 <div className="kodi-runtime__details-grid">
-                    {fields.map((field) => (
+                    {fields.filter((field) => field.visible !== false).map((field) => (
                         <FieldRow
                             key={field.key}
                             field={field}
@@ -215,21 +222,33 @@ const renderDetails = (component, context) => {
     );
 };
 
-const renderActivity = (component) => {
-    const items = component?.props?.items || [];
+const renderActivity = (component, context) => {
+    const items = context?.activity || component?.props?.items || [];
+    const tabs = component?.props?.tabs || ['Activity', 'Chatter', 'Email'];
+    const actions = component?.props?.actions || ['Log Call', 'New Task', 'Email'];
     return (
         <div className="kodi-runtime__activity">
             <div className="kodi-runtime__activity-tabs">
-                <button type="button" className="active">Activity</button>
-                <button type="button">Chatter</button>
-                <button type="button">Email</button>
+                {tabs.map((tab, index) => (
+                    <button key={tab} type="button" className={index === 0 ? 'active' : ''}>
+                        {tab}
+                    </button>
+                ))}
             </div>
             <div className="kodi-runtime__activity-actions">
-                {(component?.props?.actions || ['Log Call', 'New Task', 'Email']).map((action) => (
+                {actions.map((action) => (
                     <button key={action.label || action} type="button">
                         {action.label || action}
                     </button>
                 ))}
+            </div>
+            <div className="kodi-runtime__activity-filters">
+                <span>Filters: All time • All activities • All types</span>
+                <div>
+                    <button type="button">Refresh</button>
+                    <button type="button">Expand All</button>
+                    <button type="button">View All</button>
+                </div>
             </div>
             <div className="kodi-runtime__activity-list">
                 {(items.length ? items : [{
@@ -260,11 +279,13 @@ const renderComponentBody = (component, context, onAction) => {
             return (
                 <PanelHighlight
                     props={{
-                        title: component.props?.title || component.label || 'Highlights',
+                        title: component.props?.title || component.label || 'Record',
                         subtitle: component.props?.subtitle || component.props?.description,
                         fields: component.props?.fields || [],
                         actions: actions.length ? actions : (component.props?.actions || []),
-                        iconActions: component.props?.iconActions || []
+                        iconActions: component.props?.iconActions || [],
+                        iconColor: component.props?.iconColor,
+                        icon: component.props?.icon
                     }}
                     record={record}
                     canEdit={context?.canEdit}
@@ -285,7 +306,7 @@ const renderComponentBody = (component, context, onAction) => {
         case 'ApplicationStatusPanel':
             return renderDetails(component, context);
         case 'ActivityTimeline':
-            return renderActivity(component);
+            return renderActivity(component, context);
         case 'QuickActionsBar':
             return (
                 <div className="kodi-runtime__actions">
@@ -297,16 +318,37 @@ const renderComponentBody = (component, context, onAction) => {
                 </div>
             );
         case 'DataTable':
-        case 'RelatedList':
+        case 'RelatedList': {
+            const fields = normalizeFields(component?.props?.fields || []);
+            const relatedKey = component.instanceId || component.id || component?.props?.relatedObject;
+            const items = context?.related?.[relatedKey] || list || [];
             return (
                 <div className="kodi-runtime__table">
-                    {(list || []).length ? (
-                        list.map((item, index) => <div key={index}>{JSON.stringify(item)}</div>)
+                    {(items || []).length ? (
+                        <table>
+                            <thead>
+                                <tr>
+                                    {fields.map((field) => (
+                                        <th key={field.key}>{field.label}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items.map((item) => (
+                                    <tr key={item.id}>
+                                        {fields.map((field) => (
+                                            <td key={field.key}>{getValueByPath(item.record || item, field.key) ?? '—'}</td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : (
                         <p>No records available.</p>
                     )}
                 </div>
             );
+        }
         default:
             return (
                 <pre className="kodi-runtime__json">
@@ -336,7 +378,17 @@ const RuntimeRenderer = ({ layout, context, role, onAction }) => (
                                 >
                                     <div className="kodi-runtime__card-header">
                                         <strong>{component.label || component.name}</strong>
-                                        <span>{component.component_type}</span>
+                                        {Array.isArray(component.props?.headerTabs) ? (
+                                            <div className="kodi-runtime__card-tabs">
+                                                {component.props.headerTabs.map((tab, index) => (
+                                                    <button key={tab} type="button" className={index === 0 ? 'active' : ''}>
+                                                        {tab}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span>{component.component_type}</span>
+                                        )}
                                     </div>
                                     {renderComponentBody(component, context, onAction)}
                                 </div>

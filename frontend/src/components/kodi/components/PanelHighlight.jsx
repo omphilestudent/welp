@@ -29,45 +29,63 @@ const getValueByPath = (obj, path) => {
 
 const PanelHighlight = ({ props = {}, record = {}, canEdit, onAction }) => {
     const {
-        title = 'Highlights',
-        subtitle = 'Summary of key fields',
+        title = 'Record',
+        subtitle = 'Object',
         fields = [],
         actions = [],
-        iconActions = []
+        iconActions = [],
+        iconColor = '#22c55e',
+        icon = '●'
     } = props;
 
     const resolvedFields = normalizeFields(fields);
+    const resolvedActions = (actions.length ? actions : ['Submit for Approval', 'New Event', 'Change Owner']).map((action) => {
+        if (typeof action === 'string') return { label: action };
+        return action;
+    });
+    const overflowAction = resolvedActions.find((action) => action.variant === 'overflow');
+    const primaryActions = resolvedActions.filter((action) => action.variant !== 'overflow');
 
     return (
         <section className="kodi-panel-highlight">
-            <div className="kodi-panel-highlight__header">
-                <div>
-                    <p className="kodi-panel-highlight__eyebrow">{subtitle}</p>
-                    <h2>{title}</h2>
+            <div className="kodi-panel-highlight__left">
+                <div className="kodi-panel-highlight__icon" style={{ background: iconColor }}>
+                    {icon}
                 </div>
-                <div className="kodi-panel-highlight__icon-actions">
-                    {(iconActions.length ? iconActions : [{ label: 'Star' }, { label: 'Follow' }]).map((action) => (
-                        <button key={action.label || action} type="button" onClick={() => onAction?.(action)}>
-                            {action.icon || action.label || action}
-                        </button>
-                    ))}
+                <div className="kodi-panel-highlight__identity">
+                    <span className="kodi-panel-highlight__label">{subtitle}</span>
+                    <strong className="kodi-panel-highlight__title">{title}</strong>
                 </div>
             </div>
-            <div className="kodi-panel-highlight__fields">
+            <div className="kodi-panel-highlight__summary">
                 {resolvedFields.map((field) => (
-                    <div key={field.key} className="kodi-panel-highlight__field">
+                    <div key={field.key} className="kodi-panel-highlight__summary-field">
                         <span>{field.label}</span>
                         <strong>{getValueByPath(record, field.key) ?? '—'}</strong>
                     </div>
                 ))}
             </div>
             <div className="kodi-panel-highlight__actions">
-                {(actions.length ? actions : ['Create Case', 'Assign Case', 'Handover']).map((action) => (
-                    <button key={action.label || action} type="button" onClick={() => onAction?.(action)}>
-                        {action.label || action}
-                    </button>
-                ))}
-                {canEdit === false && <span className="kodi-panel-highlight__note">Upgrade permissions to edit.</span>}
+                <div className="kodi-panel-highlight__action-group">
+                    {primaryActions.map((action) => (
+                        <button key={action.label} type="button" onClick={() => onAction?.(action)}>
+                            {action.label}
+                        </button>
+                    ))}
+                    {overflowAction && (
+                        <button type="button" className="kodi-panel-highlight__overflow" onClick={() => onAction?.(overflowAction)}>
+                            {overflowAction.label || '⋯'}
+                        </button>
+                    )}
+                </div>
+                <div className="kodi-panel-highlight__icon-actions">
+                    {(iconActions.length ? iconActions : [{ label: '☆' }, { label: 'Follow' }]).map((action) => (
+                        <button key={action.label || action} type="button" onClick={() => onAction?.(action)}>
+                            {action.icon || action.label || action}
+                        </button>
+                    ))}
+                </div>
+                {canEdit === false && <span className="kodi-panel-highlight__note">Read-only access</span>}
             </div>
         </section>
     );

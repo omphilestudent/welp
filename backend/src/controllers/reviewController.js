@@ -52,16 +52,6 @@ const createReview = async (req, res) => {
         }
 
 
-        const existingReview = await query(
-            'SELECT id FROM reviews WHERE company_id = $1 AND author_id = $2',
-            [companyId, req.user.id]
-        );
-
-        if (existingReview.rows.length > 0) {
-            return res.status(400).json({ error: 'You have already reviewed this company' });
-        }
-
-
         const user = await query(
             `SELECT
                 u.occupation,

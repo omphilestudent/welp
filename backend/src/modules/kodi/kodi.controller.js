@@ -38,7 +38,14 @@ const layoutValidators = validate([
 const pageIdValidator = validate([param('id').custom(isUuidOrInt)]);
 
 const getRuntimeValidator = validate([param('pageId').custom(isUuidOrInt)]);
-const runtimeRecordValidator = validate([param('pageId').custom(isUuidOrInt), body('record').optional().isObject()]);
+const runtimeRecordValidator = validate([
+    param('pageId').custom(isUuidOrInt),
+    body('record').optional().isObject(),
+    body('objectName').optional().isString(),
+    body('recordId').optional(),
+    body('path').optional().isString(),
+    body('value').optional()
+]);
 
 const createAppValidators = validate([
     body('name').trim().isLength({ min: 2 }),
@@ -221,6 +228,40 @@ const updateRuntimeRecord = async (req, res) => {
         if (!payload) return res.status(404).json({ success: false, error: 'Page not found' });
         const canEdit = perms.userHasEditAccess(payload.permissions, payload.effectiveRole);
         if (!canEdit) return res.status(403).json({ success: false, error: 'Edit access denied' });
+        const objectName = req.body?.objectName || payload.recordContext?.objectName;
+        const recordId = req.body?.recordId || payload.recordContext?.recordId;
+        if (objectName && recordId) {
+            let updated = null;
+            if (req.body?.path) {
+                updated = await service.updateObjectRecordField({
+                    objectName,
+                    recordId,
+                    path: req.body.path,
+                    value: req.body.value
+                });
+                await service.createRecordActivity({
+                    objectName,
+                    recordId,
+                    title: `Updated ${req.body.path}`,
+                    meta: `Value changed`,
+                    createdBy: req.user?.id
+                });
+            } else {
+                updated = await service.updateObjectRecord({
+                    objectName,
+                    recordId,
+                    record: req.body?.record || payload.record || {}
+                });
+                await service.createRecordActivity({
+                    objectName,
+                    recordId,
+                    title: 'Record updated',
+                    meta: 'Record saved',
+                    createdBy: req.user?.id
+                });
+            }
+            return res.json({ success: true, data: updated?.record || {} });
+        }
         const record = req.body?.record || {};
         const updated = await service.upsertRuntimeRecord({
             pageId: req.params.pageId,
@@ -232,6 +273,91 @@ const updateRuntimeRecord = async (req, res) => {
         const status = error.message === 'Access denied' ? 403 : 500;
         logControllerError('updateRuntimeRecord', error);
         return res.status(status).json({ success: false, error: error.message || 'Failed to update record' });
+    }
+};
+
+const listRuntimeNotes = async (req, res) => {
+    try {
+        const payload = await runtime.buildRuntimePayload({
+            pageId: req.params.pageId,
+            role: req.user?.role,
+            userId: req.user?.id,
+            appId: req.query?.appId
+        });
+        if (!payload) return res.status(404).json({ success: false, error: 'Page not found' });
+        const notes = await service.listRecordNotes({
+            objectName: payload.recordContext?.objectName,
+            recordId: payload.recordContext?.recordId
+        });
+        return res.json({ success: true, data: notes });
+    } catch (error) {
+        logControllerError('listRuntimeNotes', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load notes' });
+    }
+};
+
+const createRuntimeNote = async (req, res) => {
+    try {
+        const payload = await runtime.buildRuntimePayload({
+            pageId: req.params.pageId,
+            role: req.user?.role,
+            userId: req.user?.id,
+            appId: req.query?.appId
+        });
+        if (!payload) return res.status(404).json({ success: false, error: 'Page not found' });
+        const note = await service.createRecordNote({
+            objectName: payload.recordContext?.objectName,
+            recordId: payload.recordContext?.recordId,
+            body: req.body?.body,
+            createdBy: req.user?.id
+        });
+        return res.status(201).json({ success: true, data: note });
+    } catch (error) {
+        logControllerError('createRuntimeNote', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to create note' });
+    }
+};
+
+const listRuntimeLinks = async (req, res) => {
+    try {
+        const payload = await runtime.buildRuntimePayload({
+            pageId: req.params.pageId,
+            role: req.user?.role,
+            userId: req.user?.id,
+            appId: req.query?.appId
+        });
+        if (!payload) return res.status(404).json({ success: false, error: 'Page not found' });
+        const links = await service.listRecordLinks({
+            objectName: payload.recordContext?.objectName,
+            recordId: payload.recordContext?.recordId
+        });
+        return res.json({ success: true, data: links });
+    } catch (error) {
+        logControllerError('listRuntimeLinks', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load links' });
+    }
+};
+
+const createRuntimeLink = async (req, res) => {
+    try {
+        const payload = await runtime.buildRuntimePayload({
+            pageId: req.params.pageId,
+            role: req.user?.role,
+            userId: req.user?.id,
+            appId: req.query?.appId
+        });
+        if (!payload) return res.status(404).json({ success: false, error: 'Page not found' });
+        const link = await service.createRecordLink({
+            objectName: payload.recordContext?.objectName,
+            recordId: payload.recordContext?.recordId,
+            label: req.body?.label,
+            url: req.body?.url,
+            createdBy: req.user?.id
+        });
+        return res.status(201).json({ success: true, data: link });
+    } catch (error) {
+        logControllerError('createRuntimeLink', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to create link' });
     }
 };
 
@@ -704,5 +830,9 @@ module.exports = {
     convertLead,
     runtimeRecordValidator,
     getRuntimeRecord,
-    updateRuntimeRecord
+    updateRuntimeRecord,
+    listRuntimeNotes,
+    createRuntimeNote,
+    listRuntimeLinks,
+    createRuntimeLink
 };

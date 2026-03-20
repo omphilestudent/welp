@@ -213,6 +213,48 @@ router.get(
     kodiPlatform.getRuntimeValidator,
     kodiPlatform.runtimeLoader
 );
+router.get(
+    '/platform/runtime/:pageId/record',
+    authenticate,
+    requireKodiFirstLoginComplete,
+    kodiPlatform.getRuntimeValidator,
+    kodiPlatform.getRuntimeRecord
+);
+router.put(
+    '/platform/runtime/:pageId/record',
+    authenticate,
+    requireKodiFirstLoginComplete,
+    kodiPlatform.runtimeRecordValidator,
+    kodiPlatform.updateRuntimeRecord
+);
+router.get(
+    '/platform/runtime/:pageId/notes',
+    authenticate,
+    requireKodiFirstLoginComplete,
+    kodiPlatform.getRuntimeValidator,
+    kodiPlatform.listRuntimeNotes
+);
+router.post(
+    '/platform/runtime/:pageId/notes',
+    authenticate,
+    requireKodiFirstLoginComplete,
+    validate([body('body').trim().isLength({ min: 1 })]),
+    kodiPlatform.createRuntimeNote
+);
+router.get(
+    '/platform/runtime/:pageId/links',
+    authenticate,
+    requireKodiFirstLoginComplete,
+    kodiPlatform.getRuntimeValidator,
+    kodiPlatform.listRuntimeLinks
+);
+router.post(
+    '/platform/runtime/:pageId/links',
+    authenticate,
+    requireKodiFirstLoginComplete,
+    validate([body('label').trim().isLength({ min: 1 }), body('url').trim().isLength({ min: 1 })]),
+    kodiPlatform.createRuntimeLink
+);
 router.get('/platform/apps/:id/navigation', authenticate, kodiPlatform.appIdValidator, kodiPlatform.getAppNavigation);
 router.get('/platform/apps', authenticate, authorizeAdmin(), kodiPlatform.listApps);
 router.get('/platform/objects', authenticate, authorizeAdmin(), kodiPlatform.listObjects);
@@ -258,6 +300,8 @@ router.post('/portal/apps/:id/pages', authenticate, authorizeAdmin(), kodiPortal
 router.patch('/portal/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), kodiPortal.updatePageValidators, kodiPortal.updatePage);
 router.delete('/portal/apps/:id/pages/:mappingId', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.deletePage);
 router.post('/portal/apps/:id/pages/reorder', authenticate, authorizeAdmin(), kodiPortal.reorderValidators, kodiPortal.reorderPages);
+router.get('/portal/apps/:id/utilities', authenticate, authorizeAdmin(), kodiPortal.appIdValidator, kodiPortal.listUtilities);
+router.put('/portal/apps/:id/utilities', authenticate, authorizeAdmin(), kodiPortal.utilitiesValidators, kodiPortal.updateUtilities);
 router.get(
     '/portal/apps/:id/navigation',
     authenticate,

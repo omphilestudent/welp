@@ -412,6 +412,104 @@ const validateFlow = ({ flowType, nodes, edges }) => {
     return [...new Set(errors)];
 };
 
+const buildFlowIssues = ({ flowType, nodes, edges }) => {
+    const errors = [];
+    const warnings = [];
+
+    if (!nodes.length) {
+        errors.push({ id: 'flow-empty', message: 'Add at least one step.' });
+        return { errors, warnings };
+    }
+
+    const startNode = nodes.find((n) => n.type === 'start');
+    const endNode = nodes.find((n) => n.type === 'end');
+
+    if (!startNode) errors.push({ id: 'missing-start', message: 'Flow must include a Start node.' });
+    if (!endNode) errors.push({ id: 'missing-end', message: 'Flow must include an End node.' });
+
+    const normalizedType = String(flowType || '').toLowerCase();
+    if (['trigger', 'event', 'event-based'].includes(normalizedType)) {
+        const trigger = nodes.find((n) => n.type === 'trigger');
+        if (!trigger) {
+            errors.push({ id: 'missing-trigger', message: 'Trigger flow needs a trigger step.' });
+        } else if (!trigger.config?.eventName) {
+            errors.push({ id: 'trigger-event', message: 'Select a trigger event.', nodeId: trigger.id });
+        }
+    }
+
+    const outgoing = new Map();
+    edges.forEach((edge) => {
+        if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
+        outgoing.get(edge.from).push(edge);
+    });
+
+    const canReachEnd = (startId, visited = new Set()) => {
+        if (visited.has(startId)) return false;
+        visited.add(startId);
+        const node = nodes.find((n) => n.id === startId);
+        if (!node) return false;
+        if (node.type === 'end') return true;
+        const outs = outgoing.get(startId) || [];
+        for (const edge of outs) {
+            if (canReachEnd(edge.to, new Set(visited))) return true;
+        }
+        return false;
+    };
+
+    nodes.forEach((node) => {
+        const outs = outgoing.get(node.id) || [];
+        if (node.type !== 'end' && !outs.length) {
+            errors.push({ id: `dangling-${node.id}`, message: 'This step is not connected.', nodeId: node.id });
+        }
+        if (node.type === 'condition') {
+            const yes = outs.find((e) => e.handle === 'yes');
+            const no = outs.find((e) => e.handle === 'no');
+            if (!yes || !no) {
+                errors.push({ id: `decision-branches-${node.id}`, message: 'Decision nodes need both Yes and No branches.', nodeId: node.id });
+            }
+            if (yes && !canReachEnd(yes.to)) {
+                errors.push({ id: `decision-yes-${node.id}`, message: 'Yes branch must reach End.', nodeId: node.id });
+            }
+            if (no && !canReachEnd(no.to)) {
+                errors.push({ id: `decision-no-${node.id}`, message: 'No branch must reach End.', nodeId: node.id });
+            }
+        }
+        if (node.type === 'start') {
+            const hasIncoming = edges.some((e) => e.to === node.id);
+            if (hasIncoming) {
+                errors.push({ id: `start-incoming-${node.id}`, message: 'Start node cannot have incoming connections.', nodeId: node.id });
+            }
+        }
+
+        if (!node.label || node.label.trim().length < 2) {
+            warnings.push({ id: `label-${node.id}`, message: 'Add a descriptive label for this step.', nodeId: node.id });
+        }
+
+        if (node.type === 'screen' && (!Array.isArray(node.config?.inputs) || node.config.inputs.length === 0)) {
+            warnings.push({ id: `screen-inputs-${node.id}`, message: 'Screen steps should collect at least one input.', nodeId: node.id });
+        }
+
+        if (node.type === 'email') {
+            if (!node.config?.to) warnings.push({ id: `email-to-${node.id}`, message: 'Email step needs a recipient.', nodeId: node.id });
+            if (!node.config?.subject) warnings.push({ id: `email-subject-${node.id}`, message: 'Email step needs a subject.', nodeId: node.id });
+        }
+
+        if (node.type === 'call_api' && !node.config?.path && !node.config?.baseUrl) {
+            warnings.push({ id: `api-endpoint-${node.id}`, message: 'API call needs a base URL or path.', nodeId: node.id });
+        }
+    });
+
+    const cycle = detectCycle(nodes, edges);
+    if (cycle) {
+        const cycleHasLoop = cycle.some((id) => nodes.find((n) => n.id === id)?.type === 'loop');
+        if (!cycleHasLoop) {
+            errors.push({ id: 'cycle', message: 'Cycles are not allowed unless a Loop node is part of the cycle.' });
+        }
+    }
+
+    return { errors, warnings };
+};
+
 export default function FlowBuilder() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -440,12 +538,17 @@ export default function FlowBuilder() {
     const [logicModal, setLogicModal] = useState({ open: false, name: '', code: '', from: null, edge: null });
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
     const [hoveredEdge, setHoveredEdge] = useState(null);
+    const [issueTab, setIssueTab] = useState('errors');
+    const [panelState, setPanelState] = useState({ left: true, right: true });
     const historyRef = useRef([]);
     const historyIndexRef = useRef(-1);
     const restoringRef = useRef(false);
     const readyRef = useRef(false);
 
     const selected = useMemo(() => nodes.find((n) => n.id === selectedId) || null, [nodes, selectedId]);
+    const issues = useMemo(() => buildFlowIssues({ flowType: flow?.type, nodes, edges }), [flow?.type, nodes, edges]);
+    const errorNodeIds = useMemo(() => new Set(issues.errors.map((issue) => issue.nodeId).filter(Boolean)), [issues.errors]);
+    const warningNodeIds = useMemo(() => new Set(issues.warnings.map((issue) => issue.nodeId).filter(Boolean)), [issues.warnings]);
 
     useEffect(() => {
         if (!canEdit) return;
@@ -767,6 +870,26 @@ export default function FlowBuilder() {
         }
     };
 
+    const saveAsVersion = async () => {
+        if (!flow) return;
+        const errors = validateFlow({ flowType: flow.type, nodes, edges });
+        if (errors.length) return toast.error(errors[0]);
+        setSaving(true);
+        try {
+            const definition = toDefinition({ nodes, edges, positions, viewport, mode, customLogic });
+            const safeDefinition = sanitizeDefinition(definition);
+            const { data } = await updateFlow(flow.id, { definition: safeDefinition });
+            setFlow(data?.data);
+            await syncTrigger(flow.id);
+            toast.success('New version saved');
+        } catch (e) {
+            console.error(e);
+            toast.error('Unable to save new version');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const test = async () => {
         if (!flow) return;
         const errors = validateFlow({ flowType: flow.type, nodes, edges });
@@ -786,6 +909,73 @@ export default function FlowBuilder() {
         } finally {
             setRun({ running: false, activeId: null });
         }
+    };
+
+    const debugFlow = async () => {
+        if (!flow) return;
+        const errors = validateFlow({ flowType: flow.type, nodes, edges });
+        if (errors.length) return toast.error(errors[0]);
+        setRun({ running: true, activeId: null });
+        try {
+            const context = { email: user?.email || 'debug@example.com', userId: user?.id || null, role: user?.role || 'admin', debug: true };
+            const { data } = await executeFlow(flow.id, context);
+            const results = data?.data?.actions || [];
+            for (const step of results) {
+                await new Promise((r) => setTimeout(r, 250));
+                setRun({ running: true, activeId: step.id });
+            }
+            toast.success('Debug run complete');
+        } catch (e) {
+            console.error(e);
+            toast.error('Debug failed');
+        } finally {
+            setRun({ running: false, activeId: null });
+        }
+    };
+
+    const activateFlow = async () => {
+        if (!flow) return;
+        const errors = validateFlow({ flowType: flow.type, nodes, edges });
+        if (errors.length) {
+            toast.error(errors[0]);
+            return;
+        }
+        const { data } = await updateFlow(flow.id, { isActive: true });
+        setFlow(data?.data);
+        await syncTrigger(flow.id);
+        toast.success('Flow activated');
+    };
+
+    const focusNode = (nodeId) => {
+        if (!nodeId || !canvasRef.current) return;
+        const nodePos = positions[nodeId];
+        if (!nodePos) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        const nodeWidth = 240;
+        const nodeHeight = 92;
+        const targetX = -nodePos.x * viewport.zoom + (rect.width / 2) - (nodeWidth / 2);
+        const targetY = -nodePos.y * viewport.zoom + (rect.height / 2) - (nodeHeight / 2);
+        setViewport((v) => ({ ...v, x: targetX, y: targetY }));
+    };
+
+    const fitToCanvas = () => {
+        if (!canvasRef.current || nodes.length === 0) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        const padding = 120;
+        const xs = nodes.map((n) => positions[n.id]?.x ?? 0);
+        const ys = nodes.map((n) => positions[n.id]?.y ?? 0);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs) + 240;
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys) + 92;
+        const width = maxX - minX + padding;
+        const height = maxY - minY + padding;
+        const scale = Math.min(1.2, Math.max(0.5, Math.min(rect.width / width, rect.height / height)));
+        const centerX = minX + (maxX - minX) / 2;
+        const centerY = minY + (maxY - minY) / 2;
+        const targetX = -centerX * scale + rect.width / 2;
+        const targetY = -centerY * scale + rect.height / 2;
+        setViewport({ x: targetX, y: targetY, zoom: scale });
     };
 
     const getEdgePath = (edge) => {
@@ -826,78 +1016,106 @@ export default function FlowBuilder() {
     return (
         <div className="fb-page">
             <div className="fb-top">
-                <button type="button" className="secondary" onClick={() => navigate('/admin/flows')}>← Back</button>
-                <div className="fb-title">
-                    <div className="fb-name">{flow?.name || 'Flow Builder'}</div>
-                    <div className="fb-sub">
-                        <span className={`badge badge-${mode}`}>{mode === 'published' ? 'Published' : 'Draft'}</span>
-                        <span className={`badge badge-active-${flow?.isActive ? 'on' : 'off'}`}>{flow?.isActive ? 'Active' : 'Inactive'}</span>
-                        {loading ? <span className="hint">Loading...</span> : <span className="hint">Shift+drag to pan | Ctrl+wheel to zoom</span>}
+                <div className="fb-top-left">
+                    <button type="button" className="fb-nav" onClick={() => navigate('/admin/flows')}>← Back</button>
+                    <div className="fb-title">
+                        <div className="fb-name">{flow?.name || 'Flow Builder'}</div>
+                        <div className="fb-sub">
+                            <span className={`badge badge-${mode}`}>{mode === 'published' ? 'Published' : 'Draft'}</span>
+                            <span className={`badge badge-active-${flow?.isActive ? 'on' : 'off'}`}>{flow?.isActive ? 'Active' : 'Inactive'}</span>
+                            <span className="hint">{flow?.updatedAt ? `Last saved ${new Date(flow.updatedAt).toLocaleString()}` : 'Not saved yet'}</span>
+                        </div>
                     </div>
                 </div>
-                <div className="fb-actions">
-                    <button type="button" className="secondary" onClick={undo} disabled={!historyState.canUndo}>Undo</button>
-                    <button type="button" className="secondary" onClick={redo} disabled={!historyState.canRedo}>Redo</button>
-                    <button
-                        type="button"
-                        className="secondary"
-                        onClick={async () => {
-                            const nextMode = mode === 'published' ? 'draft' : 'published';
-                            const errors = flow ? validateFlow({ flowType: flow.type, nodes, edges }) : [];
-                            if (nextMode === 'published' && errors.length) {
-                                toast.error(errors[0]);
-                                return;
-                            }
-                            setMode(nextMode);
-                            await save(nextMode);
-                        }}
-                    >
-                        {mode === 'published' ? 'Set Draft' : 'Publish'}
-                    </button>
-                    <button type="button" className="secondary" onClick={async () => {
-                        if (!flow) return;
-                        const { data } = await updateFlow(flow.id, { isActive: !flow.isActive });
-                        setFlow(data?.data);
-                        await syncTrigger(flow.id);
-                    }}>
-                        {flow?.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button type="button" className="secondary" onClick={test} disabled={run.running}>Test</button>
-                    <button type="button" className="primary" onClick={() => save()} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+                <div className="fb-top-right">
+                    <div className="fb-panel-toggles">
+                        <button type="button" className={`fb-toggle ${panelState.left ? 'active' : ''}`} onClick={() => setPanelState((prev) => ({ ...prev, left: !prev.left }))}>Errors</button>
+                        <button type="button" className={`fb-toggle ${panelState.right ? 'active' : ''}`} onClick={() => setPanelState((prev) => ({ ...prev, right: !prev.right }))}>Inspector</button>
+                    </div>
+                    <div className="fb-actions">
+                        <button type="button" className="fb-icon" onClick={undo} disabled={!historyState.canUndo} title="Undo">↶</button>
+                        <button type="button" className="fb-icon" onClick={redo} disabled={!historyState.canRedo} title="Redo">↷</button>
+                        <button
+                            type="button"
+                            className="secondary"
+                            onClick={async () => {
+                                const nextMode = mode === 'published' ? 'draft' : 'published';
+                                const errors = flow ? validateFlow({ flowType: flow.type, nodes, edges }) : [];
+                                if (nextMode === 'published' && errors.length) {
+                                    toast.error(errors[0]);
+                                    return;
+                                }
+                                setMode(nextMode);
+                                await save(nextMode);
+                            }}
+                        >
+                            {mode === 'published' ? 'Set Draft' : 'Publish'}
+                        </button>
+                        <button type="button" className="secondary" onClick={test} disabled={run.running}>Run</button>
+                        <button type="button" className="secondary" onClick={debugFlow} disabled={run.running}>Debug</button>
+                        <button type="button" className="secondary" onClick={saveAsVersion} disabled={saving}>Save As New Version</button>
+                        <button type="button" className="secondary" onClick={() => save()} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+                        <button type="button" className="primary" onClick={activateFlow} disabled={!flow || flow?.isActive}>Activate</button>
+                    </div>
                 </div>
             </div>
 
             <div className="fb-layout">
-                <aside className="fb-panel left">
-                    <h3>Component Library</h3>
-                    {LIBRARY.map((group) => (
-                        <div key={group.title} className="fb-group">
-                            <div className="fb-group-title">{group.title}</div>
-                            <div className="fb-items">
-                                {group.items.map((item) => (
-                                    <div
-                                        key={item.key}
-                                        className="fb-item"
-                                        draggable
-                                        onDragStart={(e) => onDragStart(e, item)}
-                                        onClick={() => {
-                                            const point = selectedId
-                                                ? { x: (positions[selectedId]?.x || 400) + 260, y: positions[selectedId]?.y || 120 }
-                                                : { x: 400, y: 140 };
-                                            addNodeFromItem(item, point, selectedId);
-                                        }}
-                                        title={item.help}
-                                    >
-                                        <div className="fb-item-label">{item.label}</div>
-                                        <div className="fb-item-help">{item.help}</div>
-                                    </div>
-                                ))}
-                            </div>
+                {panelState.left && (
+                    <aside className="fb-panel left">
+                        <div className="fb-panel-header">
+                            <h3>Errors and Warnings</h3>
+                            <button type="button" className="fb-panel-close" onClick={() => setPanelState((prev) => ({ ...prev, left: false }))}>×</button>
                         </div>
-                    ))}
-                </aside>
+                        <div className="fb-issue-tabs">
+                            <button
+                                type="button"
+                                className={`fb-issue-tab ${issueTab === 'errors' ? 'active' : ''}`}
+                                onClick={() => setIssueTab('errors')}
+                            >
+                                Errors <span className="fb-issue-count">{issues.errors.length}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`fb-issue-tab ${issueTab === 'warnings' ? 'active' : ''}`}
+                                onClick={() => setIssueTab('warnings')}
+                            >
+                                Warnings <span className="fb-issue-count">{issues.warnings.length}</span>
+                            </button>
+                        </div>
+                        <div className="fb-issue-list">
+                            {(issueTab === 'errors' ? issues.errors : issues.warnings).length === 0 && (
+                                <div className="fb-empty">No {issueTab} right now.</div>
+                            )}
+                            {(issueTab === 'errors' ? issues.errors : issues.warnings).map((issue) => (
+                                <button
+                                    key={issue.id}
+                                    type="button"
+                                    className={`fb-issue-item ${issue.nodeId ? '' : 'global'}`}
+                                    onClick={() => {
+                                        if (issue.nodeId) {
+                                            setSelectedId(issue.nodeId);
+                                            focusNode(issue.nodeId);
+                                        }
+                                    }}
+                                >
+                                    <span className="fb-issue-title">{issue.message}</span>
+                                    {issue.nodeId && <span className="fb-issue-meta">Go to step</span>}
+                                </button>
+                            ))}
+                        </div>
+                    </aside>
+                )}
 
                 <main className="fb-canvas-wrap">
+                    <div className="fb-canvas-toolbar">
+                        <button type="button" className="fb-toolbar-btn" onClick={() => openAddMenu({ x: window.innerWidth / 2, y: 140 })}>+ Add Element</button>
+                        <div className="fb-toolbar-group">
+                            <button type="button" className="fb-toolbar-icon" onClick={() => setViewport((v) => ({ ...v, zoom: Math.min(1.8, v.zoom + 0.1) }))}>+</button>
+                            <button type="button" className="fb-toolbar-icon" onClick={() => setViewport((v) => ({ ...v, zoom: Math.max(0.5, v.zoom - 0.1) }))}>−</button>
+                            <button type="button" className="fb-toolbar-icon" onClick={fitToCanvas}>Fit</button>
+                        </div>
+                    </div>
                     <div
                         className="fb-canvas"
                         ref={canvasRef}
@@ -972,6 +1190,7 @@ export default function FlowBuilder() {
                                 return (
                                     <g key={edge.id}>
                                         <path
+                                            id={edge.id}
                                             d={path}
                                             className={`fb-edge-path ${isHovered ? 'hovered' : ''}`}
                                             data-handle={edge.handle || 'out'}
@@ -1002,7 +1221,7 @@ export default function FlowBuilder() {
                                 return (
                                     <div
                                         key={node.id}
-                                        className={`fb-node type-${kind} ${active ? 'active' : ''} ${running ? 'running' : ''} ${isConnecting ? 'connecting' : ''}`}
+                                        className={`fb-node type-${kind} ${active ? 'active' : ''} ${running ? 'running' : ''} ${isConnecting ? 'connecting' : ''} ${errorNodeIds.has(node.id) ? 'error' : ''} ${warningNodeIds.has(node.id) ? 'warning' : ''}`}
                                         style={{ left: pos.x, top: pos.y }}
                                         onMouseDown={(e) => {
                                             if (e.button !== 0 || e.target.closest('.fb-node-add') || e.target.closest('.port')) return;
@@ -1030,7 +1249,12 @@ export default function FlowBuilder() {
                                         }}
                                     >
                                         <div className="fb-node-head">
-                                            <div className="fb-node-type">{node.type}</div>
+                                        <div className="fb-node-type">{node.type}</div>
+                                        {(errorNodeIds.has(node.id) || warningNodeIds.has(node.id)) && (
+                                            <span className={`fb-node-status ${errorNodeIds.has(node.id) ? 'error' : 'warning'}`}>
+                                                {errorNodeIds.has(node.id) ? 'Error' : 'Warning'}
+                                            </span>
+                                        )}
                                             <div className="fb-node-label">{node.label}</div>
                                             <button
                                                 type="button"
@@ -1100,8 +1324,12 @@ export default function FlowBuilder() {
                     </div>
                 </main>
 
-                <aside className="fb-panel right">
-                    <h3>Step Configuration</h3>
+                {panelState.right && (
+                    <aside className="fb-panel right">
+                        <div className="fb-panel-header">
+                            <h3>Step Configuration</h3>
+                            <button type="button" className="fb-panel-close" onClick={() => setPanelState((prev) => ({ ...prev, right: false }))}>×</button>
+                        </div>
                     {!selected && <div className="fb-empty">Select a step to configure it.</div>}
                     {selected && (
                         <div className="fb-config">
@@ -1270,6 +1498,7 @@ export default function FlowBuilder() {
                         </div>
                     )}
                 </aside>
+                )}
             </div>
 
             {addMenu.open && (

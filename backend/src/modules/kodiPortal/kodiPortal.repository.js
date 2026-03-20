@@ -344,6 +344,37 @@ const updateIdentity = async ({ userId, updates }) => {
     return result.rows[0] || null;
 };
 
+const listAppUtilities = async (appId) => {
+    const result = await query(
+        `SELECT *
+         FROM kodi_app_utilities
+         WHERE app_id = $1
+         ORDER BY nav_order ASC`,
+        [appId]
+    );
+    return result.rows || [];
+};
+
+const replaceAppUtilities = async (appId, utilities = []) => {
+    await query(`DELETE FROM kodi_app_utilities WHERE app_id = $1`, [appId]);
+    for (const utility of utilities) {
+        await query(
+            `INSERT INTO kodi_app_utilities (app_id, utility_key, label, icon, nav_order, is_enabled, settings)
+             VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)`,
+            [
+                appId,
+                utility.utility_key,
+                utility.label,
+                utility.icon || null,
+                utility.nav_order || 0,
+                utility.is_enabled !== false,
+                JSON.stringify(utility.settings || {})
+            ]
+        );
+    }
+    return listAppUtilities(appId);
+};
+
 module.exports = {
     query,
     getAppById,
@@ -368,5 +399,7 @@ module.exports = {
     ,getIdentityByUsername
     ,getIdentityByUserId
     ,createIdentity
-    ,updateIdentity
+    ,updateIdentity,
+    listAppUtilities,
+    replaceAppUtilities
 };

@@ -5,13 +5,14 @@ import {
     createPlatformPage,
     listKCComponents,
     listPlatformPages,
-    updatePlatformLayout
+    updatePlatformLayout,
+    listPlatformObjects
 } from '../../services/kodiPageService';
 import './KodiBuilder.css';
 import { useParams } from 'react-router-dom';
 
 const createDefaultLayout = () => ({
-    type: '1-column',
+    type: '2-column',
     orientation: 'horizontal',
     rows: [
         {
@@ -19,7 +20,12 @@ const createDefaultLayout = () => ({
             columns: [
                 {
                     id: `col-${Date.now()}-1`,
-                    width: 12,
+                    width: 8,
+                    components: []
+                },
+                {
+                    id: `col-${Date.now()}-2`,
+                    width: 4,
                     components: []
                 }
             ]
@@ -131,23 +137,56 @@ const BUILT_IN_COMPONENTS = [
         preview: {
             actions: ['Add Call', 'New Task', 'Send Update'],
             stats: ['Leads: 8', 'Calls: 12', 'Open Tasks: 3']
+        },
+        props: {
+            icon: '💼',
+            iconColor: '#22c55e',
+            subtitle: 'Record',
+            fields: ['name', 'status', 'owner']
         }
     },
     {
-        id: 'record-page',
-        component_name: 'RecordPage',
-        displayName: 'Record Page',
-        component_type: 'RecordPage',
-        description: 'Display client details, timeline, and quick search.',
+        id: 'record-details',
+        component_name: 'RecordDetails',
+        displayName: 'Record Details',
+        component_type: 'RecordDetails',
+        description: 'Salesforce-style details card.',
         version: '1.0',
-        preview: {
-            client: {
-                name: 'Jordan Smith',
-                account: 'AC-124',
-                phone: '+1 (555) 010-1010'
-            },
-            timeline: ['Last contact: Email - 8 mins ago', 'Next follow-up: Demo on Friday', 'Notes: Referral from Anna'],
-            quickFilters: ['Open', 'Prospect', 'VIP']
+        props: {
+            sections: [
+                {
+                    title: 'Information',
+                    fields: [
+                        { key: 'name', label: 'Name', editable: true },
+                        { key: 'status', label: 'Status', editable: true }
+                    ]
+                }
+            ],
+            headerTabs: ['Related', 'Details']
+        }
+    },
+    {
+        id: 'activity-panel',
+        component_name: 'ActivityTimeline',
+        displayName: 'Activity Panel',
+        component_type: 'ActivityTimeline',
+        description: 'Timeline and activity actions.',
+        version: '1.0',
+        props: {
+            actions: ['Log Call', 'New Task', 'Email']
+        }
+    },
+    {
+        id: 'related-list',
+        component_name: 'RelatedList',
+        displayName: 'Related List',
+        component_type: 'RelatedList',
+        description: 'Related records table.',
+        version: '1.0',
+        props: {
+            relatedObject: 'opportunity',
+            relatedField: 'parent_id',
+            fields: ['name', 'status']
         }
     }
 ];
@@ -166,6 +205,7 @@ const KodiBuilder = () => {
     const [saving, setSaving] = useState(false);
     const [pages, setPages] = useState([]);
     const [components, setComponents] = useState([]);
+    const [objects, setObjects] = useState([]);
     const [selectedPageId, setSelectedPageId] = useState(routePageId || '');
     const [layout, setLayout] = useState(null);
     const [selectedComponent, setSelectedComponent] = useState(null);
@@ -194,15 +234,21 @@ const KodiBuilder = () => {
         window.open(`/kodi/page/${selectedPage.slug}`, '_blank', 'noopener,noreferrer');
     };
     const selectedComponentLabel = selectedComponent ? getComponentLabel(selectedComponent) : '';
+    const availableObjects = useMemo(() => (objects.length ? objects : BUILT_IN_OBJECTS), [objects]);
 
     // Load data
     const load = async () => {
         setLoading(true);
         try {
-            const [pagesData, compsData] = await Promise.all([listPlatformPages(), listKCComponents()]);
+            const [pagesData, compsData, objectsData] = await Promise.all([
+                listPlatformPages(),
+                listKCComponents(),
+                listPlatformObjects()
+            ]);
 
             setPages(pagesData);
             setComponents(compsData);
+            setObjects(objectsData || []);
 
             if (pagesData.length > 0) {
                 const matchesRoute = routePageId && pagesData.some((p) => p.id === routePageId);
@@ -605,6 +651,50 @@ const KodiBuilder = () => {
             );
         }
 
+        if (comp.component_type === 'RecordDetails') {
+            return (
+                <div className="record-details-preview">
+                    <div className="record-details-header">
+                        <span>Related</span>
+                        <span className="active">Details</span>
+                    </div>
+                    <div className="record-details-grid">
+                        <div>
+                            <span>Name</span>
+                            <strong>Sample Record</strong>
+                        </div>
+                        <div>
+                            <span>Status</span>
+                            <strong>Active</strong>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (comp.component_type === 'ActivityTimeline') {
+            return (
+                <div className="record-activity-preview">
+                    <div className="record-activity-actions">
+                        <button type="button">Log Call</button>
+                        <button type="button">New Task</button>
+                    </div>
+                    <div className="record-activity-item">No activities yet.</div>
+                </div>
+            );
+        }
+
+        if (comp.component_type === 'RelatedList') {
+            return (
+                <div className="record-related-preview">
+                    <div className="record-related-row">
+                        <span>Related Item</span>
+                        <span>Open</span>
+                    </div>
+                </div>
+            );
+        }
+
         if (comp.component_type === 'RecordPage') {
             const client = comp.preview?.client || { name: 'Client Name', account: 'AC-000', phone: '—' };
             const timeline = comp.preview?.timeline || ['No recent activity'];
@@ -690,6 +780,15 @@ const KodiBuilder = () => {
         updateComponentProp(key, parseCommaSeparated(rawValue));
     };
 
+    const handleJsonPropChange = (key, rawValue) => {
+        try {
+            const parsed = JSON.parse(rawValue || '[]');
+            updateComponentProp(key, parsed);
+        } catch (error) {
+            toast.error('Invalid JSON format');
+        }
+    };
+
     const handleSettingsJsonApply = () => {
         try {
             const parsed = JSON.parse(settingsJson || '{}');
@@ -756,8 +855,15 @@ const KodiBuilder = () => {
     const selectedComponentHeight = selectedComponent?.layout?.height || DEFAULT_COMPONENT_LAYOUT.height;
     const selectedComponentFieldsValue = formatCommaSeparated(selectedComponentProps.fields);
     const selectedComponentActionsValue = formatCommaSeparated(selectedComponentProps.actions);
-    const selectedDataSourceFieldHints =
-        BUILT_IN_OBJECT_FIELDS[selectedComponentProps.dataSource] || [];
+    const selectedDataSourceFieldHints = (() => {
+        const objectMatch = availableObjects.find((obj) =>
+            String(obj.name || obj.id) === String(selectedComponentProps.dataSource)
+        );
+        if (objectMatch?.fields?.length) {
+            return objectMatch.fields.map((field) => field.field_name || field.fieldName).filter(Boolean);
+        }
+        return BUILT_IN_OBJECT_FIELDS[selectedComponentProps.dataSource] || [];
+    })();
     const getSpacingValue = (type, side) => selectedComponentSettings[type]?.[side] ?? '';
 
     if (loading) return <Loading />;
@@ -1317,12 +1423,22 @@ const KodiBuilder = () => {
                                         onChange={(e) => updateComponentProp("dataSource", e.target.value)}
                                     >
                                         <option value="">Select data source</option>
-                                        {BUILT_IN_OBJECTS.map((source) => (
-                                            <option key={source.name} value={source.name}>
-                                                {source.label}
+                                        {availableObjects.map((source) => (
+                                            <option key={source.name || source.id} value={source.name || source.id}>
+                                                {source.label || source.name}
                                             </option>
                                         ))}
                                     </select>
+                                </div>
+                                <div className="property-item">
+                                    <label>Record ID (optional)</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={selectedComponentProps.recordId || ""}
+                                        onChange={(e) => updateComponentProp("recordId", e.target.value)}
+                                        placeholder="UUID"
+                                    />
                                 </div>
                                 <div className="property-item">
                                     <label>
@@ -1342,6 +1458,26 @@ const KodiBuilder = () => {
                                     />
                                 </div>
                                 <div className="property-item">
+                                    <label>Related Object (Related List)</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={selectedComponentProps.relatedObject || ""}
+                                        onChange={(e) => updateComponentProp("relatedObject", e.target.value)}
+                                        placeholder="opportunity"
+                                    />
+                                </div>
+                                <div className="property-item">
+                                    <label>Related Field</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={selectedComponentProps.relatedField || ""}
+                                        onChange={(e) => updateComponentProp("relatedField", e.target.value)}
+                                        placeholder="parent_id"
+                                    />
+                                </div>
+                                <div className="property-item">
                                     <label>API Endpoint</label>
                                     <input
                                         type="text"
@@ -1349,6 +1485,39 @@ const KodiBuilder = () => {
                                         value={selectedComponentProps.endpoint || ""}
                                         onChange={(e) => updateComponentProp("endpoint", e.target.value)}
                                         placeholder="/api/contacts"
+                                    />
+                                </div>
+                                <div className="property-item">
+                                    <label>Actions (comma separated)</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={selectedComponentActionsValue}
+                                        onChange={(e) => handleArrayPropChange("actions", e.target.value)}
+                                        placeholder="Submit for Approval, New Event"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="property-section">
+                                <h4>Component Structure</h4>
+                                <div className="property-item">
+                                    <label>Sections JSON (Details)</label>
+                                    <textarea
+                                        className="property-textarea"
+                                        rows={4}
+                                        value={JSON.stringify(selectedComponentProps.sections || [], null, 2)}
+                                        onChange={(e) => handleJsonPropChange("sections", e.target.value)}
+                                    />
+                                </div>
+                                <div className="property-item">
+                                    <label>Activity Tabs (comma)</label>
+                                    <input
+                                        type="text"
+                                        className="property-input"
+                                        value={formatCommaSeparated(selectedComponentProps.tabs)}
+                                        onChange={(e) => handleArrayPropChange("tabs", e.target.value)}
+                                        placeholder="Activity, Chatter, Email"
                                     />
                                 </div>
                             </div>

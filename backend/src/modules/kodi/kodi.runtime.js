@@ -14,7 +14,6 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
     const permissionMap = perms.formatPermissions(permissionRows);
     const componentRegistry = await service.listComponentRegistry();
     const objects = await service.listObjects();
-    const record = await service.getRuntimeRecord(pageId);
     const appContextId = appId || page.linked_app_id;
     const app = appContextId ? await service.getAppById(appContextId) : null;
 
@@ -67,15 +66,73 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
         });
         return items;
     };
+    const components = flattenComponents();
+    const objectName = service.resolveObjectName(page, components);
+    const recordId = service.resolveRecordId(page, components);
+    const recordRow = await service.ensureObjectRecord({
+        objectName,
+        recordId,
+        ownerId: userId
+    });
+    const record = recordRow?.record || {};
+    if (userId && recordRow?.id) {
+        await service.trackRecentItem({
+            userId,
+            objectName,
+            recordId: recordRow.id,
+            label: record?.name || record?.title || page.label
+        });
+    }
+    const activities = recordRow?.id
+        ? await service.listRecordActivities({ objectName, recordId: recordRow.id })
+        : [];
+    const notes = recordRow?.id
+        ? await service.listRecordNotes({ objectName, recordId: recordRow.id })
+        : [];
+    const links = recordRow?.id
+        ? await service.listRecordLinks({ objectName, recordId: recordRow.id })
+        : [];
+    const recentItems = await service.listRecentItems({ userId });
+    const utilities = appContextId ? await service.listAppUtilities(appContextId) : [];
+
+    const relatedMap = {};
+    await Promise.all(
+        components
+            .filter((component) => component.component_type === 'RelatedList')
+            .map(async (component) => {
+                const relatedObject = component?.props?.relatedObject || component?.props?.dataSource;
+                const relatedField = component?.props?.relatedField || 'parent_id';
+                if (!relatedObject) return;
+                const items = await service.listRelatedRecords({
+                    objectName,
+                    recordId: recordRow?.id,
+                    relatedObject,
+                    relatedField
+                });
+                relatedMap[component.instanceId || component.id || relatedObject] = items;
+            })
+    );
 
     return {
         page,
         layout: page.layout,
-        components: flattenComponents(),
+        components,
         permissions: permissionMap,
         registry: componentRegistry,
         objects,
-        record: record || page?.settings?.sample_record || page?.settings?.sampleRecord || {},
+        record,
+        recordContext: {
+            objectName,
+            recordId: recordRow?.id || null
+        },
+        activity: activities,
+        related: relatedMap,
+        utilities: {
+            items: utilities,
+            notes,
+            links,
+            recent: recentItems
+        },
         effectiveRole,
         fields: objects.reduce((acc, obj) => {
             acc[obj.name] = obj.fields || [];
@@ -86,7 +143,8 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
             label: page.label,
             pageType: page.page_type,
             status: page.status,
-            activatedAt: page.activated_at
+            activatedAt: page.activated_at,
+            object: objects.find((obj) => obj.name === objectName) || null
         }
     };
 };

@@ -708,11 +708,13 @@ const verifyCompany = async (req, res) => {
         const { id } = req.params;
         const hasVerifiedBy = await columnExists('companies', 'verified_by');
         const hasVerifiedAt = await columnExists('companies', 'verified_at');
+        const hasStatus = await columnExists('companies', 'status');
 
         let q = `UPDATE companies SET is_verified = true`;
         const params = [];
         if (hasVerifiedBy) { q += `, verified_by = $1`; params.push(req.user.id); }
         if (hasVerifiedAt) q += `, verified_at = CURRENT_TIMESTAMP`;
+        if (hasStatus) q += `, status = 'active'`;
         q += `, updated_at = CURRENT_TIMESTAMP WHERE id = $${params.length + 1} RETURNING *`;
         params.push(id);
 

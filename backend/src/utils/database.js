@@ -445,6 +445,11 @@ const createTables = async () => {
                 conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
                 sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 content TEXT NOT NULL,
+                message_type VARCHAR(24) DEFAULT 'text',
+                attachment_url TEXT,
+                attachment_mime TEXT,
+                attachment_duration INT,
+                attachment_meta JSONB DEFAULT '{}'::jsonb,
                 is_read BOOLEAN DEFAULT false,
                 is_system_message BOOLEAN DEFAULT false,
                 read_at TIMESTAMP,
@@ -1606,6 +1611,11 @@ const runMigrations = async () => {
             // Messages
             "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_system_message BOOLEAN DEFAULT false;",
             "ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;",
+            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(24) DEFAULT 'text';",
+            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_url TEXT;",
+            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_mime TEXT;",
+            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_duration INT;",
+            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_meta JSONB DEFAULT '{}'::jsonb;",
 
             // Conversations
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP;",

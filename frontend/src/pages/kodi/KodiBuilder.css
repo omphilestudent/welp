@@ -2756,3 +2756,80 @@
     background: linear-gradient(90deg, transparent, var(--sf-border), transparent);
     margin: 16px 0;
 }
+
+/* Salesforce-inspired builder styling */
+.kodi-builder {
+    background: #b7c7df;
+}
+
+.builder-header {
+    background: #0b2a5b;
+    color: #ffffff;
+    border-bottom: none;
+}
+
+.builder-header .builder-title {
+    color: #ffffff;
+}
+
+.builder-header .builder-actions .btn-primary {
+    background: #1d4ed8;
+}
+
+.builder-sidebar {
+    background: #ffffff;
+    border-right: 1px solid #dfe3e8;
+}
+
+.builder-canvas {
+    background: #b7c7df;
+}
+
+.canvas-area {
+    background: #b7c7df;
+}
+
+.canvas-card {
+    background: #ffffff;
+    border: 1px solid #dfe3e8;
+    border-radius: 6px;
+}
+
+.builder-properties {
+    background: #ffffff;
+    border-left: 1px solid #dfe3e8;
+}
+
+.record-details-preview,
+.record-activity-preview,
+.record-related-preview {
+    background: #ffffff;
+    border: 1px solid #dfe3e8;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 12px;
+}
+
+.record-details-header {
+    display: flex;
+    gap: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 8px;
+}
+
+.record-details-header span.active {
+    border-bottom: 2px solid #3b82f6;
+    color: #111827;
+}
+
+.record-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.record-activity-actions {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}

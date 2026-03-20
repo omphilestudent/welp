@@ -10,6 +10,7 @@ const MessageThread = ({
     conversation,
     messages: initialMessages,
     onSendMessage,
+    onSendVoiceNote,
     callConfig,
     isExpired,
     timeRemainingLabel,
@@ -26,14 +27,46 @@ const MessageThread = ({
     const [newMessage, setNewMessage] = useState('');
     const [sending, setSending] = useState(false);
     const [error, setError] = useState('');
+    const [recordingError, setRecordingError] = useState('');
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordDuration, setRecordDuration] = useState(0);
+    const [voiceNote, setVoiceNote] = useState(null);
     const messagesEndRef = useRef(null);
     const threadRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const isNearBottomRef = useRef(true);
+    const recorderRef = useRef(null);
+    const recordTimerRef = useRef(null);
+    const recordStreamRef = useRef(null);
 
     useEffect(() => {
         setMessages(initialMessages || []);
     }, [initialMessages]);
+
+    useEffect(() => {
+        return () => {
+            if (voiceNote?.url) {
+                URL.revokeObjectURL(voiceNote.url);
+            }
+        };
+    }, [voiceNote]);
+
+    useEffect(() => {
+        return () => {
+            if (recorderRef.current) {
+                recorderRef.current.stop();
+                recorderRef.current = null;
+            }
+            if (recordStreamRef.current) {
+                recordStreamRef.current.getTracks().forEach((track) => track.stop());
+                recordStreamRef.current = null;
+            }
+            if (recordTimerRef.current) {
+                clearInterval(recordTimerRef.current);
+                recordTimerRef.current = null;
+            }
+        };
+    }, []);
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1];
@@ -90,6 +123,95 @@ const MessageThread = ({
             setNewMessage('');
         } catch (error) {
             setError('Failed to send message');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const startRecording = async () => {
+        setRecordingError('');
+        setVoiceNote(null);
+        try {
+            if (typeof MediaRecorder === 'undefined') {
+                setRecordingError('Voice notes are not supported in this browser.');
+                return;
+            }
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            recordStreamRef.current = stream;
+            const recorder = new MediaRecorder(stream);
+            const chunks = [];
+            recorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    chunks.push(event.data);
+                }
+            };
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+                const url = URL.createObjectURL(blob);
+                setVoiceNote({
+                    blob,
+                    url,
+                    duration: recordDuration || Math.ceil((Date.now() - recorder.startTime) / 1000) || 1,
+                    mimeType: recorder.mimeType || blob.type
+                });
+                if (recordStreamRef.current) {
+                    recordStreamRef.current.getTracks().forEach((track) => track.stop());
+                    recordStreamRef.current = null;
+                }
+            };
+            recorder.start();
+            recorder.startTime = Date.now();
+            recorderRef.current = recorder;
+            setIsRecording(true);
+            setRecordDuration(0);
+            recordTimerRef.current = setInterval(() => {
+                setRecordDuration((prev) => prev + 1);
+            }, 1000);
+        } catch (err) {
+            setRecordingError('Microphone access was denied or unavailable.');
+        }
+    };
+
+    const stopRecording = () => {
+        if (!recorderRef.current) return;
+        recorderRef.current.stop();
+        recorderRef.current = null;
+        setIsRecording(false);
+        if (recordTimerRef.current) {
+            clearInterval(recordTimerRef.current);
+            recordTimerRef.current = null;
+        }
+    };
+
+    const cancelRecording = () => {
+        if (recorderRef.current) {
+            recorderRef.current.stop();
+            recorderRef.current = null;
+        }
+        if (recordStreamRef.current) {
+            recordStreamRef.current.getTracks().forEach((track) => track.stop());
+            recordStreamRef.current = null;
+        }
+        if (recordTimerRef.current) {
+            clearInterval(recordTimerRef.current);
+            recordTimerRef.current = null;
+        }
+        setIsRecording(false);
+        setRecordDuration(0);
+        setVoiceNote(null);
+    };
+
+    const handleSendVoiceNote = async () => {
+        if (!voiceNote?.blob || !onSendVoiceNote) return;
+        setSending(true);
+        setError('');
+        try {
+            const file = new File([voiceNote.blob], 'voice-note.webm', { type: voiceNote.mimeType || 'audio/webm' });
+            await onSendVoiceNote({ file, duration: voiceNote.duration });
+            setVoiceNote(null);
+            setRecordDuration(0);
+        } catch (err) {
+            setError('Failed to send voice note');
         } finally {
             setSending(false);
         }
@@ -182,7 +304,7 @@ const MessageThread = ({
                                 return onStartVoiceCall?.();
                             }}
                         >
-                            Voice
+                            Voice Call
                         </button>
                         <button
                             className="btn btn-outline btn-small"
@@ -196,7 +318,7 @@ const MessageThread = ({
                                 return onStartVideoCall?.();
                             }}
                         >
-                            Video
+                            Video Call
                         </button>
                         <span className="thread-call-limit">
                             {callLimitText}
@@ -227,6 +349,9 @@ const MessageThread = ({
 
                 {messages.map((message, index) => {
                     const isOwn = message.sender_id === user?.id;
+                    const messageType = message.message_type || message.messageType || 'text';
+                    const attachmentUrl = message.attachment_url || message.attachmentUrl;
+                    const attachmentDuration = message.attachment_duration || message.attachmentDuration;
                     const showDate = index === 0 ||
                         format(new Date(message.created_at), 'yyyy-MM-dd') !==
                         format(new Date(messages[index - 1].created_at), 'yyyy-MM-dd');
@@ -240,7 +365,19 @@ const MessageThread = ({
                             )}
                             <div className={`message-wrapper ${isOwn ? 'own' : 'other'}`}>
                                 <div className={`message-bubble ${isOwn ? 'own' : 'other'}`}>
-                                    <p className="message-content">{message.content}</p>
+                                    {messageType === 'voice_note' && attachmentUrl ? (
+                                        <div className="message-voice-note">
+                                            <audio controls src={attachmentUrl} preload="metadata" />
+                                            <div className="message-voice-meta">
+                                                <span>Voice note</span>
+                                                {attachmentDuration ? (
+                                                    <span>{attachmentDuration}s</span>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="message-content">{message.content}</p>
+                                    )}
                                     <span className="message-time">
                     {format(new Date(message.created_at), 'h:mm a')}
                   </span>
@@ -254,21 +391,58 @@ const MessageThread = ({
 
             {conversation.status === 'accepted' && !isExpired && (
                 <form onSubmit={handleSend} className="message-input-form">
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type your message..."
-                        className="message-input"
-                        disabled={sending}
-                    />
-                    <button
-                        type="submit"
-                        disabled={!newMessage.trim() || sending}
-                        className="btn btn-primary"
-                    >
-                        {sending ? 'Sending...' : 'Send'}
-                    </button>
+                    <div className="message-input-controls">
+                        <button
+                            type="button"
+                            className="btn btn-outline btn-small"
+                            onClick={isRecording ? stopRecording : startRecording}
+                            disabled={sending}
+                        >
+                            {isRecording ? `Stop (${recordDuration}s)` : 'Record'}
+                        </button>
+                        {voiceNote && (
+                            <div className="voice-preview">
+                                <audio controls src={voiceNote.url} />
+                                <div className="voice-preview-actions">
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary btn-small"
+                                        onClick={handleSendVoiceNote}
+                                        disabled={sending}
+                                    >
+                                        Send voice note
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-small"
+                                        onClick={cancelRecording}
+                                    >
+                                        Discard
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        {recordingError && (
+                            <span className="message-input-error">{recordingError}</span>
+                        )}
+                    </div>
+                    <div className="message-input-row">
+                        <input
+                            type="text"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Type your message..."
+                            className="message-input"
+                            disabled={sending || isRecording}
+                        />
+                        <button
+                            type="submit"
+                            disabled={!newMessage.trim() || sending}
+                            className="btn btn-primary"
+                        >
+                            {sending ? 'Sending...' : 'Send'}
+                        </button>
+                    </div>
                 </form>
             )}
 

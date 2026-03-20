@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import Loading from '../../components/common/Loading';
 import RuntimeRenderer from '../../components/kodi/RuntimeRenderer';
 import PanelHighlight from '../../components/kodi/components/PanelHighlight';
+import UtilityBar from '../../components/kodi/UtilityBar';
 import { fetchRuntimePage } from '../../services/kodiPageService';
 import api from '../../services/api';
 import './KodiRuntime.css';
@@ -97,18 +98,6 @@ const KodiAppRuntimePage = () => {
         toast.error('Action not configured');
     };
 
-    const normalizeActions = (raw) => {
-        if (!raw) return [];
-        if (Array.isArray(raw)) {
-            return raw.map((action) => {
-                if (typeof action === 'string') return { label: action };
-                if (typeof action === 'object' && action) return { label: action.label || action.title || action.name || 'Action', ...action };
-                return null;
-            }).filter(Boolean);
-        }
-        return [];
-    };
-
     const setValueByPath = (obj, path, value) => {
         const parts = path.split('.');
         const next = { ...(obj || {}) };
@@ -133,7 +122,13 @@ const KodiAppRuntimePage = () => {
             await api.request({
                 url: `/kodi/platform/runtime/${pageId}/record`,
                 method: 'put',
-                data: { record: nextRecord }
+                params: { appId },
+                data: {
+                    path,
+                    value,
+                    objectName: payload?.recordContext?.objectName,
+                    recordId: payload?.recordContext?.recordId
+                }
             });
             toast.success('Record updated');
         } catch (err) {
@@ -164,64 +159,73 @@ const KodiAppRuntimePage = () => {
     const { layout: sanitizedLayout, highlight } = extractHighlight(payload?.layout);
     const recordTitle = record?.name || record?.title || record?.full_name || record?.company || payload?.page?.label;
     const recordType = payload?.metadata?.object?.label || payload?.metadata?.object?.name || payload?.page?.page_type || 'Record';
+
     const fallbackHighlight = {
         props: {
-            title: recordTitle || 'Highlights',
-            subtitle: `${recordType} Summary`,
+            title: recordTitle || 'Record',
+            subtitle: recordType,
             fields: Object.keys(record || {}).filter((key) => key !== 'id').slice(0, 4).map((key) => ({
                 key,
                 label: key.replace(/_/g, ' ')
             })),
-            actions: ['Create Case', 'Assign Case', 'Handover'],
-            iconActions: [{ label: 'Star' }, { label: 'Follow' }]
+            actions: [
+                { label: 'Submit for Approval' },
+                { label: 'New Event' },
+                { label: 'Change Owner' },
+                { label: '⋯', variant: 'overflow' }
+            ],
+            iconColor: payload?.app?.themeConfig?.primaryColor || '#22c55e',
+            icon: '💼',
+            iconActions: [{ label: '☆' }, { label: 'Follow' }]
         },
-        actions: ['Create Case', 'Assign Case', 'Handover']
+        actions: ['Submit for Approval', 'New Event', 'Change Owner']
     };
     const effectiveHighlight = highlight || fallbackHighlight;
 
     return (
         <div className="kodi-runtime">
-            <header className="kodi-runtime__record-header">
-                <div>
-                    <span className="kodi-runtime__record-type">{recordType}</span>
-                    <h1>{recordTitle || 'Record'}</h1>
-                    <div className="kodi-runtime__record-meta">
-                        <span>Owner: {record?.owner || record?.assigned_to || 'Unassigned'}</span>
-                        <span>Status: {record?.status || record?.stage || 'Active'}</span>
-                    </div>
-                </div>
-                <div className="kodi-runtime__record-actions">
-                    {normalizeActions(effectiveHighlight?.actions || effectiveHighlight?.props?.actions || []).map((action) => (
-                        <button key={action.label} type="button" onClick={() => handleAction(action)}>
-                            {action.label}
-                        </button>
-                    ))}
-                </div>
-            </header>
-            {effectiveHighlight && (
+            <div className="kodi-runtime-shell">
                 <PanelHighlight
                     props={{
-                        title: effectiveHighlight.props?.title || effectiveHighlight.label || 'Highlights',
-                        subtitle: effectiveHighlight.props?.subtitle || effectiveHighlight.props?.description,
-                        fields: effectiveHighlight.props?.fields || effectiveHighlight.props?.stats || [],
+                        title: effectiveHighlight.props?.title || recordTitle || 'Record',
+                        subtitle: effectiveHighlight.props?.subtitle || recordType,
+                        fields: effectiveHighlight.props?.fields || [],
                         actions: effectiveHighlight.actions || effectiveHighlight.props?.actions || [],
-                        iconActions: effectiveHighlight.props?.iconActions || []
+                        iconActions: effectiveHighlight.props?.iconActions || [],
+                        iconColor: effectiveHighlight.props?.iconColor,
+                        icon: effectiveHighlight.props?.icon
                     }}
                     record={record}
                     canEdit={canEdit}
                     onAction={(action) => handleAction(action)}
                 />
-            )}
-            <RuntimeRenderer
-                layout={sanitizedLayout}
-                context={{
-                    ...(payload?.metadata || {}),
-                    record,
-                    canEdit,
-                    onRecordUpdate: handleRecordUpdate
+                <div className="kodi-runtime-grid">
+                    <RuntimeRenderer
+                        layout={sanitizedLayout}
+                        context={{
+                            ...(payload?.metadata || {}),
+                            record,
+                            canEdit,
+                            onRecordUpdate: handleRecordUpdate,
+                            activity: payload?.activity || [],
+                            related: payload?.related || {},
+                            recordContext: payload?.recordContext || {}
+                        }}
+                        role={role}
+                        onAction={handleAction}
+                    />
+                </div>
+            </div>
+            <UtilityBar
+                utilities={payload?.utilities?.items || []}
+                data={{
+                    notes: payload?.utilities?.notes || [],
+                    links: payload?.utilities?.links || [],
+                    recent: payload?.utilities?.recent || [],
+                    activity: payload?.activity || []
                 }}
-                role={role}
-                onAction={handleAction}
+                pageId={pageId}
+                appId={appId}
             />
         </div>
     );

@@ -14,6 +14,9 @@ export const deactivatePortalApp = async (appId) => unwrap((await api.post(`/kod
 export const getPortalSettings = async (appId) => unwrap((await api.get(`/kodi/portal/apps/${appId}/settings`)).data);
 export const updatePortalSettings = async (appId, payload) =>
     unwrap((await api.patch(`/kodi/portal/apps/${appId}/settings`, payload)).data);
+export const listPortalUtilities = async (appId) => unwrap((await api.get(`/kodi/portal/apps/${appId}/utilities`)).data);
+export const updatePortalUtilities = async (appId, payload) =>
+    unwrap((await api.put(`/kodi/portal/apps/${appId}/utilities`, payload)).data);
 
 export const listPortalUsers = async (appId) => unwrap((await api.get(`/kodi/portal/apps/${appId}/users`)).data);
 export const assignPortalUser = async (appId, payload) => unwrap((await api.post(`/kodi/portal/apps/${appId}/users`, payload)).data);

@@ -58,7 +58,8 @@ const KodiAppShell = () => {
         '--kodi-app-primary': theme.primaryColor || '#2563eb',
         '--kodi-app-accent': theme.accentColor || '#38bdf8',
         '--kodi-app-surface': theme.surfaceColor || '#0f172a',
-        '--kodi-app-text': theme.textColor || '#e2e8f0'
+        '--kodi-app-text': theme.textColor || '#e2e8f0',
+        '--kodi-app-background': theme.backgroundGradient || 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 45%, #0ea5e9 100%)'
     };
     const navMode = appMeta?.navigationMode || appMeta?.navigation_mode || 'top';
     const density = settings.layoutDensity || 'comfortable';

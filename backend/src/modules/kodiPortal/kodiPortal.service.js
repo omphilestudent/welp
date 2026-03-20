@@ -30,6 +30,15 @@ const getBaseUrl = () => process.env.FRONTEND_URL || process.env.SITE_URL || 'ht
 const buildOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 const OTP_TTL_MINUTES = Number(process.env.KODI_OTP_TTL_MINUTES || 30);
 
+const DEFAULT_UTILITIES = [
+    { utility_key: 'notes', label: 'Notes', icon: 'note', nav_order: 1 },
+    { utility_key: 'history', label: 'History', icon: 'history', nav_order: 2 },
+    { utility_key: 'recent_items', label: 'Recent Items', icon: 'bolt', nav_order: 3 },
+    { utility_key: 'captured_links', label: 'Captured Links', icon: 'link', nav_order: 4 },
+    { utility_key: 'chat_bot', label: 'Chat Bot', icon: 'chat', nav_order: 5 },
+    { utility_key: 'omni_channel', label: 'Omni-Channel', icon: 'presence', nav_order: 6 }
+];
+
 const buildUsername = async (email) => {
     const base = String(email || '').split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase() || 'kodiuser';
     let candidate = base;
@@ -157,6 +166,7 @@ const getAppDetail = async (appId) => {
 
 const createApp = async (payload) => {
     const app = await repository.createApp(payload);
+    await repository.replaceAppUtilities(app.id, DEFAULT_UTILITIES);
     const homeLayout = {
         type: '2-column',
         orientation: 'horizontal',
@@ -272,6 +282,7 @@ const updateApp = async (appId, payload) => {
 const getSettings = async (appId) => {
     const app = await repository.getAppById(appId);
     if (!app) return null;
+    const utilities = await repository.listAppUtilities(appId);
     return {
         id: app.id,
         name: app.name,
@@ -282,7 +293,8 @@ const getSettings = async (appId) => {
         settings: app.settings || {},
         navigationMode: app.navigation_mode,
         landingBehavior: app.landing_behavior,
-        defaultPageId: app.default_page_id
+        defaultPageId: app.default_page_id,
+        utilities
     };
 };
 
@@ -322,6 +334,9 @@ const updateSettings = async (appId, payload) => {
         if (isUuid(payload.defaultPageId)) {
             await repository.updateApp({ appId, updates: { default_page_id: payload.defaultPageId } });
         }
+    }
+    if (payload.utilities) {
+        await repository.replaceAppUtilities(appId, payload.utilities);
     }
     return repository.updateApp({ appId, updates });
 };
@@ -762,9 +777,13 @@ const getNavigation = async ({ appId, role, userId }) => {
             type: page.page_type,
             isDefault: Boolean(page.is_default),
             order: page.nav_order
-        }))
+        })),
+        utilities: await repository.listAppUtilities(appId)
     };
 };
+
+const listUtilities = async (appId) => repository.listAppUtilities(appId);
+const updateUtilities = async (appId, utilities) => repository.replaceAppUtilities(appId, utilities);
 
 const listUserApps = async ({ userId, role }) => {
     const isStaff = userId ? await staff.isWelpStaff(userId) : false;
@@ -822,5 +841,7 @@ module.exports = {
     listUserApps,
     getEffectiveRuntimeRole,
     validateActivationEligibility,
-    ensureDefaultPageConsistency
+    ensureDefaultPageConsistency,
+    listUtilities,
+    updateUtilities
 };

@@ -20,7 +20,8 @@ const AppSettings = () => {
             setSettings({
                 ...detail,
                 themeConfig: detail.themeConfig || {},
-                settings: detail.settings || {}
+                settings: detail.settings || {},
+                utilities: detail.utilities || []
             });
             setPages(pageRows || []);
         } catch (error) {
@@ -46,7 +47,8 @@ const AppSettings = () => {
                 navigationMode: settings.navigationMode,
                 landingBehavior: settings.landingBehavior,
                 themeConfig: settings.themeConfig || {},
-                settings: settings.settings || {}
+                settings: settings.settings || {},
+                utilities: settings.utilities || []
             });
             toast.success('Settings saved');
             load();

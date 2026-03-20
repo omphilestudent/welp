@@ -33,7 +33,8 @@ const settingsValidators = validate([
     body('navigationMode').optional().isIn(['sidebar', 'top', 'compact']),
     body('landingBehavior').optional().isIn(['default_page', 'last_visited']),
     body('defaultPageId').optional().custom(isUuidOrInt),
-    body('settings').optional().isObject()
+    body('settings').optional().isObject(),
+    body('utilities').optional().isArray()
 ]);
 
 const assignUserValidators = validate([
@@ -96,6 +97,17 @@ const reorderValidators = validate([
     body('orderedIds').isArray({ min: 1 })
 ]);
 
+const utilitiesValidators = validate([
+    param('id').custom(isUuid),
+    body('utilities').isArray(),
+    body('utilities.*.utility_key').isString(),
+    body('utilities.*.label').isString(),
+    body('utilities.*.icon').optional().isString(),
+    body('utilities.*.nav_order').optional().isInt(),
+    body('utilities.*.is_enabled').optional().isBoolean(),
+    body('utilities.*.settings').optional().isObject()
+]);
+
 module.exports = {
     appIdValidator,
     createAppValidators,
@@ -108,5 +120,6 @@ module.exports = {
     acceptInviteValidators,
     linkPageValidators,
     updatePageValidators,
-    reorderValidators
+    reorderValidators,
+    utilitiesValidators
 };

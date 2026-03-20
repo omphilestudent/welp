@@ -110,6 +110,286 @@ const createPage = async ({ label, pageType, linkedAppId, createdBy }) => {
     }
 };
 
+const DEFAULT_UTILITIES = [
+    { utility_key: 'notes', label: 'Notes', icon: 'note', nav_order: 1 },
+    { utility_key: 'history', label: 'History', icon: 'history', nav_order: 2 },
+    { utility_key: 'recent_items', label: 'Recent Items', icon: 'bolt', nav_order: 3 },
+    { utility_key: 'captured_links', label: 'Captured Links', icon: 'link', nav_order: 4 },
+    { utility_key: 'chat_bot', label: 'Chat Bot', icon: 'chat', nav_order: 5 },
+    { utility_key: 'omni_channel', label: 'Omni-Channel', icon: 'presence', nav_order: 6 }
+];
+
+const isValidObjectName = (value) => /^[a-z0-9_-]+$/i.test(String(value || ''));
+
+const resolveObjectName = (page, components) => {
+    const settings = page?.settings || {};
+    const binding = settings.recordBinding || settings.record_binding || {};
+    const fromSettings = binding.objectName || binding.object || settings.objectName || settings.object;
+    if (fromSettings && isValidObjectName(fromSettings)) return String(fromSettings).toLowerCase();
+
+    const componentMatch = (components || []).find((component) => component?.props?.dataSource || component?.props?.objectName);
+    const fromComponent = componentMatch?.props?.dataSource || componentMatch?.props?.objectName;
+    if (fromComponent && isValidObjectName(fromComponent)) return String(fromComponent).toLowerCase();
+    return 'account';
+};
+
+const resolveRecordId = (page, components) => {
+    const settings = page?.settings || {};
+    const binding = settings.recordBinding || settings.record_binding || {};
+    const fromSettings = binding.recordId || settings.recordId || settings.record_id || null;
+    if (fromSettings) return fromSettings;
+    const componentMatch = (components || []).find((component) => component?.props?.recordId);
+    return componentMatch?.props?.recordId || null;
+};
+
+const getObjectRecordById = async ({ objectName, recordId }) => {
+    if (!objectName || !recordId) return null;
+    const result = await database.query(
+        `SELECT *
+         FROM kodi_object_records
+         WHERE object_name = $1 AND id = $2
+         LIMIT 1`,
+        [objectName, recordId]
+    );
+    return result.rows[0] || null;
+};
+
+const getLatestObjectRecord = async (objectName) => {
+    if (!objectName) return null;
+    const result = await database.query(
+        `SELECT *
+         FROM kodi_object_records
+         WHERE object_name = $1
+         ORDER BY updated_at DESC NULLS LAST, created_at DESC
+         LIMIT 1`,
+        [objectName]
+    );
+    return result.rows[0] || null;
+};
+
+const createDefaultObjectRecord = async ({ objectName, ownerId }) => {
+    const payload = {
+        name: `${objectName.charAt(0).toUpperCase() + objectName.slice(1)} Record`,
+        status: 'active'
+    };
+    const result = await database.query(
+        `INSERT INTO kodi_object_records (object_name, record, owner_id, status)
+         VALUES ($1, $2::jsonb, $3, $4)
+         RETURNING *`,
+        [objectName, JSON.stringify(payload), ownerId || null, payload.status]
+    );
+    return result.rows[0] || null;
+};
+
+const ensureObjectRecord = async ({ objectName, recordId, ownerId }) => {
+    if (!objectName) return null;
+    const existing = recordId ? await getObjectRecordById({ objectName, recordId }) : await getLatestObjectRecord(objectName);
+    if (existing) return existing;
+    return createDefaultObjectRecord({ objectName, ownerId });
+};
+
+const updateObjectRecord = async ({ objectName, recordId, record }) => {
+    if (!objectName || !recordId) return null;
+    const result = await database.query(
+        `UPDATE kodi_object_records
+         SET record = $3::jsonb,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE object_name = $1 AND id = $2
+         RETURNING *`,
+        [objectName, recordId, JSON.stringify(record || {})]
+    );
+    return result.rows[0] || null;
+};
+
+const updateObjectRecordField = async ({ objectName, recordId, path, value }) => {
+    const existing = await getObjectRecordById({ objectName, recordId });
+    if (!existing) return null;
+    const next = { ...(existing.record || {}) };
+    const parts = String(path || '').split('.').filter(Boolean);
+    let cursor = next;
+    parts.forEach((part, index) => {
+        if (index === parts.length - 1) {
+            cursor[part] = value;
+        } else {
+            cursor[part] = { ...(cursor[part] || {}) };
+            cursor = cursor[part];
+        }
+    });
+    return updateObjectRecord({ objectName, recordId, record: next });
+};
+
+const listRelatedRecords = async ({ objectName, recordId, relatedObject, relatedField }) => {
+    if (!relatedObject) return [];
+    if (!relatedField || !recordId) {
+        const result = await database.query(
+            `SELECT *
+             FROM kodi_object_records
+             WHERE object_name = $1
+             ORDER BY updated_at DESC NULLS LAST, created_at DESC
+             LIMIT 25`,
+            [relatedObject]
+        );
+        return result.rows || [];
+    }
+    const result = await database.query(
+        `SELECT *
+         FROM kodi_object_records
+         WHERE object_name = $1
+           AND (record ->> $2) = $3
+         ORDER BY updated_at DESC NULLS LAST, created_at DESC
+         LIMIT 25`,
+        [relatedObject, relatedField, String(recordId)]
+    );
+    return result.rows || [];
+};
+
+const listRecordActivities = async ({ objectName, recordId }) => {
+    if (!objectName || !recordId) return [];
+    const result = await database.query(
+        `SELECT a.*, COALESCE(u.display_name, u.email, 'System') AS actor
+         FROM kodi_record_activities a
+         LEFT JOIN users u ON u.id = a.created_by
+         WHERE a.object_name = $1 AND a.record_id = $2
+         ORDER BY a.created_at DESC
+         LIMIT 25`,
+        [objectName, recordId]
+    );
+    return result.rows || [];
+};
+
+const createRecordActivity = async ({ objectName, recordId, title, meta, createdBy }) => {
+    if (!objectName || !recordId || !title) return null;
+    const result = await database.query(
+        `INSERT INTO kodi_record_activities (object_name, record_id, title, meta, created_by)
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING *`,
+        [objectName, recordId, title, meta || null, createdBy || null]
+    );
+    return result.rows[0] || null;
+};
+
+const listRecordNotes = async ({ objectName, recordId }) => {
+    if (!objectName || !recordId) return [];
+    const result = await database.query(
+        `SELECT n.*, COALESCE(u.display_name, u.email, 'System') AS author
+         FROM kodi_record_notes n
+         LEFT JOIN users u ON u.id = n.created_by
+         WHERE n.object_name = $1 AND n.record_id = $2
+         ORDER BY n.created_at DESC
+         LIMIT 50`,
+        [objectName, recordId]
+    );
+    return result.rows || [];
+};
+
+const createRecordNote = async ({ objectName, recordId, body, createdBy }) => {
+    if (!objectName || !recordId || !body) return null;
+    const result = await database.query(
+        `INSERT INTO kodi_record_notes (object_name, record_id, body, created_by)
+         VALUES ($1,$2,$3,$4)
+         RETURNING *`,
+        [objectName, recordId, body, createdBy || null]
+    );
+    return result.rows[0] || null;
+};
+
+const listRecordLinks = async ({ objectName, recordId }) => {
+    if (!objectName || !recordId) return [];
+    const result = await database.query(
+        `SELECT l.*, COALESCE(u.display_name, u.email, 'System') AS author
+         FROM kodi_record_links l
+         LEFT JOIN users u ON u.id = l.created_by
+         WHERE l.object_name = $1 AND l.record_id = $2
+         ORDER BY l.created_at DESC
+         LIMIT 50`,
+        [objectName, recordId]
+    );
+    return result.rows || [];
+};
+
+const createRecordLink = async ({ objectName, recordId, label, url, createdBy }) => {
+    if (!objectName || !recordId || !label || !url) return null;
+    const result = await database.query(
+        `INSERT INTO kodi_record_links (object_name, record_id, label, url, created_by)
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING *`,
+        [objectName, recordId, label, url, createdBy || null]
+    );
+    return result.rows[0] || null;
+};
+
+const listRecentItems = async ({ userId }) => {
+    if (!userId) return [];
+    const result = await database.query(
+        `SELECT *
+         FROM kodi_recent_items
+         WHERE user_id = $1
+         ORDER BY visited_at DESC
+         LIMIT 15`,
+        [userId]
+    );
+    return result.rows || [];
+};
+
+const trackRecentItem = async ({ userId, objectName, recordId, label }) => {
+    if (!userId || !objectName || !recordId) return null;
+    await database.query(
+        `INSERT INTO kodi_recent_items (user_id, object_name, record_id, label)
+         VALUES ($1,$2,$3,$4)`,
+        [userId, objectName, recordId, label || null]
+    );
+    return true;
+};
+
+const listAppUtilities = async (appId) => {
+    if (!appId) return [];
+    const result = await database.query(
+        `SELECT *
+         FROM kodi_app_utilities
+         WHERE app_id = $1
+         ORDER BY nav_order ASC`,
+        [appId]
+    );
+    if (result.rows.length) return result.rows;
+    for (const utility of DEFAULT_UTILITIES) {
+        await database.query(
+            `INSERT INTO kodi_app_utilities (app_id, utility_key, label, icon, nav_order, is_enabled, settings)
+             VALUES ($1,$2,$3,$4,$5,true,'{}'::jsonb)
+             ON CONFLICT (app_id, utility_key) DO NOTHING`,
+            [appId, utility.utility_key, utility.label, utility.icon, utility.nav_order]
+        );
+    }
+    const seeded = await database.query(
+        `SELECT *
+         FROM kodi_app_utilities
+         WHERE app_id = $1
+         ORDER BY nav_order ASC`,
+        [appId]
+    );
+    return seeded.rows || [];
+};
+
+const upsertAppUtilities = async (appId, utilities = []) => {
+    if (!appId) return [];
+    await database.query(`DELETE FROM kodi_app_utilities WHERE app_id = $1`, [appId]);
+    for (const utility of utilities) {
+        await database.query(
+            `INSERT INTO kodi_app_utilities (app_id, utility_key, label, icon, nav_order, is_enabled, settings)
+             VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)`,
+            [
+                appId,
+                utility.utility_key,
+                utility.label,
+                utility.icon || null,
+                utility.nav_order || 0,
+                utility.is_enabled !== false,
+                JSON.stringify(utility.settings || {})
+            ]
+        );
+    }
+    return listAppUtilities(appId);
+};
+
 const getRuntimeRecord = async (pageId) => {
     if (!pageId) return null;
     try {
@@ -731,12 +1011,12 @@ const listApps = async () => {
 
 const ensureStandardObjects = async () => {
     const standardObjects = [
-        { name: 'case', label: 'Case', description: 'Customer service cases' },
-        { name: 'account', label: 'Account', description: 'Business accounts' },
-        { name: 'contact', label: 'Contact', description: 'People and contacts' },
-        { name: 'lead', label: 'Lead', description: 'Prospective leads' },
-        { name: 'opportunity', label: 'Opportunity', description: 'Sales opportunities' },
-        { name: 'user', label: 'User', description: 'System users' }
+        { name: 'case', label: 'Case', description: 'Customer service cases', metadata: { displayField: 'name' } },
+        { name: 'account', label: 'Account', description: 'Business accounts', metadata: { displayField: 'name' } },
+        { name: 'contact', label: 'Contact', description: 'People and contacts', metadata: { displayField: 'name' } },
+        { name: 'lead', label: 'Lead', description: 'Prospective leads', metadata: { displayField: 'name' } },
+        { name: 'opportunity', label: 'Opportunity', description: 'Sales opportunities', metadata: { displayField: 'name' } },
+        { name: 'user', label: 'User', description: 'System users', metadata: { displayField: 'name' } }
     ];
     const existing = await database.query(`SELECT id, name FROM kodi_objects`);
     const existingMap = new Map(existing.rows.map((row) => [row.name, row.id]));
@@ -746,9 +1026,9 @@ const ensureStandardObjects = async () => {
         if (!objectId) {
             const created = await database.query(
                 `INSERT INTO kodi_objects (name, label, description, metadata)
-                 VALUES ($1, $2, $3, '{}'::jsonb)
+                 VALUES ($1, $2, $3, $4::jsonb)
                  RETURNING id`,
-                [obj.name, obj.label, obj.description]
+                [obj.name, obj.label, obj.description, JSON.stringify(obj.metadata || {})]
             );
             objectId = created.rows[0]?.id;
             if (!objectId) continue;
@@ -1023,5 +1303,21 @@ module.exports = {
     removePageUser,
     createComponent,
     updateComponent,
-    deleteComponent
+    deleteComponent,
+    resolveObjectName,
+    resolveRecordId,
+    ensureObjectRecord,
+    updateObjectRecord,
+    updateObjectRecordField,
+    listRelatedRecords,
+    listRecordActivities,
+    createRecordActivity,
+    listRecordNotes,
+    createRecordNote,
+    listRecordLinks,
+    createRecordLink,
+    listRecentItems,
+    trackRecentItem,
+    listAppUtilities,
+    upsertAppUtilities
 };

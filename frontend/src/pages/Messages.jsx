@@ -42,6 +42,10 @@ const Messages = () => {
     const [isMuted, setIsMuted] = useState(false);
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [callStartedAt, setCallStartedAt] = useState(null);
+    const [callView, setCallView] = useState('standard');
+    const [audioOutputs, setAudioOutputs] = useState([]);
+    const [selectedAudioOutput, setSelectedAudioOutput] = useState('default');
+    const [supportsAudioOutput, setSupportsAudioOutput] = useState(false);
     const [extendingSession, setExtendingSession] = useState(false);
     const [psychologistDeletedNotice, setPsychologistDeletedNotice] = useState('');
     const [extendMinutes, setExtendMinutes] = useState(10);
@@ -74,6 +78,7 @@ const Messages = () => {
     const hasFetchedConversations = React.useRef(false);
     const localVideoRef = React.useRef(null);
     const remoteVideoRef = React.useRef(null);
+    const callModalRef = React.useRef(null);
     const peerRef = React.useRef(null);
     const localStreamRef = React.useRef(null);
     const ringIntervalRef = React.useRef(null);
@@ -396,6 +401,29 @@ const Messages = () => {
             setIsSidebarOpen(true);
         }
     }, [activeConversation]);
+
+    useEffect(() => {
+        const supportsSink = typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function';
+        setSupportsAudioOutput(supportsSink);
+    }, []);
+
+    useEffect(() => {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        if (callState.status === 'idle') return;
+        navigator.mediaDevices.enumerateDevices()
+            .then((devices) => {
+                const outputs = devices.filter((device) => device.kind === 'audiooutput');
+                setAudioOutputs(outputs);
+            })
+            .catch(() => null);
+    }, [callState.status]);
+
+    useEffect(() => {
+        if (!supportsAudioOutput) return;
+        const element = remoteVideoRef.current;
+        if (!element || !selectedAudioOutput) return;
+        element.setSinkId(selectedAudioOutput).catch(() => null);
+    }, [supportsAudioOutput, selectedAudioOutput, callState.status]);
 
     useEffect(() => {
         if (!userId) {
@@ -825,6 +853,7 @@ const Messages = () => {
         setIncomingOffer(null);
         stopRingtone();
         setCallStartedAt(null);
+        setCallView('standard');
     }
 
     const toggleMute = () => {
@@ -905,6 +934,62 @@ const Messages = () => {
         } finally {
             setSendingMessage(false);
         }
+    };
+
+    const handleSendVoiceNote = async ({ file, duration }) => {
+        if (!activeConversation) return;
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
+        try {
+            const formData = new FormData();
+            formData.append('voice', file);
+            if (duration) {
+                formData.append('duration', String(duration));
+            }
+            const { data } = await api.post(
+                `/messages/conversations/${activeConversation.id}/voice-notes`,
+                formData,
+                { headers: { 'Content-Type': 'multipart/form-data' } }
+            );
+            if (data) {
+                setMessages((prev) => [...prev, data]);
+                setConversations((prev) => prev.map((conv) => {
+                    if (conv.id !== activeConversation.id) return conv;
+                    return {
+                        ...conv,
+                        last_message: {
+                            content: data.content,
+                            createdAt: data.created_at || data.createdAt,
+                            senderId: data.sender_id || data.senderId,
+                            messageType: data.message_type || data.messageType,
+                            attachmentUrl: data.attachment_url || data.attachmentUrl,
+                            attachmentDuration: data.attachment_duration || data.attachmentDuration,
+                            attachmentMime: data.attachment_mime || data.attachmentMime
+                        },
+                        updated_at: data.created_at || data.createdAt || conv.updated_at
+                    };
+                }));
+            }
+        } catch (error) {
+            const message = error?.response?.data?.error || 'Failed to send voice note.';
+            toast.error(message);
+        }
+    };
+
+    const toggleCallView = () => {
+        setCallView((prev) => (prev === 'expanded' ? 'standard' : 'expanded'));
+    };
+
+    const toggleFullscreen = async () => {
+        const modal = callModalRef.current;
+        if (!modal) return;
+        if (document.fullscreenElement) {
+            await document.exitFullscreen().catch(() => null);
+            return;
+        }
+        await modal.requestFullscreen?.().catch(() => null);
     };
 
     const handleEmployeeSearch = async (value) => {
@@ -1361,6 +1446,7 @@ const Messages = () => {
                             timeRemainingLabel={timeLabel}
                             sessionLimitMinutes={sessionLimitMinutes}
                             onSendMessage={handleSendMessage}
+                            onSendVoiceNote={handleSendVoiceNote}
                             onStartVoiceCall={handleVoiceCall}
                             onStartVideoCall={handleVideoCall}
                             onOpenSidebar={() => setIsSidebarOpen(true)}
@@ -1381,7 +1467,7 @@ const Messages = () => {
             )}
             {(callState.status === 'calling' || callState.status === 'incoming' || callState.status === 'in-call') && (
                 <div className="call-overlay">
-                    <div className="call-modal">
+                    <div className={`call-modal ${callView}`} ref={callModalRef}>
                         <div className="call-header">
                             <h3>{callState.mediaType === 'voice' ? 'Voice Call' : 'Video Call'}</h3>
                             {callState.status === 'incoming' && <span>Incoming call...</span>}
@@ -1411,10 +1497,34 @@ const Messages = () => {
                                             {isCameraOff ? 'Camera On' : 'Camera Off'}
                                         </button>
                                     )}
+                                    <button className="btn btn-outline btn-small" onClick={toggleCallView}>
+                                        {callView === 'expanded' ? 'Compact' : 'Expand'}
+                                    </button>
+                                    <button className="btn btn-outline btn-small" onClick={toggleFullscreen}>
+                                        Fullscreen
+                                    </button>
                                     <button className="btn btn-secondary" onClick={() => endCall(true)}>End Call</button>
                                 </>
                             )}
                         </div>
+                        {callState.status === 'in-call' && supportsAudioOutput && audioOutputs.length > 0 && (
+                            <div className="call-audio-output">
+                                <label>
+                                    Speaker
+                                    <select
+                                        value={selectedAudioOutput}
+                                        onChange={(event) => setSelectedAudioOutput(event.target.value)}
+                                    >
+                                        <option value="default">System default</option>
+                                        {audioOutputs.map((device) => (
+                                            <option key={device.deviceId} value={device.deviceId}>
+                                                {device.label || 'Audio output'}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

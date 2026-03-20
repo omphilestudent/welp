@@ -324,7 +324,7 @@ const searchCompanies = async (req, res) => {
 
         const params = [];
         let paramIndex = 1;
-        const conditions = ["c.status = 'active'"];
+        const conditions = ["(c.status = 'active' OR c.is_verified = true)"];
 
         const rawSearch = typeof q === 'string' && q.trim() !== '' ? q : search;
         const trimmedSearch = typeof rawSearch === 'string' ? rawSearch.trim() : '';
@@ -543,10 +543,11 @@ const createCompany = async (req, res) => {
             || null;
         const finalCity = cleanedCity || derivedCity;
         const finalDescription = cleanedDescription || scrapedDescription || null;
-        const finalStatus = 'pending';
+        const isBusinessCreator = String(req.user?.role || '').toLowerCase() === 'business';
+        const autoApprove = isBusinessCreator || isAdminUser(req.user);
+        const finalStatus = autoApprove ? 'active' : 'pending';
         const needsEnrichment = true;
         const enrichmentJson = enrichmentData ? JSON.stringify(enrichmentData) : null;
-        const isBusinessCreator = String(req.user?.role || '').toLowerCase() === 'business';
 
         const insertColumns = [
             'name',
@@ -586,6 +587,14 @@ const createCompany = async (req, res) => {
         if (isBusinessCreator) {
             insertColumns.push('is_claimed', 'claimed_by');
             insertValues.push(true, req.user.id);
+        }
+        if (autoApprove) {
+            insertColumns.push('is_verified', 'verified_at');
+            insertValues.push(true, new Date());
+            if (isAdminUser(req.user)) {
+                insertColumns.push('verified_by');
+                insertValues.push(req.user.id);
+            }
         }
 
         const placeholders = insertColumns.map((_, idx) => `$${idx + 1}`);
@@ -631,9 +640,11 @@ const createCompany = async (req, res) => {
             }
         }
 
-        const responseMessage = isBusinessCreator
-            ? 'Company created and linked to your business profile.'
-            : 'Company submitted for review. Admins will verify it shortly.';
+        const responseMessage = autoApprove
+            ? 'Company created and approved successfully.'
+            : isBusinessCreator
+                ? 'Company created and linked to your business profile.'
+                : 'Company submitted for review. Admins will verify it shortly.';
 
         res.status(201).json({
             message: responseMessage,
@@ -1479,7 +1490,9 @@ const approveClaimRequest = async (req, res) => {
                  claimed_by = $1,
                  is_verified = true,
                  verified_by = $2,
-                 verified_at = CURRENT_TIMESTAMP
+                 verified_at = CURRENT_TIMESTAMP,
+                 status = 'active',
+                 updated_at = CURRENT_TIMESTAMP
              WHERE id = $3`,
             [claimRequest.rows[0].user_id, req.user.id, claimRequest.rows[0].company_id]
         );

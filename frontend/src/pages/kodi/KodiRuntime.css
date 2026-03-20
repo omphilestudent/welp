@@ -1,6 +1,6 @@
 .kodi-runtime {
-    padding: 32px;
-    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    padding: 16px;
+    background: #eef1f6;
     min-height: 100vh;
 }
 
@@ -263,7 +263,417 @@
     display: grid;
     grid-template-columns: 1fr;
     min-height: 100vh;
-    background: #f8fafc;
+    background: var(--kodi-app-background, linear-gradient(135deg, #1d4ed8 0%, #3b82f6 45%, #0ea5e9 100%));
+}
+
+.kodi-runtime-shell {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 16px 20px 80px;
+}
+
+.kodi-runtime-grid {
+    display: block;
+}
+
+.kodi-runtime__card {
+    border: 1px solid #dfe3e8;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.kodi-runtime__card-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #374151;
+}
+
+.kodi-runtime__card-tabs {
+    display: flex;
+    gap: 12px;
+}
+
+.kodi-runtime__card-tabs button {
+    border: none;
+    background: none;
+    font-size: 12px;
+    color: #6b7280;
+    padding-bottom: 4px;
+    cursor: pointer;
+}
+
+.kodi-runtime__card-tabs button.active {
+    color: #111827;
+    border-bottom: 2px solid #3b82f6;
+}
+
+.kodi-runtime__row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.kodi-runtime__column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.kodi-runtime__details {
+    padding: 8px 16px 16px;
+}
+
+.kodi-runtime__details-section {
+    padding: 12px 0;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.kodi-runtime__details-section:last-child {
+    border-bottom: none;
+}
+
+.kodi-runtime__details-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.kodi-runtime__details-section h4 {
+    margin: 0;
+    font-size: 14px;
+    color: #111827;
+}
+
+.kodi-runtime__details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 18px;
+}
+
+.kodi-runtime__field span {
+    display: block;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.kodi-runtime__field strong {
+    font-size: 14px;
+    color: #111827;
+}
+
+.kodi-runtime__field input,
+.kodi-runtime__field select {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+}
+
+.kodi-runtime__activity {
+    padding: 8px 12px 16px;
+}
+
+.kodi-runtime__activity-tabs {
+    display: flex;
+    gap: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 10px;
+}
+
+.kodi-runtime__activity-tabs button {
+    border: none;
+    background: none;
+    padding: 8px 4px;
+    font-size: 13px;
+    color: #6b7280;
+    cursor: pointer;
+}
+
+.kodi-runtime__activity-tabs button.active {
+    color: #111827;
+    border-bottom: 2px solid #3b82f6;
+}
+
+.kodi-runtime__activity-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.kodi-runtime__activity-actions button {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.kodi-runtime__activity-filters {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 10px;
+}
+
+.kodi-runtime__activity-filters button {
+    border: none;
+    background: none;
+    color: #2563eb;
+    margin-left: 8px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.kodi-runtime__activity-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.kodi-runtime__table {
+    padding: 8px 16px 16px;
+}
+
+.kodi-runtime__table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.kodi-runtime__table th,
+.kodi-runtime__table td {
+    text-align: left;
+    padding: 8px 6px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.kodi-runtime__table th {
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.kodi-utility-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border-top: 1px solid #dfe3e8;
+    display: flex;
+    gap: 16px;
+    padding: 8px 16px;
+    z-index: 40;
+}
+
+.kodi-utility-bar button {
+    border: none;
+    background: none;
+    font-size: 12px;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.kodi-utility-bar button.active {
+    color: #1d4ed8;
+    font-weight: 600;
+}
+
+.kodi-utility-panel {
+    position: fixed;
+    bottom: 44px;
+    right: 24px;
+    width: 320px;
+    background: #ffffff;
+    border: 1px solid #dfe3e8;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.12);
+    z-index: 45;
+}
+
+.kodi-utility-panel__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.kodi-utility-panel__body {
+    padding: 12px;
+    max-height: 320px;
+    overflow-y: auto;
+    font-size: 12px;
+}
+
+.kodi-utility-notes textarea {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px;
+    margin-bottom: 8px;
+}
+
+.kodi-utility-notes button,
+.kodi-utility-links button {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+
+.kodi-utility-links__form input {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px;
+    margin-bottom: 6px;
+}
+
+.kodi-utility-row {
+    padding: 6px 0;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.kodi-utility-row:last-child {
+    border-bottom: none;
+}
+
+.kodi-topbar {
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 8px 16px 0;
+    display: grid;
+    grid-template-columns: 1fr minmax(320px, 460px) 1fr;
+    align-items: center;
+    column-gap: 16px;
+}
+
+.kodi-topbar::after {
+    content: '';
+    display: block;
+    height: 3px;
+    background: linear-gradient(90deg, #8b5cf6, #ec4899);
+    margin-top: 8px;
+}
+
+.kodi-topbar__left,
+.kodi-topbar__center,
+.kodi-topbar__right {
+    align-items: center;
+}
+
+.kodi-topbar__tabs {
+    display: flex;
+    gap: 8px;
+    margin-left: 12px;
+}
+
+.kodi-topbar__tab {
+    display: flex;
+    align-items: center;
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+
+.kodi-topbar__tab.active {
+    background: #e0e7ff;
+}
+
+.kodi-topbar__menu {
+    position: absolute;
+    top: 48px;
+    left: 16px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 12px;
+    z-index: 50;
+}
+
+.kodi-topbar__menu-section p {
+    font-size: 11px;
+    color: #6b7280;
+    margin: 0 0 6px;
+}
+
+.kodi-topbar__menu-section button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: none;
+    padding: 4px 2px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.kodi-topbar__search input {
+    width: 360px;
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    padding: 6px 12px;
+}
+
+.kodi-topbar__search button {
+    display: none;
+}
+
+.kodi-topbar__launcher {
+    border: none;
+    background: none;
+    font-size: 16px;
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+.kodi-topbar__icon {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    border-radius: 6px;
+    padding: 4px 6px;
+    margin-left: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.kodi-topbar__avatar {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    border-radius: 999px;
+    padding: 4px 8px;
+    margin-left: 8px;
+    font-size: 11px;
 }
 
 .kodi-app-shell__content {

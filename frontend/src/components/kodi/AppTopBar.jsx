@@ -102,6 +102,13 @@ const AppTopBar = () => {
     return (
         <div className={`kodi-topbar kodi-topbar--${navbarStyle}`} style={styleVars}>
             <div className="kodi-topbar__left">
+                <button className="kodi-topbar__launcher" type="button">⋮⋮</button>
+                {logoUrl && <img className="kodi-topbar__logo" src={logoUrl} alt="App logo" />}
+                <div className="kodi-topbar__appname">
+                    {settings.titleDisplay === 'compact'
+                        ? (appMeta?.label || 'App').slice(0, 14)
+                        : (appMeta?.label || 'App')}
+                </div>
                 <button
                     className="kodi-topbar__switcher"
                     onClick={() => setSwitcherOpen(!switcherOpen)}
@@ -110,12 +117,6 @@ const AppTopBar = () => {
                     {currentPage?.label || 'Pages'}
                     <span className="kodi-topbar__chevron">{'\u25BE'}</span>
                 </button>
-                {logoUrl && <img className="kodi-topbar__logo" src={logoUrl} alt="App logo" />}
-                <div className="kodi-topbar__appname">
-                    {settings.titleDisplay === 'compact'
-                        ? (appMeta?.label || 'App').slice(0, 14)
-                        : (appMeta?.label || 'App')}
-                </div>
                 <nav className="kodi-topbar__tabs">
                     {openTabs.map((tabId) => {
                         const item = navMap.get(String(tabId));
@@ -187,25 +188,14 @@ const AppTopBar = () => {
                             navigate(`/search?q=${encodeURIComponent(query)}`);
                         }}
                     />
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const query = search.trim();
-                            if (!query) return;
-                            navigate(`/search?q=${encodeURIComponent(query)}`);
-                        }}
-                    >
-                        Search
-                    </button>
                 </div>
             </div>
             <div className="kodi-topbar__right">
-                <button type="button" className="kodi-topbar__action">
-                    New
-                </button>
-                <button type="button" className="kodi-topbar__action kodi-topbar__action--ghost">
-                    Follow
-                </button>
+                <button type="button" className="kodi-topbar__icon">☆</button>
+                <button type="button" className="kodi-topbar__icon">＋</button>
+                <button type="button" className="kodi-topbar__icon">?</button>
+                <button type="button" className="kodi-topbar__icon">⚙</button>
+                <button type="button" className="kodi-topbar__avatar">ME</button>
             </div>
         </div>
     );

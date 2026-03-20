@@ -81,6 +81,26 @@ const getSettings = async (req, res) => {
     }
 };
 
+const listUtilities = async (req, res) => {
+    try {
+        const utilities = await service.listUtilities(req.params.id);
+        return res.json({ success: true, data: utilities });
+    } catch (error) {
+        logControllerError('listUtilities', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to load utilities' });
+    }
+};
+
+const updateUtilities = async (req, res) => {
+    try {
+        const utilities = await service.updateUtilities(req.params.id, req.body.utilities || []);
+        return res.json({ success: true, data: utilities });
+    } catch (error) {
+        logControllerError('updateUtilities', error);
+        return res.status(400).json({ success: false, error: error.message || 'Failed to update utilities' });
+    }
+};
+
 const updateSettings = async (req, res) => {
     try {
         const app = await service.updateSettings(req.params.id, {
@@ -417,6 +437,8 @@ module.exports = {
     updateApp,
     getSettings,
     updateSettings,
+    listUtilities,
+    updateUtilities,
     activateApp,
     deactivateApp,
     listUsers,

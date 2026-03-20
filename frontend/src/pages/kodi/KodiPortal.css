@@ -806,6 +806,51 @@
     gap: 12px;
 }
 
+.kodi-portal-form__section {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.kodi-portal-form__hint {
+    font-size: 12px;
+    color: #6b7280;
+    margin: 6px 0 12px;
+}
+
+.kodi-portal-utility-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.kodi-portal-utility-row {
+    display: grid;
+    grid-template-columns: 24px 1fr 120px 60px;
+    gap: 8px;
+    align-items: center;
+}
+
+.kodi-portal-utility-row input[type="text"] {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+}
+
+.kodi-portal-utility-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.kodi-portal-utility-actions button {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    border-radius: 6px;
+    padding: 4px 6px;
+    cursor: pointer;
+}
+
 .kodi-portal-form input,
 .kodi-portal-form textarea,
 .kodi-portal-form select {

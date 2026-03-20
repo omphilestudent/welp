@@ -165,10 +165,13 @@ const initMarketingTables = async () => {
 
 const shouldSkipMarketingForUser = async (userId) => {
     const settings = await query(
-        'SELECT marketing_notifications FROM user_settings WHERE user_id = $1',
+        'SELECT marketing_notifications, email_notifications FROM user_settings WHERE user_id = $1',
         [userId]
     );
     if (settings.rows.length > 0 && settings.rows[0].marketing_notifications === false) {
+        return true;
+    }
+    if (settings.rows.length > 0 && settings.rows[0].email_notifications === false) {
         return true;
     }
 
@@ -219,6 +222,7 @@ const processMarketingQueue = async (batchSize = 25) => {
            AND q.scheduled_at <= CURRENT_TIMESTAMP
            AND t.is_active = true
            AND (us.marketing_notifications IS NULL OR us.marketing_notifications = true)
+           AND (us.email_notifications IS NULL OR us.email_notifications = true)
            AND NOT EXISTS (
                SELECT 1 FROM subscriptions s
                WHERE s.user_id = u.id AND s.status = 'active' AND s.plan = 'premium'

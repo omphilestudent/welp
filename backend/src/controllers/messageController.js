@@ -1,6 +1,6 @@
 
 const { query } = require('../utils/database');
-const { createUserNotification } = require('../utils/userNotifications');
+const { createUserNotification, canSendNotification } = require('../utils/userNotifications');
 const {
     sendMessageNotificationEmail,
     sendConversationRequestEmail,
@@ -160,6 +160,13 @@ const notifyChatEmail = async ({ senderId, recipientId, conversationId, kind = '
     if (!senderId || !recipientId || !conversationId) return;
     try {
         if (shouldThrottleEmail({ conversationId, recipientId, kind })) return;
+        const preferenceType = kind === 'request'
+            ? 'message_request'
+            : kind === 'accepted'
+                ? 'message_request'
+                : 'message';
+        const canEmail = await canSendNotification(recipientId, preferenceType, 'email');
+        if (!canEmail) return;
         const userRows = await query(
             `SELECT id, email, display_name, role
              FROM users
@@ -829,7 +836,11 @@ const getConversations = async (req, res) => {
             hasChatSystem,
             hasMessageCreatedAt,
             hasChatCreatedAt,
-            hasChatDeliveredAt
+            hasChatDeliveredAt,
+            hasMessageType,
+            hasMessageAttachmentUrl,
+            hasMessageAttachmentMime,
+            hasMessageAttachmentDuration
         ] = await Promise.all([
             columnExists('users', 'is_anonymous'),
             columnExists('users', 'avatar_url'),
@@ -842,7 +853,11 @@ const getConversations = async (req, res) => {
             columnExists('chat_messages', 'is_system_message'),
             columnExists('messages', 'created_at'),
             columnExists('chat_messages', 'created_at'),
-            columnExists('chat_messages', 'delivered_at')
+            columnExists('chat_messages', 'delivered_at'),
+            columnExists('messages', 'message_type'),
+            columnExists('messages', 'attachment_url'),
+            columnExists('messages', 'attachment_mime'),
+            columnExists('messages', 'attachment_duration')
         ]);
         const hasUsers = await tableExists('users');
         if (!hasUsers) {
@@ -911,6 +926,18 @@ const getConversations = async (req, res) => {
             AND ${messageReadColumn === 'is_read' ? 'is_read = false' : 'read_at IS NULL'}
         ) as unread_count`
             : '0 as unread_count';
+        const messageTypeSelect = messageTable === 'messages' && hasMessageType
+            ? ", 'messageType', message_type"
+            : '';
+        const attachmentUrlSelect = messageTable === 'messages' && hasMessageAttachmentUrl
+            ? ", 'attachmentUrl', attachment_url"
+            : '';
+        const attachmentMimeSelect = messageTable === 'messages' && hasMessageAttachmentMime
+            ? ", 'attachmentMime', attachment_mime"
+            : '';
+        const attachmentDurationSelect = messageTable === 'messages' && hasMessageAttachmentDuration
+            ? ", 'attachmentDuration', attachment_duration"
+            : '';
         const lastMessageSelect = messageTable && messageCreatedColumn
             ? `(
           SELECT json_build_object(
@@ -918,6 +945,10 @@ const getConversations = async (req, res) => {
             'createdAt', ${messageCreatedColumn},
             'senderId', sender_id,
             'isSystemMessage', ${systemMessageValue}
+            ${messageTypeSelect}
+            ${attachmentUrlSelect}
+            ${attachmentMimeSelect}
+            ${attachmentDurationSelect}
           )
           FROM ${messageTable}
           WHERE conversation_id = c.id
@@ -1143,6 +1174,146 @@ const sendMessage = async (req, res) => {
     } catch (error) {
         console.error('Send message error:', error);
         res.status(500).json({ error: 'Failed to send message' });
+    }
+};
+
+const sendVoiceNote = async (req, res) => {
+    try {
+        await expireConversations();
+        const { conversationId } = req.params;
+        if (!req.file) {
+            return res.status(400).json({ error: 'Voice note file is required' });
+        }
+
+        const [hasMessageType, hasAttachmentUrl] = await Promise.all([
+            columnExists('messages', 'message_type'),
+            columnExists('messages', 'attachment_url')
+        ]);
+        if (!hasMessageType || !hasAttachmentUrl) {
+            return res.status(400).json({ error: 'Voice notes are not available. Please run the latest migrations.' });
+        }
+
+        const conversation = await query(
+            `SELECT * FROM conversations
+             WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2) AND status = 'accepted'`,
+            [conversationId, req.user.id]
+        );
+
+        if (conversation.rows.length === 0) {
+            return res.status(403).json({ error: 'Not authorized or conversation not accepted' });
+        }
+
+        const convo = conversation.rows[0];
+        if (convo.status !== 'accepted') {
+            return res.status(403).json({ error: 'Conversation is not active' });
+        }
+
+        const now = new Date();
+        if (convo.expires_at && new Date(convo.expires_at) <= now) {
+            await expireConversationById(convo.id);
+            return res.status(403).json({ error: 'Conversation time has expired' });
+        }
+
+        if (!convo.started_at) {
+            const sessionUpdate = await query(
+                `UPDATE conversations
+                 SET started_at = CURRENT_TIMESTAMP,
+                     expires_at = CASE
+                        WHEN time_limit_minutes IS NOT NULL THEN CURRENT_TIMESTAMP + make_interval(mins => time_limit_minutes)
+                        ELSE CURRENT_TIMESTAMP + INTERVAL '120 minutes'
+                     END
+                 WHERE id = $1
+                 RETURNING started_at, expires_at`,
+                [conversationId]
+            );
+            if (sessionUpdate.rows.length) {
+                convo.started_at = sessionUpdate.rows[0].started_at;
+                convo.expires_at = sessionUpdate.rows[0].expires_at;
+            }
+        }
+
+        const duration = Number(req.body?.duration);
+        const safeDuration = Number.isFinite(duration) ? Math.max(1, Math.round(duration)) : null;
+        const content = req.body?.content?.trim() || 'Voice note';
+        const attachmentUrl = `/uploads/messages/${req.file.filename}`;
+        const attachmentMime = req.file.mimetype || null;
+
+        const insertCols = ['conversation_id', 'sender_id', 'content', 'message_type', 'attachment_url'];
+        const values = [conversationId, req.user.id, content, 'voice_note', attachmentUrl];
+        let idx = values.length + 1;
+
+        if (await columnExists('messages', 'attachment_mime')) {
+            insertCols.push('attachment_mime');
+            values.push(attachmentMime);
+            idx += 1;
+        }
+        if (await columnExists('messages', 'attachment_duration')) {
+            insertCols.push('attachment_duration');
+            values.push(safeDuration);
+            idx += 1;
+        }
+
+        const placeholders = insertCols.map((_, i) => `$${i + 1}`);
+        const result = await query(
+            `INSERT INTO messages (${insertCols.join(', ')})
+             VALUES (${placeholders.join(', ')})
+             RETURNING *`,
+            values
+        );
+
+        await query(
+            'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+            [conversationId]
+        );
+
+        const sender = await query(
+            'SELECT id, display_name, role FROM users WHERE id = $1',
+            [req.user.id]
+        );
+
+        res.status(201).json({
+            ...result.rows[0],
+            sender: sender.rows[0]
+        });
+
+        const io = req.app?.get('io');
+        if (io) {
+            io.to(`conversation-${conversationId}`).emit('ml-services-message', {
+                ...result.rows[0],
+                sender: sender.rows[0]
+            });
+        }
+
+        const recipientId = convo.employee_id === req.user.id ? convo.psychologist_id : convo.employee_id;
+        const senderName = sender.rows[0]?.display_name || 'Someone';
+        const notification = await createUserNotification({
+            userId: recipientId,
+            type: 'message',
+            message: `${senderName} sent you a voice note`,
+            entityType: 'conversation',
+            entityId: conversationId,
+            metadata: {
+                conversationId,
+                senderName,
+                preview: 'Voice note',
+                url: `/messages?conversation=${conversationId}`
+            }
+        });
+        if (io && notification) {
+            io.to(`user-${recipientId}`).emit('notification', notification);
+        }
+
+        notifyChatEmail({
+            senderId: req.user.id,
+            recipientId,
+            conversationId,
+            kind: 'message'
+        }).catch((emailError) => {
+            console.warn('Message email notify failed:', emailError?.message || emailError);
+        });
+    } catch (error) {
+        console.error('Send voice note error:', error);
+        res.status(500).json({ error: 'Failed to send voice note' });
     }
 };
 
@@ -1411,6 +1582,7 @@ module.exports = {
     getConversations,
     getConversationMessages,
     sendMessage,
+    sendVoiceNote,
     markMessagesAsRead,
     getUnreadCount,
     blockConversation,
