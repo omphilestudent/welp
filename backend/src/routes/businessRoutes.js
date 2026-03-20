@@ -12,7 +12,7 @@ const {
 } = require('../middleware/validation');
 const companyController = require('../controllers/companyController');
 const reviewController = require('../controllers/reviewController');
-const { applyTierLimits } = require('../middleware/applyTierLimits');
+const { requireBusinessFeature } = require('../middleware/businessPlan');
 
 const router = express.Router();
 const ownerRoles = ['business', 'admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'];
@@ -42,7 +42,7 @@ router.get(`/:companyId(${UUID_PARAM})`, apiLimiter, companyController.getBusine
 router.get(`/:companyId(${UUID_PARAM})/analytics`,
     authenticate,
     authorize(...ownerRoles),
-    applyTierLimits({ feature: 'api' }),
+    requireBusinessFeature('analytics'),
     companyController.getCompanyAnalytics
 );
 
@@ -56,6 +56,12 @@ router.post(`/:companyId(${UUID_PARAM})/api-keys`,
     authenticate,
     authorize(...ownerRoles),
     companyController.createCompanyApiKey
+);
+
+router.get(`/:companyId(${UUID_PARAM})/api-usage`,
+    authenticate,
+    authorize(...ownerRoles),
+    companyController.getCompanyApiUsage
 );
 
 router.delete(`/:companyId(${UUID_PARAM})/api-keys/:keyId(${UUID_PARAM})`,

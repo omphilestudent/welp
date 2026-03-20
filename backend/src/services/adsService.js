@@ -116,8 +116,8 @@ const buildAdQueryContext = (tables) => {
 
     const tierExpr =
         tables.businesses && tables.businessCols?.subscriptionTier
-            ? `COALESCE(b.subscription_tier, 'base')`
-            : `'base'`;
+            ? `COALESCE(b.subscription_tier, 'free_tier')`
+            : `'free_tier'`;
 
     const subscriptionExpiresExpr =
         tables.businesses && tables.businessCols?.subscriptionExpires
@@ -518,7 +518,7 @@ const getBusinessOwner = async (businessId) => {
             const legacy = await query(
                 `SELECT c.id,
                         c.name,
-                        'base' AS subscription_tier,
+                        'free_tier' AS subscription_tier,
                         NULL::timestamptz AS subscription_expires,
                         owner.id AS owner_user_id,
                         owner.email,
@@ -543,7 +543,7 @@ const getBusinessOwner = async (businessId) => {
 
 const getBusinessAdCapabilities = async ({ userId, email }) => {
     if (!userId) {
-        return { tier: 'base', maxActive: 0, analyticsMode: 'limited', premiumException: false };
+        return { tier: 'free_tier', maxActive: 0, analyticsMode: 'none', premiumException: false };
     }
 
     const premiumOverride = hasPremiumException(email);
@@ -559,15 +559,15 @@ const getBusinessAdCapabilities = async ({ userId, email }) => {
 
     try {
         const record = await getActiveSubscription('business', userId);
-        const planCode = record?.plan_code || 'business_base';
+        const planCode = record?.plan_code || 'business_free_tier';
         const snapshot = record?.limit_snapshot?.ads || {};
-        const planDefaults = (PLAN_LIMITS[planCode] || PLAN_LIMITS.business_base || {}).ads || {};
+        const planDefaults = (PLAN_LIMITS[planCode] || PLAN_LIMITS.business_free_tier || {}).ads || {};
 
         const rawMax = snapshot.maxActive ?? planDefaults.maxActive;
-        const analyticsMode = snapshot.analytics || planDefaults.analytics || 'limited';
+        const analyticsMode = snapshot.analytics || planDefaults.analytics || 'none';
 
         return {
-            tier: PLAN_LIMITS[planCode]?.tier || 'base',
+            tier: PLAN_LIMITS[planCode]?.tier || 'free_tier',
             maxActive: rawMax === null || rawMax === undefined ? Infinity : Number(rawMax),
             analyticsMode,
             premiumException: false
@@ -576,9 +576,9 @@ const getBusinessAdCapabilities = async ({ userId, email }) => {
         console.error('Error getting business ad capabilities:', error);
 
         return {
-            tier: 'base',
-            maxActive: 5, // Default to 5 active campaigns
-            analyticsMode: 'limited',
+            tier: 'free_tier',
+            maxActive: 0,
+            analyticsMode: 'none',
             premiumException: false
         };
     }

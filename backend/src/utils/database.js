@@ -54,7 +54,7 @@ const createTables = async () => {
                     CREATE TYPE subscription_tier_user AS ENUM ('free', 'premium');
                 END IF;
                 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_tier_business') THEN
-                    CREATE TYPE subscription_tier_business AS ENUM ('base', 'enhanced', 'premium');
+                    CREATE TYPE subscription_tier_business AS ENUM ('free_tier', 'base', 'enhanced', 'premium');
                 END IF;
                 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'psychologist_plan') THEN
                     CREATE TYPE psychologist_plan AS ENUM ('standard');
@@ -476,6 +476,33 @@ const createTables = async () => {
                 revoked_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS business_api_usage_daily (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                api_key_id UUID REFERENCES business_api_keys(id) ON DELETE SET NULL,
+                usage_date DATE NOT NULL,
+                request_count INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (company_id, usage_date)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_business_api_usage_daily_company_date
+                ON business_api_usage_daily (company_id, usage_date);
+
+            CREATE TABLE IF NOT EXISTS kodi_runtime_records (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                kodi_page_id UUID NOT NULL REFERENCES kodi_pages(id) ON DELETE CASCADE,
+                record JSONB NOT NULL DEFAULT '{}'::jsonb,
+                updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (kodi_page_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_kodi_runtime_records_page
+                ON kodi_runtime_records (kodi_page_id);
 
             -- Psychologist leads
             CREATE TABLE IF NOT EXISTS psychologist_leads (
@@ -1233,7 +1260,12 @@ const insertDefaultData = async () => {
                     '{"leads":{"perMonth":30},"clients":{"activeConversations":50}}'::jsonb,
                     '{"displayName":"Psychologist Partner","tagline":"Grow your impact","badge":"Professional"}'::jsonb
                 ),
-                ('business', 'business_base', 'base', 'ZAR', 100000, 'monthly', true,
+                ('business', 'business_free_tier', 'free_tier', 'ZAR', 0, 'monthly', true,
+                    '["Business profile access","Respond to reviews","API keys included","100 API calls per day"]'::jsonb,
+                    '{"api":{"callsPerDay":100},"ads":{"maxActive":0,"analytics":"none","placement":"Business profile only"},"analytics":{"level":"none"}}'::jsonb,
+                    '{"displayName":"Business Free Tier","tagline":"Start for free"}'::jsonb
+                ),
+                ('business', 'business_base', 'base', 'ZAR', 100000, 'monthly', false,
                     '["Business profile access","Respond to reviews","Basic analytics","1,000 API calls per day"]'::jsonb,
                     '{"api":{"callsPerDay":1000},"ads":{"maxActive":1,"analytics":"limited","placement":"Business profile placements"},"analytics":{"level":"basic"}}'::jsonb,
                     '{"displayName":"Business Base","tagline":"Get started with insights"}'::jsonb
@@ -1541,11 +1573,13 @@ const runMigrations = async () => {
             "UPDATE pricing_catalog SET amount_minor = 15000 WHERE audience = 'user' AND plan_code = 'user_premium';",
             "UPDATE pricing_catalog SET amount_minor = 0 WHERE audience = 'user' AND plan_code = 'user_free';",
             "UPDATE pricing_catalog SET amount_minor = 50000 WHERE audience = 'psychologist' AND plan_code = 'psychologist_standard';",
+            "UPDATE pricing_catalog SET amount_minor = 0 WHERE audience = 'business' AND plan_code = 'business_free_tier';",
             "UPDATE pricing_catalog SET amount_minor = 100000 WHERE audience = 'business' AND plan_code = 'business_base';",
             "UPDATE pricing_catalog SET amount_minor = 200000 WHERE audience = 'business' AND plan_code = 'business_enhanced';",
             "UPDATE pricing_catalog SET amount_minor = 300000 WHERE audience = 'business' AND plan_code = 'business_premium';",
             "UPDATE pricing_catalog SET features = '[\"30 minutes psychologist chat per day\",\"Unlimited business reviews\",\"Random psychologist assignment\",\"No video call discounts\"]'::jsonb, limits = '{\"chat\":{\"minutesPerDay\":30},\"perks\":{\"choosePsychologist\":false}}'::jsonb WHERE audience = 'user' AND plan_code = 'user_free';",
             "UPDATE pricing_catalog SET features = '[\"Priority psychologist access\",\"Unlimited chat support\",\"Video/voice scheduling\",\"Weekly wellbeing reports\",\"Crisis escalation hotline\"]'::jsonb, limits = '{\"chat\":{\"minutesPerDay\":120},\"call\":{\"minutesPerDay\":120},\"video\":{\"sessionsPerWeek\":3,\"minutesPerSession\":60,\"discount\":20}}'::jsonb WHERE audience = 'user' AND plan_code = 'user_premium';",
+            "UPDATE pricing_catalog SET features = '[\"Business profile access\",\"Respond to reviews\",\"API keys included\",\"100 API calls per day\"]'::jsonb, limits = '{\"api\":{\"callsPerDay\":100},\"ads\":{\"maxActive\":0,\"analytics\":\"none\",\"placement\":\"Business profile only\"},\"analytics\":{\"level\":\"none\"}}'::jsonb WHERE audience = 'business' AND plan_code = 'business_free_tier';",
             "UPDATE pricing_catalog SET features = '[\"Business profile access\",\"Respond to reviews\",\"Basic analytics\",\"1,000 API calls per day\"]'::jsonb, limits = '{\"api\":{\"callsPerDay\":1000},\"ads\":{\"maxActive\":1,\"analytics\":\"limited\",\"placement\":\"Business profile placements\"},\"analytics\":{\"level\":\"basic\"}}'::jsonb WHERE audience = 'business' AND plan_code = 'business_base';",
             "UPDATE pricing_catalog SET features = '[\"Expanded analytics\",\"Marketing insights\",\"3,000 API calls per day\",\"Upload promotional media\"]'::jsonb, limits = '{\"api\":{\"callsPerDay\":3000},\"ads\":{\"maxActive\":5,\"analytics\":\"standard\",\"placement\":\"Expanded placements\"},\"analytics\":{\"level\":\"expanded\"}}'::jsonb WHERE audience = 'business' AND plan_code = 'business_enhanced';",
             "UPDATE pricing_catalog SET features = '[\"Advanced analytics\",\"Email insights on user behavior\",\"10,000 API calls per day\",\"Advertisement capabilities\",\"Ability to advertise on other business pages\"]'::jsonb, limits = '{\"api\":{\"callsPerDay\":10000},\"ads\":{\"maxActive\":null,\"analytics\":\"advanced\",\"placement\":\"Competitor profiles\",\"sponsoredPlacements\":true},\"email\":{\"insights\":true}}'::jsonb WHERE audience = 'business' AND plan_code = 'business_premium';",

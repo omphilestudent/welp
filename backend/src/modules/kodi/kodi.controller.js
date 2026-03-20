@@ -38,6 +38,7 @@ const layoutValidators = validate([
 const pageIdValidator = validate([param('id').custom(isUuidOrInt)]);
 
 const getRuntimeValidator = validate([param('pageId').custom(isUuidOrInt)]);
+const runtimeRecordValidator = validate([param('pageId').custom(isUuidOrInt), body('record').optional().isObject()]);
 
 const createAppValidators = validate([
     body('name').trim().isLength({ min: 2 }),
@@ -189,6 +190,48 @@ const runtimeLoader = async (req, res) => {
         const status = error.message === 'Access denied' ? 403 : 500;
         logControllerError('runtimeLoader', error);
         return res.status(status).json({ success: false, error: error.message || 'Failed to load runtime page' });
+    }
+};
+
+const getRuntimeRecord = async (req, res) => {
+    try {
+        const payload = await runtime.buildRuntimePayload({
+            pageId: req.params.pageId,
+            role: req.user?.role,
+            userId: req.user?.id,
+            appId: req.query?.appId
+        });
+        if (!payload) return res.status(404).json({ success: false, error: 'Page not found' });
+        return res.json({ success: true, data: payload.record || {} });
+    } catch (error) {
+        const status = error.message === 'Access denied' ? 403 : 500;
+        logControllerError('getRuntimeRecord', error);
+        return res.status(status).json({ success: false, error: error.message || 'Failed to load record' });
+    }
+};
+
+const updateRuntimeRecord = async (req, res) => {
+    try {
+        const payload = await runtime.buildRuntimePayload({
+            pageId: req.params.pageId,
+            role: req.user?.role,
+            userId: req.user?.id,
+            appId: req.query?.appId
+        });
+        if (!payload) return res.status(404).json({ success: false, error: 'Page not found' });
+        const canEdit = perms.userHasEditAccess(payload.permissions, payload.effectiveRole);
+        if (!canEdit) return res.status(403).json({ success: false, error: 'Edit access denied' });
+        const record = req.body?.record || {};
+        const updated = await service.upsertRuntimeRecord({
+            pageId: req.params.pageId,
+            record,
+            userId: req.user?.id
+        });
+        return res.json({ success: true, data: updated });
+    } catch (error) {
+        const status = error.message === 'Access denied' ? 403 : 500;
+        logControllerError('updateRuntimeRecord', error);
+        return res.status(status).json({ success: false, error: error.message || 'Failed to update record' });
     }
 };
 
@@ -658,5 +701,8 @@ module.exports = {
     listLeads,
     createLead,
     listOpportunities,
-    convertLead
+    convertLead,
+    runtimeRecordValidator,
+    getRuntimeRecord,
+    updateRuntimeRecord
 };

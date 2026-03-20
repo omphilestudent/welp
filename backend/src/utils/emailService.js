@@ -86,12 +86,18 @@ const getPrimaryFrontendUrl = () => {
 
 // ── Review notification helpers ────────────────────────────────────────────────────────────
 const BUSINESS_PLAN_TITLES = {
+    free_tier: 'Free Tier',
     base: 'Base Plan',
     enhanced: 'Enhanced Plan',
     premium: 'Premium Plan'
 };
 
 const BUSINESS_PLAN_FEATURES = {
+    free_tier: [
+        '100 API calls per day',
+        'Business profile access',
+        'API keys included'
+    ],
     base: [
         '1,000 API calls per day',
         'Business profile access',
@@ -110,6 +116,12 @@ const BUSINESS_PLAN_FEATURES = {
 };
 
 const FALLBACK_BUSINESS_PRICING = [
+    {
+        tier: 'free_tier',
+        label: BUSINESS_PLAN_TITLES.free_tier,
+        priceLabel: 'Free',
+        features: BUSINESS_PLAN_FEATURES.free_tier
+    },
     {
         tier: 'base',
         label: BUSINESS_PLAN_TITLES.base,
@@ -1027,7 +1039,7 @@ const sendKodiAppInviteEmail = async ({ to, name, appName, role, loginUrl, invit
             <p><strong>One-time password:</strong> ${otp || 'available in your invite'}</p>
             <p>
               <a href="${inviteUrl}" style="display: inline-block; background: #2563eb; color: #fff; padding: 10px 18px; border-radius: 999px; text-decoration: none;">
-                قبول الدعوة / Accept Invitation
+                Sign in to Kodi
               </a>
             </p>
             ${pageUrl ? `<p>Default page: <a href="${pageUrl}">${pageName || 'Open page'}</a></p>` : ''}
@@ -1045,7 +1057,7 @@ const sendKodiAppInviteEmail = async ({ to, name, appName, role, loginUrl, invit
         `Role: ${role || 'member'}`,
         username ? `Username: ${username}` : '',
         otp ? `One-time password: ${otp}` : '',
-        `Accept invitation: ${inviteUrl}`,
+        `Sign in: ${inviteUrl}`,
         loginUrl ? `Login: ${loginUrl}` : '',
         pageUrl ? `Default page: ${pageName || 'Open page'} - ${pageUrl}` : '',
         '',

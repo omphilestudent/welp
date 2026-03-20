@@ -110,6 +110,43 @@ const createPage = async ({ label, pageType, linkedAppId, createdBy }) => {
     }
 };
 
+const getRuntimeRecord = async (pageId) => {
+    if (!pageId) return null;
+    try {
+        const result = await database.query(
+            `SELECT record
+             FROM kodi_runtime_records
+             WHERE kodi_page_id = $1
+             LIMIT 1`,
+            [pageId]
+        );
+        return result.rows[0]?.record || null;
+    } catch (error) {
+        logServiceError('getRuntimeRecord', error, { pageId });
+        return null;
+    }
+};
+
+const upsertRuntimeRecord = async ({ pageId, record, userId }) => {
+    if (!pageId) return null;
+    try {
+        const result = await database.query(
+            `INSERT INTO kodi_runtime_records (kodi_page_id, record, updated_by)
+             VALUES ($1, $2::jsonb, $3)
+             ON CONFLICT (kodi_page_id)
+             DO UPDATE SET record = EXCLUDED.record,
+                           updated_by = EXCLUDED.updated_by,
+                           updated_at = CURRENT_TIMESTAMP
+             RETURNING record`,
+            [pageId, JSON.stringify(record || {}), userId || null]
+        );
+        return result.rows[0]?.record || null;
+    } catch (error) {
+        logServiceError('upsertRuntimeRecord', error, { pageId });
+        throw error;
+    }
+};
+
 const listPages = async () => {
     try {
         const hasKodiPages = await tableExists('kodi_pages');
@@ -949,6 +986,8 @@ const deleteComponent = async ({ id }) => {
 
 module.exports = {
     createPage,
+    getRuntimeRecord,
+    upsertRuntimeRecord,
     listPages,
     getPageById,
     updateLayout,

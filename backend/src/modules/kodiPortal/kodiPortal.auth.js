@@ -26,6 +26,21 @@ const buildJwt = (userId, tokenVersion = 0, firstLogin = false) => {
     );
 };
 
+const recordLoginActivity = async (userId) => {
+    if (!userId) return;
+    try {
+        await repository.query(
+            `UPDATE users
+             SET last_login = CURRENT_TIMESTAMP,
+                 last_active = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [userId]
+        );
+    } catch (error) {
+        console.warn('Kodi auth login activity update failed:', error.message);
+    }
+};
+
 const signInWithUsername = async ({ username, password, otp }) => {
     const identity = await repository.getIdentityByUsername(username);
     if (!identity) throw new Error('Invalid credentials');
@@ -56,6 +71,7 @@ const signInWithUsername = async ({ username, password, otp }) => {
             action: 'kodi_auth_first_login_requested',
             notes: JSON.stringify({ username })
         });
+        await recordLoginActivity(identity.user_id);
         return {
             firstLoginRequired: true,
             token: buildJwt(user.id, user.token_version, true),
@@ -68,6 +84,7 @@ const signInWithUsername = async ({ username, password, otp }) => {
     }
     const ok = await bcrypt.compare(String(password), identity.password_hash);
     if (!ok) throw new Error('Invalid credentials');
+    await recordLoginActivity(identity.user_id);
     await logAudit({
         userId: identity.user_id,
         action: 'kodi_auth_login',

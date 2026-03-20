@@ -285,6 +285,24 @@
   animation: slideIn 0.3s ease-out;
 }
 
+.tab-btn--locked {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.tab-btn--locked:hover {
+  color: #94a3b8;
+}
+
+.tab-btn__lock {
+  margin-left: 0.5rem;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+
 
 .request-card {
   background: var(--card-bg);
@@ -964,10 +982,29 @@
   transition: all 0.2s ease;
 }
 
+.business-panel-tab--locked {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.business-panel-tab--locked:hover {
+  transform: none;
+}
+
 .business-panel-tab.active {
   background: #2563eb;
   color: #fff;
   border-color: #2563eb;
+}
+
+.tab-lock-pill {
+  margin-left: 0.5rem;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
 }
 
 .business-last-seen {
@@ -1037,6 +1074,21 @@
   padding: 1rem;
   border: 1px solid rgba(226, 232, 240, 0.8);
   margin-bottom: 1.25rem;
+}
+
+.locked-panel {
+  background: #f8fafc;
+  border: 1px dashed #cbd5f5;
+  border-radius: 18px;
+  padding: 1.5rem;
+  text-align: center;
+  color: #475569;
+  margin-bottom: 1.5rem;
+}
+
+.locked-panel h4 {
+  margin-bottom: 0.5rem;
+  color: #1e293b;
 }
 
 .business-analytics-grid {
@@ -1312,6 +1364,55 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+.api-usage-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.api-usage-metrics {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.api-usage-metrics span {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.api-usage-metrics strong {
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.business-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #312e81;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.business-plan-badge span {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
 }
 
 .api-key-reveal {

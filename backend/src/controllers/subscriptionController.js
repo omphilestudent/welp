@@ -223,7 +223,7 @@ const cancelSubscription = async (req, res) => {
             const limits = PLAN_LIMITS.user_free ?? { chatMinutes: 30 };
             await updateUserSubscriptionTier(req.user.id, 'free', limits.chatMinutes);
         } else if (ownerType === 'business') {
-            await updateBusinessSubscriptionTier(req.user.id, 'base', null);
+            await updateBusinessSubscriptionTier(req.user.id, 'free_tier', null);
         }
 
         const fallbackPayload = await getPlanPayload(null, ownerType);

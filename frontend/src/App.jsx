@@ -108,8 +108,8 @@ function App() {
                         }}
                     >
                         <div className="app">
-                            <AppTopBar />
                             <Navbar />
+                            <AppTopBar />
                             <main className="main-content">
                                 <Routes>
                                 {/* Public Routes */}

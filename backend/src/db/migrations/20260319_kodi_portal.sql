@@ -8,12 +8,35 @@ ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS navigation_mode VARCHAR(50) DEFAU
 ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS landing_behavior VARCHAR(50) DEFAULT 'default_page';
 ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS default_page_id UUID;
 DO $$
+DECLARE
+    app_page_type TEXT;
+    page_id_type TEXT;
 BEGIN
-    ALTER TABLE kodi_apps
-        ADD CONSTRAINT kodi_apps_default_page_fk
-        FOREIGN KEY (default_page_id) REFERENCES kodi_pages(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN
-    NULL;
+    SELECT udt_name
+    INTO app_page_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'kodi_apps'
+      AND column_name = 'default_page_id';
+
+    SELECT udt_name
+    INTO page_id_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'kodi_pages'
+      AND column_name = 'id';
+
+    IF app_page_type IS NOT NULL
+       AND page_id_type IS NOT NULL
+       AND app_page_type = page_id_type THEN
+        BEGIN
+            ALTER TABLE kodi_apps
+                ADD CONSTRAINT kodi_apps_default_page_fk
+                FOREIGN KEY (default_page_id) REFERENCES kodi_pages(id) ON DELETE SET NULL;
+        EXCEPTION WHEN duplicate_object THEN
+            NULL;
+        END;
+    END IF;
 END $$;
 ALTER TABLE kodi_apps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 

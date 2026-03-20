@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Loading from '../../components/common/Loading';
 import { getPortalNavigation, listUserApps } from '../../services/kodiPortalService';
@@ -60,39 +60,11 @@ const KodiAppShell = () => {
         '--kodi-app-surface': theme.surfaceColor || '#0f172a',
         '--kodi-app-text': theme.textColor || '#e2e8f0'
     };
-    const navMode = appMeta?.navigationMode || appMeta?.navigation_mode || 'sidebar';
+    const navMode = appMeta?.navigationMode || appMeta?.navigation_mode || 'top';
     const density = settings.layoutDensity || 'comfortable';
 
     return (
         <div className={`kodi-app-shell kodi-app-shell--${navMode} kodi-app-shell--${density}`} style={shellStyle}>
-            {navMode !== 'top' && (
-                <aside className="kodi-app-shell__nav">
-                    <div className="kodi-app-shell__header">
-                        <h2>{appMeta?.label || 'Kodi App'}</h2>
-                        <select
-                            value={appId}
-                            onChange={(e) => navigate(`/kodi/app/${e.target.value}`)}
-                        >
-                            {apps.map((app) => (
-                                <option key={app.app_id || app.id} value={app.app_id || app.id}>
-                                    {app.label || app.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <nav className="kodi-app-shell__menu">
-                        {navigation.map((item) => (
-                            <NavLink
-                                key={item.pageId}
-                                to={`/kodi/app/${appId}/page/${item.pageId}`}
-                                className={({ isActive }) => (isActive ? 'active' : '')}
-                            >
-                                {item.label}
-                            </NavLink>
-                        ))}
-                    </nav>
-                </aside>
-            )}
             <main className="kodi-app-shell__content">
                 <Outlet />
             </main>

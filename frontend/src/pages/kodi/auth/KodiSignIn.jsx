@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { kodiAuthSignIn } from '../../../services/kodiAuthService';
 import { useAuth } from '../../../hooks/useAuth';
+import api from '../../../services/api';
 
 const KodiSignIn = () => {
     const navigate = useNavigate();
@@ -19,9 +20,11 @@ const KodiSignIn = () => {
             if (payload.firstLoginRequired) {
                 sessionStorage.setItem('kodi_first_login_token', payload.firstLoginToken);
                 localStorage.setItem('token', payload.token);
+                api.defaults.headers.common.Authorization = `Bearer ${payload.token}`;
                 navigate('/kodi-auth/first-login');
             } else {
                 localStorage.setItem('token', payload.token);
+                api.defaults.headers.common.Authorization = `Bearer ${payload.token}`;
                 if (refreshUser) {
                     await refreshUser().catch(() => {});
                 }

@@ -26,6 +26,8 @@ router.post('/pages/:id/link', validate([body('appId').custom((val) => {
     return uuidRegex.test(str) || /^\d+$/.test(str);
 })]), controller.linkPageToApp);
 router.get('/runtime/:pageId', controller.getRuntimeValidator, controller.runtimeLoader);
+router.get('/runtime/:pageId/record', controller.getRuntimeValidator, controller.getRuntimeRecord);
+router.put('/runtime/:pageId/record', controller.runtimeRecordValidator, controller.updateRuntimeRecord);
 
 router.get('/apps', controller.listApps);
 router.post('/apps', controller.createAppValidators, controller.createApp);

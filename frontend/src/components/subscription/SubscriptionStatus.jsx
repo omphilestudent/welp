@@ -103,6 +103,18 @@ const formatPlanDisplayName = (value) => {
 };
 
 const BUSINESS_PLAN_ENTITLEMENTS = {
+    free_tier: {
+        label: 'Free Tier',
+        apiLimit: 100,
+        analyticsLevel: 'Not included',
+        analyticsFeatures: ['No analytics dashboards', 'Upgrade to unlock insights'],
+        advertising: {
+            maxAds: 0,
+            placement: 'Business profile only',
+            mediaSupport: 'Not included',
+            features: ['Ads & placements locked', 'Upgrade to unlock campaigns']
+        }
+    },
     base: {
         label: 'Base Plan',
         apiLimit: 1000,
@@ -152,6 +164,8 @@ const LOCALIZED_PRICING_FALLBACKS = {
             standard: { amountMinor: 50000, currencyCode: 'ZAR', currencySymbol: 'R' }
         },
         business: {
+            business_free_tier: { amountMinor: 0, currencyCode: 'ZAR', currencySymbol: 'R' },
+            free_tier: { amountMinor: 0, currencyCode: 'ZAR', currencySymbol: 'R' },
             business_base: { amountMinor: 100000, currencyCode: 'ZAR', currencySymbol: 'R' },
             base: { amountMinor: 100000, currencyCode: 'ZAR', currencySymbol: 'R' },
             business_enhanced: { amountMinor: 200000, currencyCode: 'ZAR', currencySymbol: 'R' },
@@ -417,7 +431,7 @@ const SubscriptionStatus = () => {
                 .filter((plan) => {
                     const code = toLowerSafe(plan.planCode);
                     const tier = toLowerSafe(plan.planTier);
-                    return code.startsWith('business_') || ['base', 'enhanced', 'premium'].includes(tier);
+                    return code.startsWith('business_') || ['free_tier', 'base', 'enhanced', 'premium'].includes(tier);
                 })
                 .sort((a, b) => (a.amountMinor ?? 0) - (b.amountMinor ?? 0));
             setBusinessPlans(normalizedPlans);

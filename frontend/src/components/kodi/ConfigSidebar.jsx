@@ -42,6 +42,267 @@ const ConfigSidebar = ({
         update({ style: { ...(component.style || {}), ...patch } });
     };
 
+    const updateProps = (patch) => {
+        update({ props: { ...(component.props || {}), ...patch } });
+    };
+
+    const updateFields = (fields) => updateProps({ fields });
+
+    const updateActions = (actions) => update({ actions });
+
+    const fieldTypes = [
+        'text',
+        'textarea',
+        'number',
+        'currency',
+        'date',
+        'datetime',
+        'phone',
+        'email',
+        'checkbox',
+        'select',
+        'multi-select',
+        'badge'
+    ];
+
+    const renderFieldsEditor = () => (
+        <div className="kodi-config__section">
+            <h4>Fields</h4>
+            {(component.props?.fields || []).map((field, index) => (
+                <div key={field.key || index} className="kodi-config__group">
+                    <label className="kodi-config__field">
+                        Key
+                        <input
+                            type="text"
+                            value={field.key || ''}
+                            onChange={(event) => {
+                                const next = [...(component.props?.fields || [])];
+                                next[index] = { ...field, key: event.target.value };
+                                updateFields(next);
+                            }}
+                        />
+                    </label>
+                    <label className="kodi-config__field">
+                        Label
+                        <input
+                            type="text"
+                            value={field.label || ''}
+                            onChange={(event) => {
+                                const next = [...(component.props?.fields || [])];
+                                next[index] = { ...field, label: event.target.value };
+                                updateFields(next);
+                            }}
+                        />
+                    </label>
+                    <label className="kodi-config__field">
+                        Type
+                        <select
+                            value={field.type || 'text'}
+                            onChange={(event) => {
+                                const next = [...(component.props?.fields || [])];
+                                next[index] = { ...field, type: event.target.value };
+                                updateFields(next);
+                            }}
+                        >
+                            {fieldTypes.map((type) => (
+                                <option key={type} value={type}>
+                                    {type}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="kodi-config__field">
+                        Editable
+                        <input
+                            type="checkbox"
+                            checked={Boolean(field.editable)}
+                            onChange={(event) => {
+                                const next = [...(component.props?.fields || [])];
+                                next[index] = { ...field, editable: event.target.checked };
+                                updateFields(next);
+                            }}
+                        />
+                    </label>
+                    <label className="kodi-config__field">
+                        Placeholder
+                        <input
+                            type="text"
+                            value={field.placeholder || ''}
+                            onChange={(event) => {
+                                const next = [...(component.props?.fields || [])];
+                                next[index] = { ...field, placeholder: event.target.value };
+                                updateFields(next);
+                            }}
+                        />
+                    </label>
+                    <label className="kodi-config__field">
+                        Options (comma separated)
+                        <input
+                            type="text"
+                            value={(field.options || []).join(', ')}
+                            onChange={(event) => {
+                                const next = [...(component.props?.fields || [])];
+                                next[index] = {
+                                    ...field,
+                                    options: event.target.value.split(',').map((item) => item.trim()).filter(Boolean)
+                                };
+                                updateFields(next);
+                            }}
+                        />
+                    </label>
+                    <button
+                        type="button"
+                        className="btn-text"
+                        onClick={() => {
+                            const next = [...(component.props?.fields || [])];
+                            next.splice(index, 1);
+                            updateFields(next);
+                        }}
+                    >
+                        Remove field
+                    </button>
+                </div>
+            ))}
+            <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => updateFields([...(component.props?.fields || []), { key: '', label: '', type: 'text', editable: false }])}
+            >
+                Add field
+            </button>
+        </div>
+    );
+
+    const renderSectionsEditor = () => (
+        <div className="kodi-config__section">
+            <h4>Sections</h4>
+            {(component.props?.sections || []).map((section, sectionIndex) => (
+                <div key={section.title || sectionIndex} className="kodi-config__group">
+                    <label className="kodi-config__field">
+                        Section title
+                        <input
+                            type="text"
+                            value={section.title || ''}
+                            onChange={(event) => {
+                                const next = [...(component.props?.sections || [])];
+                                next[sectionIndex] = { ...section, title: event.target.value };
+                                updateProps({ sections: next });
+                            }}
+                        />
+                    </label>
+                    {(section.fields || []).map((field, index) => (
+                        <div key={field.key || index} className="kodi-config__group">
+                            <label className="kodi-config__field">
+                                Key
+                                <input
+                                    type="text"
+                                    value={field.key || ''}
+                                    onChange={(event) => {
+                                        const next = [...(component.props?.sections || [])];
+                                        const fieldsNext = [...(section.fields || [])];
+                                        fieldsNext[index] = { ...field, key: event.target.value };
+                                        next[sectionIndex] = { ...section, fields: fieldsNext };
+                                        updateProps({ sections: next });
+                                    }}
+                                />
+                            </label>
+                            <label className="kodi-config__field">
+                                Label
+                                <input
+                                    type="text"
+                                    value={field.label || ''}
+                                    onChange={(event) => {
+                                        const next = [...(component.props?.sections || [])];
+                                        const fieldsNext = [...(section.fields || [])];
+                                        fieldsNext[index] = { ...field, label: event.target.value };
+                                        next[sectionIndex] = { ...section, fields: fieldsNext };
+                                        updateProps({ sections: next });
+                                    }}
+                                />
+                            </label>
+                            <label className="kodi-config__field">
+                                Type
+                                <select
+                                    value={field.type || 'text'}
+                                    onChange={(event) => {
+                                        const next = [...(component.props?.sections || [])];
+                                        const fieldsNext = [...(section.fields || [])];
+                                        fieldsNext[index] = { ...field, type: event.target.value };
+                                        next[sectionIndex] = { ...section, fields: fieldsNext };
+                                        updateProps({ sections: next });
+                                    }}
+                                >
+                                    {fieldTypes.map((type) => (
+                                        <option key={type} value={type}>
+                                            {type}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="kodi-config__field">
+                                Editable
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(field.editable)}
+                                    onChange={(event) => {
+                                        const next = [...(component.props?.sections || [])];
+                                        const fieldsNext = [...(section.fields || [])];
+                                        fieldsNext[index] = { ...field, editable: event.target.checked };
+                                        next[sectionIndex] = { ...section, fields: fieldsNext };
+                                        updateProps({ sections: next });
+                                    }}
+                                />
+                            </label>
+                            <button
+                                type="button"
+                                className="btn-text"
+                                onClick={() => {
+                                    const next = [...(component.props?.sections || [])];
+                                    const fieldsNext = [...(section.fields || [])];
+                                    fieldsNext.splice(index, 1);
+                                    next[sectionIndex] = { ...section, fields: fieldsNext };
+                                    updateProps({ sections: next });
+                                }}
+                            >
+                                Remove field
+                            </button>
+                        </div>
+                    ))}
+                    <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => {
+                            const next = [...(component.props?.sections || [])];
+                            const fieldsNext = [...(section.fields || []), { key: '', label: '', type: 'text', editable: false }];
+                            next[sectionIndex] = { ...section, fields: fieldsNext };
+                            updateProps({ sections: next });
+                        }}
+                    >
+                        Add field
+                    </button>
+                    <button
+                        type="button"
+                        className="btn-text"
+                        onClick={() => {
+                            const next = [...(component.props?.sections || [])];
+                            next.splice(sectionIndex, 1);
+                            updateProps({ sections: next });
+                        }}
+                    >
+                        Remove section
+                    </button>
+                </div>
+            ))}
+            <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => updateProps({ sections: [...(component.props?.sections || []), { title: '', fields: [] }] })}
+            >
+                Add section
+            </button>
+        </div>
+    );
+
     return (
         <aside className="kodi-config">
             <div className="kodi-config__header">
@@ -176,9 +437,11 @@ const ConfigSidebar = ({
                         Action labels (comma separated)
                         <input
                             type="text"
-                            value={(component.actions || []).join(', ')}
+                            value={(component.actions || []).map((action) => action.label || action).join(', ')}
                             onChange={(event) =>
-                                update({ actions: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })
+                                updateActions(
+                                    event.target.value.split(',').map((item) => item.trim()).filter(Boolean)
+                                )
                             }
                         />
                     </label>
@@ -192,6 +455,9 @@ const ConfigSidebar = ({
                         />
                     </label>
                 </div>
+
+                {component.component_type === 'RecordDetails' && renderSectionsEditor()}
+                {component.component_type === 'HighlightsPanel' && renderFieldsEditor()}
 
                 <div className="kodi-config__section">
                     <h4>Props</h4>

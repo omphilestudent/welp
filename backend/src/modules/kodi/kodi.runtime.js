@@ -14,6 +14,7 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
     const permissionMap = perms.formatPermissions(permissionRows);
     const componentRegistry = await service.listComponentRegistry();
     const objects = await service.listObjects();
+    const record = await service.getRuntimeRecord(pageId);
     const appContextId = appId || page.linked_app_id;
     const app = appContextId ? await service.getAppById(appContextId) : null;
 
@@ -74,6 +75,7 @@ const buildRuntimePayload = async ({ pageId, role, userId, appId }) => {
         permissions: permissionMap,
         registry: componentRegistry,
         objects,
+        record: record || page?.settings?.sample_record || page?.settings?.sampleRecord || {},
         effectiveRole,
         fields: objects.reduce((acc, obj) => {
             acc[obj.name] = obj.fields || [];

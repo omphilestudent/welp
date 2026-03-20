@@ -193,6 +193,24 @@ const DEFAULT_PLAN_BLUEPRINTS = {
     ],
     business: [
         {
+            planCode: 'business_free_tier',
+            planTier: 'free_tier',
+            amountMinor: 0,
+            displayName: 'Free Tier',
+            features: [
+                'Business profile access',
+                'Respond to reviews',
+                'API keys included',
+                '100 API calls per day'
+            ],
+            limits: {
+                api: { callsPerDay: 100 },
+                ads: { maxActive: 0, analytics: 'none' },
+                analytics: { level: 'none' }
+            },
+            isDefault: true
+        },
+        {
             planCode: 'business_base',
             planTier: 'base',
             amountMinor: 100000,
@@ -206,7 +224,7 @@ const DEFAULT_PLAN_BLUEPRINTS = {
                 api: { callsPerDay: 1000 },
                 ads: { maxActive: 1, analytics: 'limited' }
             },
-            isDefault: true
+            isDefault: false
         },
         {
             planCode: 'business_enhanced',

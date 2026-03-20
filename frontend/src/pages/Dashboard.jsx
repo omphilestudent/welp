@@ -8,6 +8,7 @@ import AvatarImage from '../components/common/AvatarImage';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import AdvertisingSection from '../components/ads/AdvertisingSection';
 import { resolveMediaUrl } from '../utils/media';
+import { getPlanKey, getPlanPermissions } from '../utils/subscriptionAccess';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
     FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo,
@@ -391,9 +392,17 @@ const Dashboard = () => {
     const applicationStatus = user?.applicationStatus || user?.application_status || null;
     const planTier = (subscription?.plan_tier || subscription?.planTier || subscription?.tier || '').toLowerCase();
     const planCode = (subscription?.planCode || subscription?.plan_code || '').toLowerCase();
+    const planKey = getPlanKey(user);
+    const planPermissions = getPlanPermissions(user);
+    const planLabel = planKey
+        .replace('business_', '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
     const planTierIsPremium = planTier === 'premium';
     const isBusinessPremiumCode = planCode === 'business_premium' || planCode.startsWith('business_premium');
-    const advertisingUnlocked = user?.role === 'business' && (planTierIsPremium || isBusinessPremiumCode || premiumExceptionActive);
+    const isBusinessFreeTier = user?.role === 'business' && planKey === 'business_free_tier';
+    const advertisingUnlocked = user?.role === 'business' && (planPermissions.adsEnabled || planTierIsPremium || isBusinessPremiumCode || premiumExceptionActive);
+    const analyticsUnlocked = user?.role === 'business' && (planPermissions.analytics || planTierIsPremium || isBusinessPremiumCode || premiumExceptionActive);
     const [userReviews, setUserReviews] = useState([]);
     const [pendingRequests, setPendingRequests] = useState([]);
     const [myCompanies, setMyCompanies] = useState([]);
@@ -453,6 +462,8 @@ const Dashboard = () => {
     const [newApiKey, setNewApiKey] = useState('');
     const [apiKeyError, setApiKeyError] = useState('');
     const [apiKeyCreating, setApiKeyCreating] = useState(false);
+    const [apiUsage, setApiUsage] = useState(null);
+    const [apiUsageLoading, setApiUsageLoading] = useState(false);
 
     useEffect(() => {
         if (activeTab === 'ads' && !advertisingUnlocked) {
@@ -535,6 +546,21 @@ const Dashboard = () => {
             setCompanyAnalytics(null);
         } finally {
             setAnalyticsLoading(false);
+        }
+    };
+
+    const fetchBusinessApiUsage = async (companyId) => {
+        if (!companyId) return;
+        setApiUsageLoading(true);
+        try {
+            const { data } = await api.get(`/business/${companyId}/api-usage`);
+            setApiUsage(data);
+            setApiKeyError('');
+        } catch (err) {
+            setApiUsage(null);
+            setApiKeyError(err.response?.data?.error || 'Failed to load API usage');
+        } finally {
+            setApiUsageLoading(false);
         }
     };
 
@@ -726,8 +752,13 @@ const Dashboard = () => {
         if (!selectedCompanyId) return;
         fetchSelectedCompanyProfile(selectedCompanyId, { skipFormUpdate: true });
         fetchBusinessReviews(selectedCompanyId, companyReviewPagination.page || 1);
-        fetchBusinessAnalytics(selectedCompanyId);
+        if (analyticsUnlocked) {
+            fetchBusinessAnalytics(selectedCompanyId);
+        }
         fetchCompanyApiKeys(selectedCompanyId);
+        if (companyPanelTab === 'api') {
+            fetchBusinessApiUsage(selectedCompanyId);
+        }
     };
 
     /* ── Chart data ── */
@@ -779,13 +810,24 @@ const Dashboard = () => {
         if (user?.role === 'business' && selectedCompanyId) {
             fetchSelectedCompanyProfile(selectedCompanyId);
             fetchBusinessReviews(selectedCompanyId, 1);
-            fetchBusinessAnalytics(selectedCompanyId);
+            if (analyticsUnlocked) {
+                fetchBusinessAnalytics(selectedCompanyId);
+            }
             fetchCompanyApiKeys(selectedCompanyId);
+            if (companyPanelTab === 'api') {
+                fetchBusinessApiUsage(selectedCompanyId);
+            }
             setNewApiKey('');
             setApiKeyError('');
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedCompanyId, user?.role]);
+
+    useEffect(() => {
+        if (companyPanelTab === 'api' && selectedCompanyId && user?.role === 'business') {
+            fetchBusinessApiUsage(selectedCompanyId);
+        }
+    }, [companyPanelTab, selectedCompanyId, user?.role]);
 
     // Re-fetch reviews when filter changes
     useEffect(() => {
@@ -1260,11 +1302,15 @@ const Dashboard = () => {
                             <button className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveTab('reviews')}>
                                 Business Hub
                             </button>
-                            {advertisingUnlocked && (
-                                <button className={`tab-btn ${activeTab === 'ads' ? 'active' : ''}`} onClick={() => setActiveTab('ads')}>
-                                    Advertising
-                                </button>
-                            )}
+                            <button
+                                className={`tab-btn ${activeTab === 'ads' ? 'active' : ''} ${!advertisingUnlocked ? 'tab-btn--locked' : ''}`}
+                                onClick={() => advertisingUnlocked && setActiveTab('ads')}
+                                disabled={!advertisingUnlocked}
+                                title={!advertisingUnlocked ? 'Available on subscription plans' : undefined}
+                            >
+                                Advertising
+                                {!advertisingUnlocked && <span className="tab-btn__lock">Locked</span>}
+                            </button>
                         </>
                     )}
                     {user?.role === 'psychologist' && (
@@ -1402,6 +1448,15 @@ const Dashboard = () => {
                                 <div>
                                     <h3>Business Hub</h3>
                                     <p>Monitor reviews, analyse sentiment, and keep your public profile accurate.</p>
+                                    <div className="business-plan-badge">
+                                        <span>Plan</span>
+                                        <strong>{planLabel}</strong>
+                                    </div>
+                                    {isBusinessFreeTier && (
+                                        <button type="button" className="btn btn-outline btn-small" onClick={() => window.location.href = '/pricing?role=business'}>
+                                            Upgrade
+                                        </button>
+                                    )}
                                 </div>
                                 {myCompanies.length > 0 && (
                                     <div className="business-company-selector">
@@ -1446,16 +1501,19 @@ const Dashboard = () => {
                                     <div className="business-panel-tabs">
                                         {[
                                             { id: 'reviews', label: 'Reviews' },
-                                            { id: 'analytics', label: 'Analytics' },
+                                            { id: 'analytics', label: 'Analytics', locked: !analyticsUnlocked },
                                             { id: 'edit', label: 'Edit Profile' },
                                             { id: 'api', label: 'API Keys' }
                                         ].map((tab) => (
                                             <button
                                                 key={tab.id}
-                                                className={`business-panel-tab ${companyPanelTab === tab.id ? 'active' : ''}`}
-                                                onClick={() => setCompanyPanelTab(tab.id)}
+                                                className={`business-panel-tab ${companyPanelTab === tab.id ? 'active' : ''} ${tab.locked ? 'business-panel-tab--locked' : ''}`}
+                                                onClick={() => !tab.locked && setCompanyPanelTab(tab.id)}
+                                                disabled={tab.locked}
+                                                title={tab.locked ? 'Available on subscription plans' : undefined}
                                             >
                                                 {tab.label}
+                                                {tab.locked && <span className="tab-lock-pill">Locked</span>}
                                             </button>
                                         ))}
                                     </div>
@@ -1528,7 +1586,16 @@ const Dashboard = () => {
                                         {/* ─── Analytics Tab ─── */}
                                         {companyPanelTab === 'analytics' && (
                                             <div className="business-analytics-panel">
-                                                {analyticsLoading ? <Loading /> : companyAnalytics ? (
+                                                {!analyticsUnlocked && (
+                                                    <div className="locked-panel">
+                                                        <h4>Analytics locked</h4>
+                                                        <p>Upgrade your business plan to unlock analytics dashboards and sentiment insights.</p>
+                                                        <button type="button" className="btn btn-primary" onClick={() => window.location.href = '/pricing?role=business'}>
+                                                            Upgrade plan
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {analyticsUnlocked && (analyticsLoading ? <Loading /> : companyAnalytics ? (
                                                     <>
                                                         {/* Summary cards */}
                                                         <div className="business-analytics-cards">
@@ -1635,7 +1702,7 @@ const Dashboard = () => {
                                                     </>
                                                 ) : (
                                                     <p className="empty-message">Analytics will appear once reviews start rolling in.</p>
-                                                )}
+                                                ))}
                                             </div>
                                         )}
 
@@ -1732,6 +1799,36 @@ const Dashboard = () => {
                                                 <p className="business-edit-intro">
                                                     Generate API keys to connect your CRM or BI tools. Keep keys private — they grant access to your business data.
                                                 </p>
+
+                                                <div className="api-usage-card">
+                                                    <div>
+                                                        <h4>API usage today</h4>
+                                                        <p className="form-hint">Plan: {planLabel}</p>
+                                                    </div>
+                                                    {apiUsageLoading ? (
+                                                        <span className="form-hint">Loading usage…</span>
+                                                    ) : (
+                                                        <div className="api-usage-metrics">
+                                                            <div>
+                                                                <span>Limit</span>
+                                                                <strong>{apiUsage?.dailyLimit ?? planPermissions.apiLimit ?? '—'}</strong>
+                                                            </div>
+                                                            <div>
+                                                                <span>Used</span>
+                                                                <strong>{apiUsage?.usedToday ?? 0}</strong>
+                                                            </div>
+                                                            <div>
+                                                                <span>Remaining</span>
+                                                                <strong>{apiUsage?.remainingToday ?? '—'}</strong>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {isBusinessFreeTier && (
+                                                        <button type="button" className="btn btn-outline btn-small" onClick={() => window.location.href = '/pricing?role=business'}>
+                                                            Upgrade for more
+                                                        </button>
+                                                    )}
+                                                </div>
 
                                                 {newApiKey && (
                                                     <div className="api-key-reveal">

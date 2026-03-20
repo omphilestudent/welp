@@ -11,7 +11,7 @@ BEGIN
         CREATE TYPE subscription_tier_user AS ENUM ('free', 'premium');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_tier_business') THEN
-        CREATE TYPE subscription_tier_business AS ENUM ('base', 'enhanced', 'premium');
+        CREATE TYPE subscription_tier_business AS ENUM ('free_tier', 'base', 'enhanced', 'premium');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'psychologist_plan') THEN
         CREATE TYPE psychologist_plan AS ENUM ('standard');
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS businesses (
     website TEXT,
     headquarters JSONB,
     status VARCHAR(32) DEFAULT 'active',
-    subscription_tier subscription_tier_business DEFAULT 'base',
+    subscription_tier subscription_tier_business DEFAULT 'free_tier',
     subscription_expires TIMESTAMP WITH TIME ZONE,
     api_calls_used INT DEFAULT 0,
     api_call_limit INT DEFAULT 1000,
@@ -186,6 +186,100 @@ CREATE TABLE IF NOT EXISTS business_analytics_daily (
     ad_clicks INT DEFAULT 0,
     UNIQUE (business_id, metric_date)
 );
+
+CREATE TABLE IF NOT EXISTS business_api_usage_daily (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    api_key_id UUID REFERENCES business_api_keys(id) ON DELETE SET NULL,
+    usage_date DATE NOT NULL,
+    request_count INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    UNIQUE (company_id, usage_date)
+);
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'business_api_usage_daily'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'business_api_usage_daily'
+              AND column_name = 'company_id'
+        ) THEN
+            ALTER TABLE business_api_usage_daily
+                ADD COLUMN company_id UUID;
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'business_api_usage_daily'
+              AND column_name = 'business_id'
+        ) THEN
+            UPDATE business_api_usage_daily
+            SET company_id = business_id
+            WHERE company_id IS NULL;
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = 'companies'
+        ) THEN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conrelid = 'business_api_usage_daily'::regclass
+                  AND conname = 'business_api_usage_daily_company_id_fkey'
+            ) THEN
+                ALTER TABLE business_api_usage_daily
+                    ADD CONSTRAINT business_api_usage_daily_company_id_fkey
+                        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE;
+            END IF;
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conrelid = 'business_api_usage_daily'::regclass
+              AND contype = 'u'
+              AND conname = 'business_api_usage_daily_company_id_usage_date_key'
+        ) THEN
+            ALTER TABLE business_api_usage_daily
+                ADD CONSTRAINT business_api_usage_daily_company_id_usage_date_key
+                    UNIQUE (company_id, usage_date);
+        END IF;
+    END IF;
+END$$;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'business_api_usage_daily'
+          AND column_name = 'company_id'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND indexname = 'idx_business_api_usage_daily_company_date'
+        ) THEN
+            EXECUTE 'CREATE INDEX idx_business_api_usage_daily_company_date ON business_api_usage_daily (company_id, usage_date)';
+        END IF;
+    END IF;
+END$$;
 
 CREATE TABLE IF NOT EXISTS reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

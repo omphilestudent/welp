@@ -135,10 +135,12 @@ const BuilderCanvas = ({
             fields = Object.keys(record || {}).filter((key) => key !== 'id').slice(0, 5);
         }
         return fields.map((field) => {
-            const fieldMeta = objectFields.find((item) => item.field_name === field);
+            const fieldKey = typeof field === 'string' ? field : field.key || field.binding || field.field || field.name;
+            const fieldLabel = typeof field === 'string' ? field : field.label || fieldKey;
+            const fieldMeta = objectFields.find((item) => item.field_name === fieldKey);
             return {
-                label: fieldMeta?.label || fieldMeta?.field_name || field,
-                value: formatValue(getRecordValue(record, field))
+                label: fieldMeta?.label || fieldMeta?.field_name || fieldLabel,
+                value: formatValue(getRecordValue(record, fieldKey))
             };
         });
     };
@@ -173,6 +175,10 @@ const BuilderCanvas = ({
         switch (previewKey) {
             case 'RecordDetails':
             case 'KeyValueFields':
+                const sectionFields = Array.isArray(component?.props?.sections)
+                    ? component.props.sections.flatMap((section) => section.fields || [])
+                    : null;
+                const detailFields = sectionFields && sectionFields.length ? resolveFields({ ...component, props: { fields: sectionFields } }, record) : fields;
                 return (
                     <div className="kodi-builder__preview kodi-builder__preview--record">
                         <div className="kodi-builder__preview-header">
@@ -183,7 +189,7 @@ const BuilderCanvas = ({
                             <span className="kodi-builder__preview-badge">Live</span>
                         </div>
                         <div className="kodi-builder__preview-grid">
-                            {fields.map((field) => (
+                            {detailFields.map((field) => (
                                 <div key={field.label} className="kodi-builder__preview-row">
                                     <span>{field.label}</span>
                                     <strong>{field.value}</strong>

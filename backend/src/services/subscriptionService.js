@@ -8,7 +8,8 @@ const PLAN_LIMITS = {
     user_free: { tier: 'free', chatMinutes: 30, callMinutes: 0, displayName: 'Free', videoDiscount: 0, videoSessionsPerWeek: 1 },
     user_premium: { tier: 'premium', chatMinutes: 120, callMinutes: 90, displayName: 'Premium', videoDiscount: 20, videoSessionsPerWeek: 3 },
     psychologist_standard: { tier: 'premium', chatMinutes: 180, callMinutes: 120, displayName: 'Psychologist Partner' },
-    business_base: { tier: 'base', apiLimit: 1000, displayName: 'Business Base', ads: { maxActive: 3, analytics: 'limited' } },
+    business_free_tier: { tier: 'free_tier', apiLimit: 100, displayName: 'Business Free Tier', ads: { maxActive: 0, analytics: 'none' } },
+    business_base: { tier: 'base', apiLimit: 1000, displayName: 'Business Base', ads: { maxActive: 1, analytics: 'limited' } },
     business_enhanced: { tier: 'enhanced', apiLimit: 3000, displayName: 'Business Enhanced', ads: { maxActive: 5, analytics: 'standard' } },
     business_premium: { tier: 'premium', apiLimit: 10000, displayName: 'Business Premium', ads: { maxActive: null, analytics: 'advanced' } }
 };
@@ -17,6 +18,7 @@ const DEFAULT_PRICING_FALLBACK = {
     user_free: { amountMinor: 0, currencySymbol: '$' },
     user_premium: { amountMinor: 0, currencySymbol: '$' },
     psychologist_standard: { amountMinor: 0, currencySymbol: '$' },
+    business_free_tier: { amountMinor: 0, currencySymbol: '$' },
     business_base: { amountMinor: 0, currencySymbol: '$' },
     business_enhanced: { amountMinor: 0, currencySymbol: '$' },
     business_premium: { amountMinor: 0, currencySymbol: '$' }
@@ -223,7 +225,7 @@ const cancelSubscriptions = async (ownerType, ownerId) => {
 const FALLBACK_PLAN_MAPPING = {
     user: { planCode: 'user_free' },
     psychologist: { planCode: 'user_free', tier: 'free' },
-    business: { planCode: 'business_base' }
+    business: { planCode: 'business_free_tier' }
 };
 
 const buildFallbackPayload = (audience = 'user') => {

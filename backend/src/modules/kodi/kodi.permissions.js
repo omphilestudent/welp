@@ -33,9 +33,20 @@ const userHasViewAccess = (permissionMap, role) => {
     return Boolean(entry?.can_view);
 };
 
+const userHasEditAccess = (permissionMap, role) => {
+    const resolvedRole = resolveRole(role);
+    if (!permissionMap || Object.keys(permissionMap).length === 0) {
+        return resolvedRole === 'admin';
+    }
+    if (!resolvedRole) return false;
+    const entry = permissionMap[resolvedRole];
+    return Boolean(entry?.can_edit);
+};
+
 module.exports = {
     formatPermissions,
     userHasViewAccess,
+    userHasEditAccess,
     isAdminRole,
     isTimesPage
 };

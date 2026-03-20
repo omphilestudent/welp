@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
+const { requireBusinessFeature } = require('../middleware/businessPlan');
 const { authorizeAdmin } = require('../middleware/adminAuth');
 const upload = require('../middleware/upload');
 const adsController = require('../controllers/adsController');
@@ -81,10 +82,10 @@ router.get('/admin/export/csv', adminAuth, adsController.adminExportCampaigns);
 router.get('/admin/export/report', adminAuth, adsController.adminGenerateReport);
 router.get('/admin/:id/audit', adminAuth, adsController.adminGetAuditLog);
 
-router.get('/me', authorize('business'), adsController.listMyCampaigns);
-router.post('/', authorize('business'), handleMediaUpload, adsController.createCampaign);
-router.put('/:id', authorize('business'), handleMediaUpload, adsController.updateCampaign);
-router.delete('/:id', authorize('business'), adsController.deleteCampaign);
-router.get('/:id', authorize('business'), adsController.getCampaign);
+router.get('/me', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.listMyCampaigns);
+router.post('/', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), handleMediaUpload, adsController.createCampaign);
+router.put('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), handleMediaUpload, adsController.updateCampaign);
+router.delete('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.deleteCampaign);
+router.get('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.getCampaign);
 
 module.exports = router;

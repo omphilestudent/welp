@@ -42,6 +42,13 @@ const flattenLimits = (limits = {}) => {
     return entries.slice(0, 6);
 };
 
+const formatTierLabel = (value) => {
+    if (!value) return '';
+    return String(value)
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const PlanCard = ({
     plan,
     subscription,
@@ -52,6 +59,7 @@ const PlanCard = ({
 }) => {
     const isCurrent = subscription?.planCode === plan.planCode;
     const price = formatPlanPrice(plan);
+    const tierLabel = formatTierLabel(plan.planTier);
     const limitEntries = useMemo(() => flattenLimits(plan.limits), [plan.limits]);
 
     const adsLimit = plan.limits?.ads;
@@ -72,7 +80,7 @@ const PlanCard = ({
         <div className={`plan-card ${highlighted ? 'plan-card--highlighted' : ''}`}>
             <div className="plan-card__header">
                 <div>
-                    <p className="plan-card__eyebrow">{plan.planTier}</p>
+                    <p className="plan-card__eyebrow">{tierLabel}</p>
                     <h3>{plan.metadata?.displayName || plan.planCode}</h3>
                 </div>
                 {plan.planTier === 'premium' && <FaCrown className="plan-card__badge" />}

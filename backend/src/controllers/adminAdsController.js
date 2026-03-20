@@ -91,7 +91,7 @@ const listAds = async (req, res) => {
         }
 
         if (req.query.tier) {
-            filters.push(`COALESCE(b.subscription_tier, 'base') = $${idx}`);
+            filters.push(`COALESCE(b.subscription_tier, 'free_tier') = $${idx}`);
             params.push(req.query.tier);
             idx += 1;
         }

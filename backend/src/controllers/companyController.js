@@ -5,6 +5,8 @@ const { sendClaimInvitation } = require('../utils/emailService');
 const { scrapeCompanyFromWebsite } = require('../services/companyScraperService');
 const { enrichCompanyWithOSM } = require('../services/companyEnrichmentService');
 const { generateAutoReview } = require('../services/autoReviewService');
+const { getBusinessPlanSnapshotByBusinessId, getBusinessDailyApiLimit } = require('../utils/businessPlan');
+const { getUsageRecord } = require('../services/businessApiUsageService');
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
 const OWNER_ACCESS_ROLES = new Set(['business', ...ADMIN_ROLES]);
@@ -1090,6 +1092,34 @@ const getCompanyApiKeys = async (req, res) => {
     }
 };
 
+const getCompanyApiUsage = async (req, res) => {
+    try {
+        const companyId = resolveCompanyIdParam(req.params);
+        if (!companyId || !UUID_REGEX.test(companyId)) {
+            return res.status(400).json({ error: 'Invalid company ID format' });
+        }
+
+        await assertCompanyOwnership(companyId, req.user);
+
+        const planSnapshot = await getBusinessPlanSnapshotByBusinessId(companyId);
+        const dailyLimit = getBusinessDailyApiLimit(planSnapshot);
+        const usage = await getUsageRecord(companyId, new Date());
+        const usedToday = Number(usage?.request_count || 0);
+        const remainingToday = Number.isFinite(dailyLimit) ? Math.max(dailyLimit - usedToday, 0) : null;
+
+        res.json({
+            plan: planSnapshot?.planCode || 'business_free_tier',
+            dailyLimit,
+            usedToday,
+            remainingToday,
+            usageDate: new Date().toISOString().slice(0, 10),
+            resetsAt: new Date(new Date().setHours(24, 0, 0, 0)).toISOString()
+        });
+    } catch (error) {
+        return handleControllerError(res, error, 'Failed to fetch API usage');
+    }
+};
+
 const createCompanyApiKey = async (req, res) => {
     try {
         const companyId = resolveCompanyIdParam(req.params);
@@ -1670,6 +1700,7 @@ module.exports = {
     updateCompany,
     getCompanyReviewsForBusiness,
     getCompanyAnalytics,
+    getCompanyApiUsage,
     getCompanyApiKeys,
     createCompanyApiKey,
     revokeCompanyApiKey,

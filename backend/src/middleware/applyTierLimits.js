@@ -1,6 +1,8 @@
 const { ensureChatQuota } = require('../services/chatQuotaService');
 const { getActiveSubscription, PLAN_LIMITS } = require('../services/subscriptionService');
 const { query } = require('../utils/database');
+const { getBusinessPlanSnapshotByOwner, getBusinessDailyApiLimit } = require('../utils/businessPlan');
+const { incrementUsage } = require('../services/businessApiUsageService');
 const { hasPremiumException } = require('../utils/premiumAccess');
 
 const ROLE_TO_OWNER = {
@@ -84,34 +86,35 @@ const enforceApiQuota = async (user) => {
         return;
     }
 
-    const result = await query(
-        `SELECT id, api_call_limit, api_calls_used
-         FROM businesses
-         WHERE owner_user_id = $1
+    const businessPlan = await getBusinessPlanSnapshotByOwner(user.id);
+    const dailyLimit = getBusinessDailyApiLimit(businessPlan);
+    if (!Number.isFinite(dailyLimit) || dailyLimit <= 0) {
+        const error = new Error('API access is not enabled for this plan');
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const businessRecord = await query(
+        `SELECT id
+         FROM companies
+         WHERE COALESCE(claimed_by, created_by_user_id) = $1
          LIMIT 1`,
         [user.id]
     );
-
-    if (result.rows.length === 0) {
+    if (!businessRecord.rows.length) {
         return;
     }
 
-    const business = result.rows[0];
-    const limit = Number(business.api_call_limit || 0);
-    const used = Number(business.api_calls_used || 0);
+    const usage = await incrementUsage({
+        companyId: businessRecord.rows[0].id,
+        dailyLimit
+    });
 
-    if (limit > 0 && used >= limit) {
+    if (usage.exceeded) {
         const error = new Error('Daily API quota reached');
         error.statusCode = 429;
         throw error;
     }
-
-    await query(
-        `UPDATE businesses
-         SET api_calls_used = api_calls_used + 1
-         WHERE id = $1`,
-        [business.id]
-    );
 };
 
 module.exports = {
