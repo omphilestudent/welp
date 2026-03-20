@@ -971,6 +971,19 @@ const Messages = () => {
             toast.error('Your account is restricted until KYC is approved.');
             return;
         }
+        const tempId = `temp-voice-${Date.now()}`;
+        const tempUrl = URL.createObjectURL(file);
+        const optimisticMessage = {
+            id: tempId,
+            conversation_id: activeConversation.id,
+            sender_id: user?.id,
+            content: 'Voice note',
+            message_type: 'voice_note',
+            attachment_url: tempUrl,
+            attachment_duration: duration || null,
+            created_at: new Date().toISOString()
+        };
+        setMessages((prev) => [...prev, optimisticMessage]);
         try {
             const formData = new FormData();
             formData.append('voice', file);
@@ -982,28 +995,33 @@ const Messages = () => {
                 formData,
                 { headers: { 'Content-Type': 'multipart/form-data' } }
             );
-            if (data) {
-                setMessages((prev) => [...prev, data]);
+            const message = data?.message || data;
+            if (message) {
+                setMessages((prev) => prev.filter((item) => item.id !== tempId).concat(message));
                 setConversations((prev) => prev.map((conv) => {
                     if (conv.id !== activeConversation.id) return conv;
                     return {
                         ...conv,
                         last_message: {
-                            content: data.content,
-                            createdAt: data.created_at || data.createdAt,
-                            senderId: data.sender_id || data.senderId,
-                            messageType: data.message_type || data.messageType,
-                            attachmentUrl: data.attachment_url || data.attachmentUrl,
-                            attachmentDuration: data.attachment_duration || data.attachmentDuration,
-                            attachmentMime: data.attachment_mime || data.attachmentMime
+                            content: message.content,
+                            createdAt: message.created_at || message.createdAt,
+                            senderId: message.sender_id || message.senderId,
+                            messageType: message.message_type || message.messageType,
+                            attachmentUrl: message.attachment_url || message.attachmentUrl,
+                            attachmentDuration: message.attachment_duration || message.attachmentDuration,
+                            attachmentMime: message.attachment_mime || message.attachmentMime
                         },
-                        updated_at: data.created_at || data.createdAt || conv.updated_at
+                        updated_at: message.created_at || message.createdAt || conv.updated_at
                     };
                 }));
+                fetchMessages(activeConversation.id);
             }
         } catch (error) {
             const message = error?.response?.data?.error || 'Failed to send voice note.';
             toast.error(message);
+            setMessages((prev) => prev.filter((item) => item.id !== tempId));
+        } finally {
+            URL.revokeObjectURL(tempUrl);
         }
     };
 
@@ -1123,7 +1141,7 @@ const Messages = () => {
                     Your account is restricted until KYC is completed and approved.
                 </div>
             )}
-            <div className="messages-container">
+            <div className={`messages-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
                 <div
                     className={`messages-sidebar ${isSidebarOpen ? 'open' : ''}`}
                     onWheel={(event) => event.stopPropagation()}
@@ -1485,15 +1503,6 @@ const Messages = () => {
                     </div>
                 </div>
             </div>
-            {!isSidebarOpen && isMobileView && (
-                <button
-                    type="button"
-                    className="messages-sidebar-fab"
-                    onClick={() => setIsSidebarOpen(true)}
-                >
-                    Conversations
-                </button>
-            )}
             {(callState.status === 'calling' || callState.status === 'incoming' || callState.status === 'in-call') && (
                 <div className="call-overlay">
                     <div className={`call-modal ${callView}`} ref={callModalRef}>
