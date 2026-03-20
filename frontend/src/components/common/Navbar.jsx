@@ -22,6 +22,22 @@ const Navbar = () => {
     const userId = user?.id || null;
     const userRole = String(user?.role || '').toLowerCase();
 
+    // Lock body scroll when mobile menu is open
+    useEffect(() => {
+        if (isMobileMenuOpen) {
+            document.body.style.overflow = 'hidden';
+            document.body.classList.add('menu-open');
+        } else {
+            document.body.style.overflow = '';
+            document.body.classList.remove('menu-open');
+        }
+
+        return () => {
+            document.body.style.overflow = '';
+            document.body.classList.remove('menu-open');
+        };
+    }, [isMobileMenuOpen]);
+
     useEffect(() => {
         checkAdminStatus(userRole);
         if (userId) {
@@ -46,7 +62,9 @@ const Navbar = () => {
     // Close mobile menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (isMobileMenuOpen && !event.target.closest('.navbar-menu') && !event.target.closest('.navbar-toggle')) {
+            if (isMobileMenuOpen &&
+                !event.target.closest('.navbar-menu-mobile') &&
+                !event.target.closest('.navbar-toggle')) {
                 setIsMobileMenuOpen(false);
             }
         };
@@ -189,10 +207,10 @@ const Navbar = () => {
                 <div className="navbar-controls">
                     {!user && (
                         <div className="navbar-auth-desktop">
-                            <Link to="/login" className="btn btn-primary navbar-auth-btn">
+                            <Link to="/login" className="btn-primary navbar-auth-btn">
                                 Login
                             </Link>
-                            <Link to="/register" className="btn btn-secondary navbar-auth-btn">
+                            <Link to="/register" className="btn-secondary navbar-auth-btn">
                                 Sign Up
                             </Link>
                         </div>
@@ -290,7 +308,7 @@ const Navbar = () => {
                                 )}
                             </Link>
 
-                            <button onClick={handleLogout} className="btn btn-primary navbar-logout-btn">
+                            <button onClick={handleLogout} className="btn-primary navbar-logout-btn">
                                 Logout
                             </button>
                         </>

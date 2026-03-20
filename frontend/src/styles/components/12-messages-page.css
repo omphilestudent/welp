@@ -874,6 +874,44 @@
   align-items: center;
 }
 
+.message-mic-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.message-mic-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.message-mic-btn.recording {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+  box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.15);
+  animation: micPulse 1.4s ease-in-out infinite;
+}
+
+.message-mic-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes micPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
 .message-input-wrapper {
   flex: 1;
   display: flex;

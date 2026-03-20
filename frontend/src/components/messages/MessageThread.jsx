@@ -31,6 +31,7 @@ const MessageThread = ({
     const [isRecording, setIsRecording] = useState(false);
     const [recordDuration, setRecordDuration] = useState(0);
     const [voiceNote, setVoiceNote] = useState(null);
+    const [autoSendOnStop, setAutoSendOnStop] = useState(false);
     const messagesEndRef = useRef(null);
     const threadRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -128,6 +129,22 @@ const MessageThread = ({
         }
     };
 
+    const sendVoiceNoteBlob = async ({ blob, mimeType, duration }) => {
+        if (!blob || !onSendVoiceNote) return;
+        setSending(true);
+        setError('');
+        try {
+            const file = new File([blob], 'voice-note.webm', { type: mimeType || 'audio/webm' });
+            await onSendVoiceNote({ file, duration });
+            setVoiceNote(null);
+            setRecordDuration(0);
+        } catch (err) {
+            setError('Failed to send voice note');
+        } finally {
+            setSending(false);
+        }
+    };
+
     const startRecording = async () => {
         setRecordingError('');
         setVoiceNote(null);
@@ -148,12 +165,18 @@ const MessageThread = ({
             recorder.onstop = () => {
                 const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
                 const url = URL.createObjectURL(blob);
-                setVoiceNote({
-                    blob,
-                    url,
-                    duration: recordDuration || Math.ceil((Date.now() - recorder.startTime) / 1000) || 1,
-                    mimeType: recorder.mimeType || blob.type
-                });
+                const duration = recordDuration || Math.ceil((Date.now() - recorder.startTime) / 1000) || 1;
+                if (autoSendOnStop) {
+                    setAutoSendOnStop(false);
+                    sendVoiceNoteBlob({ blob, mimeType: recorder.mimeType || blob.type, duration });
+                } else {
+                    setVoiceNote({
+                        blob,
+                        url,
+                        duration,
+                        mimeType: recorder.mimeType || blob.type
+                    });
+                }
                 if (recordStreamRef.current) {
                     recordStreamRef.current.getTracks().forEach((track) => track.stop());
                     recordStreamRef.current = null;
@@ -181,6 +204,10 @@ const MessageThread = ({
             clearInterval(recordTimerRef.current);
             recordTimerRef.current = null;
         }
+        if (recordStreamRef.current) {
+            recordStreamRef.current.getTracks().forEach((track) => track.stop());
+            recordStreamRef.current = null;
+        }
     };
 
     const cancelRecording = () => {
@@ -202,19 +229,8 @@ const MessageThread = ({
     };
 
     const handleSendVoiceNote = async () => {
-        if (!voiceNote?.blob || !onSendVoiceNote) return;
-        setSending(true);
-        setError('');
-        try {
-            const file = new File([voiceNote.blob], 'voice-note.webm', { type: voiceNote.mimeType || 'audio/webm' });
-            await onSendVoiceNote({ file, duration: voiceNote.duration });
-            setVoiceNote(null);
-            setRecordDuration(0);
-        } catch (err) {
-            setError('Failed to send voice note');
-        } finally {
-            setSending(false);
-        }
+        if (!voiceNote?.blob) return;
+        await sendVoiceNoteBlob({ blob: voiceNote.blob, mimeType: voiceNote.mimeType, duration: voiceNote.duration });
     };
 
     const handleAcceptRequest = async () => {
@@ -392,36 +408,6 @@ const MessageThread = ({
             {conversation.status === 'accepted' && !isExpired && (
                 <form onSubmit={handleSend} className="message-input-form">
                     <div className="message-input-controls">
-                        <button
-                            type="button"
-                            className="btn btn-outline btn-small"
-                            onClick={isRecording ? stopRecording : startRecording}
-                            disabled={sending}
-                        >
-                            {isRecording ? `Stop (${recordDuration}s)` : 'Record'}
-                        </button>
-                        {voiceNote && (
-                            <div className="voice-preview">
-                                <audio controls src={voiceNote.url} />
-                                <div className="voice-preview-actions">
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary btn-small"
-                                        onClick={handleSendVoiceNote}
-                                        disabled={sending}
-                                    >
-                                        Send voice note
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary btn-small"
-                                        onClick={cancelRecording}
-                                    >
-                                        Discard
-                                    </button>
-                                </div>
-                            </div>
-                        )}
                         {recordingError && (
                             <span className="message-input-error">{recordingError}</span>
                         )}
@@ -435,6 +421,22 @@ const MessageThread = ({
                             className="message-input"
                             disabled={sending || isRecording}
                         />
+                        <button
+                            type="button"
+                            className={`message-mic-btn ${isRecording ? 'recording' : ''}`}
+                            onClick={() => {
+                                if (isRecording) {
+                                    setAutoSendOnStop(true);
+                                    stopRecording();
+                                } else {
+                                    startRecording();
+                                }
+                            }}
+                            disabled={sending}
+                            title={isRecording ? `Tap to send (${recordDuration}s)` : 'Record voice note'}
+                        >
+                            🎤
+                        </button>
                         <button
                             type="submit"
                             disabled={!newMessage.trim() || sending}
