@@ -213,6 +213,9 @@ const resolveAdsAuthMessage = (error) => {
         return null;
     }
     const payload = error.response.data;
+    if (payload?.code === 'PLAN_UPGRADE_REQUIRED') {
+        return null;
+    }
     const detail =
         (typeof payload?.error === 'string' && payload.error.trim()) ||
         (typeof payload?.message === 'string' && payload.message.trim());
@@ -431,7 +434,9 @@ const SubscriptionStatus = () => {
                 .filter((plan) => {
                     const code = toLowerSafe(plan.planCode);
                     const tier = toLowerSafe(plan.planTier);
-                    return code.startsWith('business_') || ['free_tier', 'base', 'enhanced', 'premium'].includes(tier);
+                    const isBusinessPlan = code.startsWith('business_') || ['base', 'enhanced', 'premium'].includes(tier);
+                    const isFreeTier = tier === 'free_tier' || code === 'business_free_tier';
+                    return isBusinessPlan && !isFreeTier;
                 })
                 .sort((a, b) => (a.amountMinor ?? 0) - (b.amountMinor ?? 0));
             setBusinessPlans(normalizedPlans);
@@ -585,8 +590,7 @@ const SubscriptionStatus = () => {
         : '—';
     const statusText = effectiveSubscription.statusLabel || toTitle(statusNormalized) || 'Free';
     const paidStatus = ['active', 'trialing', 'past_due'].includes(statusNormalized);
-    const isPremiumPlan = planTierNormalized === 'premium' || planCodeNormalized?.includes('premium');
-    const canCancel = paidStatus && isPremiumPlan && effectiveSubscription.cancellable !== false;
+    const canCancel = paidStatus && effectiveSubscription.cancellable !== false;
     const showUpgrade = !canCancel;
     const shouldShowPlanSelector = isBusinessUser;
 
