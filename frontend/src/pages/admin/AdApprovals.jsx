@@ -50,12 +50,13 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 const AdApprovals = () => {
     const [ads, setAds] = useState([]);
     const [filteredAds, setFilteredAds] = useState([]);
+    const [activeAds, setActiveAds] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedOverride, setSelectedOverride] = useState({});
     const [selectedAds, setSelectedAds] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
-        reviewStatus: 'pending',
+        reviewStatus: '',
         status: '',
         tier: '',
         business: '',
@@ -129,6 +130,16 @@ const AdApprovals = () => {
         }
     }, [filters, dateRange]);
 
+    const fetchActiveAds = useCallback(async () => {
+        try {
+            const { data } = await adminListAds({ status: 'active', reviewStatus: 'approved' });
+            setActiveAds(Array.isArray(data.campaigns) ? data.campaigns : []);
+        } catch (error) {
+            console.warn('Unable to load active ads:', error);
+            setActiveAds([]);
+        }
+    }, []);
+
     // Fetch failure log
     const fetchFailureLog = useCallback(async () => {
         setFailureLoading(true);
@@ -145,7 +156,8 @@ const AdApprovals = () => {
     useEffect(() => {
         fetchAds();
         fetchFailureLog();
-    }, [fetchAds, fetchFailureLog]);
+        fetchActiveAds();
+    }, [fetchAds, fetchFailureLog, fetchActiveAds]);
 
     // Apply local filters
     const applyLocalFilters = (adsData) => {
@@ -201,10 +213,6 @@ const AdApprovals = () => {
         totalSpend: ads.reduce((sum, a) => sum + ((a.spend_minor || 0) / 100), 0)
     }), [ads]);
 
-    const activeAds = useMemo(
-        () => ads.filter((ad) => normalizeStatus(ad.status) === 'active'),
-        [ads]
-    );
 
     // Handle filter changes
     const handleFilterChange = (field) => (e) => {
@@ -326,6 +334,7 @@ const AdApprovals = () => {
             await adminPauseAd(adId);
             toast.success('Ad paused');
             fetchAds();
+            fetchActiveAds();
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to pause ad');
         }
@@ -336,6 +345,7 @@ const AdApprovals = () => {
             await adminResumeAd(adId);
             toast.success('Ad resumed');
             fetchAds();
+            fetchActiveAds();
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to resume ad');
         }
@@ -347,6 +357,7 @@ const AdApprovals = () => {
             await adminRemoveAd(adId, reason);
             toast.success('Ad removed');
             fetchAds();
+            fetchActiveAds();
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to remove ad');
         }
