@@ -5,6 +5,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import socketService from '../../services/socket';
 import api from '../../services/api';
+import { resolveMediaUrl } from '../../utils/media';
+import { FaPhoneAlt, FaVideo, FaChevronLeft } from 'react-icons/fa';
 
 const MessageThread = ({
     conversation,
@@ -308,34 +310,36 @@ const MessageThread = ({
     return (
         <div className={`message-thread ${isExpired ? 'is-expired' : ''}`} ref={threadRef}>
             <div className="thread-header">
-                <button
-                    type="button"
-                    className="thread-back-button"
-                    onClick={() => onOpenSidebar?.()}
-                    aria-label="Open conversations"
-                >
-                    Conversations
-                </button>
-                <div className="thread-participant">
+                <div className="thread-header-left">
                     <button
                         type="button"
-                        className="thread-participant-name"
-                        onClick={() => other?.id && navigate(`/users/${other.id}`)}
+                        className="thread-back-button"
+                        onClick={() => onOpenSidebar?.()}
+                        aria-label="Open conversations"
                     >
-                        {other?.display_name || 'Unknown'}
+                        <FaChevronLeft />
                     </button>
-                    {other?.role === 'psychologist' && (
-                        <span className="role-badge">
-              {other.is_verified ? 'Verified Psychologist' : 'Psychologist'}
-            </span>
-                    )}
+                    <div className="thread-participant">
+                        <button
+                            type="button"
+                            className="thread-participant-name"
+                            onClick={() => other?.id && navigate(`/users/${other.id}`)}
+                        >
+                            {other?.display_name || 'Unknown'}
+                        </button>
+                        {other?.role === 'psychologist' && (
+                            <span className="role-badge">
+                                {other.is_verified ? 'Verified Psychologist' : 'Psychologist'}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 {showCallActions && (
                     <div className="thread-actions">
                         <button
-                            className="btn btn-outline btn-small"
+                            className="thread-action-btn"
                             disabled={callDisabled}
-                            title={callDisabled ? callDisabledReason : undefined}
+                            title={callDisabled ? callDisabledReason : 'Voice call'}
                             onClick={() => {
                                 if (callDisabled) return;
                                 if (!canCall) {
@@ -344,12 +348,13 @@ const MessageThread = ({
                                 return onStartVoiceCall?.();
                             }}
                         >
-                            Voice Call
+                            <FaPhoneAlt />
+                            <span className="thread-action-label">Voice</span>
                         </button>
                         <button
-                            className="btn btn-outline btn-small"
+                            className="thread-action-btn"
                             disabled={callDisabled}
-                            title={callDisabled ? callDisabledReason : undefined}
+                            title={callDisabled ? callDisabledReason : 'Video call'}
                             onClick={() => {
                                 if (callDisabled) return;
                                 if (!canCall) {
@@ -358,19 +363,12 @@ const MessageThread = ({
                                 return onStartVideoCall?.();
                             }}
                         >
-                            Video Call
+                            <FaVideo />
+                            <span className="thread-action-label">Video</span>
                         </button>
                         <span className="thread-call-limit">
                             {callLimitText}
                         </span>
-                    </div>
-                )}
-                {callDisabled && callDisabledReason && (
-                    <div
-                        className="call-disabled-hint"
-                        style={{ fontSize: '0.8rem', color: '#dc2626', marginTop: '0.35rem' }}
-                    >
-                        {callDisabledReason}
                     </div>
                 )}
             </div>
@@ -407,7 +405,11 @@ const MessageThread = ({
                                 <div className={`message-bubble ${isOwn ? 'own' : 'other'}`}>
                                     {messageType === 'voice_note' && attachmentUrl ? (
                                         <div className="message-voice-note">
-                                            <audio controls src={attachmentUrl} preload="metadata" />
+                                            <audio
+                                                controls
+                                                src={attachmentUrl.startsWith('blob:') ? attachmentUrl : resolveMediaUrl(attachmentUrl)}
+                                                preload="metadata"
+                                            />
                                             <div className="message-voice-meta">
                                                 <span>Voice note</span>
                                                 {attachmentDuration ? (
@@ -444,14 +446,16 @@ const MessageThread = ({
                         )}
                     </div>
                     <div className="message-input-row">
-                        <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Type your message..."
-                            className="message-input"
-                            disabled={sending || isRecording}
-                        />
+                        <div className="message-input-wrapper">
+                            <input
+                                type="text"
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                placeholder="Type your message..."
+                                className="message-input"
+                                disabled={sending || isRecording}
+                            />
+                        </div>
                         <button
                             type="button"
                             className={`message-mic-btn ${isRecording ? 'recording' : ''}`}
@@ -471,7 +475,7 @@ const MessageThread = ({
                         <button
                             type="submit"
                             disabled={!newMessage.trim() || sending}
-                            className="btn btn-primary"
+                            className="send-btn"
                         >
                             {sending ? 'Sending...' : 'Send'}
                         </button>

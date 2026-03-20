@@ -650,14 +650,14 @@
   /* Notification menu on mobile */
   .notification-menu {
     position: fixed;
-    top: 58px;
-    right: 8px;
-    left: auto;
-    width: min(80vw, 320px);
-    max-width: 80vw;
-    border-radius: 16px;
-    max-height: 50vh;
-    padding: 16px;
+    top: 56px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: calc(100vw - 24px);
+    border-radius: 14px;
+    max-height: 40vh;
+    padding: 12px;
     animation: none;
     z-index: 2000;
   }
@@ -677,8 +677,9 @@
     max-width: 100%;
     margin-top: 12px;
     border-radius: 16px;
-    max-height: 50vh;
+    max-height: 40vh;
     overflow-y: auto;
+    padding: 12px;
   }
 
   @keyframes slideUp {

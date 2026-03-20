@@ -8,7 +8,7 @@ import AvatarImage from '../components/common/AvatarImage';
 import ProfileSettings from '../components/settings/ProfileSettings';
 import AdvertisingSection from '../components/ads/AdvertisingSection';
 import { resolveMediaUrl } from '../utils/media';
-import { getPlanKey, getPlanPermissions } from '../utils/subscriptionAccess';
+import { getPlanKey, getPlanPermissions, requirePaidBusinessOrRedirect } from '../utils/subscriptionAccess';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
     FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo,
@@ -25,6 +25,7 @@ import {
     addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format,
     isSameDay, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks
 } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 const BUSINESS_PIE_COLORS = ['#6366f1', '#f59e0b', '#0ea5e9', '#10b981', '#ec4899'];
 
@@ -385,6 +386,7 @@ const ChartTooltip = ({ active, payload, label }) => {
 ───────────────────────────────────────────── */
 const Dashboard = () => {
     const { user, refreshUser } = useAuth();
+    const navigate = useNavigate();
     const normalizedEmail = (user?.email || '').toLowerCase();
     const premiumExceptionActive = normalizedEmail === 'omphilemohlala@welp.com';
     const subscription = user?.subscription;
@@ -469,9 +471,10 @@ const Dashboard = () => {
 
     useEffect(() => {
         if (activeTab === 'ads' && !advertisingUnlocked) {
+            requirePaidBusinessOrRedirect(navigate, user, 'advertising');
             setActiveTab('reviews');
         }
-    }, [activeTab, advertisingUnlocked]);
+    }, [activeTab, advertisingUnlocked, navigate, user]);
 
     /* ── Helpers ── */
     const formatDuration = (seconds = 0) => {
@@ -1329,9 +1332,14 @@ const Dashboard = () => {
                             </button>
                             <button
                                 className={`tab-btn ${activeTab === 'ads' ? 'active' : ''} ${!advertisingUnlocked ? 'tab-btn--locked' : ''}`}
-                                onClick={() => advertisingUnlocked && setActiveTab('ads')}
-                                disabled={!advertisingUnlocked}
-                                title={!advertisingUnlocked ? 'Available on subscription plans' : undefined}
+                                onClick={() => {
+                                    if (advertisingUnlocked) {
+                                        setActiveTab('ads');
+                                    } else {
+                                        requirePaidBusinessOrRedirect(navigate, user, 'advertising');
+                                    }
+                                }}
+                                title={!advertisingUnlocked ? 'Upgrade required for advertising' : undefined}
                             >
                                 Advertising
                                 {!advertisingUnlocked && <span className="tab-btn__lock">Locked</span>}

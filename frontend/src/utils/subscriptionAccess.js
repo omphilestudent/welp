@@ -135,4 +135,26 @@ export const isBusinessPlan = (user) => {
     return key.startsWith('business_');
 };
 
+export const isFreeTierBusiness = (user) => getPlanKey(user) === 'business_free_tier';
+
+export const businessHasPremiumAccess = (user) => {
+    if (!user || user.role !== 'business') return false;
+    return !isFreeTierBusiness(user);
+};
+
+export const getPricingRedirectTarget = (feature) => {
+    if (!feature) return '/pricing';
+    return `/pricing?from=${encodeURIComponent(feature)}`;
+};
+
+export const requirePaidBusinessOrRedirect = (navigate, user, feature) => {
+    if (!navigate) return false;
+    if (!user || user.role !== 'business') return true;
+    if (isFreeTierBusiness(user)) {
+        navigate(getPricingRedirectTarget(feature || 'premium'), { replace: false });
+        return false;
+    }
+    return true;
+};
+
 export { PLAN_PERMISSIONS };
