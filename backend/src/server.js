@@ -50,6 +50,7 @@ const { initMarketingTables, startMarketingScheduler } = require('./services/mar
 const { startScheduler: startMarketingCampaignScheduler } = require('./modules/marketing/marketing.scheduler');
 const { initEmailMarketingTables, startEmailCampaignScheduler } = require('./services/emailMarketingService');
 const { startDailyReviewReminderScheduler } = require('./services/dailyReviewReminderService');
+const { startAdInvoiceScheduler } = require('./services/adInvoiceService');
 const { query } = require('./utils/database');
 const { createUserNotification } = require('./utils/userNotifications');
 const { getActiveSubscription, getPlanPayload } = require('./services/subscriptionService');
@@ -783,6 +784,7 @@ const startServer = async () => {
                 startMarketingCampaignScheduler();
                 startEmailCampaignScheduler();
                 startDailyReviewReminderScheduler();
+                startAdInvoiceScheduler();
             } catch (error) {
                 console.warn('⚠️ Marketing scheduler init failure:', error.message);
             }

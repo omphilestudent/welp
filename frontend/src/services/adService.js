@@ -6,6 +6,11 @@ const ADMIN_BASE = `${ADS_BASE}/admin`;
 export const listCampaigns = (params = {}) => api.get(ADS_BASE, { params });
 
 export const getMyCampaigns = () => api.get(`${ADS_BASE}/me`);
+export const getAdPricing = () => api.get(`${ADS_BASE}/pricing`);
+export const getMyAdInvoices = () => api.get(`${ADS_BASE}/invoices`);
+export const downloadAdInvoice = (invoiceId) => api.get(`${ADS_BASE}/invoices/${invoiceId}/download`, {
+    responseType: 'blob'
+});
 
 export const createCampaign = (formData) =>
     api.post(ADS_BASE, formData, {
@@ -58,6 +63,7 @@ export const adminListAdFailures = (params = {}) =>
 export const adminPauseAd = (campaignId) => api.post(`${ADMIN_BASE}/${campaignId}/pause`);
 
 export const adminResumeAd = (campaignId) => api.post(`${ADMIN_BASE}/${campaignId}/resume`);
+export const adminRemoveAd = (campaignId, reason) => api.post(`${ADMIN_BASE}/${campaignId}/remove`, { reason });
 
 export const adminFeatureAd = (campaignId, featured = true) =>
     api.post(`${ADMIN_BASE}/${campaignId}/feature`, { featured });

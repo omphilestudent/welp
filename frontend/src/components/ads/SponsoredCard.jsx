@@ -11,10 +11,12 @@ const SponsoredCard = ({
     rotateIntervalMs = 45000
 }) => {
     const [activeIndex, setActiveIndex] = useState(0);
+    const [mediaIndex, setMediaIndex] = useState(0);
     const { campaigns, loading } = usePlacementAds({ placement, location, industry, behaviors });
 
     useEffect(() => {
         setActiveIndex(0);
+        setMediaIndex(0);
     }, [campaigns]);
 
     useEffect(() => {
@@ -26,6 +28,23 @@ const SponsoredCard = ({
     }, [campaigns, rotateIntervalMs]);
 
     const campaign = campaigns[activeIndex] || null;
+
+    const mediaItems = useMemo(() => {
+        if (!campaign) return [];
+        if (Array.isArray(campaign.images) && campaign.images.length) {
+            return campaign.images;
+        }
+        return [{ asset_url: campaign.asset_url, media_type: campaign.media_type, alt_text: campaign.name }];
+    }, [campaign]);
+
+    useEffect(() => {
+        setMediaIndex(0);
+        if (mediaItems.length <= 1) return undefined;
+        const interval = setInterval(() => {
+            setMediaIndex((prev) => (prev + 1) % mediaItems.length);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [mediaItems]);
 
     useEffect(() => {
         if (!campaign) return;
@@ -52,12 +71,13 @@ const SponsoredCard = ({
     };
 
     const mediaNode = useMemo(() => {
-        if (!campaign) return null;
-        if (campaign.media_type === 'video') {
+        if (!campaign || !mediaItems.length) return null;
+        const media = mediaItems[mediaIndex] || mediaItems[0];
+        if (media.media_type === 'video') {
             return (
                 <video
                     className="sponsored-media"
-                    src={campaign.asset_url}
+                    src={media.asset_url}
                     controls
                     muted
                     loop
@@ -68,17 +88,17 @@ const SponsoredCard = ({
         return (
             <img
                 className="sponsored-media"
-                src={campaign.asset_url}
-                alt={campaign.name}
+                src={media.asset_url}
+                alt={media.alt_text || campaign.name}
                 loading="lazy"
             />
         );
-    }, [campaign]);
+    }, [campaign, mediaItems, mediaIndex]);
 
     if (loading || !campaign) return null;
 
     return (
-        <article className="sponsored-card" onClick={handleClick}>
+        <article className="sponsored-card sponsored-card--fade" onClick={handleClick}>
             {mediaNode}
             <div className="sponsored-card__content">
                 <span className="sponsored-card__badge">Sponsored</span>

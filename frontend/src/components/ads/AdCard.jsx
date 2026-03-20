@@ -24,6 +24,9 @@ const formatDate = (value) => {
 const AdCard = ({ ad, onEdit, onDelete }) => {
     const ctr = ad.ctr ?? (ad.impressions > 0 ? Number(((ad.clicks / ad.impressions) * 100).toFixed(2)) : 0);
     const spend = ad.spend_minor ? ad.spend_minor / 100 : Number(ad.spendMajor || 0);
+    const startsAt = ad.starts_at ? formatDate(ad.starts_at) : '—';
+    const endsAt = ad.ends_at ? formatDate(ad.ends_at) : '—';
+    const imageCount = Array.isArray(ad.images) ? ad.images.length : 0;
 
     return (
         <article className="ad-card">
@@ -60,6 +63,16 @@ const AdCard = ({ ad, onEdit, onDelete }) => {
             <div className="ad-card__placements">
                 <span>Placements:</span>
                 <strong>{ad.placements?.map((item) => item.placement).join(', ') || '—'}</strong>
+            </div>
+            <div className="ad-card__placements">
+                <span>Window:</span>
+                <strong>{startsAt} → {endsAt}</strong>
+            </div>
+            <div className="ad-card__placements">
+                <span>Priority:</span>
+                <strong>{ad.priority_level || 1}</strong>
+                <span>Images:</span>
+                <strong>{imageCount}</strong>
             </div>
             <footer className="ad-card__footer">
                 <div className="ad-card__notes">

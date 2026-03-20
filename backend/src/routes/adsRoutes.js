@@ -11,7 +11,7 @@ const MAX_MEDIA_BYTES = Number(process.env.AD_MEDIA_MAX_BYTES || 15 * 1024 * 102
 const MAX_MEDIA_MB = Math.max(1, Math.round(MAX_MEDIA_BYTES / (1024 * 1024)));
 
 const handleMediaUpload = (req, res, next) => {
-    upload.single('media')(req, res, async (err) => {
+    upload.array('media', 6)(req, res, async (err) => {
         if (!err) return next();
 
         let responseMessage = 'Failed to process media upload';
@@ -51,6 +51,7 @@ const handleMediaUpload = (req, res, next) => {
 
 // ==================== PUBLIC ROUTES ====================
 router.get('/', adsController.listCampaigns);
+router.get('/pricing', adsController.getAdPricing);
 router.get('/placement', adsController.getPlacementAds);
 router.post('/:id/impression', adsController.recordImpression);
 router.post('/:id/click', adsController.recordClick);
@@ -75,6 +76,7 @@ router.post('/admin/bulk-reject', adminAuth, adsController.adminBulkReject);
 
 router.post('/admin/:id/pause', adminAuth, adsController.adminPauseCampaign);
 router.post('/admin/:id/resume', adminAuth, adsController.adminResumeCampaign);
+router.post('/admin/:id/remove', adminAuth, adsController.adminRemoveCampaign);
 router.post('/admin/:id/feature', adminAuth, adsController.adminFeatureCampaign);
 router.delete('/admin/:id', adminAuth, adsController.adminDeleteCampaign);
 
@@ -83,6 +85,8 @@ router.get('/admin/export/report', adminAuth, adsController.adminGenerateReport)
 router.get('/admin/:id/audit', adminAuth, adsController.adminGetAuditLog);
 
 router.get('/me', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.listMyCampaigns);
+router.get('/invoices', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.listMyInvoices);
+router.get('/invoices/:id/download', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.downloadInvoice);
 router.post('/', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), handleMediaUpload, adsController.createCampaign);
 router.put('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), handleMediaUpload, adsController.updateCampaign);
 router.delete('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.deleteCampaign);

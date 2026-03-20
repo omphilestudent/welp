@@ -175,11 +175,17 @@ video {
 
 .ads-rail {
     padding: 2rem 0;
+    animation: adsFade 0.35s ease;
 }
 
 .ads-rail__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 1.5rem;
+}
+
+@keyframes adsFade {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 

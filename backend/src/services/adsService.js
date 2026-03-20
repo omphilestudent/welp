@@ -7,12 +7,34 @@ const ACCEPTED_MEDIA_TYPES = ['image', 'video', 'gif'];
 const AD_SCHEMA_TTL_MS = 5 * 60 * 1000;
 let businessTableAvailable = true;
 
+const AD_PRICING = {
+    placements: {
+        business_profile: 5000,
+        search_results: 7500,
+        category: 6500,
+        recommended: 9000
+    },
+    options: {
+        standard: 1,
+        spotlight: 1.2
+    }
+};
+
+const PRIORITY_MULTIPLIERS = {
+    1: 1,
+    2: 1.5,
+    3: 2
+};
+
+const MAX_ROTATION_POOL = 6;
+
 let cachedAdSchema = null;
 let adTableMetadata = {
     checked: false,
     businesses: false,
     companies: false,
     placements: false,
+    images: false,
     businessCols: {
         name: false,
         ownerUserId: false,
@@ -181,6 +203,7 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
                  to_regclass('public.businesses') IS NOT NULL AS has_businesses,
                  to_regclass('public.companies') IS NOT NULL AS has_companies,
                  to_regclass('public.ad_placements') IS NOT NULL AS has_ad_placements,
+                 to_regclass('public.ad_images') IS NOT NULL AS has_ad_images,
                  EXISTS (
                      SELECT 1 FROM information_schema.columns
                      WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'name'
@@ -216,6 +239,7 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
             businesses: rows[0]?.has_businesses === true,
             companies: rows[0]?.has_companies === true,
             placements: rows[0]?.has_ad_placements === true,
+            images: rows[0]?.has_ad_images === true,
             businessCols: {
                 name: rows[0]?.businesses_has_name === true,
                 ownerUserId: rows[0]?.businesses_has_owner_user_id === true,
@@ -236,6 +260,7 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
             businesses: false,
             companies: false,
             placements: false,
+            images: false,
             businessCols: {
                 name: false,
                 ownerUserId: false,
@@ -426,15 +451,87 @@ const buildBehaviorFilter = (filters, params, behaviors = []) => {
     )`);
 };
 
+const getPriorityMultiplier = (level) => {
+    const numeric = Number(level);
+    if (Number.isNaN(numeric)) return 1;
+    return PRIORITY_MULTIPLIERS[numeric] || 1;
+};
+
+const getAdBasePrice = (placement, option = 'standard') => {
+    const base = AD_PRICING.placements[placement] || AD_PRICING.placements.business_profile;
+    const optionMultiplier = AD_PRICING.options[option] || 1;
+    return Math.round(base * optionMultiplier);
+};
+
+const getAdChargeBreakdown = ({ placement, adOption, priorityLevel }) => {
+    const basePrice = getAdBasePrice(placement, adOption);
+    const priorityMultiplier = getPriorityMultiplier(priorityLevel);
+    const total = Math.round(basePrice * priorityMultiplier);
+    const prioritySurcharge = Math.max(0, total - basePrice);
+    return {
+        basePriceMinor: basePrice,
+        prioritySurchargeMinor: prioritySurcharge,
+        totalMinor: total,
+        priorityMultiplier
+    };
+};
+
+const getAdPricingCatalog = () => ({
+    placements: AD_PRICING.placements,
+    options: AD_PRICING.options,
+    priorityMultipliers: PRIORITY_MULTIPLIERS
+});
+
+const campaignWeight = (campaign) => {
+    const placementWeight = Array.isArray(campaign.placements) && campaign.placements.length
+        ? Math.max(...campaign.placements.map((entry) => Number(entry.weight || 1)))
+        : 1;
+    const priority = getPriorityMultiplier(campaign.priority_level || 1);
+    return Math.max(1, placementWeight) * priority;
+};
+
+const chooseWeightedCampaigns = (campaigns, limit = MAX_ROTATION_POOL) => {
+    const pool = [...campaigns];
+    const picks = [];
+    while (pool.length && picks.length < limit) {
+        const totalWeight = pool.reduce((sum, campaign) => sum + campaignWeight(campaign), 0);
+        let threshold = Math.random() * totalWeight;
+        let index = 0;
+        for (; index < pool.length; index += 1) {
+            threshold -= campaignWeight(pool[index]);
+            if (threshold <= 0) break;
+        }
+        const chosen = pool.splice(Math.min(index, pool.length - 1), 1)[0];
+        if (chosen) picks.push(chosen);
+    }
+    return picks;
+};
+
+const uniqueByBusiness = (campaigns) => {
+    const seen = new Set();
+    return campaigns.filter((campaign) => {
+        const key = campaign.business_id || campaign.businessId || campaign.company_id || campaign.companyId;
+        if (!key) return true;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+};
+
 const fetchPlacementCampaigns = async ({ placement, location, industry, behaviors = [] }) => {
     const schema = await ensureAdSchema();
     const tables = await ensureAdTableMetadata();
+    await expireElapsedCampaigns();
 
     const filters = ["c.status = 'active'"];
 
     if (schema.hasReviewStatus) {
         filters.push("c.review_status = 'approved'");
     }
+
+    filters.push('(c.starts_at IS NULL OR c.starts_at <= NOW())');
+    filters.push('(c.ends_at IS NULL OR c.ends_at >= NOW())');
+    filters.push('c.removed_at IS NULL');
 
     const params = [];
 
@@ -461,6 +558,27 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
             ) AS ${placementsAlias}`
         : `, '[]'::jsonb AS ${placementsAlias}`;
 
+    const imagesColumn = tables.images
+        ? `,
+            (
+                SELECT COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'id', ai.id,
+                            'asset_url', ai.asset_url,
+                            'media_type', ai.media_type,
+                            'display_order', ai.display_order,
+                            'alt_text', ai.alt_text
+                        )
+                        ORDER BY ai.display_order ASC, ai.created_at ASC
+                    ),
+                    '[]'::jsonb
+                )
+                FROM ad_images ai
+                WHERE ai.campaign_id = c.id AND ai.is_active = true
+            ) AS images`
+        : `, '[]'::jsonb AS images`;
+
     const placementsOrderBy = tables.placements
         ? `(SELECT COALESCE(MAX(ap.weight), 0) FROM ad_placements ap WHERE ap.campaign_id = c.id) DESC,`
         : '';
@@ -469,7 +587,7 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
         const result = await query(
             `
             SELECT
-                c.*${reviewColumn}${spendColumn}${bidRateColumn}${overrideColumn}${placementsColumn}
+                c.*${reviewColumn}${spendColumn}${bidRateColumn}${overrideColumn}${placementsColumn}${imagesColumn}
             FROM advertising_campaigns c
             ${whereClause}
             ORDER BY ${placementsOrderBy}
@@ -482,7 +600,8 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
 
         return result.rows.map((row) => ({
             ...row,
-            placements: row.placements ?? row.placements_agg ?? []
+            placements: row.placements ?? row.placements_agg ?? [],
+            images: row.images ?? []
         }));
     } catch (error) {
         console.error('Error fetching placement campaigns:', error);
@@ -600,6 +719,21 @@ const countActiveCampaigns = async (businessId) => {
     } catch (error) {
         console.error('Error counting active campaigns:', error);
         return 0;
+    }
+};
+
+const expireElapsedCampaigns = async () => {
+    try {
+        await query(
+            `UPDATE advertising_campaigns
+             SET status = 'expired',
+                 updated_at = NOW()
+             WHERE status IN ('active','paused')
+               AND ends_at IS NOT NULL
+               AND ends_at < NOW()`
+        );
+    } catch (error) {
+        console.warn('Unable to expire campaigns:', error.message);
     }
 };
 
@@ -807,6 +941,25 @@ const adminGetAdDetails = async (adId, options = {}) => {
         const spendMinorSelect = schema.hasSpendMinor ? 'COALESCE(c.spend_minor, 0)' : '0::bigint';
         const bidRateMinorSelect = schema.hasBidRateMinor ? 'COALESCE(c.bid_rate_minor, 0)' : '0::bigint';
         const overrideSelect = schema.hasOverride ? 'COALESCE(c.override_restrictions, false)' : 'false';
+        const imagesSelect = tables.images
+            ? `(
+                        SELECT COALESCE(
+                            jsonb_agg(
+                                jsonb_build_object(
+                                    'id', ai.id,
+                                    'asset_url', ai.asset_url,
+                                    'media_type', ai.media_type,
+                                    'display_order', ai.display_order,
+                                    'alt_text', ai.alt_text
+                                )
+                                ORDER BY ai.display_order ASC, ai.created_at ASC
+                            ),
+                            '[]'::jsonb
+                        )
+                        FROM ad_images ai
+                        WHERE ai.campaign_id = c.id AND ai.is_active = true
+                    )`
+            : `'[]'::jsonb`;
 
         const ownerPhoneField = await getOwnerPhoneField();
         const ownerPhoneExpr = ownerPhoneField ? `owner.${ownerPhoneField}` : 'NULL';
@@ -833,6 +986,7 @@ const adminGetAdDetails = async (adId, options = {}) => {
                     ${spendMinorSelect} AS spend_minor,
                     ${bidRateMinorSelect} AS bid_rate_minor,
                     ${overrideSelect} AS override_restrictions,
+                    ${imagesSelect} AS images,
                     ${reviewedBySelect} AS reviewed_by,
                     ${reviewedAtSelect} AS reviewed_at,
                     ${reviewNotesSelect} AS review_notes,
@@ -1261,6 +1415,54 @@ const adminResumeAd = async (adId, adminId) => {
 };
 
 /**
+ * Remove an active ad
+ */
+const adminRemoveAd = async ({ adId, adminId, reason = null }) => {
+    try {
+        const ad = await adminGetAdDetails(adId);
+
+        if (!ad) {
+            throw new Error('Ad not found');
+        }
+
+        const result = await query(
+            `
+            UPDATE advertising_campaigns
+            SET 
+                status = 'removed',
+                removed_at = NOW(),
+                removed_by = $2,
+                removal_reason = $3,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [adId, adminId, reason]
+        );
+
+        await logAdminAction({
+            adminId,
+            action: 'REMOVE_AD',
+            targetId: adId,
+            targetType: 'ad',
+            details: { reason }
+        });
+
+        if (ad.business_id) {
+            await notifyBusinessOwner(ad.business_id, 'ad_removed', {
+                adName: ad.name,
+                reason
+            });
+        }
+
+        return result.rows[0];
+    } catch (error) {
+        console.error('Error removing ad:', error);
+        throw error;
+    }
+};
+
+/**
  * Get ad review statistics
  */
 const adminGetAdStats = async (days = 30) => {
@@ -1425,7 +1627,8 @@ const getNotificationTitle = (type) => {
         ad_approved: 'Your Ad Has Been Approved',
         ad_rejected: 'Your Ad Was Rejected',
         ad_paused: 'Your Ad Has Been Paused',
-        ad_resumed: 'Your Ad Has Been Resumed'
+        ad_resumed: 'Your Ad Has Been Resumed',
+        ad_removed: 'Your Ad Was Removed'
     };
     return titles[type] || 'Ad Status Update';
 };
@@ -1435,7 +1638,8 @@ const getNotificationMessage = (type, data) => {
         ad_approved: `Your ad "${data.adName}" has been approved and is now live.`,
         ad_rejected: `Your ad "${data.adName}" was rejected. Reason: ${data.reason}`,
         ad_paused: `Your ad "${data.adName}" has been paused by an administrator.`,
-        ad_resumed: `Your ad "${data.adName}" has been resumed.`
+        ad_resumed: `Your ad "${data.adName}" has been resumed.`,
+        ad_removed: `Your ad "${data.adName}" has been removed. ${data.reason ? `Reason: ${data.reason}` : ''}`
     };
     return messages[type] || 'Your ad status has been updated.';
 };
@@ -1508,6 +1712,11 @@ module.exports = {
     upsertPlacements,
     validateMediaType,
     fetchPlacementCampaigns,
+    getAdChargeBreakdown,
+    getAdPricingCatalog,
+    chooseWeightedCampaigns,
+    uniqueByBusiness,
+    expireElapsedCampaigns,
     getBusinessAdCapabilities,
     countActiveCampaigns,
     formatAnalyticsForTier,
@@ -1524,6 +1733,7 @@ module.exports = {
     adminBulkRejectAds,
     adminPauseAd,
     adminResumeAd,
+    adminRemoveAd,
     adminGetAdStats,
     logAdminAction
 };

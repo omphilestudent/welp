@@ -377,6 +377,11 @@ CREATE TABLE IF NOT EXISTS advertising_campaigns (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
+    campaign_name VARCHAR(255),
+    ad_option VARCHAR(32) DEFAULT 'standard',
+    placement_type VARCHAR(32),
+    priority_level INT DEFAULT 1,
+    priority_multiplier NUMERIC(6,2) DEFAULT 1.0,
     media_type media_type NOT NULL DEFAULT 'image',
     asset_url TEXT NOT NULL,
     thumbnail_url TEXT,
@@ -388,7 +393,7 @@ CREATE TABLE IF NOT EXISTS advertising_campaigns (
     bid_type VARCHAR(16) DEFAULT 'cpc',
     bid_rate_minor BIGINT DEFAULT 0,
     spend_minor BIGINT DEFAULT 0,
-    status VARCHAR(32) DEFAULT 'draft' CHECK (status IN ('draft','pending_review','active','paused','completed','rejected')),
+    status VARCHAR(32) DEFAULT 'draft' CHECK (status IN ('draft','pending_review','active','paused','completed','rejected','expired','removed')),
     review_status ad_review_status DEFAULT 'pending',
     submitted_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     reviewed_at TIMESTAMP WITH TIME ZONE,
@@ -397,8 +402,26 @@ CREATE TABLE IF NOT EXISTS advertising_campaigns (
     override_restrictions BOOLEAN DEFAULT false,
     impressions INT DEFAULT 0,
     clicks INT DEFAULT 0,
+    starts_at TIMESTAMP WITH TIME ZONE,
+    ends_at TIMESTAMP WITH TIME ZONE,
+    removed_at TIMESTAMP WITH TIME ZONE,
+    removed_by UUID REFERENCES users(id),
+    removal_reason TEXT,
+    billing_cycle_anchor TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    last_invoiced_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ad_images (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    campaign_id UUID NOT NULL REFERENCES advertising_campaigns(id) ON DELETE CASCADE,
+    asset_url TEXT NOT NULL,
+    media_type media_type NOT NULL DEFAULT 'image',
+    display_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    alt_text TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS ad_placements (
@@ -406,6 +429,31 @@ CREATE TABLE IF NOT EXISTS ad_placements (
     campaign_id UUID NOT NULL REFERENCES advertising_campaigns(id) ON DELETE CASCADE,
     placement VARCHAR(32) NOT NULL CHECK (placement IN ('business_profile','search_results','category','recommended')),
     weight INT DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ad_invoices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    invoice_number VARCHAR(64) NOT NULL,
+    period_start TIMESTAMP WITH TIME ZONE NOT NULL,
+    period_end TIMESTAMP WITH TIME ZONE NOT NULL,
+    status VARCHAR(24) DEFAULT 'issued',
+    subtotal_minor BIGINT DEFAULT 0,
+    total_minor BIGINT DEFAULT 0,
+    invoice_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ad_invoice_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    invoice_id UUID NOT NULL REFERENCES ad_invoices(id) ON DELETE CASCADE,
+    campaign_id UUID REFERENCES advertising_campaigns(id) ON DELETE SET NULL,
+    description TEXT NOT NULL,
+    placement VARCHAR(32),
+    base_price_minor BIGINT DEFAULT 0,
+    priority_surcharge_minor BIGINT DEFAULT 0,
+    total_minor BIGINT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 

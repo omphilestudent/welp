@@ -6,6 +6,10 @@ const {
     getBusinessIdForUser,
     upsertPlacements,
     fetchPlacementCampaigns,
+    chooseWeightedCampaigns,
+    uniqueByBusiness,
+    expireElapsedCampaigns,
+    getAdChargeBreakdown,
     getBusinessAdCapabilities,
     countActiveCampaigns,
     formatAnalyticsForTier,
@@ -18,6 +22,8 @@ const {
     adminBulkRejectAds,
     adminPauseAd,
     adminResumeAd,
+    adminRemoveAd,
+    getAdPricingCatalog,
     adminGetAdStats,
     logAdminAction,
     logAdFailure,
@@ -25,6 +31,11 @@ const {
 } = require('../services/adsService');
 const { recordAuditLog } = require('../utils/auditLogger');
 const { hasPremiumException } = require('../utils/premiumAccess');
+const {
+    listBusinessInvoices,
+    getInvoiceWithItems,
+    generateInvoiceDocument
+} = require('../services/adInvoiceService');
 
 const AD_ASSET_FOLDER = path.join(__dirname, '../../uploads/ads');
 fs.mkdirSync(AD_ASSET_FOLDER, { recursive: true });
@@ -44,7 +55,7 @@ const tableExists = async (tableName) => {
     }
 };
 
-const VALID_STATUSES = ['draft', 'active', 'paused', 'completed'];
+const VALID_STATUSES = ['draft', 'active', 'paused', 'completed', 'expired', 'removed'];
 const VALID_BID_TYPES = ['cpc', 'cpm'];
 let adImpressionsTableReady = false;
 let featureColumnReady = false;
@@ -186,6 +197,13 @@ const parseBehaviors = (value) => {
     return [];
 };
 
+const parseTimestamp = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+};
+
 const calculateBudgetMinor = (value) => {
     if (!value) return null;
     const parsed = Number(value);
@@ -212,8 +230,10 @@ const createCampaign = async (req, res) => {
         const validationIssues = [];
         const placements = parsePlacements(req.body.placements);
         const campaignName = String(req.body.name || req.body.campaignName || '').trim();
-        const hasUploadedMedia = Boolean(req.file);
+        const mediaFiles = Array.isArray(req.files) ? req.files : req.file ? [req.file] : [];
+        const hasUploadedMedia = mediaFiles.length > 0;
         const providedMediaUrl = req.body.asset_url || req.body.media_url || null;
+        const providedMediaUrls = req.body.media_urls || req.body.mediaUrls || null;
 
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -236,13 +256,19 @@ const createCampaign = async (req, res) => {
                 `Unsupported placements: ${invalidPlacements.map((entry) => entry.placement).join(', ')}`
             );
         }
-        if (!hasUploadedMedia && !providedMediaUrl) {
+        if (!hasUploadedMedia && !providedMediaUrl && !providedMediaUrls) {
             validationIssues.push('Upload a media file to submit your campaign');
         }
 
         const dailyBudgetMinor = resolveMinorAmount(req.body.dailyBudget, req.body.dailyBudgetMinor);
         if (!Number.isFinite(dailyBudgetMinor) || dailyBudgetMinor <= 0) {
             validationIssues.push('Daily budget must be greater than 0');
+        }
+
+        const startsAt = parseTimestamp(req.body.startsAt || req.body.starts_at);
+        const endsAt = parseTimestamp(req.body.endsAt || req.body.ends_at);
+        if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) {
+            validationIssues.push('End date must be after the start date');
         }
 
         if (validationIssues.length) {
@@ -304,15 +330,44 @@ const createCampaign = async (req, res) => {
 
         let mediaType = req.body.media_type || req.body.mediaType;
         let assetUrl = providedMediaUrl;
-        if (req.file) {
-            const ext = path.extname(req.file.originalname).toLowerCase();
+        const uploadedAssets = [];
+        if (mediaFiles.length) {
+            for (const file of mediaFiles) {
+                const ext = path.extname(file.originalname).toLowerCase();
+                const inferredType = EXTENSION_TYPE_MAP[ext];
+                if (!mediaType || EXTENSION_TYPE_MAP[ext] !== mediaType) {
+                    mediaType = inferredType;
+                }
+                uploadedAssets.push(buildAssetUrl(req, file.filename));
+            }
+        }
+        if (providedMediaUrls) {
+            try {
+                const parsed = typeof providedMediaUrls === 'string' ? JSON.parse(providedMediaUrls) : providedMediaUrls;
+                if (Array.isArray(parsed)) {
+                    parsed.filter(Boolean).forEach((url) => uploadedAssets.push(url));
+                }
+            } catch {
+                String(providedMediaUrls)
+                    .split(',')
+                    .map((val) => val.trim())
+                    .filter(Boolean)
+                    .forEach((url) => uploadedAssets.push(url));
+            }
+        } else if (providedMediaUrl) {
+            uploadedAssets.push(providedMediaUrl);
+        }
+
+        if (mediaFiles.length) {
+            const ext = path.extname(mediaFiles[0].originalname).toLowerCase();
             const inferredType = EXTENSION_TYPE_MAP[ext];
             mediaType = mediaType || inferredType;
             if (!mediaType || EXTENSION_TYPE_MAP[ext] !== mediaType) {
                 return res.status(400).json({ success: false, error: 'Media type does not match file extension' });
             }
-            assetUrl = buildAssetUrl(req, req.file.filename);
         }
+
+        assetUrl = uploadedAssets[0] || assetUrl;
 
         const targetLocations = parseList(req.body.targetLocations);
         const targetIndustries = parseList(req.body.targetIndustries);
@@ -320,6 +375,9 @@ const createCampaign = async (req, res) => {
         const bidRateMinor = resolveMinorAmount(req.body.bidRate, req.body.bidRateMinor) || 0;
         const bidType = VALID_BID_TYPES.includes(req.body.bid_type) ? req.body.bid_type : 'cpc';
         const thumbnailUrl = req.body.thumbnailUrl || assetUrl;
+        const priorityLevel = Math.min(3, Math.max(1, parseInt(req.body.priorityLevel || req.body.priority_level || 1, 10)));
+        const priorityMultiplier = priorityLevel === 3 ? 2 : priorityLevel === 2 ? 1.5 : 1;
+        const adOption = String(req.body.adOption || req.body.ad_option || 'standard');
         const statusValue = 'pending_review';
         const reviewStatusValue = 'pending';
         const submittedAt = new Date();
@@ -354,9 +412,14 @@ const createCampaign = async (req, res) => {
                 bid_rate_minor,
                 status,
                 review_status,
-                submitted_at
+                submitted_at,
+                starts_at,
+                ends_at,
+                priority_level,
+                priority_multiplier,
+                ad_option
             ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
             ) RETURNING *`,
             [
                 businessId,
@@ -373,14 +436,38 @@ const createCampaign = async (req, res) => {
                 bidRateMinor,
                 statusValue,
                 reviewStatusValue,
-                submittedAt
+                submittedAt,
+                startsAt,
+                endsAt,
+                priorityLevel,
+                priorityMultiplier,
+                adOption
             ]
         );
 
         const campaign = rows[0];
         await upsertPlacements(campaign.id, sanitizedPlacements);
 
+        if (uploadedAssets.length) {
+            const imageValues = [];
+            const imageParams = [];
+            uploadedAssets.forEach((url, index) => {
+                imageParams.push(campaign.id, url, mediaType || 'image', index);
+                imageValues.push(`($${imageParams.length - 3}, $${imageParams.length - 2}, $${imageParams.length - 1}, $${imageParams.length})`);
+            });
+            await query(
+                `INSERT INTO ad_images (campaign_id, asset_url, media_type, display_order)
+                 VALUES ${imageValues.join(', ')}`,
+                imageParams
+            );
+        }
+
         campaign.placements = sanitizedPlacements;
+        campaign.images = uploadedAssets.map((url, index) => ({
+            asset_url: url,
+            media_type: mediaType || 'image',
+            display_order: index
+        }));
 
         await recordAuditLog({
             userId: req.user.id,
@@ -436,6 +523,7 @@ const createCampaign = async (req, res) => {
 };
 
 const buildCampaignsQuery = async (filters = [], params = [], options = {}) => {
+    await expireElapsedCampaigns();
     await ensureAdCampaignSchema();
     if (!options.includeAllStatuses) {
         filters.push(`c.review_status = 'approved'`);
@@ -449,7 +537,24 @@ const buildCampaignsQuery = async (filters = [], params = [], options = {}) => {
                 SELECT jsonb_agg(jsonb_build_object('placement', ap.placement, 'weight', ap.weight))
                 FROM ad_placements ap
                 WHERE ap.campaign_id = c.id
-            ) AS placements
+            ) AS placements,
+            (
+                SELECT COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'id', ai.id,
+                            'asset_url', ai.asset_url,
+                            'media_type', ai.media_type,
+                            'display_order', ai.display_order,
+                            'alt_text', ai.alt_text
+                        )
+                        ORDER BY ai.display_order ASC, ai.created_at ASC
+                    ),
+                    '[]'::jsonb
+                )
+                FROM ad_images ai
+                WHERE ai.campaign_id = c.id AND ai.is_active = true
+            ) AS images
         FROM advertising_campaigns c
         ${whereClause}
         ORDER BY c.created_at DESC
@@ -487,6 +592,14 @@ const listCampaigns = async (req, res) => {
     } catch (error) {
         console.error('List campaigns error:', error);
         return res.status(500).json({ success: false, error: 'Unable to list campaigns' });
+    }
+};
+
+const getAdPricing = (req, res) => {
+    try {
+        return res.json({ success: true, pricing: getAdPricingCatalog() });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: 'Unable to load pricing' });
     }
 };
 
@@ -545,6 +658,52 @@ const listMyCampaigns = async (req, res) => {
     }
 };
 
+const listMyInvoices = async (req, res) => {
+    try {
+        const businessId = await getBusinessIdForUser(req.user.id);
+        if (!businessId) {
+            return res.status(403).json({ success: false, error: 'Business profile not found' });
+        }
+        const invoices = await listBusinessInvoices(businessId);
+        return res.json({ success: true, invoices });
+    } catch (error) {
+        console.error('List invoices error:', error);
+        return res.status(500).json({ success: false, error: 'Unable to load invoices' });
+    }
+};
+
+const downloadInvoice = async (req, res) => {
+    try {
+        const businessId = await getBusinessIdForUser(req.user.id);
+        if (!businessId) {
+            return res.status(403).json({ success: false, error: 'Business profile not found' });
+        }
+        const { id } = req.params;
+        const record = await getInvoiceWithItems(id, businessId);
+        if (!record) {
+            return res.status(404).json({ success: false, error: 'Invoice not found' });
+        }
+        let invoice = record.invoice;
+        if (!invoice.invoice_url) {
+            const business = await query(`SELECT name FROM companies WHERE id = $1`, [businessId]);
+            const invoiceUrl = await generateInvoiceDocument({
+                invoice,
+                business: business.rows[0],
+                items: record.items
+            });
+            await query(`UPDATE ad_invoices SET invoice_url = $2 WHERE id = $1`, [invoice.id, invoiceUrl]);
+            invoice = { ...invoice, invoice_url: invoiceUrl };
+        }
+
+        const filename = invoice.invoice_url.split('/').pop();
+        const filePath = path.join(__dirname, '../../uploads/invoices', filename);
+        return res.download(filePath, filename);
+    } catch (error) {
+        console.error('Download invoice error:', error);
+        return res.status(500).json({ success: false, error: 'Unable to download invoice' });
+    }
+};
+
 const updateCampaign = async (req, res) => {
     try {
         const { id } = req.params;
@@ -576,14 +735,36 @@ const updateCampaign = async (req, res) => {
             }
         };
 
-        if (req.file) {
-            const ext = path.extname(req.file.originalname).toLowerCase();
-            const inferred = EXTENSION_TYPE_MAP[ext];
-            const mediaType = req.body.mediaType || inferred;
-            if (!inferred || inferred !== mediaType) {
-                return res.status(400).json({ error: 'Media type mismatch' });
+        const mediaFiles = Array.isArray(req.files) ? req.files : req.file ? [req.file] : [];
+        const providedMediaUrls = req.body.media_urls || req.body.mediaUrls || null;
+        let uploadedAssets = [];
+        let mediaTypeOverride = null;
+        if (mediaFiles.length) {
+            for (const file of mediaFiles) {
+                const ext = path.extname(file.originalname).toLowerCase();
+                const inferred = EXTENSION_TYPE_MAP[ext];
+                mediaTypeOverride = mediaTypeOverride || inferred;
+                uploadedAssets.push(buildAssetUrl(req, file.filename));
             }
-            const assetUrl = buildAssetUrl(req, req.file.filename);
+        }
+        if (providedMediaUrls) {
+            try {
+                const parsed = typeof providedMediaUrls === 'string' ? JSON.parse(providedMediaUrls) : providedMediaUrls;
+                if (Array.isArray(parsed)) {
+                    parsed.filter(Boolean).forEach((url) => uploadedAssets.push(url));
+                }
+            } catch {
+                String(providedMediaUrls)
+                    .split(',')
+                    .map((val) => val.trim())
+                    .filter(Boolean)
+                    .forEach((url) => uploadedAssets.push(url));
+            }
+        }
+
+        if (mediaFiles.length || uploadedAssets.length) {
+            const mediaType = req.body.mediaType || mediaTypeOverride || existing.rows[0].media_type;
+            const assetUrl = uploadedAssets[0] || existing.rows[0].asset_url;
             setField('media_type', mediaType, true);
             setField('asset_url', assetUrl, true);
             setField('thumbnail_url', req.body.thumbnailUrl || assetUrl, true);
@@ -604,6 +785,24 @@ const updateCampaign = async (req, res) => {
             setField('bid_type', req.body.bid_type, true);
         }
 
+        const startsAt = parseTimestamp(req.body.startsAt || req.body.starts_at);
+        const endsAt = parseTimestamp(req.body.endsAt || req.body.ends_at);
+        if (startsAt) setField('starts_at', startsAt, true);
+        if (endsAt) setField('ends_at', endsAt, true);
+        if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) {
+            return res.status(400).json({ error: 'End date must be after the start date' });
+        }
+
+        if (req.body.priorityLevel || req.body.priority_level) {
+            const priorityLevel = Math.min(3, Math.max(1, parseInt(req.body.priorityLevel || req.body.priority_level, 10)));
+            setField('priority_level', priorityLevel, true);
+            const priorityMultiplier = priorityLevel === 3 ? 2 : priorityLevel === 2 ? 1.5 : 1;
+            setField('priority_multiplier', priorityMultiplier, true);
+        }
+        if (req.body.adOption || req.body.ad_option) {
+            setField('ad_option', String(req.body.adOption || req.body.ad_option).trim(), true);
+        }
+
         if (req.body.status && ['draft', 'paused', 'pending_review'].includes(req.body.status)) {
             setField('status', req.body.status);
         }
@@ -622,6 +821,21 @@ const updateCampaign = async (req, res) => {
                  SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
                  WHERE id = $${params.length + 1}`,
                 [...params, id]
+            );
+        }
+
+        if (uploadedAssets.length) {
+            await query('DELETE FROM ad_images WHERE campaign_id = $1', [id]);
+            const imageValues = [];
+            const imageParams = [];
+            uploadedAssets.forEach((url, index) => {
+                imageParams.push(id, url, req.body.mediaType || mediaTypeOverride || existing.rows[0].media_type, index);
+                imageValues.push(`($${imageParams.length - 3}, $${imageParams.length - 2}, $${imageParams.length - 1}, $${imageParams.length})`);
+            });
+            await query(
+                `INSERT INTO ad_images (campaign_id, asset_url, media_type, display_order)
+                 VALUES ${imageValues.join(', ')}`,
+                imageParams
             );
         }
 
@@ -721,7 +935,9 @@ const getPlacementAds = async (req, res) => {
         const behaviors = parseList(req.query.behaviors);
 
         const campaigns = await fetchPlacementCampaigns({ placement, location, industry, behaviors });
-        return res.json({ success: true, campaigns });
+        const uniqueCampaigns = uniqueByBusiness(campaigns);
+        const weighted = chooseWeightedCampaigns(uniqueCampaigns);
+        return res.json({ success: true, campaigns: weighted });
     } catch (error) {
         console.error('Fetch placement ads error:', error);
         return res.status(500).json({ success: false, error: 'Unable to load ads' });
@@ -1051,6 +1267,18 @@ const adminResumeCampaign = async (req, res) => {
     }
 };
 
+const adminRemoveCampaign = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const reason = req.body?.reason || null;
+        const result = await adminRemoveAd({ adId: id, adminId: req.user.id, reason });
+        return res.json({ success: true, data: result, message: 'Campaign removed successfully' });
+    } catch (error) {
+        console.error('Error in adminRemoveCampaign:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Failed to remove campaign' });
+    }
+};
+
 const adminFeatureCampaign = async (req, res) => {
     try {
         const { id } = req.params;
@@ -1274,8 +1502,11 @@ const adminListAdFailures = async (req, res) => {
 module.exports = {
     createCampaign,
     listCampaigns,
+    getAdPricing,
     getCampaign,
     listMyCampaigns,
+    listMyInvoices,
+    downloadInvoice,
     updateCampaign,
     deleteCampaign,
     getPlacementAds,
@@ -1291,6 +1522,7 @@ module.exports = {
     adminBulkReject,
     adminPauseCampaign,
     adminResumeCampaign,
+    adminRemoveCampaign,
     adminFeatureCampaign,
     adminDeleteCampaign,
     adminExportCampaigns,

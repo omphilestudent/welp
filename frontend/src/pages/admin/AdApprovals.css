@@ -49,6 +49,39 @@
     margin-bottom: 24px;
 }
 
+.active-ads-panel {
+    margin-bottom: 24px;
+    padding: 20px;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.active-ads-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.active-ad-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    background: var(--gray-50);
+}
+
+.active-ad-card h4 {
+    margin: 0 0 4px;
+    font-size: 16px;
+}
+
+.active-ad-actions {
+    display: flex;
+    gap: 8px;
+}
+
 .stat-card {
     background: white;
     border-radius: 12px;

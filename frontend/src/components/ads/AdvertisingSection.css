@@ -150,6 +150,38 @@
     gap: 0.5rem;
 }
 
+.ads-pricing-summary {
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+}
+
+.ads-pricing-summary h4 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    color: #0f172a;
+}
+
+.ads-pricing-grid {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.ads-pricing-grid div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.ads-pricing-total {
+    margin: 0.75rem 0 0;
+    font-size: 0.9rem;
+    color: #0f172a;
+}
+
 .placements-grid {
     display: flex;
     flex-wrap: wrap;
@@ -219,6 +251,31 @@
     padding: 1.5rem;
     color: var(--text-muted, #6b7280);
     text-align: center;
+}
+
+.ads-invoices {
+    margin-top: 2rem;
+}
+
+.ads-invoice-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.ads-invoice-card {
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 1rem;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+}
+
+.ads-invoice-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .ad-card-grid {

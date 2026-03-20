@@ -5,7 +5,10 @@ import {
     createCampaign,
     deleteCampaign,
     getMyCampaigns,
-    updateCampaign
+    updateCampaign,
+    getAdPricing,
+    getMyAdInvoices,
+    downloadAdInvoice
 } from '../../services/adService';
 import AdCard from './AdCard';
 import './AdvertisingSection.css';
@@ -23,7 +26,11 @@ const INITIAL_FORM = {
     clickRedirectUrl: '',
     targetLocations: '',
     targetIndustries: '',
-    behaviors: ''
+    behaviors: '',
+    startsAt: '',
+    endsAt: '',
+    priorityLevel: '1',
+    adOption: 'standard'
 };
 
 const normalizeCapabilities = (raw) => {
@@ -77,13 +84,16 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [form, setForm] = useState(INITIAL_FORM);
     const [selectedPlacements, setSelectedPlacements] = useState(['business_profile']);
-    const [mediaFile, setMediaFile] = useState(null);
+    const [mediaFiles, setMediaFiles] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [capabilities, setCapabilities] = useState(null);
     const [editingCampaign, setEditingCampaign] = useState(null);
     const [formMessage, setFormMessage] = useState(null);
     const [formMessageType, setFormMessageType] = useState('info');
+    const [pricing, setPricing] = useState(null);
+    const [invoices, setInvoices] = useState([]);
+    const [invoiceLoading, setInvoiceLoading] = useState(false);
     const userId = user?.id;
     const userRole = user?.role;
     const isBusinessUser = userRole === 'business';
@@ -110,6 +120,27 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         }
     }, []);
 
+    const loadPricing = useCallback(async () => {
+        try {
+            const { data } = await getAdPricing();
+            setPricing(data.pricing || null);
+        } catch {
+            setPricing(null);
+        }
+    }, []);
+
+    const loadInvoices = useCallback(async () => {
+        setInvoiceLoading(true);
+        try {
+            const { data } = await getMyAdInvoices();
+            setInvoices(Array.isArray(data.invoices) ? data.invoices : []);
+        } catch {
+            setInvoices([]);
+        } finally {
+            setInvoiceLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         if (!isBusinessUser || !userId) {
             setCampaigns([]);
@@ -117,7 +148,9 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
             return;
         }
         loadCampaigns();
-    }, [isBusinessUser, userId, loadCampaigns]);
+        loadPricing();
+        loadInvoices();
+    }, [isBusinessUser, userId, loadCampaigns, loadPricing, loadInvoices]);
 
     const handleFieldChange = (field) => (event) => {
         setForm((prev) => ({
@@ -162,12 +195,25 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         !premiumOverride && capabilities?.tier && capabilities.tier !== 'premium';
 
     const placementsSummary = useMemo(() => selectedPlacements.join(', '), [selectedPlacements]);
+    const pricingSummary = useMemo(() => {
+        if (!pricing) return null;
+        const optionMultiplier = pricing.options?.[form.adOption] || 1;
+        const priorityMultiplier = pricing.priorityMultipliers?.[form.priorityLevel] || 1;
+        const placementTotals = selectedPlacements.map((placement) => {
+            const base = pricing.placements?.[placement] || pricing.placements?.business_profile || 0;
+            const baseAdjusted = Math.round(base * optionMultiplier);
+            const total = Math.round(baseAdjusted * priorityMultiplier);
+            return { placement, base: baseAdjusted, total };
+        });
+        const total = placementTotals.reduce((sum, entry) => sum + entry.total, 0);
+        return { placementTotals, total };
+    }, [pricing, selectedPlacements, form.adOption, form.priorityLevel]);
     const editing = Boolean(editingCampaign);
 
     const resetForm = () => {
         setForm(INITIAL_FORM);
         setSelectedPlacements(['business_profile']);
-        setMediaFile(null);
+        setMediaFiles([]);
         setEditingCampaign(null);
     };
 
@@ -182,11 +228,11 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
             toast.error('Select at least one placement');
             return;
         }
-        if (!editing && !mediaFile) {
+        if (!editing && mediaFiles.length === 0) {
             toast.error('Please upload a media file');
             return;
         }
-        if (mediaFile && mediaFile.size > MAX_MEDIA_BYTES) {
+        if (mediaFiles.some((file) => file && file.size > MAX_MEDIA_BYTES)) {
             toast.error(`Media file exceeds ${MAX_MEDIA_MB}MB limit`);
             return;
         }
@@ -206,8 +252,10 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         }
 
         const formData = new FormData();
-        if (mediaFile) {
-            formData.append('media', mediaFile);
+        if (mediaFiles.length) {
+            mediaFiles.forEach((file) => {
+                formData.append('media', file);
+            });
         }
         formData.append('name', form.name || 'Sponsored Campaign');
         formData.append('mediaType', form.mediaType);
@@ -218,6 +266,10 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         formData.append('targetIndustries', form.targetIndustries);
         formData.append('behaviors', form.behaviors);
         formData.append('placements', JSON.stringify(selectedPlacements));
+        formData.append('startsAt', form.startsAt || '');
+        formData.append('endsAt', form.endsAt || '');
+        formData.append('priorityLevel', form.priorityLevel || '1');
+        formData.append('adOption', form.adOption || 'standard');
 
         setSaving(true);
         try {
@@ -257,6 +309,23 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         }
     };
 
+    const handleDownloadInvoice = async (invoice) => {
+        try {
+            const response = await downloadAdInvoice(invoice.id);
+            const blob = new Blob([response.data], { type: response.headers['content-type'] || 'text/html' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${invoice.invoice_number || 'ad-invoice'}.html`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            toast.error('Unable to download invoice');
+        }
+    };
+
     const handleEdit = (campaign) => {
         setEditingCampaign(campaign);
         setForm({
@@ -271,12 +340,16 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
             targetIndustries: (campaign.target_industries || []).join(', '),
             behaviors: campaign.target_behaviors
                 ? campaign.target_behaviors.map((entry) => entry).join(', ')
-                : ''
+                : '',
+            startsAt: campaign.starts_at ? new Date(campaign.starts_at).toISOString().slice(0, 16) : '',
+            endsAt: campaign.ends_at ? new Date(campaign.ends_at).toISOString().slice(0, 16) : '',
+            priorityLevel: String(campaign.priority_level || '1'),
+            adOption: campaign.ad_option || 'standard'
         });
         setSelectedPlacements(
             (campaign.placements || []).map((placement) => placement.placement)
         );
-        setMediaFile(null);
+        setMediaFiles([]);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -415,6 +488,39 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
                 </div>
                 <div className="ads-form-grid">
                     <label>
+                        Start date/time
+                        <input
+                            type="datetime-local"
+                            value={form.startsAt}
+                            onChange={handleFieldChange('startsAt')}
+                        />
+                    </label>
+                    <label>
+                        End date/time
+                        <input
+                            type="datetime-local"
+                            value={form.endsAt}
+                            onChange={handleFieldChange('endsAt')}
+                        />
+                    </label>
+                    <label>
+                        Priority level
+                        <select value={form.priorityLevel} onChange={handleFieldChange('priorityLevel')}>
+                            <option value="1">Standard</option>
+                            <option value="2">Boosted</option>
+                            <option value="3">Priority</option>
+                        </select>
+                    </label>
+                    <label>
+                        Ad option
+                        <select value={form.adOption} onChange={handleFieldChange('adOption')}>
+                            <option value="standard">Standard</option>
+                            <option value="spotlight">Spotlight</option>
+                        </select>
+                    </label>
+                </div>
+                <div className="ads-form-grid">
+                    <label>
                         Click redirect URL
                         <input
                             value={form.clickRedirectUrl}
@@ -463,18 +569,35 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
                         ))}
                     </div>
                 </div>
+                {pricingSummary && (
+                    <div className="ads-pricing-summary">
+                        <h4>Estimated 30-day charge</h4>
+                        <div className="ads-pricing-grid">
+                            {pricingSummary.placementTotals.map((entry) => (
+                                <div key={entry.placement}>
+                                    <span>{entry.placement.replace('_', ' ')}</span>
+                                    <strong>${(entry.total / 100).toFixed(2)}</strong>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="ads-pricing-total">
+                            Total: <strong>${(pricingSummary.total / 100).toFixed(2)}</strong>
+                        </p>
+                    </div>
+                )}
                 <label className="media-upload">
                     <span>
-                        {mediaFile
-                            ? mediaFile.name
+                        {mediaFiles.length
+                            ? `${mediaFiles.length} file(s) selected`
                             : editing
-                                ? 'Current media will be reused unless you upload a new file'
+                                ? 'Current media will be reused unless you upload new files'
                                 : 'Upload media (PNG, JPG, MP4, GIF)'}
                     </span>
                     <input
                         type="file"
                         accept="image/*,video/*,.gif"
-                        onChange={(event) => setMediaFile(event.target.files[0])}
+                        multiple
+                        onChange={(event) => setMediaFiles(Array.from(event.target.files || []))}
                     />
                 </label>
                 <div className="form-actions">
@@ -514,6 +637,40 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
                             />
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            <section className="ads-invoices">
+                <div className="campaign-list__header">
+                    <h3>Ad invoices</h3>
+                    {invoiceLoading && <span className="loading-chip">Loading...</span>}
+                </div>
+                {invoices.length === 0 ? (
+                    <p className="campaign-empty">No invoices have been issued yet.</p>
+                ) : (
+                    <div className="ads-invoice-grid">
+                        {invoices.map((invoice) => (
+                            <div key={invoice.id} className="ads-invoice-card">
+                                <div>
+                                    <h4>{invoice.invoice_number}</h4>
+                                    <p className="text-secondary">
+                                        {invoice.period_start ? new Date(invoice.period_start).toLocaleDateString() : '—'} —{' '}
+                                        {invoice.period_end ? new Date(invoice.period_end).toLocaleDateString() : '—'}
+                                    </p>
+                                </div>
+                                <div className="ads-invoice-meta">
+                                    <strong>${((invoice.total_minor || 0) / 100).toFixed(2)}</strong>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm"
+                                        onClick={() => handleDownloadInvoice(invoice)}
+                                    >
+                                        Download
+                                    </button>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 )}

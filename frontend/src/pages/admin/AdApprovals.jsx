@@ -9,6 +9,7 @@ import {
     adminBulkRejectAds,
     adminPauseAd,
     adminResumeAd,
+    adminRemoveAd,
     adminGetAdDetails,
     adminGetAdAnalytics,
     adminListAdFailures
@@ -200,6 +201,11 @@ const AdApprovals = () => {
         totalSpend: ads.reduce((sum, a) => sum + ((a.spend_minor || 0) / 100), 0)
     }), [ads]);
 
+    const activeAds = useMemo(
+        () => ads.filter((ad) => normalizeStatus(ad.status) === 'active'),
+        [ads]
+    );
+
     // Handle filter changes
     const handleFilterChange = (field) => (e) => {
         const value = e.target.value;
@@ -335,6 +341,17 @@ const AdApprovals = () => {
         }
     };
 
+    const handleRemoveAd = async (adId) => {
+        const reason = window.prompt('Provide a reason for removing this ad (optional):') || null;
+        try {
+            await adminRemoveAd(adId, reason);
+            toast.success('Ad removed');
+            fetchAds();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to remove ad');
+        }
+    };
+
     const handleViewDetails = async (ad) => {
         try {
             setLoading(true);
@@ -446,7 +463,8 @@ const AdApprovals = () => {
                             <option value="active">Active</option>
                             <option value="paused">Paused</option>
                             <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
+                            <option value="expired">Expired</option>
+                            <option value="removed">Removed</option>
                         </select>
 
                         <select
@@ -556,6 +574,46 @@ const AdApprovals = () => {
                     </div>
                 </form>
             )}
+
+            <section className="active-ads-panel">
+                <div className="panel-header">
+                    <div>
+                        <h2>Active Ads</h2>
+                        <p className="text-secondary">Remove active ads from circulation when needed.</p>
+                    </div>
+                    <span className="badge badge-active">{activeAds.length}</span>
+                </div>
+                {activeAds.length === 0 ? (
+                    <p className="empty-state">No active ads available.</p>
+                ) : (
+                    <div className="active-ads-grid">
+                        {activeAds.map((ad) => (
+                            <div key={getAdId(ad)} className="active-ad-card">
+                                <div>
+                                    <h4>{ad.name || 'Untitled Campaign'}</h4>
+                                    <p className="text-secondary">{ad.business_name || ad.advertiser || 'Business'}</p>
+                                </div>
+                                <div className="active-ad-actions">
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm"
+                                        onClick={() => handleViewDetails(ad)}
+                                    >
+                                        Details
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger btn-sm"
+                                        onClick={() => handleRemoveAd(getAdId(ad))}
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
 
             {/* Bulk Actions */}
             {selectedAds.length > 0 && (
@@ -741,14 +799,24 @@ const AdApprovals = () => {
                                         )}
 
                                         {normalizeStatus(ad.status) === 'active' && (
-                                            <button
-                                                className="btn btn-icon btn-warning"
-                                                onClick={() => handlePauseAd(getAdId(ad))}
-                                                title="Pause"
-                                                disabled={loading}
-                                            >
-                                                ⏸️
-                                            </button>
+                                            <>
+                                                <button
+                                                    className="btn btn-icon btn-warning"
+                                                    onClick={() => handlePauseAd(getAdId(ad))}
+                                                    title="Pause"
+                                                    disabled={loading}
+                                                >
+                                                    ⏸️
+                                                </button>
+                                                <button
+                                                    className="btn btn-icon btn-danger"
+                                                    onClick={() => handleRemoveAd(getAdId(ad))}
+                                                    title="Remove"
+                                                    disabled={loading}
+                                                >
+                                                    ✖
+                                                </button>
+                                            </>
                                         )}
 
                                         {normalizeStatus(ad.status) === 'paused' && (
