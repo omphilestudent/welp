@@ -7,6 +7,7 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
 const psychologistController = require('../controllers/psychologistController');
 const psychologistDashboardController = require('../controllers/psychologistDashboardController');
+const sessionRatingController = require('../controllers/sessionRatingController');
 const { restrictUnverifiedPsychologist } = require('../middleware/restrictUnverifiedPsychologist');
 
 const router = express.Router();
@@ -78,6 +79,19 @@ router.get('/dashboard/calls',
     authorize('psychologist'),
     checkRoleFlag('dashboard'),
     psychologistDashboardController.getRecentCalls
+);
+
+router.get('/dashboard/ratings/summary',
+    authenticate,
+    authorize('psychologist'),
+    checkRoleFlag('dashboard'),
+    psychologistDashboardController.getRatingsSummary
+);
+
+router.get('/:psychologistId/ratings/summary',
+    authenticate,
+    apiLimiter,
+    sessionRatingController.getPsychologistSummary
 );
 
 router.post('/dashboard/schedule',

@@ -419,6 +419,7 @@ const Dashboard = () => {
     const [psychLeads, setPsychLeads] = useState([]);
     const [psychSchedule, setPsychSchedule] = useState([]);
     const [psychPermissions, setPsychPermissions] = useState(null);
+    const [psychRatingSummary, setPsychRatingSummary] = useState(null);
     const [calendarIntegrations, setCalendarIntegrations] = useState([]);
     const [externalEvents, setExternalEvents] = useState([]);
     const [recentCalls, setRecentCalls] = useState([]);
@@ -872,6 +873,8 @@ const Dashboard = () => {
                 setPsychLeads(leadsRes.data || []);
                 setPsychSchedule(scheduleRes.data || []);
                 setPsychPermissions(permissionsRes.data || null);
+                const ratingsRes = await api.get('/psychologists/dashboard/ratings/summary').catch(() => ({ data: null }));
+                setPsychRatingSummary(ratingsRes.data || null);
                 const integrationsRes = await api.get('/psychologists/dashboard/calendar-integrations').catch(() => ({ data: [] }));
                 setCalendarIntegrations(integrationsRes.data || []);
                 const callsRes = await api.get('/psychologists/dashboard/calls').catch(() => ({ data: [] }));
@@ -2172,6 +2175,49 @@ const Dashboard = () => {
                                         </div>
                                     </div>
                                 )}
+                            </section>
+
+                            {/* Session ratings card */}
+                            <section className="psych-card psych-card--compact">
+                                <header className="psych-card__header">
+                                    <div>
+                                        <h3>Session Ratings</h3>
+                                        <p>Weekly and monthly feedback averages.</p>
+                                    </div>
+                                </header>
+                                <div className="psych-card__body">
+                                    {psychRatingSummary ? (
+                                        <div className="psych-rating-grid">
+                                            <div className="psych-rating-metric">
+                                                <span className="psych-rating-label">This week</span>
+                                                <strong>{Number(psychRatingSummary.weekly_avg || 0).toFixed(1)}</strong>
+                                                <span className="psych-rating-count">
+                                                    {psychRatingSummary.weekly_count || 0} ratings
+                                                </span>
+                                            </div>
+                                            <div className="psych-rating-metric">
+                                                <span className="psych-rating-label">This month</span>
+                                                <strong>{Number(psychRatingSummary.monthly_avg || 0).toFixed(1)}</strong>
+                                                <span className="psych-rating-count">
+                                                    {psychRatingSummary.monthly_count || 0} ratings
+                                                </span>
+                                            </div>
+                                            {Array.isArray(psychRatingSummary.recent_comments) && psychRatingSummary.recent_comments.length > 0 && (
+                                                <div className="psych-rating-comments">
+                                                    <h4>Recent feedback</h4>
+                                                    {psychRatingSummary.recent_comments.map((comment, index) => (
+                                                        <div key={`${comment.created_at}-${index}`} className="psych-rating-comment">
+                                                            <span>{comment.review_text}</span>
+                                                            <small>{new Date(comment.created_at).toLocaleDateString()}</small>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="empty-message">No ratings yet.</p>
+                                    )}
+                                </div>
                             </section>
 
                             {/* Leads card */}

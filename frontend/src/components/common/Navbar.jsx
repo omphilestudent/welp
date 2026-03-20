@@ -195,15 +195,24 @@ const Navbar = () => {
                     {!user && renderLink('/register/psychologist', 'Join as Psychologist')}
 
                     {user && user.role === 'psychologist' && (
-                        renderLink('/messages', 'Messages')
+                        <>
+                            {renderLink('/dashboard', 'Dashboard')}
+                            {renderLink('/messages', 'Messages')}
+                        </>
                     )}
 
                     {user && user.role === 'employee' && (
-                        renderLink('/messages', 'Messages')
+                        <>
+                            {renderLink('/dashboard', 'Dashboard')}
+                            {renderLink('/messages', 'Messages')}
+                        </>
                     )}
 
                     {user && user.role === 'business' && (
-                        renderLink('/search', 'Search Companies')
+                        <>
+                            {renderLink('/dashboard', 'Dashboard')}
+                            {renderLink('/search', 'Search Companies')}
+                        </>
                     )}
                 </div>
 

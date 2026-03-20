@@ -10,6 +10,10 @@ const { ensureChatQuota, getUsageSummary } = require('../services/chatQuotaServi
 const { PLAN_LIMITS } = require('../services/subscriptionService');
 const { emitFlowEvent } = require('../services/flowEngine');
 const { handleChatReplyNotification } = require('../modules/marketing/marketing.triggers');
+const {
+    getPsychologistRatingAggregates,
+    getRecommendationScore
+} = require('../services/psychologistSessionRatingService');
 
 const tableExists = async (tableName) => {
     try {
@@ -503,11 +507,27 @@ const getAvailablePsychologists = async (req, res) => {
             );
         }
 
-        if (selected.length === 0) {
-            return res.json(rows.slice(0, Math.min(limit, rows.length)));
+        const isPremiumClient = req.user?.role === 'employee'
+            && String(req.user?.subscription_tier || '').toLowerCase() === 'premium';
+        const fallbackList = rows.slice(0, Math.min(limit, rows.length));
+        const candidateList = selected.length === 0 ? fallbackList : selected;
+
+        if (isPremiumClient && candidateList.length > 0) {
+            const ratingMap = await getPsychologistRatingAggregates(candidateList.map((psych) => psych.id));
+            const scored = candidateList
+                .map((psych) => {
+                    const aggregate = ratingMap.get(psych.id) || {};
+                    return {
+                        ...psych,
+                        rating_score: getRecommendationScore(aggregate)
+                    };
+                })
+                .sort((a, b) => b.rating_score - a.rating_score)
+                .slice(0, limit);
+            return res.json(scored);
         }
 
-        res.json(selected);
+        return res.json(candidateList);
     } catch (error) {
         console.error('Get psychologists error:', error);
         res.status(500).json({ error: 'Failed to fetch psychologists' });

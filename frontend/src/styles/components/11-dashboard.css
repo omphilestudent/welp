@@ -545,6 +545,69 @@
   gap: 1rem;
 }
 
+.psych-rating-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.psych-rating-metric {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.psych-rating-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.psych-rating-metric strong {
+  font-size: 1.6rem;
+  color: var(--text-primary);
+}
+
+.psych-rating-count {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.psych-rating-comments {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.85rem;
+}
+
+.psych-rating-comments h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.psych-rating-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.psych-rating-comment small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
 .psych-schedule-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

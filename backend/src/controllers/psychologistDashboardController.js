@@ -1,6 +1,7 @@
 const { query } = require('../utils/database');
 const { getRoleFlags } = require('../middleware/roleFlags');
 const { analyzeSentiment } = require('../services/mlServices');
+const { getPsychologistRatingSummary } = require('../services/psychologistSessionRatingService');
 const https = require('https');
 const http = require('http');
 
@@ -131,6 +132,16 @@ const getRecentCalls = async (req, res) => {
     } catch (error) {
         console.error('Get recent calls error:', error);
         return res.status(500).json({ error: 'Failed to load recent calls' });
+    }
+};
+
+const getRatingsSummary = async (req, res) => {
+    try {
+        const summary = await getPsychologistRatingSummary(req.user.id);
+        return res.json(summary);
+    } catch (error) {
+        console.error('Get rating summary error:', error);
+        return res.status(500).json({ error: 'Failed to load rating summary' });
     }
 };
 const addScheduleItem = async (req, res) => {
@@ -621,6 +632,7 @@ module.exports = {
     exportScheduleIcs,
     updateScheduleItem,
     getRecentCalls,
+    getRatingsSummary,
     getLeads,
     sendLeadMessage,
     archiveLead,

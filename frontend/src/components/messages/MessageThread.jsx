@@ -291,7 +291,7 @@ const MessageThread = ({
 
     if (!conversation) {
         return (
-            <div className="message-thread-placeholder">
+            <div className="msg-thread-placeholder">
                 <p>Select a conversation to start messaging</p>
             </div>
         );
@@ -308,36 +308,36 @@ const MessageThread = ({
         : `Daily limit: ${sessionLimitMinutes} min`;
 
     return (
-        <div className={`message-thread ${isExpired ? 'is-expired' : ''}`} ref={threadRef}>
-            <div className="thread-header">
-                <div className="thread-header-left">
+        <div className={`msg-thread ${isExpired ? 'is-expired' : ''}`} ref={threadRef}>
+            <div className="msg-thread-header">
+                <div className="msg-thread-header-left">
                     <button
                         type="button"
-                        className="thread-back-button"
+                        className="msg-thread-back"
                         onClick={() => onOpenSidebar?.()}
                         aria-label="Open conversations"
                     >
                         <FaChevronLeft />
                     </button>
-                    <div className="thread-participant">
+                    <div className="msg-thread-participant">
                         <button
                             type="button"
-                            className="thread-participant-name"
+                            className="msg-thread-participant-name"
                             onClick={() => other?.id && navigate(`/users/${other.id}`)}
                         >
                             {other?.display_name || 'Unknown'}
                         </button>
                         {other?.role === 'psychologist' && (
-                            <span className="role-badge">
+                            <span className="msg-role-badge">
                                 {other.is_verified ? 'Verified Psychologist' : 'Psychologist'}
                             </span>
                         )}
                     </div>
                 </div>
                 {showCallActions && (
-                    <div className="thread-actions">
+                    <div className="msg-thread-actions">
                         <button
-                            className="thread-action-btn"
+                            className="msg-thread-action-btn"
                             disabled={callDisabled}
                             title={callDisabled ? callDisabledReason : 'Voice call'}
                             onClick={() => {
@@ -349,10 +349,10 @@ const MessageThread = ({
                             }}
                         >
                             <FaPhoneAlt />
-                            <span className="thread-action-label">Voice</span>
+                            <span className="msg-thread-action-label">Voice</span>
                         </button>
                         <button
-                            className="thread-action-btn"
+                            className="msg-thread-action-btn"
                             disabled={callDisabled}
                             title={callDisabled ? callDisabledReason : 'Video call'}
                             onClick={() => {
@@ -364,9 +364,9 @@ const MessageThread = ({
                             }}
                         >
                             <FaVideo />
-                            <span className="thread-action-label">Video</span>
+                            <span className="msg-thread-action-label">Video</span>
                         </button>
-                        <span className="thread-call-limit">
+                        <span className="msg-thread-call-limit">
                             {callLimitText}
                         </span>
                     </div>
@@ -374,12 +374,12 @@ const MessageThread = ({
             </div>
 
             <div
-                className={`messages-thread-container ${isExpired ? 'is-expired' : ''}`}
+                className={`msg-thread-body ${isExpired ? 'is-expired' : ''}`}
                 ref={messagesContainerRef}
                 onScroll={handleScroll}
             >
                 {isExpired && (
-                    <div className="messages-time-flag">
+                    <div className="msg-time-flag">
                         {timeRemainingLabel} • Messages are archived when time expires.
                     </div>
                 )}
@@ -397,20 +397,20 @@ const MessageThread = ({
                     return (
                         <React.Fragment key={message.id}>
                             {showDate && (
-                                <div className="message-date-divider">
+                                <div className="msg-date-divider">
                                     {format(new Date(message.created_at), 'MMMM d, yyyy')}
                                 </div>
                             )}
-                            <div className={`message-wrapper ${isOwn ? 'own' : 'other'}`}>
-                                <div className={`message-bubble ${isOwn ? 'own' : 'other'}`}>
+                            <div className={`msg-wrapper ${isOwn ? 'own' : 'other'}`}>
+                                <div className={`msg-bubble ${isOwn ? 'own' : 'other'}`}>
                                     {messageType === 'voice_note' && attachmentUrl ? (
-                                        <div className="message-voice-note">
+                                        <div className="msg-voice-note">
                                             <audio
                                                 controls
                                                 src={attachmentUrl.startsWith('blob:') ? attachmentUrl : resolveMediaUrl(attachmentUrl)}
                                                 preload="metadata"
                                             />
-                                            <div className="message-voice-meta">
+                                            <div className="msg-voice-meta">
                                                 <span>Voice note</span>
                                                 {attachmentDuration ? (
                                                     <span>{attachmentDuration}s</span>
@@ -418,9 +418,9 @@ const MessageThread = ({
                                             </div>
                                         </div>
                                     ) : (
-                                        <p className="message-content">{message.content}</p>
+                                        <p className="msg-content">{message.content}</p>
                                     )}
-                                    <span className="message-time">
+                                    <span className="msg-time">
                     {format(new Date(message.created_at), 'h:mm a')}
                   </span>
                                 </div>
@@ -432,33 +432,33 @@ const MessageThread = ({
             </div>
 
             {conversation.status === 'accepted' && !isExpired && (
-                <form onSubmit={handleSend} className="message-input-form">
-                    <div className="message-input-controls">
+                <form onSubmit={handleSend} className="msg-input-form">
+                    <div className="msg-input-controls">
                         {isRecording && (
-                            <div className="voice-recording-bar">
-                                <span className="voice-recording-dot" />
-                                <span className="voice-recording-text">Recording</span>
-                                <span className="voice-recording-time">{recordDuration}s</span>
+                            <div className="msg-voice-recording-bar">
+                                <span className="msg-voice-recording-dot" />
+                                <span className="msg-voice-recording-text">Recording</span>
+                                <span className="msg-voice-recording-time">{recordDuration}s</span>
                             </div>
                         )}
                         {recordingError && (
-                            <span className="message-input-error">{recordingError}</span>
+                            <span className="msg-input-error">{recordingError}</span>
                         )}
                     </div>
-                    <div className="message-input-row">
-                        <div className="message-input-wrapper">
+                    <div className="msg-input-row">
+                        <div className="msg-input-wrapper">
                             <input
                                 type="text"
                                 value={newMessage}
                                 onChange={(e) => setNewMessage(e.target.value)}
                                 placeholder="Type your message..."
-                                className="message-input"
+                                className="msg-input"
                                 disabled={sending || isRecording}
                             />
                         </div>
                         <button
                             type="button"
-                            className={`message-mic-btn ${isRecording ? 'recording' : ''}`}
+                            className={`msg-mic-btn ${isRecording ? 'is-recording' : ''}`}
                             onClick={() => {
                                 if (isRecording) {
                                     setAutoSendOnStop(true);
@@ -475,7 +475,7 @@ const MessageThread = ({
                         <button
                             type="submit"
                             disabled={!newMessage.trim() || sending}
-                            className="send-btn"
+                            className="msg-send-btn"
                         >
                             {sending ? 'Sending...' : 'Send'}
                         </button>
@@ -484,21 +484,21 @@ const MessageThread = ({
             )}
 
             {conversation.status === 'accepted' && isExpired && (
-                <div className="pending-message pending-message--expired">
+                <div className="msg-pending-message msg-pending-message--expired">
                     <p>Your allocated chat time has ended. Daily minutes reset every midnight.</p>
                 </div>
             )}
 
             {conversation.status === 'pending' && conversation.employee?.id === user?.id && (
-                <div className="pending-message">
+                <div className="msg-pending-message">
                     {conversation.last_message?.senderId === user?.id ? (
                         <p>Waiting for the psychologist to accept your request...</p>
                     ) : (
                         <>
                             <p>This conversation request is pending your approval.</p>
-                            <div className="pending-actions">
-                                <button onClick={handleAcceptRequest} className="btn btn-primary">Accept</button>
-                                <button onClick={handleRejectRequest} className="btn btn-secondary">Decline</button>
+                            <div className="msg-pending-actions">
+                                <button onClick={handleAcceptRequest} className="msg-btn msg-btn-primary">Accept</button>
+                                <button onClick={handleRejectRequest} className="msg-btn msg-btn-secondary">Decline</button>
                             </div>
                         </>
                     )}
@@ -506,15 +506,15 @@ const MessageThread = ({
             )}
 
             {conversation.status === 'pending' && conversation.psychologist?.id === user?.id && (
-                <div className="pending-message">
+                <div className="msg-pending-message">
                     {conversation.last_message?.senderId === user?.id ? (
                         <p>Waiting for the employee to accept your message request...</p>
                     ) : (
                         <>
                             <p>New request from an employee.</p>
-                            <div className="pending-actions">
-                                <button onClick={handleAcceptRequest} className="btn btn-primary">Accept</button>
-                                <button onClick={handleRejectRequest} className="btn btn-secondary">Decline</button>
+                            <div className="msg-pending-actions">
+                                <button onClick={handleAcceptRequest} className="msg-btn msg-btn-primary">Accept</button>
+                                <button onClick={handleRejectRequest} className="msg-btn msg-btn-secondary">Decline</button>
                             </div>
                         </>
                     )}
@@ -525,3 +525,6 @@ const MessageThread = ({
 };
 
 export default MessageThread;
+
+
+

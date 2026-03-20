@@ -9,7 +9,7 @@ const ConversationList = ({ conversations, activeId, onSelect }) => {
 
     if (!conversations || conversations.length === 0) {
         return (
-            <div className="empty-state">
+            <div className="msg-empty-state">
                 <p>No conversations yet</p>
             </div>
         );
@@ -23,7 +23,7 @@ const ConversationList = ({ conversations, activeId, onSelect }) => {
     };
 
     return (
-        <div className="conversation-list">
+        <div className="msg-conv-list">
             {conversations.map(conv => {
                 const other = getOtherParticipant(conv);
                 const lastMessage = conv.last_message;
@@ -31,36 +31,36 @@ const ConversationList = ({ conversations, activeId, onSelect }) => {
                 return (
                     <div
                         key={conv.id}
-                        className={`conversation-item ${conv.id === activeId ? 'active' : ''}`}
+                        className={`msg-conv-item ${conv.id === activeId ? 'active' : ''}`}
                         onClick={() => onSelect(conv)}
                     >
-                        <div className="conversation-avatar">
+                        <div className="msg-conv-avatar">
                             {other?.avatar_url ? (
                                 <AvatarImage src={other.avatar_url} alt={other?.display_name || 'Conversation participant'} />
                             ) : (
-                                <div className="avatar-placeholder">
+                                <div className="msg-avatar-placeholder">
                                     {other?.display_name?.charAt(0) || '?'}
                                 </div>
                             )}
                         </div>
 
-                        <div className="conversation-info">
-                            <h4 className="conversation-name">
+                        <div className="msg-conv-info">
+                            <h4 className="msg-conv-name">
                                 {other?.display_name || 'Unknown'}
                                 {conv.psychologist?.is_verified && (
-                                    <span className="verified-badge" title="Verified Psychologist">✓</span>
+                                    <span className="msg-verified-badge" title="Verified Psychologist">✓</span>
                                 )}
                             </h4>
 
                             {lastMessage && (
-                                <p className="conversation-last-message">
+                                <p className="msg-conv-last-message">
                                     {lastMessage.content?.length > 50
                                         ? `${lastMessage.content.substring(0, 50)}...`
                                         : lastMessage.content}
                                 </p>
                             )}
 
-                            <span className="conversation-time">
+                            <span className="msg-conv-time">
                 {lastMessage && formatDistanceToNow(new Date(lastMessage.createdAt))} ago
               </span>
                         </div>
@@ -72,3 +72,4 @@ const ConversationList = ({ conversations, activeId, onSelect }) => {
 };
 
 export default ConversationList;
+

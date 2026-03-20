@@ -54,37 +54,37 @@ const ChatAllocationModal = ({
     }
 
     return (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-            <div className="modal-card">
-                <div className="modal-header">
-                    <h3>{title}</h3>
+        <div className="msg-modal-overlay" role="dialog" aria-modal="true">
+            <div className="msg-allocation-modal">
+                <div className="msg-modal-header">
+                    <h3 className="msg-modal-title">{title}</h3>
                     <button
                         type="button"
-                        className="modal-close"
+                        className="msg-modal-close"
                         onClick={onClose}
                         aria-label="Close"
                     >
                         ×
                     </button>
                 </div>
-                <div className="modal-body">
-                    <p className="modal-subtitle">
+                <div className="msg-modal-body">
+                    <p className="msg-modal-subtitle">
                         You have <strong>{safeRemaining}</strong> minutes available today.
                         Choose how many you'd like to spend on this session.
                     </p>
-                    <div className="allocation-presets">
+                    <div className="msg-allocation-presets">
                         {PRESETS.map((value) => (
                             <button
                                 key={value}
                                 type="button"
-                                className={`allocation-chip ${minutes === value ? 'active' : ''}`}
+                                className={`msg-allocation-chip ${minutes === value ? 'is-active' : ''}`}
                                 onClick={() => handlePreset(value)}
                                 disabled={value > maxAllowed}
                             >
                                 {value} min
                             </button>
                         ))}
-                        <div className="allocation-custom">
+                        <div className="msg-allocation-custom">
                             <label htmlFor="custom-minutes">Custom</label>
                             <input
                                 id="custom-minutes"
@@ -98,21 +98,21 @@ const ChatAllocationModal = ({
                             />
                         </div>
                     </div>
-                    <p className="modal-hint">
+                    <p className="msg-modal-hint">
                         Sessions end automatically when allocated minutes expire (daily max {safeLimit} min).
                     </p>
                 </div>
-                <div className="modal-actions">
+                <div className="msg-modal-actions">
                     <button
                         type="button"
-                        className="btn btn-secondary"
+                        className="msg-btn msg-btn-secondary"
                         onClick={onClose}
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
-                        className="btn btn-primary"
+                        className="msg-btn msg-btn-primary"
                         disabled={disabled}
                         onClick={() => onConfirm(Math.min(minutes, maxAllowed))}
                     >

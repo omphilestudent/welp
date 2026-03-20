@@ -7,6 +7,7 @@ import socketService from '../services/socket';
 import ConversationList from '../components/messages/ConversationList';
 import MessageThread from '../components/messages/MessageThread';
 import ChatAllocationModal from '../components/messages/ChatAllocationModal';
+import SessionRatingModal from '../components/messages/SessionRatingModal';
 import Loading from '../components/common/Loading';
 import toast from 'react-hot-toast';
 import { FaSearch, FaStar, FaUserPlus, FaVideo, FaHistory, FaClock, FaExclamationTriangle, FaLock } from 'react-icons/fa';
@@ -49,6 +50,8 @@ const Messages = () => {
     const [extendingSession, setExtendingSession] = useState(false);
     const [psychologistDeletedNotice, setPsychologistDeletedNotice] = useState('');
     const [extendMinutes, setExtendMinutes] = useState(10);
+    const [pendingRatings, setPendingRatings] = useState([]);
+    const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
     useEffect(() => {
         setPsychologistDeletedNotice('');
@@ -273,6 +276,16 @@ const Messages = () => {
         }
     };
 
+    const fetchPendingRatings = useCallback(async () => {
+        if (user?.role !== 'employee') return;
+        try {
+            const { data } = await api.get('/sessions/pending-ratings');
+            setPendingRatings(data?.sessions || []);
+        } catch (error) {
+            console.error('Failed to load pending ratings', error);
+        }
+    }, [user?.role]);
+
     const fetchMessages = useCallback(async (conversationId) => {
         try {
             const { data } = await api.get(`/messages/conversations/${conversationId}/messages`);
@@ -313,6 +326,39 @@ const Messages = () => {
         }
     }, [activeConversation, visibleConversations, fetchMessages]);
 
+    const activeRatingSession = pendingRatings?.[0] || null;
+
+    const handleSubmitRating = async ({ ratingValue, feedback }) => {
+        if (!activeRatingSession) return;
+        setRatingSubmitting(true);
+        try {
+            await api.post(`/sessions/${activeRatingSession.conversation_id}/rating`, {
+                ratingValue,
+                reviewText: feedback
+            });
+            toast.success('Thanks for rating your session!');
+            await fetchPendingRatings();
+        } catch (error) {
+            const message = error?.response?.data?.error || 'Failed to submit rating';
+            toast.error(message);
+        } finally {
+            setRatingSubmitting(false);
+        }
+    };
+
+    const handleSkipRating = async () => {
+        if (!activeRatingSession) return;
+        setRatingSubmitting(true);
+        try {
+            await api.post(`/sessions/${activeRatingSession.conversation_id}/rating/skip`, { remindAfterHours: 48 });
+            await fetchPendingRatings();
+        } catch (error) {
+            console.error('Failed to defer rating', error);
+        } finally {
+            setRatingSubmitting(false);
+        }
+    };
+
     useEffect(() => {
         if (hasFetchedConversations.current) return;
         hasFetchedConversations.current = true;
@@ -335,8 +381,9 @@ const Messages = () => {
             fetchAvailablePsychologists();
             fetchEmployeeFavorites();
             loadChatUsage();
+            fetchPendingRatings();
         }
-    }, [userId, userRole, loadChatUsage]);
+    }, [userId, userRole, loadChatUsage, fetchPendingRatings]);
 
     useEffect(() => {
         const conversationId = searchParams.get('conversation');
@@ -348,6 +395,13 @@ const Messages = () => {
             }
         }
     }, [searchParams, visibleConversations, fetchMessages]);
+
+    useEffect(() => {
+        if (user?.role !== 'employee') return;
+        if (activeConversation?.status === 'ended' || (timeRemainingMs != null && timeRemainingMs <= 0)) {
+            fetchPendingRatings();
+        }
+    }, [activeConversation?.status, timeRemainingMs, fetchPendingRatings, user?.role]);
 
     useEffect(() => {
         const employeeId = searchParams.get('employee');
@@ -1134,34 +1188,35 @@ const Messages = () => {
     if (loading) return <Loading />;
 
     return (
-        <div className="messages-page">
+        <div className="msg-page">
             {error && <div className="alert alert-error">{error}</div>}
             {isPsychRestricted && (
                 <div className="alert alert-warning">
                     Your account is restricted until KYC is completed and approved.
                 </div>
             )}
-            <div className={`messages-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+            <div className={`msg-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
                 <div
-                    className={`messages-sidebar ${isSidebarOpen ? 'open' : ''}`}
+                    className={`msg-sidebar ${isSidebarOpen ? 'open' : ''}`}
                     onWheel={(event) => event.stopPropagation()}
                     onTouchMove={(event) => event.stopPropagation()}
                 >
-                    <div className="sidebar-header">
+                    <div className="msg-sidebar-header">
                         <h2>Messages</h2>
                         <button
                             type="button"
-                            className="btn btn-outline btn-small messages-sidebar-toggle"
+                            className="msg-btn msg-btn-outline msg-btn-small msg-sidebar-toggle"
                             onClick={() => setIsSidebarOpen(false)}
                         >
                             Close
                         </button>
                     </div>
+                    <div className="msg-sidebar-content">
                     {user?.role === 'psychologist' && (
-                        <div className="psych-sidebar">
-                            <div className="psych-search">
+                        <div className="msg-psych-sidebar">
+                            <div className="msg-psych-search">
                                 <label>Search employees</label>
-                                <div className="psych-search-input">
+                                <div className="msg-psych-search-input">
                                     <FaSearch />
                                     <input
                                         type="text"
@@ -1171,22 +1226,22 @@ const Messages = () => {
                                     />
                                 </div>
                                 {employeeResults.length > 0 && (
-                                    <div className="psych-search-results">
+                                    <div className="msg-psych-search-results">
                                         {employeeResults.map((employee) => (
-                                            <div key={employee.id} className="psych-search-item">
+                                            <div key={employee.id} className="msg-psych-search-item">
                                                 <div>
                                                     <strong>{employee.display_name}</strong>
                                                     <span>{employee.occupation || 'Employee'}</span>
                                                 </div>
-                                                <div className="psych-search-actions">
+                                                <div className="msg-psych-search-actions">
                                                     <button
-                                                        className="btn btn-outline btn-small"
+                                                        className="msg-btn msg-btn-outline msg-btn-small"
                                                         onClick={() => handleStartConversation(employee.id)}
                                                     >
                                                         <FaUserPlus /> Request
                                                     </button>
                                                     <button
-                                                        className="btn btn-secondary btn-small"
+                                                        className="msg-btn msg-btn-secondary msg-btn-small"
                                                         onClick={() => handleFavoriteAdd(employee)}
                                                     >
                                                         <FaStar /> Favorite
@@ -1198,23 +1253,23 @@ const Messages = () => {
                                 )}
                             </div>
 
-                            <div className="psych-sidebar-section">
+                            <div className="msg-psych-section">
                                 <h3>Leads</h3>
                                 {psychLeads.length > 0 ? (
                                     psychLeads.map((lead) => (
-                                        <div key={lead.id} className="psych-lead-row">
+                                        <div key={lead.id} className="msg-psych-lead-row">
                                             <div>
                                                 <strong>{lead.display_name}</strong>
                                                 <span>{lead.summary}</span>
                                             </div>
                                             <button
-                                                className="btn btn-outline btn-small"
+                                                className="msg-btn msg-btn-outline msg-btn-small"
                                                 onClick={() => handleLeadMessage(lead.id)}
                                             >
                                                 Message
                                             </button>
                                             <button
-                                                className="btn btn-secondary btn-small"
+                                                className="msg-btn msg-btn-secondary msg-btn-small"
                                                 onClick={() => handleLeadArchive(lead.id)}
                                             >
                                                 Remove
@@ -1222,21 +1277,21 @@ const Messages = () => {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="psych-empty">No leads yet.</p>
+                                    <p className="msg-psych-empty">No leads yet.</p>
                                 )}
                             </div>
 
-                            <div className="psych-sidebar-section">
+                            <div className="msg-psych-section">
                                 <h3>Favorites</h3>
                                 {psychFavorites.length > 0 ? (
                                     psychFavorites.map((favorite) => (
-                                        <div key={favorite.id} className="psych-favorite-row">
+                                        <div key={favorite.id} className="msg-psych-favorite-row">
                                             <div>
                                                 <strong>{favorite.display_name}</strong>
                                                 <span>{favorite.notes || 'Connected client'}</span>
                                             </div>
                                             <button
-                                                className="btn btn-secondary btn-small"
+                                                className="msg-btn msg-btn-secondary msg-btn-small"
                                                 onClick={() => handleFavoriteRemove(favorite.id)}
                                             >
                                                 Remove
@@ -1244,7 +1299,7 @@ const Messages = () => {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="psych-empty">No favorites saved.</p>
+                                    <p className="msg-psych-empty">No favorites saved.</p>
                                 )}
                             </div>
                         </div>
@@ -1254,20 +1309,21 @@ const Messages = () => {
                         activeId={activeConversation?.id}
                         onSelect={handleSelectConversation}
                     />
+                    </div>
                 </div>
 
-                <div className="messages-main">
+                <div className="msg-main">
                     {!activeConversation && visibleConversations.length === 0 && (
-                        <div className="empty-state">
+                        <div className="msg-empty-state">
                             <p>No conversations yet</p>
                             <span>Start a chat to see it here.</span>
                         </div>
                     )}
                     {user?.role === 'employee' && (
-                        <div className="employee-support-toggle">
+                        <div className="msg-support-toggle">
                             <button
                                 type="button"
-                                className="btn btn-outline btn-small"
+                                className="msg-btn msg-btn-outline msg-btn-small"
                                 onClick={() => setShowSupportPanel((prev) => !prev)}
                             >
                                 {showSupportPanel ? 'Hide support insights' : 'Show support insights'}
@@ -1275,41 +1331,41 @@ const Messages = () => {
                         </div>
                     )}
                     {user?.role === 'employee' && showSupportPanel && (
-                        <div className="employee-support-panel">
+                        <div className="msg-support-panel">
                             {chatUsage && (
-                                <section className="chat-usage-card">
+                                <section className="msg-chat-usage-card">
                                     <div>
-                                        <p className="status-label">Today's chat time</p>
+                                        <p className="msg-status-label">Today's chat time</p>
                                         <h4>{chatUsage.remaining} minutes remaining</h4>
-                                    <p className="conversation-status-subtitle">
-                                        Used {chatUsage.used} / {chatUsage.limit} minutes
-                                    </p>
-                                    {chatUsage.remaining <= 0 && (
-                                        <p className="upgrade-reminder">
-                                            Daily limit reached. Come back tomorrow for more chats.
+                                        <p className="msg-status-subtitle">
+                                            Used {chatUsage.used} / {chatUsage.limit} minutes
                                         </p>
-                                    )}
-                                </div>
-                                {psychologistDeletedNotice && (
-                                    <div className="upgrade-reminder" style={{ marginTop: '0.75rem' }}>
-                                        <FaExclamationTriangle />
-                                        <span>{psychologistDeletedNotice}</span>
+                                        {chatUsage.remaining <= 0 && (
+                                            <p className="msg-upgrade-reminder">
+                                                Daily limit reached. Come back tomorrow for more chats.
+                                            </p>
+                                        )}
                                     </div>
-                                )}
-                                {psychologistDeletedNotice && featuredPsychologist && ((chatUsage?.remaining ?? 0) > 0) && (
-                                    <button
-                                        className="btn btn-outline btn-small"
-                                        onClick={() => handleRequestPsychologist(featuredPsychologist)}
-                                    >
-                                        Request a new psychologist
-                                    </button>
-                                )}
-                            </section>
+                                    {psychologistDeletedNotice && (
+                                        <div className="msg-upgrade-reminder" style={{ marginTop: '0.75rem' }}>
+                                            <FaExclamationTriangle />
+                                            <span>{psychologistDeletedNotice}</span>
+                                        </div>
+                                    )}
+                                    {psychologistDeletedNotice && featuredPsychologist && ((chatUsage?.remaining ?? 0) > 0) && (
+                                        <button
+                                            className="msg-btn msg-btn-outline msg-btn-small"
+                                            onClick={() => handleRequestPsychologist(featuredPsychologist)}
+                                        >
+                                            Request a new psychologist
+                                        </button>
+                                    )}
+                                </section>
                             )}
-                            <section className="available-psych-card">
-                                <div className="available-psych-card__header">
+                            <section className="msg-psych-card">
+                                <div className="msg-psych-card__header">
                                     <span>Available psychologist</span>
-                                    <span className="available-psych-card__tier">
+                                    <span className="msg-psych-card__tier">
                                         {isPaidTier ? 'Premium access' : 'Free tier'}
                                     </span>
                                 </div>
@@ -1317,12 +1373,12 @@ const Messages = () => {
                                     <>
                                         <h3>{featuredPsychologist.display_name}</h3>
                                         {featuredSpecialization ? (
-                                            <p className="available-psych-card__role">{featuredSpecialization}</p>
+                                            <p className="msg-psych-card__role">{featuredSpecialization}</p>
                                         ) : (
-                                            <p className="available-psych-card__role">Certified therapists standing by</p>
+                                            <p className="msg-psych-card__role">Certified therapists standing by</p>
                                         )}
                                         {(featuredPsychologist.years_of_experience || featuredLanguages) && (
-                                            <p className="available-psych-card__meta">
+                                            <p className="msg-psych-card__meta">
                                                 {featuredPsychologist.years_of_experience
                                                     ? `${featuredPsychologist.years_of_experience} years experience`
                                                     : ''}
@@ -1330,26 +1386,26 @@ const Messages = () => {
                                                 {featuredLanguages}
                                             </p>
                                         )}
-                                        <p className="available-psych-card__note">
+                                        <p className="msg-psych-card__note">
                                             {featuredPsychologist.biography
                                                 || 'Private support from licensed practitioners is available for every request.'}
                                         </p>
                                     </>
                                 ) : (
-                                    <p className="available-psych-card__note">
+                                    <p className="msg-psych-card__note">
                                         No psychologist recommended yet.
                                     </p>
                                 )}
-                                <div className="available-psych-card__actions">
+                                <div className="msg-psych-card__actions">
                                     <button
-                                        className="btn btn-primary btn-small"
+                                        className="msg-btn msg-btn-primary msg-btn-small"
                                         onClick={() => handleRequestPsychologist(featuredPsychologist)}
                                         disabled={!canRequestSupport || allocationModal.loading || !featuredPsychologist}
                                     >
                                         {allocationModal.loading ? 'Requesting...' : 'Request private support'}
                                     </button>
                                     <button
-                                        className="btn btn-outline btn-small"
+                                        className="msg-btn msg-btn-outline msg-btn-small"
                                         onClick={() => {
                                             if (!featuredPsychologist) return;
                                             if (isFeaturedFavorited) {
@@ -1367,47 +1423,47 @@ const Messages = () => {
                                             href={featuredPsychologist.website}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="btn btn-outline btn-small"
+                                            className="msg-btn msg-btn-outline msg-btn-small"
                                         >
                                             View profile
                                         </a>
                                     )}
                                 </div>
-                                <p className="available-psych-card__note available-psych-card__note--muted">
+                                <p className="msg-psych-card__note msg-psych-card__note--muted">
                                     Free employees are limited to one psychologist at a time. {autoDeleteNote}
                                 </p>
                             </section>
 
-                            <section className="conversation-status-card">
-                                <div className="conversation-status-header">
+                            <section className="msg-status-card">
+                                <div className="msg-status-header">
                                     <div>
-                                        <p className="status-label">Current Psychologist</p>
+                                        <p className="msg-status-label">Current Psychologist</p>
                                         <h4>{currentPsychologist?.display_name || 'Awaiting support'}</h4>
                                         {currentSpecialization && (
-                                            <p className="conversation-status-subtitle">{currentSpecialization}</p>
+                                            <p className="msg-status-subtitle">{currentSpecialization}</p>
                                         )}
                                     </div>
-                                    <span className={`status-badge ${isConversationExpired ? 'warning' : 'active'}`}>
+                                    <span className={`msg-status-badge ${isConversationExpired ? 'warning' : 'active'}`}>
                                         {isConversationExpired ? 'Session ended' : 'Active'}
                                     </span>
                                 </div>
-                                <div className="conversation-status-line">
+                                <div className="msg-status-line">
                                     <FaClock /> {timeLabel}
                                 </div>
-                                <div className="conversation-progress">
-                                    <div className="progress-track">
-                                        <div className="progress-fill" style={{ width: `${sessionProgress}%` }} />
+                                <div className="msg-status-progress">
+                                    <div className="msg-progress-track">
+                                        <div className="msg-progress-fill" style={{ width: `${sessionProgress}%` }} />
                                     </div>
-                                    <p className="progress-text">
+                                    <p className="msg-progress-text">
                                         {sessionLimitMinutes} minute limit • Auto-deletes when time runs out
                                     </p>
                                 </div>
-                                <div className="conversation-status-line">
+                                <div className="msg-status-line">
                                     {hasResponse ? 'Psychologist has replied' : 'Waiting for a reply'}
                                 </div>
-                                <div className="conversation-status-actions">
+                                <div className="msg-status-actions">
                                     <button
-                                        className="btn btn-outline btn-small"
+                                        className="msg-btn msg-btn-outline msg-btn-small"
                                         onClick={handleVideoCall}
                                         disabled={!canStartVideoCall || isFreeEmployee}
                                           title={isFreeEmployee ? callRestrictionCopy : undefined}
@@ -1415,7 +1471,7 @@ const Messages = () => {
                                         <FaVideo /> Setup video call
                                     </button>
                                     <button
-                                        className="btn btn-secondary btn-small"
+                                        className="msg-btn msg-btn-secondary msg-btn-small"
                                         onClick={handleViewHistory}
                                         disabled={!activeConversation}
                                     >
@@ -1423,7 +1479,7 @@ const Messages = () => {
                                     </button>
                                     {isConversationExpired && (chatUsage?.remaining ?? 0) > 0 && (
                                         <button
-                                            className="btn btn-primary btn-small"
+                                            className="msg-btn msg-btn-primary msg-btn-small"
                                             onClick={handleExtendSession}
                                             disabled={extendingSession}
                                         >
@@ -1432,7 +1488,7 @@ const Messages = () => {
                                     )}
                                 </div>
                                 {isConversationExpired && (chatUsage?.remaining ?? 0) > 0 && (
-                                    <div className="conversation-extend-control">
+                                    <div className="msg-extend">
                                         <label>
                                             Minutes
                                             <input
@@ -1451,7 +1507,7 @@ const Messages = () => {
                                     </div>
                                 )}
                                   {showUpgradeReminder && (
-                                      <div className="upgrade-reminder">
+                                      <div className="msg-upgrade-reminder">
                                           <FaExclamationTriangle />
                                           <span>
                                               {isConversationExpired
@@ -1461,7 +1517,7 @@ const Messages = () => {
                                       </div>
                                   )}
                                   {isFreeEmployee && (
-                                      <div className="upgrade-reminder" style={{ marginTop: '0.75rem' }}>
+                                      <div className="msg-upgrade-reminder" style={{ marginTop: '0.75rem' }}>
                                           <FaLock />
                                           <span>
                                               {callRestrictionCopy} Psychologists can still initiate a call with you.
@@ -1470,7 +1526,7 @@ const Messages = () => {
                                   )}
                             </section>
 
-                            <section className="messages-sponsored-slot">
+                            <section className="msg-sponsored-slot">
                                    <SponsoredCard
                                     placement="category"
                                     behaviors={[userRole, featuredSpecialization].filter(Boolean)}
@@ -1481,7 +1537,7 @@ const Messages = () => {
                     )}
 
                     <div
-                        className="messages-thread-wrapper"
+                        className="msg-thread-wrapper"
                         onWheel={(event) => event.stopPropagation()}
                         onTouchMove={(event) => event.stopPropagation()}
                     >
@@ -1504,49 +1560,49 @@ const Messages = () => {
                 </div>
             </div>
             {(callState.status === 'calling' || callState.status === 'incoming' || callState.status === 'in-call') && (
-                <div className="call-overlay">
-                    <div className={`call-modal ${callView}`} ref={callModalRef}>
-                        <div className="call-header">
+                <div className="msg-call-overlay">
+                    <div className={`msg-call-modal ${callView}`} ref={callModalRef}>
+                        <div className="msg-call-header">
                             <h3>{callState.mediaType === 'voice' ? 'Voice Call' : 'Video Call'}</h3>
                             {callState.status === 'incoming' && <span>Incoming call...</span>}
                             {callState.status === 'calling' && <span>Calling...</span>}
                             {callState.status === 'in-call' && <span>Connected • {new Date(callDurationSec * 1000).toISOString().substr(11, 8)}</span>}
                         </div>
                         {callState.status === 'in-call' && (
-                            <div className="call-status-badge">On call</div>
+                            <div className="msg-call-status-badge">On call</div>
                         )}
-                        <div className="call-videos">
-                            <video ref={remoteVideoRef} autoPlay playsInline className="call-video remote" />
-                            <video ref={localVideoRef} autoPlay playsInline muted className="call-video local" />
+                        <div className="msg-call-videos">
+                            <video ref={remoteVideoRef} autoPlay playsInline className="msg-call-video remote" />
+                            <video ref={localVideoRef} autoPlay playsInline muted className="msg-call-video local" />
                         </div>
-                        <div className="call-actions">
+                        <div className="msg-call-actions">
                             {callState.status === 'incoming' ? (
                                 <>
-                                    <button className="btn btn-primary" onClick={acceptCall}>Accept</button>
-                                    <button className="btn btn-secondary" onClick={declineCall}>Decline</button>
+                                    <button className="msg-btn msg-btn-primary" onClick={acceptCall}>Accept</button>
+                                    <button className="msg-btn msg-btn-secondary" onClick={declineCall}>Decline</button>
                                 </>
                             ) : (
                                 <>
-                                    <button className="btn btn-outline btn-small" onClick={toggleMute}>
+                                    <button className="msg-btn msg-btn-outline msg-btn-small" onClick={toggleMute}>
                                         {isMuted ? 'Unmute' : 'Mute'}
                                     </button>
                                     {callState.mediaType === 'video' && (
-                                        <button className="btn btn-outline btn-small" onClick={toggleCamera}>
+                                        <button className="msg-btn msg-btn-outline msg-btn-small" onClick={toggleCamera}>
                                             {isCameraOff ? 'Camera On' : 'Camera Off'}
                                         </button>
                                     )}
-                                    <button className="btn btn-outline btn-small" onClick={toggleCallView}>
+                                    <button className="msg-btn msg-btn-outline msg-btn-small" onClick={toggleCallView}>
                                         {callView === 'expanded' ? 'Compact' : 'Expand'}
                                     </button>
-                                    <button className="btn btn-outline btn-small" onClick={toggleFullscreen}>
+                                    <button className="msg-btn msg-btn-outline msg-btn-small" onClick={toggleFullscreen}>
                                         Fullscreen
                                     </button>
-                                    <button className="btn btn-secondary" onClick={() => endCall(true)}>End Call</button>
+                                    <button className="msg-btn msg-btn-secondary" onClick={() => endCall(true)}>End Call</button>
                                 </>
                             )}
                         </div>
                         {callState.status === 'in-call' && supportsAudioOutput && audioOutputs.length > 0 && (
-                            <div className="call-audio-output">
+                            <div className="msg-call-audio-output">
                                 <label>
                                     Speaker
                                     <select
@@ -1568,10 +1624,17 @@ const Messages = () => {
             )}
             {isSidebarOpen && isMobileView && (
                 <div
-                    className="messages-sidebar-overlay"
+                    className="msg-sidebar-overlay"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
+            <SessionRatingModal
+                open={Boolean(activeRatingSession)}
+                session={activeRatingSession}
+                submitting={ratingSubmitting}
+                onSubmit={handleSubmitRating}
+                onSkip={handleSkipRating}
+            />
             <ChatAllocationModal
                 open={allocationModal.open}
                 psychologist={allocationModal.psychologist}
@@ -1586,3 +1649,12 @@ const Messages = () => {
 };
 
 export default Messages;
+
+
+
+
+
+
+
+
+

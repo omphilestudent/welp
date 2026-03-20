@@ -57,62 +57,62 @@ const ChatRequestModal = ({ isOpen, onClose, onSuccess }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="modal-overlay">
+        <div className="msg-modal-overlay">
             <motion.div
-                className="modal-content chat-request-modal"
+                className="msg-modal-content msg-chat-request-modal"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
             >
-                <div className="modal-header">
+                <div className="msg-modal-header">
                     <h2>Request Chat with Psychologist</h2>
-                    <button className="close-btn" onClick={onClose}>
+                    <button className="msg-close-btn" onClick={onClose}>
                         <FaTimes />
                     </button>
                 </div>
 
-                <div className="modal-body">
+                <div className="msg-modal-body">
                     {fetching ? (
-                        <div className="loading-inline">
-                            <span className="spinner" aria-hidden="true"></span>
+                        <div className="msg-loading-inline">
+                            <span className="msg-spinner" aria-hidden="true"></span>
                             <span>Loading psychologists...</span>
                         </div>
                     ) : (
                         <>
-                            <div className="psychologists-list">
+                            <div className="msg-request-psych-list">
                                 <h3>Available Psychologists</h3>
                                 {psychologists.length === 0 ? (
-                                    <p className="no-psychologists">No psychologists available at the moment</p>
+                                    <p className="msg-request-psych-empty">No psychologists available at the moment</p>
                                 ) : (
                                     psychologists.map(psych => (
                                         <div
                                             key={psych.id}
-                                            className={`psychologist-card ${selectedPsychologist?.id === psych.id ? 'selected' : ''}`}
+                                            className={`msg-request-psych-card ${selectedPsychologist?.id === psych.id ? 'is-selected' : ''}`}
                                             onClick={() => setSelectedPsychologist(psych)}
                                         >
-                                            <div className="psychologist-avatar">
+                                            <div className="msg-request-psych-avatar">
                                                 {psych.avatar_url ? (
                                                     <AvatarImage src={psych.avatar_url} alt={psych.display_name} />
                                                 ) : (
-                                                    <div className="avatar-placeholder">
+                                                    <div className="msg-request-psych-avatar-placeholder">
                                                         {psych.display_name?.charAt(0) || 'P'}
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="psychologist-info">
+                                            <div className="msg-request-psych-info">
                                                 <h4>
                                                     {psych.display_name || 'Unknown'}
                                                     {psych.is_verified && (
-                                                        <FaCheckCircle className="verified-badge" title="Verified" />
+                                                        <FaCheckCircle className="msg-request-psych-verified" title="Verified" />
                                                     )}
                                                 </h4>
-                                                <p className="specialization">
+                                                <p className="msg-request-psych-specialization">
                                                     {psych.specialization?.slice(0, 3).join(' • ') || 'General Psychology'}
                                                 </p>
-                                                <p className="experience">{psych.years_of_experience || 0} years experience</p>
+                                                <p className="msg-request-psych-experience">{psych.years_of_experience || 0} years experience</p>
                                             </div>
                                             {selectedPsychologist?.id === psych.id && (
-                                                <FaCheckCircle className="selected-icon" />
+                                                <FaCheckCircle className="msg-request-psych-selected" />
                                             )}
                                         </div>
                                     ))
@@ -120,13 +120,13 @@ const ChatRequestModal = ({ isOpen, onClose, onSuccess }) => {
                             </div>
 
                             {selectedPsychologist && (
-                                <div className="message-section">
+                                <div className="msg-section">
                                     <h3>Send a Message (Optional)</h3>
                                     <textarea
                                         value={message}
                                         onChange={(e) => setMessage(e.target.value)}
                                         placeholder="Introduce yourself and explain why you'd like to chat..."
-                                        className="form-textarea"
+                                        className="msg-textarea"
                                         rows="4"
                                     />
                                 </div>
@@ -135,14 +135,14 @@ const ChatRequestModal = ({ isOpen, onClose, onSuccess }) => {
                     )}
                 </div>
 
-                <div className="modal-footer">
-                    <button onClick={onClose} className="btn btn-secondary">
+                <div className="msg-modal-footer">
+                    <button onClick={onClose} className="msg-btn msg-btn-secondary">
                         Cancel
                     </button>
                     <button
                         onClick={handleSubmit}
                         disabled={!selectedPsychologist || loading}
-                        className="btn btn-primary"
+                        className="msg-btn msg-btn-primary"
                     >
                         <FaComment /> {loading ? 'Sending...' : 'Send Request'}
                     </button>
@@ -153,3 +153,5 @@ const ChatRequestModal = ({ isOpen, onClose, onSuccess }) => {
 };
 
 export default ChatRequestModal;
+
+
