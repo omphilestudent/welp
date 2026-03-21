@@ -3,6 +3,8 @@ const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const { requireBusinessFeature } = require('../middleware/businessPlan');
 const { authorizeAdmin } = require('../middleware/adminAuth');
+const { param } = require('express-validator');
+const { validate } = require('../middleware/validation');
 const upload = require('../middleware/upload');
 const adsController = require('../controllers/adsController');
 const { logAdFailure } = require('../services/adsService');
@@ -52,9 +54,11 @@ const handleMediaUpload = (req, res, next) => {
 // ==================== PUBLIC ROUTES ====================
 router.get('/', adsController.listCampaigns);
 router.get('/pricing', adsController.getAdPricing);
+const validateId = validate([param('id').isUUID().withMessage('Invalid id')]);
+
 router.get('/placement', adsController.getPlacementAds);
-router.post('/:id/impression', adsController.recordImpression);
-router.post('/:id/click', adsController.recordClick);
+router.post('/:id/impression', validateId, adsController.recordImpression);
+router.post('/:id/click', validateId, adsController.recordClick);
 
 // ==================== BUSINESS ROUTES ====================
 router.use(authenticate);
@@ -66,30 +70,30 @@ const adminAuth = [authorizeAdmin()];
 router.get('/admin/list', adminAuth, adsController.adminListCampaigns);
 router.get('/admin/stats', adminAuth, adsController.adminGetStats);
 router.get('/admin/failures', adminAuth, adsController.adminListAdFailures);
-router.get('/admin/:id', adminAuth, adsController.adminGetCampaignDetails);
-router.get('/admin/:id/analytics', adminAuth, adsController.adminGetCampaignAnalytics);
+router.get('/admin/:id', adminAuth, validateId, adsController.adminGetCampaignDetails);
+router.get('/admin/:id/analytics', adminAuth, validateId, adsController.adminGetCampaignAnalytics);
 
 router.post('/admin/approve', adminAuth, adsController.adminApproveCampaign);
 router.post('/admin/reject', adminAuth, adsController.adminRejectCampaign);
 router.post('/admin/bulk-approve', adminAuth, adsController.adminBulkApprove);
 router.post('/admin/bulk-reject', adminAuth, adsController.adminBulkReject);
 
-router.post('/admin/:id/pause', adminAuth, adsController.adminPauseCampaign);
-router.post('/admin/:id/resume', adminAuth, adsController.adminResumeCampaign);
-router.post('/admin/:id/remove', adminAuth, adsController.adminRemoveCampaign);
-router.post('/admin/:id/feature', adminAuth, adsController.adminFeatureCampaign);
-router.delete('/admin/:id', adminAuth, adsController.adminDeleteCampaign);
+router.post('/admin/:id/pause', adminAuth, validateId, adsController.adminPauseCampaign);
+router.post('/admin/:id/resume', adminAuth, validateId, adsController.adminResumeCampaign);
+router.post('/admin/:id/remove', adminAuth, validateId, adsController.adminRemoveCampaign);
+router.post('/admin/:id/feature', adminAuth, validateId, adsController.adminFeatureCampaign);
+router.delete('/admin/:id', adminAuth, validateId, adsController.adminDeleteCampaign);
 
 router.get('/admin/export/csv', adminAuth, adsController.adminExportCampaigns);
 router.get('/admin/export/report', adminAuth, adsController.adminGenerateReport);
-router.get('/admin/:id/audit', adminAuth, adsController.adminGetAuditLog);
+router.get('/admin/:id/audit', adminAuth, validateId, adsController.adminGetAuditLog);
 
 router.get('/me', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.listMyCampaigns);
 router.get('/invoices', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.listMyInvoices);
-router.get('/invoices/:id/download', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.downloadInvoice);
+router.get('/invoices/:id/download', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), validateId, adsController.downloadInvoice);
 router.post('/', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), handleMediaUpload, adsController.createCampaign);
-router.put('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), handleMediaUpload, adsController.updateCampaign);
-router.delete('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.deleteCampaign);
-router.get('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), adsController.getCampaign);
+router.put('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), validateId, handleMediaUpload, adsController.updateCampaign);
+router.delete('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), validateId, adsController.deleteCampaign);
+router.get('/:id', authorize('business'), requireBusinessFeature('ads', { businessIdResolver: () => null }), validateId, adsController.getCampaign);
 
 module.exports = router;

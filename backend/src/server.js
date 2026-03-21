@@ -100,7 +100,7 @@ validateJwtSecret();
 const corsOptions = {
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps, curl, Postman)
-        if (!origin || frontendOrigins.includes(origin) || frontendOrigins.includes('*')) {
+        if (!origin || frontendOrigins.includes(origin)) {
             return callback(null, true);
         }
 
@@ -113,6 +113,8 @@ const corsOptions = {
 };
 
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 
 // Socket.IO with better error handling
@@ -127,6 +129,11 @@ app.set('io', io);
 // Security middleware
 app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
+    frameguard: { action: 'deny' },
+    hsts: process.env.NODE_ENV === 'production'
+        ? { maxAge: 15552000, includeSubDomains: true, preload: true }
+        : false,
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],

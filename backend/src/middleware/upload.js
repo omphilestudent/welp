@@ -16,7 +16,17 @@ const getExtension = (filename) => path.extname(filename).toLowerCase();
 const fileFilter = (req, file, cb) => {
     const ext = getExtension(file.originalname);
     const allowed = Object.values(ALLOWED_EXTENSIONS).some((list) => list.includes(ext));
-    if (!allowed) {
+    const mime = String(file.mimetype || '').toLowerCase();
+    const allowedMime = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/gif',
+        'video/mp4',
+        'video/webm',
+        'video/quicktime'
+    ].includes(mime);
+    if (!allowed || !allowedMime) {
         return cb(new Error('Unsupported media format'));
     }
     cb(null, true);

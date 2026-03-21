@@ -715,8 +715,18 @@ const downloadInvoice = async (req, res) => {
             invoice = { ...invoice, invoice_url: invoiceUrl };
         }
 
-        const filename = invoice.invoice_url.split('/').pop();
+        if (invoice.invoice_url && /^https?:\/\//i.test(invoice.invoice_url)) {
+            return res.redirect(invoice.invoice_url);
+        }
+
+        const filename = path.basename(String(invoice.invoice_url || ''));
+        if (!filename) {
+            return res.status(404).json({ success: false, error: 'Invoice file not found' });
+        }
         const filePath = path.join(__dirname, '../../uploads/invoices', filename);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ success: false, error: 'Invoice file not found' });
+        }
         return res.download(filePath, filename);
     } catch (error) {
         console.error('Download invoice error:', error);

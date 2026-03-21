@@ -48,7 +48,7 @@ const listAds = async (req, res) => {
             });
         }
 
-        const limit = Math.min(Number(req.query.limit) || 25, 100);
+        const limit = Math.min(Math.max(Number(req.query.limit) || 25, 1), 100);
         const page = Math.max(Number(req.query.page) || 1, 1);
         const offset = (page - 1) * limit;
 
@@ -104,6 +104,7 @@ const listAds = async (req, res) => {
 
         const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
 
+        const adsParams = [...params, limit, offset];
         const [adsResult, countResult] = await Promise.all([
             query(
                 `SELECT c.*,
@@ -115,8 +116,8 @@ const listAds = async (req, res) => {
                  LEFT JOIN users u ON b.owner_user_id = u.id
                  ${whereClause}
                  ORDER BY c.submitted_at DESC NULLS LAST
-                 LIMIT ${limit} OFFSET ${offset}`,
-                params
+                 LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+                adsParams
             ),
             query(
                 `SELECT COUNT(*)::int AS total
