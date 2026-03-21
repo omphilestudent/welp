@@ -11,6 +11,10 @@ const {
     logout,
     refreshToken
 } = require('../controllers/authController');
+const {
+    startGoogleOAuth,
+    handleGoogleOAuthCallback
+} = require('../controllers/authController');
 
 const { authenticate } = require('../middleware/auth');
 const { authLimiter, loginLimiter } = require('../middleware/rateLimiter');
@@ -23,6 +27,8 @@ router.post('/register/business', authLimiter, registerBusiness);
 router.post('/login', loginLimiter, validate(loginValidation), login);
 router.post('/logout', logout);
 router.post('/refresh', refreshToken);
+router.get('/google', startGoogleOAuth);
+router.get('/google/callback', handleGoogleOAuthCallback);
 
 // Protected
 router.get('/me', authenticate, getMe);

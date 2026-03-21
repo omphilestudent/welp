@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { registerEmployee } from '../services/registrationService';
@@ -41,6 +41,10 @@ const ROLES = [
 const Register = () => {
     const [step, setStep]               = useState('choose'); // 'choose' | 'employee-form'
     const [selectedRole, setSelectedRole] = useState(null);
+    const [searchParams] = useSearchParams();
+    const socialProvider = searchParams.get('social');
+    const socialToken = searchParams.get('token');
+    const isSocial = Boolean(socialProvider && socialToken);
     const navigate                      = useNavigate();
 
     const handleRoleSelect = (role) => {
@@ -48,9 +52,9 @@ const Register = () => {
             setSelectedRole(role);
             setStep('employee-form');
         } else if (role.key === 'psychologist') {
-            navigate('/register/psychologist');
+            navigate(isSocial ? `/register/psychologist?social=${encodeURIComponent(socialProvider)}&token=${encodeURIComponent(socialToken)}` : '/register/psychologist');
         } else if (role.key === 'business') {
-            navigate('/register/business');
+            navigate(isSocial ? `/register/business?social=${encodeURIComponent(socialProvider)}&token=${encodeURIComponent(socialToken)}` : '/register/business');
         }
     };
 
@@ -71,7 +75,7 @@ const Register = () => {
                         <div className="reg-header">
                             <Link to="/" className="reg-logo">Welp</Link>
                             <h1>Join Welp</h1>
-                            <p>Choose how you'll use the platform</p>
+                            <p>{isSocial ? `Continue with ${socialProvider}` : "Choose how you'll use the platform"}</p>
                         </div>
 
                         <div className="reg-role-grid">
@@ -114,7 +118,11 @@ const Register = () => {
                         <button className="reg-back-btn" onClick={() => setStep('choose')}>
                             ← Back
                         </button>
-                        <EmployeeRegistrationForm />
+                        <EmployeeRegistrationForm
+                            socialProvider={socialProvider}
+                            socialToken={socialToken}
+                            isSocial={isSocial}
+                        />
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -123,7 +131,7 @@ const Register = () => {
 };
 
 // ─── Employee registration (inline, stays on this page) ──────────────────────
-const EmployeeRegistrationForm = () => {
+const EmployeeRegistrationForm = ({ isSocial, socialToken, socialProvider }) => {
     const navigate = useNavigate();
     const [form, setForm] = useState({
         displayName: '', email: '', password: '', confirmPassword: '',
@@ -132,23 +140,41 @@ const EmployeeRegistrationForm = () => {
     const [loading, setLoading] = useState(false);
     const [showPw, setShowPw]   = useState(false);
 
+    useEffect(() => {
+        if (!isSocial || !socialToken) return;
+        try {
+            const tokenPayload = socialToken.split('.')[1];
+            const normalized = tokenPayload.replace(/-/g, '+').replace(/_/g, '/');
+            const decoded = JSON.parse(atob(normalized));
+            setForm((prev) => ({
+                ...prev,
+                email: decoded?.email || prev.email,
+                displayName: decoded?.name || prev.displayName
+            }));
+        } catch (error) {
+            // ignore decode errors
+        }
+    }, [isSocial, socialToken]);
+
     const set = (field) => (e) =>
         setForm(f => ({ ...f, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!form.agreeTerms) return toast.error('Please accept the terms of service');
-        if (form.password !== form.confirmPassword) return toast.error('Passwords do not match');
-        if (form.password.length < 8) return toast.error('Password must be at least 8 characters');
+        e.preventDefault();        if (!form.agreeTerms) return toast.error('Please accept the terms of service');
+        if (!isSocial) {
+            if (form.password !== form.confirmPassword) return toast.error('Passwords do not match');
+            if (form.password.length < 8) return toast.error('Password must be at least 8 characters');
+        }
 
         setLoading(true);
         try {
             const data = await registerEmployee({
                 email:       form.email,
-                password:    form.password,
+                password:    isSocial ? undefined : form.password,
                 displayName: form.displayName,
                 role:        'employee',
                 isAnonymous: form.isAnonymous,
+                socialToken: isSocial ? socialToken : undefined
             });
 
             if (data.token) {
@@ -172,6 +198,7 @@ const EmployeeRegistrationForm = () => {
     };
 
     const strength = (() => {
+        if (isSocial) return 0;
         const p = form.password;
         if (!p) return 0;
         let s = 0;
@@ -186,7 +213,7 @@ const EmployeeRegistrationForm = () => {
         <div className="reg-form-wrap">
             <div className="reg-header">
                 <span className="reg-role-badge">👤 Employee</span>
-                <h1>Create your account</h1>
+                <h1>{isSocial ? `Continue with ${socialProvider}` : 'Create your account'}</h1>
                 <p>Free forever · Anonymous option available</p>
             </div>
 
@@ -211,45 +238,51 @@ const EmployeeRegistrationForm = () => {
                         value={form.email}
                         onChange={set('email')}
                         required
+                        readOnly={isSocial}
                     />
                 </div>
 
-                <div className="reg-field">
-                    <label>Password</label>
-                    <div className="reg-pw-wrap">
+                {!isSocial && (
+                    <div className="reg-field">
+                        <label>Password</label>
+                        <div className="reg-pw-wrap">
+                            <input
+                                type={showPw ? 'text' : 'password'}
+                                placeholder="Min 8 characters"
+                                value={form.password}
+                                onChange={set('password')}
+                                required
+                            />
+                            <button type="button" className="reg-pw-toggle" onClick={() => setShowPw(s => !s)}>
+                                {showPw ? '🙈' : '👁️'}
+                            </button>
+                        </div>
+                        {form.password && (
+                            <div className="reg-pw-strength">
+                                {[1,2,3,4].map(i => (
+                                    <span key={i} className={`reg-pw-bar ${strength >= i ? `strength-${strength}` : ''}`} />
+                                ))}
+                                <span className="reg-pw-label">
+                                    {['', 'Weak', 'Fair', 'Good', 'Strong'][strength]}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )
+
+                {!isSocial && (
+                    <div className="reg-field">
+                        <label>Confirm password</label>
                         <input
                             type={showPw ? 'text' : 'password'}
-                            placeholder="Min 8 characters"
-                            value={form.password}
-                            onChange={set('password')}
+                            placeholder="Repeat password"
+                            value={form.confirmPassword}
+                            onChange={set('confirmPassword')}
                             required
                         />
-                        <button type="button" className="reg-pw-toggle" onClick={() => setShowPw(s => !s)}>
-                            {showPw ? '🙈' : '👁️'}
-                        </button>
                     </div>
-                    {form.password && (
-                        <div className="reg-pw-strength">
-                            {[1,2,3,4].map(i => (
-                                <span key={i} className={`reg-pw-bar ${strength >= i ? `strength-${strength}` : ''}`} />
-                            ))}
-                            <span className="reg-pw-label">
-                                {['', 'Weak', 'Fair', 'Good', 'Strong'][strength]}
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="reg-field">
-                    <label>Confirm password</label>
-                    <input
-                        type={showPw ? 'text' : 'password'}
-                        placeholder="Repeat password"
-                        value={form.confirmPassword}
-                        onChange={set('confirmPassword')}
-                        required
-                    />
-                </div>
+                )}
+                )})}
 
                 <label className="reg-checkbox">
                     <input type="checkbox" checked={form.isAnonymous} onChange={set('isAnonymous')} />

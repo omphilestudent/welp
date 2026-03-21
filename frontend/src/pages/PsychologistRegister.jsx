@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { registerPsychologist } from '../services/registrationService';
@@ -46,8 +46,28 @@ const empty = {
 
 const PsychologistRegister = () => {
     const navigate       = useNavigate();
+    const [searchParams] = useSearchParams();
+    const socialProvider = searchParams.get('social');
+    const socialToken = searchParams.get('token');
+    const isSocial = Boolean(socialProvider && socialToken);
     const [step, setStep] = useState(0);
     const [form, setForm] = useState(empty);
+
+    useEffect(() => {
+        if (!isSocial || !socialToken) return;
+        try {
+            const tokenPayload = socialToken.split('.')[1];
+            const normalized = tokenPayload.replace(/-/g, '+').replace(/_/g, '/');
+            const decoded = JSON.parse(atob(normalized));
+            setForm((prev) => ({
+                ...prev,
+                email: decoded?.email || prev.email,
+                displayName: decoded?.name || prev.displayName
+            }));
+        } catch (error) {
+            // ignore decode errors
+        }
+    }, [isSocial, socialToken]);
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [showPw, setShowPw]       = useState(false);
@@ -118,8 +138,10 @@ const PsychologistRegister = () => {
         if (step === 0) {
             if (!form.displayName) return 'Full name is required';
             if (!form.email)       return 'Email is required';
-            if (!form.password || form.password.length < 8) return 'Password must be at least 8 characters';
-            if (form.password !== form.confirmPassword) return 'Passwords do not match';
+            if (!isSocial) {
+                if (!form.password || form.password.length < 8) return 'Password must be at least 8 characters';
+                if (form.password !== form.confirmPassword) return 'Passwords do not match';
+            }
         }
         if (step === 1) {
             if (!form.licenseNumber) return 'License / registration number is required';
@@ -154,7 +176,7 @@ const PsychologistRegister = () => {
         try {
             await registerPsychologist({
                 email:           form.email,
-                password:        form.password,
+                password:        isSocial ? undefined : form.password,
                 displayName:     form.displayName,
                 role:            'psychologist',
                 // Application fields
@@ -171,7 +193,8 @@ const PsychologistRegister = () => {
                 bio:             form.bio,
                 website:         form.website,
                 documents:       Object.values(documents),
-                skipDocuments
+                skipDocuments,
+                socialToken:    isSocial ? socialToken : undefined
             });
 
             setSubmitted(true);
@@ -267,21 +290,32 @@ const PsychologistRegister = () => {
                                     </div>
                                     <div className="reg-field">
                                         <label>Email address *</label>
-                                        <input type="email" value={form.email} onChange={set('email')} placeholder="you@clinic.com" required />
+                                        <input
+                                            type="email"
+                                            value={form.email}
+                                            onChange={set('email')}
+                                            placeholder="you@clinic.com"
+                                            required
+                                            readOnly={isSocial}
+                                        />
                                     </div>
-                                    <div className="reg-field">
-                                        <label>Password *</label>
-                                        <div className="reg-pw-wrap">
-                                            <input type={showPw ? 'text' : 'password'} value={form.password} onChange={set('password')} placeholder="Min 8 characters" />
-                                            <button type="button" className="reg-pw-toggle" onClick={() => setShowPw(s => !s)}>
-                                                {showPw ? '🙈' : '👁️'}
-                                            </button>
+                                    {!isSocial && (
+                                        <div className="reg-field">
+                                            <label>Password *</label>
+                                            <div className="reg-pw-wrap">
+                                                <input type={showPw ? 'text' : 'password'} value={form.password} onChange={set('password')} placeholder="Min 8 characters" />
+                                                <button type="button" className="reg-pw-toggle" onClick={() => setShowPw(s => !s)}>
+                                                    {showPw ? '🙈' : '👁️'}
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="reg-field">
-                                        <label>Confirm password *</label>
-                                        <input type={showPw ? 'text' : 'password'} value={form.confirmPassword} onChange={set('confirmPassword')} placeholder="Repeat password" />
-                                    </div>
+                                    )}
+                                    {!isSocial && (
+                                        <div className="reg-field">
+                                            <label>Confirm password *</label>
+                                            <input type={showPw ? 'text' : 'password'} value={form.confirmPassword} onChange={set('confirmPassword')} placeholder="Repeat password" />
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

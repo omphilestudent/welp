@@ -1633,7 +1633,7 @@ const Dashboard = () => {
                                 </p>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                {(kycStatus === 'not_submitted' || kycStatus === 'rejected') && (
+                                {!user?.documents_submitted && (
                                     <button className="btn btn-primary" onClick={() => setShowKycModal(true)}>
                                         Upload Documents
                                     </button>

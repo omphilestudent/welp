@@ -1,5 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const https = require('https');
+const crypto = require('crypto');
 const { query } = require('../utils/database');
 const { createAdminNotification } = require('../utils/adminNotifications');
 const { emitFlowEvent } = require('../services/flowEngine');
@@ -181,6 +183,74 @@ const assignStarterSubscription = async (userId, role = 'employee') => {
     }
 };
 
+const fetchJson = (url, options = {}) => new Promise((resolve, reject) => {
+    const req = https.request(url, options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+            try {
+                const parsed = JSON.parse(data || '{}');
+                if (res.statusCode && res.statusCode >= 400) {
+                    const error = new Error(parsed.error_description || parsed.error || 'Request failed');
+                    error.statusCode = res.statusCode;
+                    error.payload = parsed;
+                    return reject(error);
+                }
+                return resolve(parsed);
+            } catch (err) {
+                err.statusCode = res.statusCode;
+                return reject(err);
+            }
+        });
+    });
+    req.on('error', reject);
+    if (options.body) {
+        req.write(options.body);
+    }
+    req.end();
+});
+
+const buildFrontendRedirect = (token, fallback = '/') => {
+    const base = process.env.FRONTEND_URL || process.env.SITE_URL || 'http://localhost:5173';
+    const target = `${base.replace(/\/$/, '')}/oauth/callback?token=${encodeURIComponent(token)}`;
+    if (fallback) {
+        return `${target}&redirect=${encodeURIComponent(fallback)}`;
+    }
+    return target;
+};
+
+const buildFrontendSignupRedirect = (provider, token) => {
+    const base = process.env.FRONTEND_URL || process.env.SITE_URL || 'http://localhost:5173';
+    return `${base.replace(/\/$/, '')}/register?social=${encodeURIComponent(provider)}&token=${encodeURIComponent(token)}`;
+};
+
+const generateSocialSignupToken = (payload) => {
+    const secret = process.env.JWT_SECRET || 'changeme';
+    return jwt.sign(
+        {
+            purpose: 'social_signup',
+            ...payload
+        },
+        secret,
+        { expiresIn: process.env.JWT_SOCIAL_SIGNUP_EXPIRES_IN || '30m' }
+    );
+};
+
+const parseSocialSignupToken = (token) => {
+    try {
+        const secret = process.env.JWT_SECRET || 'changeme';
+        const decoded = jwt.verify(token, secret);
+        if (decoded?.purpose !== 'social_signup') {
+            throw new Error('Invalid social signup token');
+        }
+        return decoded;
+    } catch (error) {
+        const err = new Error('Invalid social signup token');
+        err.statusCode = 400;
+        throw err;
+    }
+};
+
 const generateToken = (user, options = {}) => {
     const role = String(user?.role || '').toLowerCase().trim();
     const isAdminRole = ['super_admin', 'superadmin', 'system_admin', 'admin', 'hr_admin'].includes(role);
@@ -247,16 +317,23 @@ const getUserByIdForProfile = async (userId) => {
     );
 };
 
-const validateRegistrationCredentials = (email, password) => {
-    if (!email || !password) {
-        const error = new Error('Email and password are required');
+const validateRegistrationCredentials = (email, password, options = {}) => {
+    if (!email) {
+        const error = new Error('Email is required');
         error.statusCode = 400;
         throw error;
     }
-    if (password.length < 8) {
-        const error = new Error('Password must be at least 8 characters');
-        error.statusCode = 400;
-        throw error;
+    if (!options.skipPassword) {
+        if (!password) {
+            const error = new Error('Email and password are required');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (password.length < 8) {
+            const error = new Error('Password must be at least 8 characters');
+            error.statusCode = 400;
+            throw error;
+        }
     }
     return String(email).toLowerCase().trim();
 };
@@ -273,9 +350,10 @@ const createUserAccount = async ({
     jobTitle,
     kycStatus,
     documentsSubmitted,
-    canUseProfile
+    canUseProfile,
+    skipPassword = false
 }) => {
-    const normalizedEmail = validateRegistrationCredentials(email, password);
+    const normalizedEmail = validateRegistrationCredentials(email, password, { skipPassword });
 
     const existing = await query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
     if (existing.rows.length > 0) {
@@ -284,7 +362,8 @@ const createUserAccount = async ({
         throw error;
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const rawPassword = skipPassword ? crypto.randomBytes(32).toString('hex') : password;
+    const passwordHash = await bcrypt.hash(rawPassword, 12);
 
     const hasIsActive = await columnExists('users', 'is_active');
     const hasIsVerified = await columnExists('users', 'is_verified');
@@ -366,16 +445,21 @@ const createUserAccount = async ({
 
 const registerEmployee = async (req, res) => {
     try {
-        const { email, password, displayName, isAnonymous = false } = req.body;
+        const { email, password, displayName, isAnonymous = false, socialToken, social_token } = req.body;
+        const socialPayload = socialToken || social_token ? parseSocialSignupToken(socialToken || social_token) : null;
+        const resolvedEmail = socialPayload?.email || email;
+        const resolvedName = socialPayload?.name || displayName;
+        const isVerified = socialPayload?.email_verified ?? true;
 
         const user = await createUserAccount({
-            email,
+            email: resolvedEmail,
             password,
             role: 'employee',
-            displayName,
+            displayName: resolvedName,
             isActive: true,
-            isVerified: true,
-            isAnonymous
+            isVerified,
+            isAnonymous,
+            skipPassword: Boolean(socialPayload)
         });
         await assignAccountNumberToUser(user.id, user.role).catch((error) => {
             console.warn('Employee account number assignment failed:', error.message);
@@ -445,8 +529,14 @@ const registerPsychologist = async (req, res) => {
             bio,
             website,
             documents,
-            skipDocuments
+            skipDocuments,
+            socialToken,
+            social_token
         } = req.body;
+        const socialPayload = socialToken || social_token ? parseSocialSignupToken(socialToken || social_token) : null;
+        const resolvedEmail = socialPayload?.email || email;
+        const resolvedName = socialPayload?.name || displayName;
+        const isVerified = socialPayload?.email_verified ?? false;
 
         console.log('[registerPsychologist] payload:', {
             email,
@@ -472,16 +562,17 @@ const registerPsychologist = async (req, res) => {
         const documentsSubmitted = !shouldSkipDocuments && hasDocuments;
 
         const user = await createUserAccount({
-            email,
+            email: resolvedEmail,
             password,
             role: 'psychologist',
-            displayName,
+            displayName: resolvedName,
             isActive: false,
-            isVerified: false,
+            isVerified,
             status: 'pending_review',
             kycStatus,
             documentsSubmitted,
-            canUseProfile: false
+            canUseProfile: false,
+            skipPassword: Boolean(socialPayload)
         });
         await assignAccountNumberToUser(user.id, user.role).catch((error) => {
             console.warn('Psychologist account number assignment failed:', error.message);
@@ -588,12 +679,12 @@ const registerPsychologist = async (req, res) => {
                 if (hasFullNameColumn) {
                     legacyCols.push('full_name');
                     legacyPlaceholders.push(`$${legacyIdx++}`);
-                    legacyParams.push(displayName || email.split('@')[0]);
+                    legacyParams.push(resolvedName || resolvedEmail.split('@')[0]);
                 }
                 if (hasEmailColumn) {
                     legacyCols.push('email');
                     legacyPlaceholders.push(`$${legacyIdx++}`);
-                    legacyParams.push(email.toLowerCase());
+                    legacyParams.push(resolvedEmail.toLowerCase());
                 }
 
                 const hasLicenseNumber = await columnExists('psychologist_applications', 'license_number');
@@ -712,7 +803,7 @@ const registerPsychologist = async (req, res) => {
         try {
             await createAdminNotification({
                 type: 'psychologist_application',
-                message: `New psychologist application from ${email}`,
+            message: `New psychologist application from ${resolvedEmail}`,
                 entityType: 'psychologist_application',
                 entityId: user.id
             });
@@ -796,8 +887,14 @@ const registerBusiness = async (req, res) => {
             claimCompanyId,
             howDidYouHear,
             documents,
-            contactPhone
+            contactPhone,
+            socialToken,
+            social_token
         } = req.body;
+        const socialPayload = socialToken || social_token ? parseSocialSignupToken(socialToken || social_token) : null;
+        const resolvedEmail = socialPayload?.email || email;
+        const resolvedName = socialPayload?.name || displayName;
+        const isVerified = socialPayload?.email_verified ?? false;
 
         if (!companyName) {
             return res.status(400).json({ error: 'Company name is required' });
@@ -840,14 +937,15 @@ const registerBusiness = async (req, res) => {
         }
 
         const user = await createUserAccount({
-            email,
+            email: resolvedEmail,
             password,
             role: 'business',
-            displayName,
+            displayName: resolvedName,
             isActive: false,
-            isVerified: false,
+            isVerified,
             status: 'pending_review',
-            jobTitle
+            jobTitle,
+            skipPassword: Boolean(socialPayload)
         });
         await assignAccountNumberToUser(user.id, user.role).catch((error) => {
             console.warn('Business account number assignment failed:', error.message);
@@ -873,8 +971,8 @@ const registerBusiness = async (req, res) => {
                 claim_company_id: claimCompanyId || null,
                 how_did_you_hear: howDidYouHear || null,
                 contact_information: {
-                    name: displayName,
-                    email: email.toLowerCase(),
+                    name: resolvedName,
+                    email: resolvedEmail.toLowerCase(),
                     phone: normalizedContactPhone,
                     jobTitle: jobTitle || null
                 }
@@ -1273,6 +1371,95 @@ const refreshToken = async (req, res) => {
     }
 };
 
+const startGoogleOAuth = async (req, res) => {
+    try {
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.BACKEND_URL || 'http://localhost:5000'}/auth/google/callback`;
+        if (!clientId) {
+            return res.status(500).json({ error: 'Google OAuth not configured' });
+        }
+        const state = crypto.randomBytes(16).toString('hex');
+        res.cookie('oauth_state', state, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
+        const params = new URLSearchParams({
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            response_type: 'code',
+            scope: 'openid email profile',
+            state,
+            prompt: 'consent',
+            access_type: 'offline'
+        });
+        return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+    } catch (error) {
+        console.error('Google OAuth start error:', error);
+        return res.status(500).json({ error: 'Unable to start Google OAuth' });
+    }
+};
+
+const handleGoogleOAuthCallback = async (req, res) => {
+    try {
+        const { code, state } = req.query;
+        const storedState = req.cookies?.oauth_state;
+        if (!code) {
+            return res.status(400).json({ error: 'Missing OAuth code' });
+        }
+        if (storedState && state !== storedState) {
+            return res.status(400).json({ error: 'Invalid OAuth state' });
+        }
+
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+        const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.BACKEND_URL || 'http://localhost:5000'}/auth/google/callback`;
+        if (!clientId || !clientSecret) {
+            return res.status(500).json({ error: 'Google OAuth not configured' });
+        }
+
+        const body = new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            code: String(code),
+            grant_type: 'authorization_code',
+            redirect_uri: redirectUri
+        }).toString();
+
+        const tokenPayload = await fetchJson('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body
+        });
+
+        const tokenInfo = tokenPayload.id_token
+            ? await fetchJson(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(tokenPayload.id_token)}`)
+            : null;
+
+        const email = tokenInfo?.email?.toLowerCase?.();
+        if (!email) {
+            return res.status(400).json({ error: 'Unable to read Google account email' });
+        }
+
+        const existing = await getUserByEmailForLogin(email);
+        const user = existing.rows[0];
+        if (!user) {
+            const signupToken = generateSocialSignupToken({
+                email,
+                name: tokenInfo?.name || email.split('@')[0],
+                provider: 'google',
+                email_verified: Boolean(tokenInfo?.email_verified)
+            });
+            res.clearCookie('oauth_state');
+            return res.redirect(buildFrontendSignupRedirect('google', signupToken));
+        }
+
+        const token = generateToken(user);
+        const redirectPath = req.query?.redirect || req.cookies?.oauth_redirect || '/';
+        res.clearCookie('oauth_state');
+        return res.redirect(buildFrontendRedirect(token, redirectPath));
+    } catch (error) {
+        console.error('Google OAuth callback error:', error);
+        return res.status(500).json({ error: error.message || 'Google OAuth failed' });
+    }
+};
+
 module.exports = {
     registerEmployee,
     registerPsychologist,
@@ -1281,5 +1468,7 @@ module.exports = {
     getMe,
     getSessionSettings,
     logout,
-    refreshToken
+    refreshToken,
+    startGoogleOAuth,
+    handleGoogleOAuthCallback
 };

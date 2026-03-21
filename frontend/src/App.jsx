@@ -10,6 +10,8 @@ import SystemNotificationBootstrapper from './components/system/SystemNotificati
 import InactivityManager from './components/system/InactivityManager';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import OAuthCallback from './pages/OAuthCallback';
+import GoogleOAuthRedirect from './pages/GoogleOAuthRedirect';
 import Register from './pages/Register';
 import CompanyPage from './pages/CompanyPage';
 import SearchPage from './pages/SearchPage';
@@ -119,6 +121,8 @@ function App() {
                                 {/* Public Routes */}
                                 <Route path="/" element={<Home />} />
                                 <Route path="/login" element={<Login />} />
+                                <Route path="/oauth/callback" element={<OAuthCallback />} />
+                                <Route path="/auth/google/callback" element={<GoogleOAuthRedirect />} />
                                 <Route path="/register" element={<Register />} />
                                 <Route path="/invite/:token" element={<InviteEvent />} />
                                 <Route path="/search" element={<SearchPage />} />

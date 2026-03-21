@@ -386,15 +386,24 @@ const applyApplicationAction = async ({
             }
             break;
         case 'approve':
-            nextStatus = 'approved';
-            updates.push('reviewed_at = CURRENT_TIMESTAMP');
-            setColumn('reviewed_by', adminId);
-            if (notes !== undefined) {
-                setColumn('admin_notes', notes || null);
-            }
-            if (type === 'psychologist') {
-                setColumn('kyc_status', 'approved');
-                setColumn('can_use_profile', true);
+            if (type === 'psychologist' && !current.documents_submitted) {
+                nextStatus = 'rejected';
+                updates.push('reviewed_at = CURRENT_TIMESTAMP');
+                setColumn('reviewed_by', adminId);
+                setColumn('admin_notes', notes || 'Rejected: missing required documents');
+                setColumn('kyc_status', 'rejected');
+                setColumn('can_use_profile', false);
+            } else {
+                nextStatus = 'approved';
+                updates.push('reviewed_at = CURRENT_TIMESTAMP');
+                setColumn('reviewed_by', adminId);
+                if (notes !== undefined) {
+                    setColumn('admin_notes', notes || null);
+                }
+                if (type === 'psychologist') {
+                    setColumn('kyc_status', 'approved');
+                    setColumn('can_use_profile', true);
+                }
             }
             break;
         case 'reject':
