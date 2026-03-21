@@ -606,6 +606,44 @@
     padding: 24px;
 }
 
+.remove-ad-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    color: var(--gray-700);
+    font-size: 14px;
+}
+
+.remove-ad-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.remove-ad-field textarea {
+    border-radius: 10px;
+    border: 1px solid var(--gray-300);
+    padding: 10px 12px;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.remove-ad-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--gray-600);
+}
+
+.remove-ad-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
 /* Details Content */
 .details-content {
     display: flex;

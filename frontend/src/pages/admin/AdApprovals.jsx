@@ -12,6 +12,7 @@ import {
     adminPauseAd,
     adminResumeAd,
     adminRemoveAd,
+    adminDeleteAd,
     adminGetAdDetails,
     adminGetAdAnalytics,
     adminListAdFailures
@@ -77,6 +78,12 @@ const AdApprovals = () => {
     const [failureLoading, setFailureLoading] = useState(false);
     const [currencyCode, setCurrencyCode] = useState('ZAR');
     const [currencySymbol, setCurrencySymbol] = useState('R');
+    const [removeDialog, setRemoveDialog] = useState({
+        open: false,
+        ad: null,
+        reason: '',
+        deletePermanently: false
+    });
 
     const getAdId = (ad) => ad?.id || ad?.campaign_id || ad?.campaignId;
     const normalizeReviewStatus = (status) => {
@@ -375,11 +382,29 @@ const AdApprovals = () => {
         }
     };
 
-    const handleRemoveAd = async (adId) => {
-        const reason = window.prompt('Provide a reason for removing this ad (optional):') || null;
+    const handleRemoveAd = (adId) => {
+        const ad = ads.find((entry) => getAdId(entry) === adId) || activeAds.find((entry) => getAdId(entry) === adId);
+        setRemoveDialog({
+            open: true,
+            ad: ad || { id: adId },
+            reason: '',
+            deletePermanently: false
+        });
+    };
+
+    const confirmRemoveAd = async () => {
+        if (!removeDialog.ad) return;
+        const adId = getAdId(removeDialog.ad);
         try {
-            await adminRemoveAd(adId, reason);
-            toast.success('Ad removed');
+            if (removeDialog.deletePermanently) {
+                await adminDeleteAd(adId);
+                toast.success('Ad deleted');
+            } else {
+                const reason = removeDialog.reason?.trim() || null;
+                await adminRemoveAd(adId, reason);
+                toast.success('Ad removed');
+            }
+            setRemoveDialog({ open: false, ad: null, reason: '', deletePermanently: false });
             fetchAds();
             fetchActiveAds();
         } catch (error) {
@@ -1013,6 +1038,53 @@ const AdApprovals = () => {
                         )}
                     </div>
                 )}
+            </Modal>
+
+            <Modal
+                isOpen={removeDialog.open}
+                onClose={() => setRemoveDialog({ open: false, ad: null, reason: '', deletePermanently: false })}
+                title="Remove ad"
+            >
+                <div className="remove-ad-modal">
+                    <p>
+                        This will stop the ad immediately. You can also permanently delete it.
+                    </p>
+                    <label className="remove-ad-field">
+                        <span>Removal reason (optional)</span>
+                        <textarea
+                            rows="3"
+                            value={removeDialog.reason}
+                            onChange={(e) => setRemoveDialog((prev) => ({ ...prev, reason: e.target.value }))}
+                            placeholder="Add a short note for audit logs..."
+                        />
+                    </label>
+                    <label className="remove-ad-checkbox">
+                        <input
+                            type="checkbox"
+                            checked={removeDialog.deletePermanently}
+                            onChange={(e) =>
+                                setRemoveDialog((prev) => ({ ...prev, deletePermanently: e.target.checked }))
+                            }
+                        />
+                        <span>Delete permanently (cannot be undone)</span>
+                    </label>
+                    <div className="remove-ad-actions">
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => setRemoveDialog({ open: false, ad: null, reason: '', deletePermanently: false })}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-danger"
+                            onClick={confirmRemoveAd}
+                        >
+                            {removeDialog.deletePermanently ? 'Delete Ad' : 'Remove Ad'}
+                        </button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );
