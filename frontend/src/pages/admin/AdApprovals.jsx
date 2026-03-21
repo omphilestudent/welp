@@ -1034,6 +1034,32 @@ const AdApprovals = () => {
                             </div>
                         )}
 
+                        <div className="ad-preview">
+                            <h4>Live Ad Preview</h4>
+                            <div className="ad-preview__card">
+                                <span className="ad-preview__badge">Sponsored</span>
+                                {Array.isArray(selectedAd.images) && selectedAd.images.length > 0 ? (
+                                    <img
+                                        src={selectedAd.images[0].asset_url}
+                                        alt={selectedAd.name}
+                                        className="ad-preview__image"
+                                    />
+                                ) : selectedAd.asset_url ? (
+                                    <img
+                                        src={selectedAd.asset_url}
+                                        alt={selectedAd.name}
+                                        className="ad-preview__image"
+                                    />
+                                ) : (
+                                    <div className="ad-preview__placeholder">No image available</div>
+                                )}
+                                <div className="ad-preview__content">
+                                    <h5>{selectedAd.name || 'Ad Campaign'}</h5>
+                                    <p>{selectedAd.business_name || 'Business'}</p>
+                                </div>
+                            </div>
+                        </div>
+
                         {selectedAd.rejection_reason && (
                             <div className="rejection-reason">
                                 <h4>Rejection Reason</h4>

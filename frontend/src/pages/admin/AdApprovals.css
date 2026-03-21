@@ -568,6 +568,7 @@
     max-height: 90vh;
     overflow-y: auto;
     animation: slideUp 0.3s;
+    margin: 0 auto;
 }
 
 .modal__header {
@@ -730,6 +731,65 @@
     font-size: 20px;
     font-weight: 600;
     color: var(--gray-900);
+}
+
+.ad-preview {
+    background: var(--gray-50);
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.ad-preview__card {
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    position: relative;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.ad-preview__badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #111827;
+    color: #fff;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    z-index: 1;
+}
+
+.ad-preview__image {
+    width: 100%;
+    display: block;
+    height: 180px;
+    object-fit: cover;
+}
+
+.ad-preview__placeholder {
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-100);
+    color: var(--gray-500);
+}
+
+.ad-preview__content {
+    padding: 14px 16px;
+}
+
+.ad-preview__content h5 {
+    margin: 0 0 6px;
+    font-size: 16px;
+    color: var(--gray-900);
+}
+
+.ad-preview__content p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--gray-500);
 }
 
 .rejection-reason {
