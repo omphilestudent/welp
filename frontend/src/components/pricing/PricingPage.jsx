@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import Loading from '../common/Loading';
 import PlanCard from './PlanCard';
 import CurrencyToggle from './CurrencyToggle';
-import UpgradeModal from './UpgradeModal';
+import CheckoutModal from './CheckoutModal';
 import { fetchCountries, fetchPricingByAudience } from '../../services/pricingService';
 import { fetchSubscription, upgradeSubscription } from '../../services/subscriptionService';
 import { getMyCampaigns } from '../../services/adService';
@@ -15,6 +15,7 @@ const PREMIUM_EMAIL = 'omphilemohlala@welp.com';
 
 const PricingPage = () => {
     const { user, isAuthenticated, refreshUser, updateUser } = useAuth();
+    const navigate = useNavigate();
     const derivedCountry = useMemo(() => deriveCountryCode(user || {}), [user]);
     const derivedCurrency = useMemo(() => currencyForCountry(derivedCountry), [derivedCountry]);
     const [searchParams, setSearchParams] = useSearchParams();
@@ -145,6 +146,7 @@ const PricingPage = () => {
             toast.success(`Upgraded to ${plan.metadata?.displayName || plan.planCode}`);
             await loadSubscription();
             setUpgradePlan(null);
+            window.localStorage.removeItem('welp_upgrade_intent');
         } catch (error) {
             const message = error.response?.data?.error || 'Upgrade failed';
             toast.error(message);
@@ -152,6 +154,39 @@ const PricingPage = () => {
             setUpgradePending(false);
         }
     };
+
+    const handleCheckout = async (plan) => {
+        if (!plan) return;
+        if (!isAuthenticated) {
+            const intent = {
+                planCode: plan.planCode,
+                audience,
+                country,
+                currency: plan.currencyCode || pricing?.currency?.code || currency || derivedCurrency.code
+            };
+            window.localStorage.setItem('welp_upgrade_intent', JSON.stringify(intent));
+            navigate(`/register?redirect=/pricing?role=${audience}&country=${country}`);
+            return;
+        }
+        setUpgradePlan(plan);
+    };
+
+    useEffect(() => {
+        if (!isAuthenticated || !pricing) return;
+        const raw = window.localStorage.getItem('welp_upgrade_intent');
+        if (!raw) return;
+        try {
+            const intent = JSON.parse(raw);
+            if (!intent?.planCode) return;
+            const plans = pricing?.plans || [];
+            const match = plans.find((plan) => plan.planCode === intent.planCode);
+            if (match) {
+                setUpgradePlan(match);
+            }
+        } catch {
+            // ignore
+        }
+    }, [isAuthenticated, pricing]);
 
     const heroCopy = useMemo(() => {
         if (premiumExceptionActive) {
@@ -171,6 +206,25 @@ const PricingPage = () => {
 
     const plans = pricing?.plans || [];
     const sortedPlans = [...plans].sort((a, b) => (a.amountMinor ?? 0) - (b.amountMinor ?? 0));
+    const filteredPlans = useMemo(() => {
+        if (audience === 'employee') {
+            return sortedPlans.filter((plan) => ['user_free', 'user_premium'].includes(plan.planCode));
+        }
+        if (audience === 'psychologist') {
+            const allowed = sortedPlans.filter((plan) =>
+                ['psychologist_free', 'psychologist_standard', 'psychologist_premium'].includes(plan.planCode)
+            );
+            if (allowed.length) {
+                const free = allowed.find((plan) => plan.planTier === 'free');
+                const premium = allowed.find((plan) => plan.planTier === 'premium') || allowed[allowed.length - 1];
+                return [free, premium].filter(Boolean);
+            }
+            const freeTier = sortedPlans.filter((plan) => plan.planTier === 'free');
+            const premiumTier = sortedPlans.filter((plan) => plan.planTier === 'premium');
+            return [freeTier[0], premiumTier[premiumTier.length - 1]].filter(Boolean);
+        }
+        return sortedPlans;
+    }, [audience, sortedPlans]);
 
     return (
         <section className="pricing-page">
@@ -209,12 +263,12 @@ const PricingPage = () => {
             </div>
 
             <div className="pricing-page__grid">
-                {sortedPlans.map((plan) => (
+                {filteredPlans.map((plan) => (
                     <PlanCard
                         key={plan.planCode}
                         plan={plan}
                         subscription={subscription}
-                        onSelect={(selected) => setUpgradePlan(selected)}
+                        onSelect={(selected) => handleCheckout(selected)}
                         audience={audience}
                         adCapabilities={adsCapabilities}
                         highlighted={plan.metadata?.badge === 'Best value' || plan.planTier === 'premium'}
@@ -222,10 +276,13 @@ const PricingPage = () => {
                 ))}
             </div>
 
-            <UpgradeModal
+            <CheckoutModal
                 plan={upgradePlan}
                 open={Boolean(upgradePlan)}
-                onClose={() => setUpgradePlan(null)}
+                onClose={() => {
+                    setUpgradePlan(null);
+                    window.localStorage.removeItem('welp_upgrade_intent');
+                }}
                 onConfirm={handleUpgrade}
                 submitting={upgradePending}
             />
