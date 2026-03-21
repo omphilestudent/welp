@@ -207,6 +207,10 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
                  to_regclass('public.ad_images') IS NOT NULL AS has_ad_images,
                  EXISTS (
                      SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'ad_images' AND column_name = 'is_active'
+                 ) AS ad_images_has_is_active,
+                 EXISTS (
+                     SELECT 1 FROM information_schema.columns
                      WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'name'
                  ) AS businesses_has_name,
                  EXISTS (
@@ -241,6 +245,7 @@ const ensureAdTableMetadata = async (forceRefresh = false) => {
             companies: rows[0]?.has_companies === true,
             placements: rows[0]?.has_ad_placements === true,
             images: rows[0]?.has_ad_images === true,
+            imagesHasIsActive: rows[0]?.ad_images_has_is_active === true,
             businessCols: {
                 name: rows[0]?.businesses_has_name === true,
                 ownerUserId: rows[0]?.businesses_has_owner_user_id === true,
@@ -585,6 +590,7 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
             ) AS ${placementsAlias}`
         : `, '[]'::jsonb AS ${placementsAlias}`;
 
+    const imagesActiveFilter = tables.imagesHasIsActive ? 'AND ai.is_active = true' : '';
     const imagesColumn = tables.images
         ? `,
             (
@@ -602,7 +608,7 @@ const fetchPlacementCampaigns = async ({ placement, location, industry, behavior
                     '[]'::jsonb
                 )
                 FROM ad_images ai
-                WHERE ai.campaign_id = c.id AND ai.is_active = true
+                WHERE ai.campaign_id = c.id ${imagesActiveFilter}
             ) AS images`
         : `, '[]'::jsonb AS images`;
 
@@ -968,6 +974,7 @@ const adminGetAdDetails = async (adId, options = {}) => {
         const spendMinorSelect = schema.hasSpendMinor ? 'COALESCE(c.spend_minor, 0)' : '0::bigint';
         const bidRateMinorSelect = schema.hasBidRateMinor ? 'COALESCE(c.bid_rate_minor, 0)' : '0::bigint';
         const overrideSelect = schema.hasOverride ? 'COALESCE(c.override_restrictions, false)' : 'false';
+        const imagesActiveFilter = tables.imagesHasIsActive ? 'AND ai.is_active = true' : '';
         const imagesSelect = tables.images
             ? `(
                         SELECT COALESCE(
@@ -984,7 +991,7 @@ const adminGetAdDetails = async (adId, options = {}) => {
                             '[]'::jsonb
                         )
                         FROM ad_images ai
-                        WHERE ai.campaign_id = c.id AND ai.is_active = true
+                        WHERE ai.campaign_id = c.id ${imagesActiveFilter}
                     )`
             : `'[]'::jsonb`;
 
