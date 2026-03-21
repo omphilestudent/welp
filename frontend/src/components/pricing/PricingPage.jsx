@@ -200,12 +200,11 @@ const PricingPage = () => {
         return 'Choose the plan that matches your growth stage.';
     }, [adsCapabilities, isBusinessAudience, premiumExceptionActive]);
 
-    if (loading && !pricing) {
-        return <Loading />;
-    }
-
-    const plans = pricing?.plans || [];
-    const sortedPlans = [...plans].sort((a, b) => (a.amountMinor ?? 0) - (b.amountMinor ?? 0));
+    const plans = useMemo(() => pricing?.plans || [], [pricing]);
+    const sortedPlans = useMemo(
+        () => [...plans].sort((a, b) => (a.amountMinor ?? 0) - (b.amountMinor ?? 0)),
+        [plans]
+    );
     const filteredPlans = useMemo(() => {
         if (audience === 'employee') {
             return sortedPlans.filter((plan) => ['user_free', 'user_premium'].includes(plan.planCode));
@@ -225,6 +224,10 @@ const PricingPage = () => {
         }
         return sortedPlans;
     }, [audience, sortedPlans]);
+
+    if (loading && !pricing) {
+        return <Loading />;
+    }
 
     return (
         <section className="pricing-page">
