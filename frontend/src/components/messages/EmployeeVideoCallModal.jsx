@@ -1,20 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import Modal from '../common/Modal';
 import { addDays, format, startOfWeek } from 'date-fns';
-
-const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
+import { formatAmountMinor } from '../../utils/currency';
 
 const EmployeeVideoCallModal = ({
     open,
     onClose,
     availability,
+    rates,
     weekStart,
     onWeekChange,
     onConfirm,
     hasSavedCard,
     loading
 }) => {
-    const [selectedMinutes, setSelectedMinutes] = useState(30);
+    const [selectedRateId, setSelectedRateId] = useState('');
     const [selectedSlot, setSelectedSlot] = useState('');
 
     const availabilityMap = useMemo(() => {
@@ -30,9 +30,21 @@ const EmployeeVideoCallModal = ({
         [weekStart]
     );
 
+    const activeRates = useMemo(() => (
+        (rates || []).filter((rate) => rate.is_active ?? rate.isActive ?? true)
+    ), [rates]);
+
+    const selectedRate = useMemo(() => (
+        activeRates.find((rate) => String(rate.id) === String(selectedRateId)) || activeRates[0] || null
+    ), [activeRates, selectedRateId]);
+
     const handleConfirm = () => {
-        if (!selectedSlot) return;
-        onConfirm({ scheduledAt: selectedSlot, durationMinutes: selectedMinutes });
+        if (!selectedSlot || !selectedRate) return;
+        onConfirm({
+            scheduledAt: selectedSlot,
+            durationMinutes: Number(selectedRate.duration_minutes || 60),
+            rateId: selectedRate.id
+        });
     };
 
     return (
@@ -42,19 +54,29 @@ const EmployeeVideoCallModal = ({
                     <p className="msg-modal-hint">Add a saved card to schedule a paid video call.</p>
                 )}
                 <div className="msg-booking-block">
-                    <h4>Session length</h4>
-                    <div className="msg-booking-duration">
-                        {DURATION_OPTIONS.map((option) => (
-                            <button
-                                type="button"
-                                key={option}
-                                className={`msg-chip ${selectedMinutes === option ? 'is-active' : ''}`}
-                                onClick={() => setSelectedMinutes(option)}
-                            >
-                                {option} min
-                            </button>
-                        ))}
-                    </div>
+                    <h4>Session rates</h4>
+                    {activeRates.length === 0 ? (
+                        <p className="msg-modal-hint">No rates available yet.</p>
+                    ) : (
+                        <div className="msg-booking-rates">
+                            {activeRates.map((rate) => (
+                                <label key={rate.id} className={`msg-booking-rate ${String(rate.id) === String(selectedRate?.id) ? 'is-selected' : ''}`}>
+                                    <input
+                                        type="radio"
+                                        name="rate"
+                                        checked={String(rate.id) === String(selectedRate?.id)}
+                                        onChange={() => setSelectedRateId(rate.id)}
+                                    />
+                                    <div>
+                                        <strong>{rate.label || `${rate.duration_minutes} min session`}</strong>
+                                        <div className="msg-booking-rate-meta">
+                                            {formatAmountMinor(rate.amount_minor, rate.currency_code)} {rate.duration_minutes ? `${rate.duration_minutes} min` : ''}
+                                        </div>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div className="msg-booking-block">
                     <h4>Select time</h4>
@@ -106,7 +128,7 @@ const EmployeeVideoCallModal = ({
                     type="button"
                     className="msg-btn msg-btn-primary"
                     onClick={handleConfirm}
-                    disabled={!hasSavedCard || !selectedSlot || loading}
+                    disabled={!hasSavedCard || !selectedSlot || !selectedRate || loading}
                 >
                     {loading ? 'Scheduling…' : 'Confirm & start call'}
                 </button>
@@ -117,6 +139,7 @@ const EmployeeVideoCallModal = ({
 
 EmployeeVideoCallModal.defaultProps = {
     availability: [],
+    rates: [],
     weekStart: startOfWeek(new Date(), { weekStartsOn: 1 }),
     onWeekChange: () => {},
     onConfirm: () => {},

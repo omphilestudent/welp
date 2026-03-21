@@ -52,24 +52,24 @@ const getMyRates = async (req, res) => {
 
 const createRate = async (req, res) => {
     try {
-        const { amount, currencyCode, durationType, label, setActive = true } = req.body;
+        const { amount, currencyCode, durationMinutes, label, setActive = true } = req.body;
         if (!amount || Number(amount) <= 0) {
             return res.status(400).json({ error: 'Rate amount must be greater than 0' });
         }
-        if (!['per_hour', 'per_minute'].includes(durationType)) {
-            return res.status(400).json({ error: 'durationType must be per_hour or per_minute' });
+        const allowedDurations = [15, 30, 60];
+        const minutes = Number(durationMinutes);
+        if (!allowedDurations.includes(minutes)) {
+            return res.status(400).json({ error: 'durationMinutes must be 15, 30, or 60' });
         }
         const rate = await upsertRate({
             psychologistId: req.user.id,
-            label,
+            label: label || `${minutes}-minute session`,
             amountMajor: Number(amount),
             currencyCode: currencyCode || 'USD',
-            durationType,
+            durationType: 'per_session',
+            durationMinutes: minutes,
             isActive: Boolean(setActive)
         });
-        if (setActive) {
-            await setRateActive(rate.id, req.user.id);
-        }
         res.status(201).json({ rate });
     } catch (error) {
         console.error('Create rate error:', error);
@@ -207,13 +207,16 @@ const createBookingForPsychologist = async (req, res) => {
             if (!rows.length) {
                 return res.status(400).json({ error: 'Selected rate is not active' });
             }
+            if (Number(durationMinutes) && Number(rows[0].duration_minutes) !== Number(durationMinutes)) {
+                return res.status(400).json({ error: 'Duration does not match selected rate' });
+            }
         }
         const booking = await createBooking({
             psychologistId,
             employeeId: req.user.id,
             rateId,
             scheduledAt,
-            durationMinutes: Number(durationMinutes) || 60
+            durationMinutes: Number(durationMinutes) || Number(rate?.duration_minutes || 60)
         });
         res.status(201).json({ booking });
     } catch (error) {

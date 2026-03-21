@@ -225,6 +225,31 @@ const PricingPage = () => {
         return sortedPlans;
     }, [audience, sortedPlans]);
 
+    const displayPlans = useMemo(() => {
+        if (audience !== 'psychologist') return filteredPlans;
+        const hasFree = filteredPlans.some((plan) => plan.planTier === 'free');
+        if (hasFree) return filteredPlans;
+        const currencyCode = pricing?.currency?.code || currency || derivedCurrency.code;
+        return [
+            {
+                planCode: 'psychologist_free',
+                planTier: 'free',
+                amountMinor: 0,
+                currencyCode,
+                billingPeriod: 'monthly',
+                metadata: { displayName: 'Free Tier', badge: 'Starter' },
+                features: [
+                    'Profile listing',
+                    'Set session rates',
+                    'Client calls available',
+                    'No lead access'
+                ],
+                limits: { leads: { access: false } }
+            },
+            ...filteredPlans
+        ];
+    }, [audience, filteredPlans, pricing?.currency?.code, currency, derivedCurrency.code]);
+
     if (loading && !pricing) {
         return <Loading />;
     }
@@ -266,7 +291,7 @@ const PricingPage = () => {
             </div>
 
             <div className="pricing-page__grid">
-                {filteredPlans.map((plan) => (
+                {displayPlans.map((plan) => (
                     <PlanCard
                         key={plan.planCode}
                         plan={plan}

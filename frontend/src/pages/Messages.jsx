@@ -782,7 +782,7 @@ const Messages = () => {
         await startCall(callMediaType, minutes);
     };
 
-    const handleConfirmVideoCall = async ({ scheduledAt, durationMinutes }) => {
+    const handleConfirmVideoCall = async ({ scheduledAt, durationMinutes, rateId }) => {
         if (!currentPsychologist?.id) return;
         if (!hasSavedCard) {
             toast.error('Add a saved card to schedule this call.');
@@ -791,7 +791,7 @@ const Messages = () => {
         setVideoCallScheduling(true);
         try {
             const { data } = await api.post(`/psychologists/${currentPsychologist.id}/bookings`, {
-                rateId: activePsychRate?.id || null,
+                rateId: rateId || activePsychRate?.id || null,
                 scheduledAt: new Date(scheduledAt).toISOString(),
                 durationMinutes
             });
@@ -1801,6 +1801,7 @@ const Messages = () => {
                 open={videoCallModalOpen}
                 onClose={() => setVideoCallModalOpen(false)}
                 availability={videoCallAvailability}
+                rates={currentRates}
                 weekStart={videoCallWeekStart}
                 onWeekChange={(nextWeek) => {
                     setVideoCallWeekStart(nextWeek);
@@ -1820,6 +1821,7 @@ const Messages = () => {
 };
 
 export default Messages;
+
 
 
 

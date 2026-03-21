@@ -42,7 +42,7 @@ const listRates = async (psychologistId) => {
         `SELECT *
          FROM psychologist_rates
          WHERE psychologist_id = $1
-         ORDER BY is_active DESC, created_at DESC`,
+         ORDER BY duration_minutes ASC, created_at DESC`,
         [psychologistId]
     );
     return result.rows;
@@ -53,16 +53,24 @@ const upsertRate = async ({
     label,
     amountMajor,
     currencyCode = DEFAULT_CURRENCY,
-    durationType,
+    durationType = 'per_session',
+    durationMinutes = 60,
     isActive = true
 }) => {
     const amountMinor = toMinor(amountMajor);
     const result = await query(
         `INSERT INTO psychologist_rates
-         (psychologist_id, label, amount_minor, currency_code, duration_type, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6)
+         (psychologist_id, label, amount_minor, currency_code, duration_type, duration_minutes, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (psychologist_id, duration_minutes) DO UPDATE
+         SET label = EXCLUDED.label,
+             amount_minor = EXCLUDED.amount_minor,
+             currency_code = EXCLUDED.currency_code,
+             duration_type = EXCLUDED.duration_type,
+             is_active = EXCLUDED.is_active,
+             updated_at = CURRENT_TIMESTAMP
          RETURNING *`,
-        [psychologistId, label || null, amountMinor, currencyCode, durationType, isActive]
+        [psychologistId, label || null, amountMinor, currencyCode, durationType, Number(durationMinutes) || 60, isActive]
     );
     return result.rows[0];
 };
@@ -319,6 +327,9 @@ const createBooking = async ({
 
 const calculateSessionBaseAmount = ({ rate, durationMinutes }) => {
     if (!rate) return 0;
+    if (rate.duration_minutes) {
+        return Number(rate.amount_minor || 0);
+    }
     if (rate.duration_type === 'per_minute') {
         return Number(rate.amount_minor || 0) * Number(durationMinutes || 0);
     }

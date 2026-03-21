@@ -167,7 +167,7 @@ const UserProfile = () => {
                                             <span>{rate.is_active ? 'Active' : 'Available'}</span>
                                         </div>
                                         <div className="profile-rate-amount">
-                                            {formatAmountMinor(rate.amount_minor, rate.currency_code) || '—'} {rate.duration_type === 'per_minute' ? 'per minute' : 'per hour'}
+                                            {formatAmountMinor(rate.amount_minor, rate.currency_code) || '—'} {rate.duration_minutes ? `${rate.duration_minutes} min` : (rate.duration_type === 'per_minute' ? 'per minute' : 'per hour')}
                                         </div>
                                     </div>
                                 ))}
@@ -177,7 +177,7 @@ const UserProfile = () => {
                         )}
                         {activeRate && (
                             <p className="profile-rate-note">
-                                Active rate: {formatAmountMinor(activeRate.amount_minor, activeRate.currency_code)} {activeRate.duration_type === 'per_minute' ? 'per minute' : 'per hour'}.
+                                Active rate: {formatAmountMinor(activeRate.amount_minor, activeRate.currency_code)} {activeRate.duration_minutes ? `${activeRate.duration_minutes} min` : (activeRate.duration_type === 'per_minute' ? 'per minute' : 'per hour')}.
                             </p>
                         )}
                     </section>
@@ -256,3 +256,5 @@ const UserProfile = () => {
 };
 
 export default UserProfile;
+
+

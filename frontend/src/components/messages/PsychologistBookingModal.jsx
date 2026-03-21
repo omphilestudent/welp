@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 import { formatAmountMinor } from '../../utils/currency';
 import { addDays, startOfWeek, format } from 'date-fns';
 
-const DEFAULT_DURATION_OPTIONS = [30, 45, 60, 90];
 const WELP_FEE_MINOR = 200 * 100;
 
 const formatDateTime = (value) => {
@@ -18,6 +17,9 @@ const formatDateTime = (value) => {
 const deriveBaseAmountMinor = (rate, durationMinutes) => {
     if (!rate) return 0;
     const amountMinor = Number(rate.amount_minor || rate.amountMinor || 0);
+    if (rate.duration_minutes) {
+        return amountMinor;
+    }
     const duration = Number(durationMinutes || 0);
     if (rate.duration_type === 'per_minute') {
         return amountMinor * duration;
@@ -32,7 +34,6 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
     const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
     const [selectedRateId, setSelectedRateId] = useState('');
     const [scheduledAt, setScheduledAt] = useState('');
-    const [durationMinutes, setDurationMinutes] = useState(60);
     const [step, setStep] = useState('select');
     const [booking, setBooking] = useState(null);
     const [payment, setPayment] = useState(null);
@@ -94,7 +95,8 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
         }
     }, [activeRates, selectedRateId]);
 
-    const baseAmountMinor = deriveBaseAmountMinor(selectedRate, durationMinutes);
+    const selectedDuration = Number(selectedRate?.duration_minutes || 60);
+    const baseAmountMinor = deriveBaseAmountMinor(selectedRate, selectedDuration);
     const totalAmountMinor = baseAmountMinor + WELP_FEE_MINOR;
 
     const handleSelectSlot = (slot) => {
@@ -121,7 +123,7 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
             const { data } = await api.post(`/psychologists/${psychologist.id}/bookings`, {
                 rateId: selectedRate.id,
                 scheduledAt: new Date(scheduledAt).toISOString(),
-                durationMinutes: Number(durationMinutes) || 60
+                durationMinutes: selectedDuration
             });
             setBooking(data?.booking || null);
             setStep('checkout');
@@ -168,7 +170,7 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
                                 <div>
                                     <strong>{rate.label || 'Session rate'}</strong>
                                     <div className="msg-booking-rate-meta">
-                                        {formatAmountMinor(rate.amount_minor, rate.currency_code)} {rate.duration_type === 'per_minute' ? 'per minute' : 'per hour'}
+                                        {formatAmountMinor(rate.amount_minor, rate.currency_code)} {rate.duration_minutes ? `${rate.duration_minutes} min` : (rate.duration_type === 'per_minute' ? 'per minute' : 'per hour')}
                                     </div>
                                 </div>
                             </label>
@@ -180,16 +182,8 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
             <div className="msg-booking-block">
                 <h4>Session length</h4>
                 <div className="msg-booking-duration">
-                    {DEFAULT_DURATION_OPTIONS.map((option) => (
-                        <button
-                            type="button"
-                            key={option}
-                            className={`msg-chip ${durationMinutes === option ? 'is-active' : ''}`}
-                            onClick={() => setDurationMinutes(option)}
-                        >
-                            {option} min
-                        </button>
-                    ))}
+                    <span className="msg-booking-duration__label">Selected</span>
+                    <strong>{selectedDuration} minutes</strong>
                 </div>
             </div>
 
@@ -266,7 +260,7 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
                 <h4>Booking summary</h4>
                 <p><strong>Psychologist:</strong> {psychologist?.display_name || 'Psychologist'}</p>
                 <p><strong>Scheduled for:</strong> {scheduledAt ? new Date(scheduledAt).toLocaleString() : '—'}</p>
-                <p><strong>Session length:</strong> {durationMinutes} minutes</p>
+                <p><strong>Session length:</strong> {selectedDuration} minutes</p>
                 <p><strong>Rate:</strong> {selectedRate?.label || 'Session rate'}</p>
             </div>
             <div className="msg-booking-summary">

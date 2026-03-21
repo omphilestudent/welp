@@ -426,7 +426,11 @@ const Dashboard = () => {
     const [externalEvents, setExternalEvents] = useState([]);
     const [recentCalls, setRecentCalls] = useState([]);
     const [psychRates, setPsychRates] = useState([]);
-    const [psychRateForm, setPsychRateForm] = useState({ amount: '', durationType: 'per_hour', label: '' });
+    const [psychRateForm, setPsychRateForm] = useState({
+        15: '',
+        30: '',
+        60: ''
+    });
     const [savingRate, setSavingRate] = useState(false);
     const [psychPayoutAccount, setPsychPayoutAccount] = useState(null);
     const [payoutForm, setPayoutForm] = useState({
@@ -938,7 +942,16 @@ const Dashboard = () => {
                 setPsychLeads(leadsRes.data || []);
                 setPsychSchedule(scheduleRes.data || []);
                 setPsychPermissions(permissionsRes.data || null);
-                setPsychRates(ratesRes.data?.rates || []);
+                const loadedRates = ratesRes.data?.rates || [];
+                setPsychRates(loadedRates);
+                const rateMap = loadedRates.reduce((acc, rate) => {
+                    const minutes = Number(rate.duration_minutes || rate.durationMinutes);
+                    if ([15, 30, 60].includes(minutes)) {
+                        acc[minutes] = (Number(rate.amount_minor || 0) / 100).toFixed(2);
+                    }
+                    return acc;
+                }, { 15: '', 30: '', 60: '' });
+                setPsychRateForm(rateMap);
                 setPsychPayoutAccount(payoutRes.data?.account || null);
                 setPayoutRequirements(payoutRes.data?.requirements || null);
                 setPayoutComplete(Boolean(payoutRes.data?.isComplete));
@@ -1062,40 +1075,27 @@ const Dashboard = () => {
         } catch { toast.error('Failed to remove schedule item'); }
     };
 
-    const handleRateSubmit = async (event) => {
-        event.preventDefault();
-        if (!psychRateForm.amount) {
+    const handleRateSubmit = async (durationMinutes) => {
+        const amount = psychRateForm[durationMinutes];
+        if (!amount) {
             toast.error('Enter a rate amount.');
+            return;
+        }
+        if (Number(amount) <= 0) {
+            toast.error('Rate amount must be greater than 0.');
             return;
         }
         setSavingRate(true);
         try {
             await api.post('/psychologists/dashboard/rates', {
-                amount: psychRateForm.amount,
-                durationType: psychRateForm.durationType,
-                label: psychRateForm.label
+                amount,
+                durationMinutes
             });
             const { data } = await api.get('/psychologists/dashboard/rates');
             setPsychRates(data?.rates || []);
-            setPsychRateForm({ amount: '', durationType: 'per_hour', label: '' });
             toast.success('Rate saved');
         } catch (error) {
             toast.error(error?.response?.data?.error || 'Failed to save rate');
-        } finally {
-            setSavingRate(false);
-        }
-    };
-
-    const handleActivateRate = async (rateId) => {
-        if (!rateId) return;
-        setSavingRate(true);
-        try {
-            await api.post(`/psychologists/dashboard/rates/${rateId}/activate`);
-            const { data } = await api.get('/psychologists/dashboard/rates');
-            setPsychRates(data?.rates || []);
-            toast.success('Active rate updated');
-        } catch (error) {
-            toast.error(error?.response?.data?.error || 'Failed to update rate');
         } finally {
             setSavingRate(false);
         }
@@ -1727,59 +1727,32 @@ const Dashboard = () => {
                                     </div>
 
                                     <div className="psych-rate-grid">
-                                        <form className="psych-rate-form" onSubmit={handleRateSubmit}>
-                                            <h4>Session rate</h4>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                placeholder="Rate amount"
-                                                value={psychRateForm.amount}
-                                                onChange={(e) => setPsychRateForm({ ...psychRateForm, amount: e.target.value })}
-                                            />
-                                            <select
-                                                value={psychRateForm.durationType}
-                                                onChange={(e) => setPsychRateForm({ ...psychRateForm, durationType: e.target.value })}
-                                            >
-                                                <option value="per_hour">Per hour</option>
-                                                <option value="per_minute">Per minute</option>
-                                            </select>
-                                            <input
-                                                type="text"
-                                                placeholder="Label (optional)"
-                                                value={psychRateForm.label}
-                                                onChange={(e) => setPsychRateForm({ ...psychRateForm, label: e.target.value })}
-                                            />
-                                            <button type="submit" className="btn btn-primary btn-small" disabled={savingRate}>
-                                                {savingRate ? 'Saving...' : 'Save rate'}
-                                            </button>
-                                        </form>
-
-                                        <div className="psych-rate-list">
-                                            <h4>Active rates</h4>
-                                            {psychRates.length === 0 ? (
-                                                <p className="empty-message">No rates yet.</p>
-                                            ) : (
-                                                psychRates.map((rate) => (
-                                                    <div key={rate.id} className={`psych-rate-row ${rate.is_active ? 'is-active' : ''}`}>
-                                                        <div>
-                                                            <strong>{rate.label || 'Session rate'}</strong>
-                                                            <span>
-                                                                {rate.currency_code || 'USD'} {(Number(rate.amount_minor || 0) / 100).toFixed(2)} {rate.duration_type === 'per_minute' ? '/ min' : '/ hour'}
-                                                            </span>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-outline btn-small"
-                                                            onClick={() => handleActivateRate(rate.id)}
-                                                            disabled={savingRate || rate.is_active}
-                                                        >
-                                                            {rate.is_active ? 'Active' : 'Make active'}
-                                                        </button>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
+                                        {[15, 30, 60].map((minutes) => (
+                                            <div key={minutes} className="psych-rate-card">
+                                                <div>
+                                                    <h4>{minutes === 60 ? '60 minutes / 1 hour' : `${minutes} minutes`}</h4>
+                                                    <p>Set your session price for this duration.</p>
+                                                </div>
+                                                <div className="psych-rate-card__input">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="0.00"
+                                                        value={psychRateForm[minutes]}
+                                                        onChange={(e) => setPsychRateForm({ ...psychRateForm, [minutes]: e.target.value })}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-primary btn-small"
+                                                        onClick={() => handleRateSubmit(minutes)}
+                                                        disabled={savingRate}
+                                                    >
+                                                        {savingRate ? 'Saving...' : 'Save rate'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
 
                                     <form className="psych-payout-form" onSubmit={handlePayoutSubmit}>
