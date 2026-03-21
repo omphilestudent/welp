@@ -23,7 +23,8 @@ const Login = () => {
     const [loading, setLoading] = useState({
         email: false,
         google: false,
-        github: false
+        microsoft: false,
+        apple: false
     });
     const [loginMethod, setLoginMethod] = useState(null);
     const [loginAttempts, setLoginAttempts] = useState(0);
@@ -360,7 +361,7 @@ const Login = () => {
     };
 
     // Get loading state for any social login
-    const isSocialLoading = loading.google || loading.github;
+    const isSocialLoading = loading.google || loading.microsoft || loading.apple;
 
     // Prepare props for LoginForm
     const loginFormProps = {
@@ -473,7 +474,7 @@ const Login = () => {
                             <div>
                                 <strong>Different login method required</strong>
                                 <p>
-                                    This account was created with a social provider. Use Google or GitHub below to
+                                    This account was created with a social provider. Use Google, Microsoft, or Apple below to
                                     access it.
                                 </p>
                             </div>
@@ -527,23 +528,42 @@ const Login = () => {
                         </button>
 
                         <button
-                            onClick={() => handleSocialLogin('github')}
-                            className="login-social__btn login-social__btn--github"
-                            disabled={loading.email || loading.github || isLocked}
-                            aria-label="Login with GitHub"
-                            aria-busy={loading.github}
+                            onClick={() => handleSocialLogin('microsoft')}
+                            className="login-social__btn login-social__btn--microsoft"
+                            disabled={loading.email || loading.microsoft || isLocked}
+                            aria-label="Login with Microsoft"
+                            aria-busy={loading.microsoft}
                         >
-                            {loading.github ? (
+                            {loading.microsoft ? (
+                                <span>Loading?</span>
+                            ) : (
+                                <>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path fill="currentColor" d="M2 3h9v9H2zM13 3h9v9h-9zM2 13h9v9H2zM13 13h9v9h-9z" />
+                                    </svg>
+                                    Microsoft
+                                </>
+                            )}
+                        </button>
+
+                        <button
+                            onClick={() => handleSocialLogin('apple')}
+                            className="login-social__btn login-social__btn--apple"
+                            disabled={loading.email || loading.apple || isLocked}
+                            aria-label="Login with Apple"
+                            aria-busy={loading.apple}
+                        >
+                            {loading.apple ? (
                                 <span>Loading?</span>
                             ) : (
                                 <>
                                     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
                                         <path
                                             fill="currentColor"
-                                            d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12c0-5.52-4.48-10-10-10z"
+                                            d="M16.4 13.2c0-2.1 1.7-3 1.8-3.1-1-.6-2.6-.7-3.2-.7-1.4-.1-2.7.8-3.4.8-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.2-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.4 1.2 0 1.6-.8 3-.8 1.4 0 1.8.8 3 .8 1.3 0 2.1-1.2 2.9-2.3.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.8-1.1-2.8-4.1zM14.9 5.3c.7-.8 1.2-1.9 1.1-3-1 .1-2.2.7-2.9 1.5-.6.7-1.2 1.8-1.1 2.9 1 .1 2.2-.5 2.9-1.4z"
                                         />
                                     </svg>
-                                    GitHub
+                                    Apple
                                 </>
                             )}
                         </button>

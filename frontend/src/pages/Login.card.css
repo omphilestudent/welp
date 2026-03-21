@@ -311,10 +311,16 @@
     }
 }
 
-.login-social__btn--github {
-    background: #0f172a;
+.login-social__btn--microsoft {
+    background: #2563eb;
     color: #f8fafc;
-    border-color: #0f172a;
+    border-color: #2563eb;
+}
+
+.login-social__btn--apple {
+    background: #111827;
+    color: #f8fafc;
+    border-color: #111827;
 }
 
 /* Form inputs styling (preserve existing) */

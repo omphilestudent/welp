@@ -838,7 +838,7 @@ const Messages = () => {
         if (callState.status !== 'idle') {
             toast('You are already in a call.');
             return;
-        }\r\n
+        }
         if (activeConversation?.status !== 'accepted') {
             toast('This request is still pending. Calls unlock after acceptance.');
             return;
@@ -862,7 +862,7 @@ const Messages = () => {
         if (callState.status !== 'idle') {
             toast('You are already in a call.');
             return;
-        }\r\n
+        }
         if (activeConversation?.status !== 'accepted') {
             toast('This request is still pending. Calls unlock after acceptance.');
             return;
@@ -1821,6 +1821,7 @@ const Messages = () => {
 };
 
 export default Messages;
+
 
 
 
