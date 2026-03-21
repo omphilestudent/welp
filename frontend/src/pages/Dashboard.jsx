@@ -255,8 +255,9 @@ const ProfileSection = ({ user, company, onUpdate }) => {
             await api.patch('/users/profile', { avatarUrl: data.avatarUrl });
             toast.success('Profile picture updated!');
             onUpdate?.();
-        } catch {
-            toast.error('Failed to upload image');
+        } catch (error) {
+            const message = error?.response?.data?.error || 'Failed to upload image';
+            toast.error(message);
         } finally {
             setUploading(false);
         }
