@@ -1020,7 +1020,11 @@ const AdApprovals = () => {
                                     </div>
                                     <div className="analytics-item">
                                         <label>CTR</label>
-                                        <span>{selectedAd.analytics.ctr?.toFixed(2)}%</span>
+                                        <span>
+                                            {Number.isFinite(Number(selectedAd.analytics.ctr))
+                                                ? Number(selectedAd.analytics.ctr).toFixed(2)
+                                                : '0.00'}%
+                                        </span>
                                     </div>
                                     <div className="analytics-item">
                                         <label>Total Spend</label>
