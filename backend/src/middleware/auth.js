@@ -2,6 +2,7 @@
 const jwt = require('jsonwebtoken');
 const { query } = require('../utils/database');
 const { getRoleFlags } = require('./roleFlags');
+const { getPsychologistPlan, psychologistHasLeadAccess } = require('../services/psychologistBillingService');
 const staff = require('../utils/welpStaff');
 const { fetchSessionSettings } = require('../utils/sessionSettings');
 
@@ -158,12 +159,28 @@ const authenticate = async (req, res, next) => {
             err.statusCode = 401;
             throw err;
         }
+        const baseFlags = getRoleFlags(user.role);
+        let roleFlags = { ...baseFlags };
+        if (normalizedRole === 'psychologist') {
+            try {
+                const plan = await getPsychologistPlan(user.id);
+                const leadAccess = await psychologistHasLeadAccess(user.id);
+                roleFlags = {
+                    ...roleFlags,
+                    plan: plan.tier || roleFlags.plan || 'free',
+                    leads: Boolean(leadAccess)
+                };
+            } catch (entError) {
+                console.warn('Psychologist entitlement lookup failed:', entError.message);
+            }
+        }
+
         const enrichedUser = {
             ...user,
             isWelpStaff: Boolean(staffRole),
             staffRoleKey: staffRole || null,
             staffDepartment: user.staff_department || null,
-            role_flags: getRoleFlags(user.role)
+            role_flags: roleFlags
         };
         authCache.set(token, { user: enrichedUser, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
         return enrichedUser;

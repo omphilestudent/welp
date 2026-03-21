@@ -14,6 +14,8 @@ const {
     getPsychologistRatingAggregates,
     getRecommendationScore
 } = require('../services/psychologistSessionRatingService');
+const { getPsychologistRecommendationWeight } = require('../services/psychologistBillingService');
+const { getPsychologistClientEntitlement, getPsychologistClientCallFeeMinor } = require('../services/psychologistCallService');
 const { uploadToCloudinary, resolveResourceType, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 const tableExists = async (tableName) => {
@@ -552,22 +554,35 @@ const getAvailablePsychologists = async (req, res) => {
         const fallbackList = rows.slice(0, Math.min(limit, rows.length));
         const candidateList = selected.length === 0 ? fallbackList : selected;
 
-        if (isPremiumClient && candidateList.length > 0) {
-            const ratingMap = await getPsychologistRatingAggregates(candidateList.map((psych) => psych.id));
-            const scored = candidateList
+        const viewerTier = isPremiumClient ? 'premium' : 'free';
+        const weighted = await Promise.all(
+            candidateList.map(async (psych) => ({
+                ...psych,
+                recommendation_weight: await getPsychologistRecommendationWeight({
+                    psychologistId: psych.id,
+                    viewerTier
+                })
+            }))
+        );
+
+        if (isPremiumClient && weighted.length > 0) {
+            const ratingMap = await getPsychologistRatingAggregates(weighted.map((psych) => psych.id));
+            const scored = weighted
                 .map((psych) => {
                     const aggregate = ratingMap.get(psych.id) || {};
+                    const ratingScore = getRecommendationScore(aggregate);
                     return {
                         ...psych,
-                        rating_score: getRecommendationScore(aggregate)
+                        rating_score: ratingScore,
+                        weighted_score: ratingScore * (psych.recommendation_weight || 1)
                     };
                 })
-                .sort((a, b) => b.rating_score - a.rating_score)
+                .sort((a, b) => b.weighted_score - a.weighted_score)
                 .slice(0, limit);
             return res.json(scored);
         }
 
-        return res.json(candidateList);
+        return res.json(weighted);
     } catch (error) {
         console.error('Get psychologists error:', error);
         res.status(500).json({ error: 'Failed to fetch psychologists' });
@@ -1579,6 +1594,33 @@ const startVideoSession = async (req, res) => {
     }
 };
 
+const getCallEntitlement = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const conversation = await query(
+            `SELECT employee_id, psychologist_id
+             FROM conversations
+             WHERE id = $1 AND (employee_id = $2 OR psychologist_id = $2)`,
+            [conversationId, req.user.id]
+        );
+        if (!conversation.rows.length) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+        const row = conversation.rows[0];
+        const entitlement = await getPsychologistClientEntitlement(row.psychologist_id, row.employee_id);
+        const callFeeMinor = await getPsychologistClientCallFeeMinor(row.psychologist_id, row.employee_id);
+        return res.json({
+            psychologistId: row.psychologist_id,
+            employeeId: row.employee_id,
+            entitlement,
+            callFeeMinor
+        });
+    } catch (error) {
+        console.error('Get call entitlement error:', error);
+        return res.status(500).json({ error: 'Failed to load call entitlement' });
+    }
+};
+
 const getChatUsageSummary = async (req, res) => {
     try {
         const summary = await getUsageSummary(req.user);
@@ -1692,5 +1734,6 @@ module.exports = {
     getChatUsageSummary,
     getPsychologistFavorites,
     addPsychologistFavorite,
-    removePsychologistFavorite
+    removePsychologistFavorite,
+    getCallEntitlement
 };

@@ -182,6 +182,11 @@ router.get('/unread-count',
     messageController.getUnreadCount
 );
 
+router.get('/conversations/:conversationId/call-entitlement',
+    authenticate,
+    messageController.getCallEntitlement
+);
+
 router.post('/conversations/:conversationId/block',
     authenticate,
     authorize('employee'),

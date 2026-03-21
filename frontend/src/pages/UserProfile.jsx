@@ -4,6 +4,8 @@ import api from '../services/api';
 import Loading from '../components/common/Loading';
 import AvatarImage from '../components/common/AvatarImage';
 import { useAuth } from '../hooks/useAuth';
+import PsychologistBookingModal from '../components/messages/PsychologistBookingModal';
+import { formatAmountMinor } from '../utils/currency';
 
 const formatDateTime = (value) => {
     if (!value) return '';
@@ -21,6 +23,9 @@ const UserProfile = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [messaging, setMessaging] = useState(false);
+    const [rates, setRates] = useState([]);
+    const [ratesLoading, setRatesLoading] = useState(false);
+    const [bookingOpen, setBookingOpen] = useState(false);
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -38,12 +43,33 @@ const UserProfile = () => {
         loadProfile();
     }, [id]);
 
+    useEffect(() => {
+        if (!profile?.user || profile.user.role !== 'psychologist') return;
+        setRatesLoading(true);
+        api.get(`/psychologists/${profile.user.id}/rates`)
+            .then(({ data }) => setRates(data?.rates || []))
+            .catch(() => setRates([]))
+            .finally(() => setRatesLoading(false));
+    }, [profile?.user]);
+
     if (loading) return <Loading />;
     if (error) return <div className="alert alert-error">{error}</div>;
     if (!profile?.user) return null;
 
     const { user, psychologistProfile, schedule = [], externalEvents = [] } = profile;
-    const availability = psychologistProfile?.availability || {};
+    const availabilitySlots = Array.isArray(psychologistProfile?.availability)
+        ? psychologistProfile.availability
+        : [];
+    const availabilityByDay = availabilitySlots.reduce((acc, slot) => {
+        if (!slot?.isAvailable) return acc;
+        const dayKey = Number.isFinite(slot.dayOfWeek) ? slot.dayOfWeek : null;
+        if (dayKey == null) return acc;
+        acc[dayKey] = acc[dayKey] || [];
+        acc[dayKey].push(slot.hour);
+        return acc;
+    }, {});
+    const dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const activeRate = rates.find((rate) => rate.is_active ?? rate.isActive) || rates[0];
     const handleBack = () => {
         if (location.key !== 'default') {
             navigate(-1);
@@ -118,15 +144,63 @@ const UserProfile = () => {
             {user.role === 'psychologist' && (
                 <>
                     <section className="profile-section-card">
-                        <h3>Availability</h3>
-                        {Object.keys(availability).length > 0 ? (
-                            <div className="availability-grid">
-                                {Object.entries(availability).map(([day, slots]) => (
-                                    <div key={day} className="availability-card">
-                                        <strong>{day}</strong>
-                                        <div>{Array.isArray(slots) ? slots.join(', ') : String(slots)}</div>
+                        <div className="profile-rate-header">
+                            <h3>Session rates</h3>
+                            {currentUser?.role === 'employee' && (
+                                <button
+                                    type="button"
+                                    className="btn btn-primary btn-small"
+                                    onClick={() => setBookingOpen(true)}
+                                >
+                                    Book a session
+                                </button>
+                            )}
+                        </div>
+                        {ratesLoading ? (
+                            <p>Loading rates...</p>
+                        ) : rates.length > 0 ? (
+                            <div className="profile-rate-list">
+                                {rates.map((rate) => (
+                                    <div key={rate.id} className={`profile-rate-card ${rate.is_active ? 'is-active' : ''}`}>
+                                        <div>
+                                            <strong>{rate.label || 'Session rate'}</strong>
+                                            <span>{rate.is_active ? 'Active' : 'Available'}</span>
+                                        </div>
+                                        <div className="profile-rate-amount">
+                                            {formatAmountMinor(rate.amount_minor, rate.currency_code) || '—'} {rate.duration_type === 'per_minute' ? 'per minute' : 'per hour'}
+                                        </div>
                                     </div>
                                 ))}
+                            </div>
+                        ) : (
+                            <p>No rates published yet.</p>
+                        )}
+                        {activeRate && (
+                            <p className="profile-rate-note">
+                                Active rate: {formatAmountMinor(activeRate.amount_minor, activeRate.currency_code)} {activeRate.duration_type === 'per_minute' ? 'per minute' : 'per hour'}.
+                            </p>
+                        )}
+                    </section>
+
+                    <section className="profile-section-card">
+                        <h3>Availability</h3>
+                        {Object.keys(availabilityByDay).length > 0 ? (
+                            <div className="availability-grid">
+                                {Object.entries(availabilityByDay)
+                                    .sort(([a], [b]) => Number(a) - Number(b))
+                                    .map(([dayKey, hours]) => {
+                                    const label = dayLabels[Number(dayKey)] || `Day ${dayKey}`;
+                                    const formatted = (hours || [])
+                                        .sort((a, b) => a - b)
+                                        .map((hour) => `${String(hour).padStart(2, '0')}:00`)
+                                        .join(', ');
+                                    return (
+                                        <div key={dayKey} className="availability-card">
+                                            <strong>{label}</strong>
+                                            <div>{formatted || 'No slots'}</div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         ) : (
                             <p>No availability shared yet.</p>
@@ -172,6 +246,11 @@ const UserProfile = () => {
                     </section>
                 </>
             )}
+            <PsychologistBookingModal
+                open={bookingOpen}
+                psychologist={user.role === 'psychologist' ? user : null}
+                onClose={() => setBookingOpen(false)}
+            />
         </div>
     );
 };

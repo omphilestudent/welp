@@ -28,7 +28,8 @@ import {
     FaBullhorn,
     FaProjectDiagram,
     FaChevronDown,
-    FaChevronRight
+    FaChevronRight,
+    FaWallet
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
@@ -201,6 +202,12 @@ const AdminLayout = () => {
             icon: <FaBullhorn />,
             label: 'Ad Approvals',
             color: '#dd6b20'
+        },
+        {
+            path: '/admin/psychologist-ledger',
+            icon: <FaWallet />,
+            label: 'Psychologist Ledger',
+            color: '#0ea5e9'
         },
         {
             path: '/admin/tickets',

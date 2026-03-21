@@ -11,6 +11,7 @@ const adminAdsController = require('../controllers/adminAdsController');
 const companyController = require('../controllers/companyController');
 const marketingRoutes = require('../modules/marketing/marketing.routes');
 const marketingController = require('../modules/marketing/marketing.controller');
+const psychologistBillingController = require('../controllers/psychologistBillingController');
 
 const router = express.Router();
 
@@ -107,6 +108,21 @@ router.post('/ads/reject',
         body('notes').optional().isString()
     ]),
     adminAdsController.rejectAd
+);
+
+// Psychologist ledger access (account number gated)
+router.post('/psychologist-ledger/lookup',
+    validate([
+        body('accountNumber').isString().isLength({ min: 4 })
+    ]),
+    psychologistBillingController.adminLookupLedgerByAccount
+);
+
+router.patch('/psychologist-ledger/payouts/:paymentId',
+    validate([
+        param('paymentId').isUUID()
+    ]),
+    psychologistBillingController.adminMarkPayoutPaid
 );
 
 router.get('/pricing', adminController.getPricingConfig);

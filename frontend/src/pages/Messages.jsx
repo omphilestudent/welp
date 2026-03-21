@@ -8,12 +8,17 @@ import ConversationList from '../components/messages/ConversationList';
 import MessageThread from '../components/messages/MessageThread';
 import ChatAllocationModal from '../components/messages/ChatAllocationModal';
 import SessionRatingModal from '../components/messages/SessionRatingModal';
+import PsychologistBookingModal from '../components/messages/PsychologistBookingModal';
+import CallDurationModal from '../components/messages/CallDurationModal';
+import EmployeeVideoCallModal from '../components/messages/EmployeeVideoCallModal';
 import Loading from '../components/common/Loading';
 import toast from 'react-hot-toast';
 import { FaSearch, FaStar, FaUserPlus, FaVideo, FaHistory, FaClock, FaExclamationTriangle, FaLock } from 'react-icons/fa';
 import { fetchChatUsage } from '../services/chatUsageService';
 import SponsoredCard from '../components/ads/SponsoredCard';
 import { getPlanKey, hasAccess } from '../utils/subscriptionAccess';
+import { formatAmountMinor } from '../utils/currency';
+import { addDays, startOfWeek } from 'date-fns';
 
 const Messages = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -52,6 +57,18 @@ const Messages = () => {
     const [extendMinutes, setExtendMinutes] = useState(10);
     const [pendingRatings, setPendingRatings] = useState([]);
     const [ratingSubmitting, setRatingSubmitting] = useState(false);
+    const [bookingModalOpen, setBookingModalOpen] = useState(false);
+    const [currentRates, setCurrentRates] = useState([]);
+    const [currentRatesLoading, setCurrentRatesLoading] = useState(false);
+    const [callEntitlement, setCallEntitlement] = useState(null);
+    const [callDurationOpen, setCallDurationOpen] = useState(false);
+    const [callDurationLoading, setCallDurationLoading] = useState(false);
+    const [callMediaType, setCallMediaType] = useState('video');
+    const [videoCallModalOpen, setVideoCallModalOpen] = useState(false);
+    const [videoCallAvailability, setVideoCallAvailability] = useState([]);
+    const [videoCallWeekStart, setVideoCallWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+    const [hasSavedCard, setHasSavedCard] = useState(false);
+    const [videoCallScheduling, setVideoCallScheduling] = useState(false);
 
     useEffect(() => {
         setPsychologistDeletedNotice('');
@@ -141,6 +158,10 @@ const Messages = () => {
         currentPsychologist?.specialization ||
         currentPsychologist?.specializations
     );
+    const activePsychRate = useMemo(() => {
+        if (!currentRates?.length) return null;
+        return currentRates.find((rate) => rate.is_active ?? rate.isActive) || currentRates[0];
+    }, [currentRates]);
     const lastMessageAuthorId = activeConversation?.last_message?.senderId;
     const hasResponse = currentPsychologist && lastMessageAuthorId === currentPsychologist.id;
     const defaultSessionLimit = user?.role === 'employee'
@@ -248,6 +269,15 @@ const Messages = () => {
         }
     };
 
+    const fetchPaymentSummary = async () => {
+        try {
+            const { data } = await api.get('/payments/methods/summary');
+            setHasSavedCard(Boolean(data?.hasSavedCard));
+        } catch (err) {
+            setHasSavedCard(false);
+        }
+    };
+
     const loadChatUsage = useCallback(async () => {
         if (user?.role !== 'employee') return;
         try {
@@ -273,6 +303,32 @@ const Messages = () => {
             setEmployeeFavorites(data?.favorites || []);
         } catch (err) {
             console.error('Failed to load psychologist favorites', err);
+        }
+    };
+
+    const loadCallEntitlement = async () => {
+        if (!activeConversation?.id) return;
+        setCallDurationLoading(true);
+        try {
+            const { data } = await api.get(`/messages/conversations/${activeConversation.id}/call-entitlement`);
+            setCallEntitlement(data);
+        } catch (error) {
+            toast.error('Failed to load call entitlement');
+        } finally {
+            setCallDurationLoading(false);
+        }
+    };
+
+    const fetchVideoCallAvailability = async (weekStartOverride) => {
+        if (!currentPsychologist?.id) return;
+        const targetWeek = weekStartOverride || videoCallWeekStart;
+        try {
+            const { data } = await api.get(`/psychologists/${currentPsychologist.id}/availability`, {
+                params: { weekStart: targetWeek.toISOString().slice(0, 10) }
+            });
+            setVideoCallAvailability(data?.availability || []);
+        } catch {
+            setVideoCallAvailability([]);
         }
     };
 
@@ -382,8 +438,28 @@ const Messages = () => {
             fetchEmployeeFavorites();
             loadChatUsage();
             fetchPendingRatings();
+            fetchPaymentSummary();
         }
     }, [userId, userRole, loadChatUsage, fetchPendingRatings]);
+
+    useEffect(() => {
+        if (user?.role !== 'employee') return;
+        if (!currentPsychologist?.id) {
+            setCurrentRates([]);
+            return;
+        }
+        setCurrentRatesLoading(true);
+        api.get(`/psychologists/${currentPsychologist.id}/rates`)
+            .then(({ data }) => setCurrentRates(data?.rates || []))
+            .catch(() => setCurrentRates([]))
+            .finally(() => setCurrentRatesLoading(false));
+    }, [currentPsychologist?.id, user?.role]);
+
+    useEffect(() => {
+        if (videoCallModalOpen) {
+            fetchVideoCallAvailability();
+        }
+    }, [videoCallWeekStart, videoCallModalOpen]);
 
     useEffect(() => {
         const conversationId = searchParams.get('conversation');
@@ -593,6 +669,9 @@ const Messages = () => {
             if (payload.code === 'CALL_BLOCKED_FREE_TIER') {
                 endCall(false);
             }
+            if (payload.code === 'CALL_BUSY') {
+                endCall(false);
+            }
         };
         socketService.onError(handleSocketError);
         return () => {
@@ -697,13 +776,51 @@ const Messages = () => {
         }
     };
 
+    const handleConfirmCallDuration = async (minutes) => {
+        setCallDurationOpen(false);
+        if (callState.status !== 'idle') return;
+        await startCall(callMediaType, minutes);
+    };
+
+    const handleConfirmVideoCall = async ({ scheduledAt, durationMinutes }) => {
+        if (!currentPsychologist?.id) return;
+        if (!hasSavedCard) {
+            toast.error('Add a saved card to schedule this call.');
+            return;
+        }
+        setVideoCallScheduling(true);
+        try {
+            const { data } = await api.post(`/psychologists/${currentPsychologist.id}/bookings`, {
+                rateId: activePsychRate?.id || null,
+                scheduledAt: new Date(scheduledAt).toISOString(),
+                durationMinutes
+            });
+            const booking = data?.booking;
+            if (booking?.id) {
+                await api.post(`/psychologists/bookings/${booking.id}/checkout`);
+                setVideoCallModalOpen(false);
+                await startCall('video', durationMinutes, booking.scheduled_at || booking.scheduledAt);
+            }
+        } catch (error) {
+            const message = error?.response?.data?.error || 'Psychologist is busy. Choose another time.';
+            toast.error(message);
+        } finally {
+            setVideoCallScheduling(false);
+        }
+    };
+
     const handleVideoCall = () => {
         if (!activeConversation || !currentPsychologist) {
             toast.error('No active psychologist yet.');
             return;
         }
-        if (isFreeEmployee) {
-            toast(callRestrictionCopy);
+        if (user?.role === 'employee') {
+            if (isFreeEmployee) {
+                toast(callRestrictionCopy);
+                return;
+            }
+            setVideoCallModalOpen(true);
+            fetchVideoCallAvailability();
             return;
         }
 
@@ -722,7 +839,9 @@ const Messages = () => {
             return;
         }
 
-        startCall('video');
+        setCallDurationOpen(true);
+        setCallMediaType('video');
+        loadCallEntitlement();
     };
 
     const handleVoiceCall = () => {
@@ -730,7 +849,7 @@ const Messages = () => {
             toast.error('No active psychologist yet.');
             return;
         }
-        if (isFreeEmployee) {
+        if (user?.role === 'employee') {
             toast(callRestrictionCopy);
             return;
         }
@@ -750,7 +869,9 @@ const Messages = () => {
             return;
         }
 
-        startCall('voice');
+        setCallDurationOpen(true);
+        setCallMediaType('voice');
+        loadCallEntitlement();
     };
 
     const createPeerConnection = (conversationId) => {
@@ -780,7 +901,7 @@ const Messages = () => {
         return pc;
     };
 
-    const startCall = async (mediaType) => {
+    const startCall = async (mediaType, durationMinutes, scheduledAt) => {
         if (!activeConversation) return;
         if (isFreeEmployee) {
             toast(callRestrictionCopy);
@@ -822,7 +943,9 @@ const Messages = () => {
             socketService.emitCallOffer({
                 conversationId: activeConversation.id,
                 sdp: offer,
-                mediaType
+                mediaType,
+                durationMinutes,
+                scheduledAt
             });
 
             setCallState({
@@ -1447,6 +1570,21 @@ const Messages = () => {
                                         {isConversationExpired ? 'Session ended' : 'Active'}
                                     </span>
                                 </div>
+                                {user?.role === 'employee' && (
+                                    <div className="msg-rate-summary">
+                                        <span>Session rate</span>
+                                        {currentRatesLoading ? (
+                                            <strong>Loading...</strong>
+                                        ) : activePsychRate ? (
+                                            <strong>
+                                                {formatAmountMinor(activePsychRate.amount_minor, activePsychRate.currency_code) || '—'}{' '}
+                                                {activePsychRate.duration_type === 'per_minute' ? 'per minute' : 'per hour'}
+                                            </strong>
+                                        ) : (
+                                            <strong>Not available yet</strong>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="msg-status-line">
                                     <FaClock /> {timeLabel}
                                 </div>
@@ -1470,6 +1608,14 @@ const Messages = () => {
                                       >
                                         <FaVideo /> Setup video call
                                     </button>
+                                    {user?.role === 'employee' && currentPsychologist && (
+                                        <button
+                                            className="msg-btn msg-btn-primary msg-btn-small"
+                                            onClick={() => setBookingModalOpen(true)}
+                                        >
+                                            Book session
+                                        </button>
+                                    )}
                                     <button
                                         className="msg-btn msg-btn-secondary msg-btn-small"
                                         onClick={handleViewHistory}
@@ -1643,6 +1789,31 @@ const Messages = () => {
                 loading={allocationModal.loading}
                 onClose={() => setAllocationModal({ open: false, psychologist: null, loading: false })}
                 onConfirm={handleConfirmAllocation}
+            />
+            <CallDurationModal
+                open={callDurationOpen}
+                onClose={() => setCallDurationOpen(false)}
+                onConfirm={handleConfirmCallDuration}
+                entitlement={callEntitlement?.entitlement}
+                callFeeMinor={callEntitlement?.callFeeMinor}
+            />
+            <EmployeeVideoCallModal
+                open={videoCallModalOpen}
+                onClose={() => setVideoCallModalOpen(false)}
+                availability={videoCallAvailability}
+                weekStart={videoCallWeekStart}
+                onWeekChange={(nextWeek) => {
+                    setVideoCallWeekStart(nextWeek);
+                    fetchVideoCallAvailability(nextWeek);
+                }}
+                onConfirm={handleConfirmVideoCall}
+                hasSavedCard={hasSavedCard}
+                loading={videoCallScheduling}
+            />
+            <PsychologistBookingModal
+                open={bookingModalOpen}
+                psychologist={currentPsychologist}
+                onClose={() => setBookingModalOpen(false)}
             />
         </div>
     );

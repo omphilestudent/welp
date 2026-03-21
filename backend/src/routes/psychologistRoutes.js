@@ -5,12 +5,33 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { checkRoleFlag } = require('../middleware/roleFlags');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const psychologistController = require('../controllers/psychologistController');
 const psychologistDashboardController = require('../controllers/psychologistDashboardController');
 const sessionRatingController = require('../controllers/sessionRatingController');
+const psychologistBillingController = require('../controllers/psychologistBillingController');
+const { requirePsychologistLeadAccess } = require('../middleware/psychologistEntitlements');
 const { restrictUnverifiedPsychologist } = require('../middleware/restrictUnverifiedPsychologist');
 
 const router = express.Router();
+
+const payoutProofDir = path.join(__dirname, '../../uploads/payout-proofs');
+if (!fs.existsSync(payoutProofDir)) {
+    fs.mkdirSync(payoutProofDir, { recursive: true });
+}
+const payoutProofStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, payoutProofDir),
+    filename: (_req, file, cb) => {
+        const safe = file.originalname.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9.\-_]/g, '');
+        cb(null, `${Date.now()}-${safe}`);
+    }
+});
+const payoutProofUpload = multer({
+    storage: payoutProofStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 
 const psychologistApplicationValidation = [
@@ -129,6 +150,7 @@ router.get('/dashboard/leads',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('leads'),
+    requirePsychologistLeadAccess,
     psychologistDashboardController.getLeads
 );
 
@@ -136,6 +158,7 @@ router.post('/dashboard/leads/:leadId/message',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('leads'),
+    requirePsychologistLeadAccess,
     restrictUnverifiedPsychologist,
     psychologistDashboardController.sendLeadMessage
 );
@@ -144,6 +167,7 @@ router.patch('/dashboard/leads/:leadId/archive',
     authenticate,
     authorize('psychologist'),
     checkRoleFlag('leads'),
+    requirePsychologistLeadAccess,
     restrictUnverifiedPsychologist,
     psychologistDashboardController.archiveLead
 );
@@ -207,6 +231,123 @@ router.post('/dashboard/calendar-integrations/:integrationId/sync',
     checkRoleFlag('schedule'),
     restrictUnverifiedPsychologist,
     psychologistDashboardController.syncCalendarIntegration
+);
+
+// Psychologist rates + payouts
+router.get('/dashboard/rates',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.getMyRates
+);
+
+router.post('/dashboard/rates',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.createRate
+);
+
+router.post('/dashboard/rates/:rateId/activate',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.setActiveRate
+);
+
+router.get('/dashboard/payout-account',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.getPayoutDetails
+);
+
+router.post('/dashboard/payout-account',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.updatePayoutDetails
+);
+
+router.post('/dashboard/payout-account/proof',
+    authenticate,
+    authorize('psychologist'),
+    payoutProofUpload.single('proof'),
+    psychologistBillingController.uploadPayoutProof
+);
+
+router.get('/dashboard/plan',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.getDashboardPlan
+);
+
+router.get('/dashboard/availability',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.getWeeklyAvailabilityForDashboard
+);
+
+router.post('/dashboard/availability',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.updateWeeklyAvailabilityForDashboard
+);
+
+router.get('/dashboard/ledger',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.getPsychologistLedger
+);
+
+router.get('/dashboard/earnings',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.getEarningsSummary
+);
+
+router.get('/dashboard/statements',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.listMonthlyStatements
+);
+
+router.post('/dashboard/statements',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.generateStatement
+);
+
+router.get('/dashboard/statements/:statementId/download',
+    authenticate,
+    authorize('psychologist'),
+    psychologistBillingController.downloadStatement
+);
+
+// Public psych rates + availability for booking
+router.get('/:psychologistId/rates',
+    authenticate,
+    apiLimiter,
+    psychologistBillingController.getRatesForPsychologist
+);
+
+router.get('/:psychologistId/availability',
+    authenticate,
+    apiLimiter,
+    psychologistBillingController.getAvailabilityForPsychologist
+);
+
+router.get('/:psychologistId/booking-preview',
+    authenticate,
+    apiLimiter,
+    psychologistBillingController.getBookingPreview
+);
+
+router.post('/:psychologistId/bookings',
+    authenticate,
+    authorize('employee'),
+    psychologistBillingController.createBookingForPsychologist
+);
+
+router.post('/bookings/:bookingId/checkout',
+    authenticate,
+    authorize('employee'),
+    psychologistBillingController.checkoutBookingPayment
 );
 
 module.exports = router;

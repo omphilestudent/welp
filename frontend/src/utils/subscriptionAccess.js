@@ -26,6 +26,15 @@ const PLAN_PERMISSIONS = {
         apiLimit: 0,
         adsEnabled: false
     },
+    psychologist_free: {
+        chatLimit: 60,
+        videoCall: false,
+        choosePsychologist: false,
+        dashboardAccess: true,
+        analytics: false,
+        apiLimit: 0,
+        adsEnabled: false
+    },
     business_free_tier: {
         chatLimit: 0,
         videoCall: false,
@@ -72,6 +81,7 @@ const PLAN_ALIASES = {
     premium: 'client_paid',
     user_premium: 'client_paid',
     psychologist: 'psychologist',
+    psychologist_free: 'psychologist_free',
     psychologist_standard: 'psychologist',
     psychologist_premium: 'psychologist',
     business_free_tier: 'business_free_tier',
@@ -103,6 +113,7 @@ const resolvePlanKeyFromSubscription = (subscription, role) => {
     }
 
     if (roleKey === 'psychologist') {
+        if (planCode === 'psychologist_free' || planTier === 'free') return 'psychologist_free';
         return 'psychologist';
     }
 

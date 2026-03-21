@@ -58,6 +58,7 @@ import FlowManagement from './pages/admin/FlowManagement';
 import FlowAdmin from './pages/admin/FlowAdmin';
 import FlowBuilder from './pages/admin/FlowBuilder';
 import AdminTickets from './pages/admin/AdminTickets';
+import PsychologistLedger from './pages/admin/PsychologistLedger';
 import KodiDashboard from './pages/kodi/KodiDashboard';
 import KodiLogin from './pages/kodi/KodiLogin';
 import KodiPage from './pages/kodi/KodiPage';
@@ -300,6 +301,7 @@ function App() {
                                     <Route path="claims" element={<ClaimRequests />} />
                                     <Route path="marketing" element={<AdminMarketing />} />
                                     <Route path="ads" element={<AdApprovals />} />
+                                    <Route path="psychologist-ledger" element={<PsychologistLedger />} />
                                     <Route path="tickets" element={<AdminTickets />} />
                                     <Route path="flows" element={<FlowAdmin />} />
                                     <Route path="flows/advanced" element={<FlowManagement />} />

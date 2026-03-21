@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
@@ -15,7 +15,8 @@ import {
     FaChevronDown, FaChevronUp, FaStar, FaReply, FaCheckCircle,
     FaTimesCircle, FaUserSecret, FaUser, FaChartBar, FaSync,
     FaGlobe, FaMapMarkerAlt, FaEnvelope, FaPhone, FaImage,
-    FaCrown, FaShieldAlt, FaExclamationTriangle
+    FaCrown, FaShieldAlt, FaExclamationTriangle,
+    FaMoneyBillWave, FaWallet, FaFileInvoiceDollar
 } from 'react-icons/fa';
 import {
     ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart,
@@ -424,6 +425,32 @@ const Dashboard = () => {
     const [calendarIntegrations, setCalendarIntegrations] = useState([]);
     const [externalEvents, setExternalEvents] = useState([]);
     const [recentCalls, setRecentCalls] = useState([]);
+    const [psychRates, setPsychRates] = useState([]);
+    const [psychRateForm, setPsychRateForm] = useState({ amount: '', durationType: 'per_hour', label: '' });
+    const [savingRate, setSavingRate] = useState(false);
+    const [psychPayoutAccount, setPsychPayoutAccount] = useState(null);
+    const [payoutForm, setPayoutForm] = useState({
+        accountNumber: '',
+        accountHolder: '',
+        bankName: '',
+        notes: '',
+        countryCode: 'ZA',
+        branchCode: '',
+        routingNumber: '',
+        swiftCode: ''
+    });
+    const [payoutRequirements, setPayoutRequirements] = useState(null);
+    const [payoutComplete, setPayoutComplete] = useState(false);
+    const [payoutProofUploading, setPayoutProofUploading] = useState(false);
+    const [payoutProofUrl, setPayoutProofUrl] = useState('');
+    const [availabilitySlots, setAvailabilitySlots] = useState([]);
+    const [availabilityWeekStart, setAvailabilityWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+    const [availabilitySaving, setAvailabilitySaving] = useState(false);
+    const [savingPayout, setSavingPayout] = useState(false);
+    const [psychPlanInfo, setPsychPlanInfo] = useState(null);
+    const [psychEarnings, setPsychEarnings] = useState(null);
+    const [psychStatements, setPsychStatements] = useState([]);
+    const [statementGenerating, setStatementGenerating] = useState(false);
     const [calendarIntegrationDraft, setCalendarIntegrationDraft] = useState({ provider: 'google', name: '', icalUrl: '' });
     const [scheduleDraft, setScheduleDraft] = useState({ title: '', date: '', time: '', type: 'meeting', location: '' });
     const [calendarView, setCalendarView] = useState('month');
@@ -798,6 +825,15 @@ const Dashboard = () => {
         ]
         : [];
 
+    const availabilityWeekDays = Array.from({ length: 7 }, (_, idx) => addDays(availabilityWeekStart, idx));
+    const availabilityMap = useMemo(() => {
+        const map = new Map();
+        availabilitySlots.forEach((slot) => {
+            map.set(`${slot.dayOfWeek}-${slot.hour}`, slot.isAvailable);
+        });
+        return map;
+    }, [availabilitySlots]);
+
     /* ── Lifecycle ── */
     useEffect(() => {
         if (!userKey) {
@@ -812,6 +848,15 @@ const Dashboard = () => {
         fetchDashboardData();
         // only re-run when the authenticated user identity or role changes
     }, [userKey, userRole]);
+
+    useEffect(() => {
+        if (user?.role !== 'psychologist') return;
+        api.get('/psychologists/dashboard/availability', {
+            params: { weekStart: availabilityWeekStart.toISOString().slice(0, 10) }
+        })
+            .then((res) => setAvailabilitySlots(res.data?.availability || []))
+            .catch(() => setAvailabilitySlots([]));
+    }, [availabilityWeekStart, user?.role]);
 
     useEffect(() => {
         if (user?.role === 'business' && selectedCompanyId) {
@@ -864,22 +909,62 @@ const Dashboard = () => {
                     setSelectedCompanyId((prev) => prev || companies[0].id);
                 }
             } else if (user?.role === 'psychologist') {
-                const [pendingRes, leadsRes, scheduleRes, permissionsRes] = await Promise.all([
+                const [
+                    pendingRes,
+                    leadsRes,
+                    scheduleRes,
+                    permissionsRes,
+                    ratesRes,
+                    payoutRes,
+                    planRes,
+                    earningsRes,
+                    statementsRes,
+                    availabilityRes
+                ] = await Promise.all([
                     api.get('/messages/conversations/pending').catch(() => ({ data: [] })),
                     api.get('/psychologists/dashboard/leads').catch(() => ({ data: [] })),
                     api.get('/psychologists/dashboard/schedule').catch(() => ({ data: [] })),
-                    api.get('/psychologists/dashboard/permissions').catch(() => ({ data: null }))
+                    api.get('/psychologists/dashboard/permissions').catch(() => ({ data: null })),
+                    api.get('/psychologists/dashboard/rates').catch(() => ({ data: { rates: [] } })),
+                    api.get('/psychologists/dashboard/payout-account').catch(() => ({ data: { account: null } })),
+                    api.get('/psychologists/dashboard/plan').catch(() => ({ data: null })),
+                    api.get('/psychologists/dashboard/earnings').catch(() => ({ data: null })),
+                    api.get('/psychologists/dashboard/statements').catch(() => ({ data: { statements: [] } })),
+                    api.get('/psychologists/dashboard/availability', {
+                        params: { weekStart: availabilityWeekStart.toISOString().slice(0, 10) }
+                    }).catch(() => ({ data: { availability: [] } }))
                 ]);
                 setPendingRequests(pendingRes.data || []);
                 setPsychLeads(leadsRes.data || []);
                 setPsychSchedule(scheduleRes.data || []);
                 setPsychPermissions(permissionsRes.data || null);
+                setPsychRates(ratesRes.data?.rates || []);
+                setPsychPayoutAccount(payoutRes.data?.account || null);
+                setPayoutRequirements(payoutRes.data?.requirements || null);
+                setPayoutComplete(Boolean(payoutRes.data?.isComplete));
+                setPayoutProofUrl(payoutRes.data?.account?.proof_document_url || '');
+                if (payoutRes.data?.account) {
+                    setPayoutForm({
+                        accountNumber: payoutRes.data.account.account_number || '',
+                        accountHolder: payoutRes.data.account.account_holder || '',
+                        bankName: payoutRes.data.account.bank_name || '',
+                        notes: payoutRes.data.account.notes || '',
+                        countryCode: payoutRes.data.account.country_code || 'ZA',
+                        branchCode: payoutRes.data.account.branch_code || '',
+                        routingNumber: payoutRes.data.account.routing_number || '',
+                        swiftCode: payoutRes.data.account.swift_code || ''
+                    });
+                }
+                setPsychPlanInfo(planRes.data || null);
+                setPsychEarnings(earningsRes.data || null);
+                setPsychStatements(statementsRes.data?.statements || []);
                 const ratingsRes = await api.get('/psychologists/dashboard/ratings/summary').catch(() => ({ data: null }));
                 setPsychRatingSummary(ratingsRes.data || null);
                 const integrationsRes = await api.get('/psychologists/dashboard/calendar-integrations').catch(() => ({ data: [] }));
                 setCalendarIntegrations(integrationsRes.data || []);
                 const callsRes = await api.get('/psychologists/dashboard/calls').catch(() => ({ data: [] }));
                 setRecentCalls(callsRes.data || []);
+                setAvailabilitySlots(availabilityRes.data?.availability || []);
             }
         } catch (err) {
             setError('Failed to load dashboard data');
@@ -975,6 +1060,144 @@ const Dashboard = () => {
             setPsychSchedule((prev) => prev.filter((item) => item.id !== itemId));
             toast.success('Schedule item removed');
         } catch { toast.error('Failed to remove schedule item'); }
+    };
+
+    const handleRateSubmit = async (event) => {
+        event.preventDefault();
+        if (!psychRateForm.amount) {
+            toast.error('Enter a rate amount.');
+            return;
+        }
+        setSavingRate(true);
+        try {
+            await api.post('/psychologists/dashboard/rates', {
+                amount: psychRateForm.amount,
+                durationType: psychRateForm.durationType,
+                label: psychRateForm.label
+            });
+            const { data } = await api.get('/psychologists/dashboard/rates');
+            setPsychRates(data?.rates || []);
+            setPsychRateForm({ amount: '', durationType: 'per_hour', label: '' });
+            toast.success('Rate saved');
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to save rate');
+        } finally {
+            setSavingRate(false);
+        }
+    };
+
+    const handleActivateRate = async (rateId) => {
+        if (!rateId) return;
+        setSavingRate(true);
+        try {
+            await api.post(`/psychologists/dashboard/rates/${rateId}/activate`);
+            const { data } = await api.get('/psychologists/dashboard/rates');
+            setPsychRates(data?.rates || []);
+            toast.success('Active rate updated');
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to update rate');
+        } finally {
+            setSavingRate(false);
+        }
+    };
+
+    const handlePayoutSubmit = async (event) => {
+        event.preventDefault();
+        setSavingPayout(true);
+        try {
+            const { data } = await api.post('/psychologists/dashboard/payout-account', {
+                accountNumber: payoutForm.accountNumber,
+                accountHolder: payoutForm.accountHolder,
+                bankName: payoutForm.bankName,
+                notes: payoutForm.notes,
+                countryCode: payoutForm.countryCode,
+                branchCode: payoutForm.branchCode,
+                routingNumber: payoutForm.routingNumber,
+                swiftCode: payoutForm.swiftCode
+            });
+            setPsychPayoutAccount(data?.account || null);
+            setPayoutRequirements(data?.requirements || null);
+            setPayoutComplete(Boolean(data?.isComplete));
+            toast.success('Payout details saved');
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to save payout details');
+        } finally {
+            setSavingPayout(false);
+        }
+    };
+
+    const handlePayoutProofUpload = async (file) => {
+        if (!file) return;
+        setPayoutProofUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('proof', file);
+            const { data } = await api.post('/psychologists/dashboard/payout-account/proof', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setPsychPayoutAccount(data?.account || null);
+            setPayoutProofUrl(data?.account?.proof_document_url || '');
+            setPayoutComplete(Boolean(data?.isComplete));
+            toast.success('Proof of account uploaded');
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to upload proof');
+        } finally {
+            setPayoutProofUploading(false);
+        }
+    };
+
+    const handleAvailabilityToggle = (dayOfWeek, hour) => {
+        if (isPsychRestricted) {
+            toast.error('Your account is restricted until KYC is approved.');
+            return;
+        }
+        setAvailabilitySlots((prev) => {
+            let updated = false;
+            const next = prev.map((slot) => {
+                if (slot.dayOfWeek === dayOfWeek && slot.hour === hour) {
+                    updated = true;
+                    return { ...slot, isAvailable: !slot.isAvailable };
+                }
+                return slot;
+            });
+            if (!updated) {
+                next.push({ dayOfWeek, hour, isAvailable: true });
+            }
+            return next;
+        });
+    };
+
+    const handleAvailabilitySave = async () => {
+        setAvailabilitySaving(true);
+        try {
+            await api.post('/psychologists/dashboard/availability', {
+                slots: availabilitySlots
+            });
+            toast.success('Availability updated');
+        } catch (error) {
+            toast.error('Failed to save availability');
+        } finally {
+            setAvailabilitySaving(false);
+        }
+    };
+
+    const handleGenerateStatement = async () => {
+        setStatementGenerating(true);
+        try {
+            const nowDate = new Date();
+            const payload = {
+                year: nowDate.getUTCFullYear(),
+                month: nowDate.getUTCMonth() + 1
+            };
+            await api.post('/psychologists/dashboard/statements', payload);
+            const { data } = await api.get('/psychologists/dashboard/statements');
+            setPsychStatements(data?.statements || []);
+            toast.success('Statement generated');
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to generate statement');
+        } finally {
+            setStatementGenerating(false);
+        }
     };
 
     const handleLeadMessage = async (leadId) => {
@@ -1358,6 +1581,9 @@ const Dashboard = () => {
                             <button className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`} onClick={() => setActiveTab('requests')}>
                                 Pending Requests ({pendingRequests.length})
                             </button>
+                            <button className={`tab-btn ${activeTab === 'payouts' ? 'active' : ''}`} onClick={() => setActiveTab('payouts')}>
+                                Rates &amp; Payouts
+                            </button>
                             <button className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
                                 Profile Settings
                             </button>
@@ -1475,6 +1701,231 @@ const Dashboard = () => {
                     {(user?.role === 'employee' || user?.role === 'psychologist') && activeTab === 'profile' && (
                         <div className="profile-tab">
                             <ProfileSettings onUpdate={fetchDashboardData} />
+                        </div>
+                    )}
+
+                    {user?.role === 'psychologist' && activeTab === 'payouts' && (
+                        <div className="psych-payout-tab">
+                            <section className="psych-card psych-card--wide">
+                                <header className="psych-card__header">
+                                    <div>
+                                        <h3><FaMoneyBillWave /> Rates &amp; Payouts</h3>
+                                        <p>Manage your session rates, payout details, and statements.</p>
+                                    </div>
+                                </header>
+                                <div className="psych-card__body">
+                                    <div className="psych-rate-summary">
+                                        <span className="badge badge-primary">
+                                            Plan: {psychPlanInfo?.plan?.tier || 'free'}
+                                        </span>
+                                        <span className="badge badge-secondary">
+                                            Lead access: {psychPlanInfo?.leadAccess ? 'Enabled' : 'Not available'}
+                                        </span>
+                                        <span className={`badge ${payoutComplete ? 'badge-success' : 'badge-warning'}`}>
+                                            Payout profile: {payoutComplete ? 'Complete' : 'Incomplete'}
+                                        </span>
+                                    </div>
+
+                                    <div className="psych-rate-grid">
+                                        <form className="psych-rate-form" onSubmit={handleRateSubmit}>
+                                            <h4>Session rate</h4>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="Rate amount"
+                                                value={psychRateForm.amount}
+                                                onChange={(e) => setPsychRateForm({ ...psychRateForm, amount: e.target.value })}
+                                            />
+                                            <select
+                                                value={psychRateForm.durationType}
+                                                onChange={(e) => setPsychRateForm({ ...psychRateForm, durationType: e.target.value })}
+                                            >
+                                                <option value="per_hour">Per hour</option>
+                                                <option value="per_minute">Per minute</option>
+                                            </select>
+                                            <input
+                                                type="text"
+                                                placeholder="Label (optional)"
+                                                value={psychRateForm.label}
+                                                onChange={(e) => setPsychRateForm({ ...psychRateForm, label: e.target.value })}
+                                            />
+                                            <button type="submit" className="btn btn-primary btn-small" disabled={savingRate}>
+                                                {savingRate ? 'Saving...' : 'Save rate'}
+                                            </button>
+                                        </form>
+
+                                        <div className="psych-rate-list">
+                                            <h4>Active rates</h4>
+                                            {psychRates.length === 0 ? (
+                                                <p className="empty-message">No rates yet.</p>
+                                            ) : (
+                                                psychRates.map((rate) => (
+                                                    <div key={rate.id} className={`psych-rate-row ${rate.is_active ? 'is-active' : ''}`}>
+                                                        <div>
+                                                            <strong>{rate.label || 'Session rate'}</strong>
+                                                            <span>
+                                                                {rate.currency_code || 'USD'} {(Number(rate.amount_minor || 0) / 100).toFixed(2)} {rate.duration_type === 'per_minute' ? '/ min' : '/ hour'}
+                                                            </span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-outline btn-small"
+                                                            onClick={() => handleActivateRate(rate.id)}
+                                                            disabled={savingRate || rate.is_active}
+                                                        >
+                                                            {rate.is_active ? 'Active' : 'Make active'}
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <form className="psych-payout-form" onSubmit={handlePayoutSubmit}>
+                                        <h4><FaWallet /> Payout account</h4>
+                                        <div className="psych-payout-grid">
+                                            <label>
+                                                Country
+                                                <select
+                                                    value={payoutForm.countryCode}
+                                                    onChange={(e) => setPayoutForm({ ...payoutForm, countryCode: e.target.value })}
+                                                >
+                                                    <option value="ZA">South Africa</option>
+                                                    <option value="US">United States</option>
+                                                    <option value="GB">United Kingdom</option>
+                                                    <option value="EU">Europe</option>
+                                                    <option value="OTHER">Other</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                Account number
+                                                <input
+                                                    type="text"
+                                                    value={payoutForm.accountNumber}
+                                                    onChange={(e) => setPayoutForm({ ...payoutForm, accountNumber: e.target.value })}
+                                                />
+                                            </label>
+                                            {payoutForm.countryCode === 'ZA' && (
+                                                <label>
+                                                    Branch code
+                                                    <input
+                                                        type="text"
+                                                        value={payoutForm.branchCode}
+                                                        onChange={(e) => setPayoutForm({ ...payoutForm, branchCode: e.target.value })}
+                                                    />
+                                                </label>
+                                            )}
+                                            {payoutForm.countryCode === 'US' && (
+                                                <label>
+                                                    Routing number
+                                                    <input
+                                                        type="text"
+                                                        value={payoutForm.routingNumber}
+                                                        onChange={(e) => setPayoutForm({ ...payoutForm, routingNumber: e.target.value })}
+                                                    />
+                                                </label>
+                                            )}
+                                            {payoutForm.countryCode !== 'ZA' && payoutForm.countryCode !== 'US' && (
+                                                <label>
+                                                    Swift code
+                                                    <input
+                                                        type="text"
+                                                        value={payoutForm.swiftCode}
+                                                        onChange={(e) => setPayoutForm({ ...payoutForm, swiftCode: e.target.value })}
+                                                    />
+                                                </label>
+                                            )}
+                                            <label>
+                                                Account holder
+                                                <input
+                                                    type="text"
+                                                    value={payoutForm.accountHolder}
+                                                    onChange={(e) => setPayoutForm({ ...payoutForm, accountHolder: e.target.value })}
+                                                />
+                                            </label>
+                                            <label>
+                                                Bank / provider
+                                                <input
+                                                    type="text"
+                                                    value={payoutForm.bankName}
+                                                    onChange={(e) => setPayoutForm({ ...payoutForm, bankName: e.target.value })}
+                                                />
+                                            </label>
+                                            <label>
+                                                Notes
+                                                <textarea
+                                                    value={payoutForm.notes}
+                                                    onChange={(e) => setPayoutForm({ ...payoutForm, notes: e.target.value })}
+                                                />
+                                            </label>
+                                        </div>
+                                        <div className="psych-proof-upload">
+                                            <label>
+                                                Proof of account (required)
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,image/*"
+                                                    onChange={(e) => handlePayoutProofUpload(e.target.files?.[0])}
+                                                    disabled={payoutProofUploading}
+                                                />
+                                            </label>
+                                            {payoutProofUploading && <span className="empty-message">Uploading proofâ€¦</span>}
+                                            {!payoutProofUploading && payoutProofUrl ? (
+                                                <a href={payoutProofUrl} target="_blank" rel="noreferrer">View uploaded proof</a>
+                                            ) : null}
+                                            {!payoutProofUploading && !payoutProofUrl ? (
+                                                <span className="empty-message">No proof uploaded yet.</span>
+                                            ) : null}
+                                        </div>
+                                        <button type="submit" className="btn btn-primary btn-small" disabled={savingPayout}>
+                                            {savingPayout ? 'Saving...' : 'Save payout details'}
+                                        </button>
+                                    </form>
+
+                                    <div className="psych-earnings-summary">
+                                        <h4><FaChartBar /> Earnings</h4>
+                                        <div className="psych-earnings-grid">
+                                            <div>
+                                                <span>Gross</span>
+                                                <strong>{psychEarnings?.totalsFormatted?.gross ?? 0}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Fees</span>
+                                                <strong>{psychEarnings?.totalsFormatted?.fee ?? 0}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Net</span>
+                                                <strong>{psychEarnings?.totalsFormatted?.net ?? 0}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Unpaid</span>
+                                                <strong>{psychEarnings?.totalsFormatted?.unpaid ?? 0}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="psych-statement-list">
+                                        <div className="psych-statement-header">
+                                            <h4><FaFileInvoiceDollar /> Monthly statements</h4>
+                                            <button type="button" className="btn btn-outline btn-small" onClick={handleGenerateStatement} disabled={statementGenerating}>
+                                                {statementGenerating ? 'Generating...' : 'Generate current month'}
+                                            </button>
+                                        </div>
+                                        {psychStatements.length === 0 ? (
+                                            <p className="empty-message">No statements yet.</p>
+                                        ) : (
+                                            psychStatements.map((statement) => (
+                                                <div key={statement.id} className="psych-statement-row">
+                                                    <span>{statement.period_start} – {statement.period_end}</span>
+                                                    <a className="btn btn-secondary btn-small" href={`/api/psychologists/dashboard/statements/${statement.id}/download`}>
+                                                        Download
+                                                    </a>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     )}
 
@@ -2076,6 +2527,68 @@ const Dashboard = () => {
                                             <input type="text" placeholder="Location / link" value={scheduleDraft.location} onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })} />
                                             <button type="submit" className="btn btn-primary btn-small" disabled={isPsychRestricted}>Add</button>
                                         </form>
+                                        <div className="psych-availability">
+                                            <div className="psych-availability__header">
+                                                <div>
+                                                    <h4>Weekly hourly availability</h4>
+                                                    <p>Select hours you are available for sessions.</p>
+                                                </div>
+                                                <div className="psych-availability__actions">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline btn-small"
+                                                        onClick={() => setAvailabilityWeekStart((prev) => addDays(prev, -7))}
+                                                    >
+                                                        Previous week
+                                                    </button>
+                                                    <span className="psych-availability__range">
+                                                        {format(availabilityWeekStart, 'MMM d')} â€“ {format(addDays(availabilityWeekStart, 6), 'MMM d')}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline btn-small"
+                                                        onClick={() => setAvailabilityWeekStart((prev) => addDays(prev, 7))}
+                                                    >
+                                                        Next week
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-primary btn-small"
+                                                        onClick={handleAvailabilitySave}
+                                                        disabled={availabilitySaving}
+                                                    >
+                                                        {availabilitySaving ? 'Savingâ€¦' : 'Save availability'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="psych-availability__grid">
+                                                <div className="psych-availability__row psych-availability__row--header">
+                                                    <span />
+                                                    {availabilityWeekDays.map((day) => (
+                                                        <span key={day.toISOString()}>{format(day, 'EEE d')}</span>
+                                                    ))}
+                                                </div>
+                                                {Array.from({ length: 24 }, (_, hour) => (
+                                                    <div key={hour} className="psych-availability__row">
+                                                        <span className="psych-availability__hour">{String(hour).padStart(2, '0')}:00</span>
+                                                        {availabilityWeekDays.map((day) => {
+                                                            const dayOfWeek = day.getDay();
+                                                            const key = `${dayOfWeek}-${hour}`;
+                                                            const isAvailable = availabilityMap.get(key);
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={`${key}-${day.toISOString()}`}
+                                                                    className={`psych-availability__cell ${isAvailable ? 'is-available' : ''}`}
+                                                                    onClick={() => handleAvailabilityToggle(dayOfWeek, hour)}
+                                                                    disabled={isPsychRestricted}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                         <div className={`psych-calendar psych-calendar--${calendarView}`}>
                                             <div className="psych-calendar-weekdays">
                                                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
@@ -2239,6 +2752,148 @@ const Dashboard = () => {
                                 </div>
                             </section>
 
+                            {/* Rates & Payouts card */}
+                            {false && (
+                            <section className="psych-card psych-card--compact">
+                                <header className="psych-card__header">
+                                    <div>
+                                        <h3><FaMoneyBillWave /> Rates &amp; Payouts</h3>
+                                        <p>Manage session pricing, payout account, and statements.</p>
+                                    </div>
+                                </header>
+                                <div className="psych-card__body">
+                                    <div className="psych-rate-summary">
+                                        <span className="badge badge-primary">
+                                            Plan: {psychPlanInfo?.plan?.tier || 'free'}
+                                        </span>
+                                        <span className="badge badge-secondary">
+                                            Lead access: {psychPlanInfo?.leadAccess ? 'Enabled' : 'Not available'}
+                                        </span>
+                                    </div>
+                                    <form className="psych-rate-form" onSubmit={handleRateSubmit}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="Rate amount"
+                                            value={psychRateForm.amount}
+                                            onChange={(e) => setPsychRateForm({ ...psychRateForm, amount: e.target.value })}
+                                        />
+                                        <select
+                                            value={psychRateForm.durationType}
+                                            onChange={(e) => setPsychRateForm({ ...psychRateForm, durationType: e.target.value })}
+                                        >
+                                            <option value="per_hour">Per hour</option>
+                                            <option value="per_minute">Per minute</option>
+                                        </select>
+                                        <input
+                                            type="text"
+                                            placeholder="Label (optional)"
+                                            value={psychRateForm.label}
+                                            onChange={(e) => setPsychRateForm({ ...psychRateForm, label: e.target.value })}
+                                        />
+                                        <button type="submit" className="btn btn-primary btn-small" disabled={savingRate}>
+                                            {savingRate ? 'Saving...' : 'Save rate'}
+                                        </button>
+                                    </form>
+                                    <div className="psych-rate-list">
+                                        {psychRates.length === 0 ? (
+                                            <p className="empty-message">No rates yet.</p>
+                                        ) : (
+                                            psychRates.map((rate) => (
+                                                <div key={rate.id} className={`psych-rate-row ${rate.is_active ? 'is-active' : ''}`}>
+                                                    <div>
+                                                        <strong>{rate.label || 'Session rate'}</strong>
+                                                        <span>
+                                                            {rate.currency_code || 'USD'} {(Number(rate.amount_minor || 0) / 100).toFixed(2)} {rate.duration_type === 'per_minute' ? '/ min' : '/ hour'}
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline btn-small"
+                                                        onClick={() => handleActivateRate(rate.id)}
+                                                        disabled={savingRate || rate.is_active}
+                                                    >
+                                                        {rate.is_active ? 'Active' : 'Make active'}
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                    <form className="psych-payout-form" onSubmit={handlePayoutSubmit}>
+                                        <h4><FaWallet /> Payout account</h4>
+                                        <input
+                                            type="text"
+                                            placeholder="Account number"
+                                            value={payoutForm.accountNumber}
+                                            onChange={(e) => setPayoutForm({ ...payoutForm, accountNumber: e.target.value })}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Account holder"
+                                            value={payoutForm.accountHolder}
+                                            onChange={(e) => setPayoutForm({ ...payoutForm, accountHolder: e.target.value })}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Bank / provider"
+                                            value={payoutForm.bankName}
+                                            onChange={(e) => setPayoutForm({ ...payoutForm, bankName: e.target.value })}
+                                        />
+                                        <textarea
+                                            placeholder="Notes (optional)"
+                                            value={payoutForm.notes}
+                                            onChange={(e) => setPayoutForm({ ...payoutForm, notes: e.target.value })}
+                                        />
+                                        <button type="submit" className="btn btn-primary btn-small" disabled={savingPayout}>
+                                            {savingPayout ? 'Saving...' : 'Save payout details'}
+                                        </button>
+                                    </form>
+                                    <div className="psych-earnings-summary">
+                                        <h4><FaChartBar /> Earnings</h4>
+                                        <div className="psych-earnings-grid">
+                                            <div>
+                                                <span>Gross</span>
+                                                <strong>{psychEarnings?.totalsFormatted?.gross ?? 0}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Fees</span>
+                                                <strong>{psychEarnings?.totalsFormatted?.fee ?? 0}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Net</span>
+                                                <strong>{psychEarnings?.totalsFormatted?.net ?? 0}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Unpaid</span>
+                                                <strong>{psychEarnings?.totalsFormatted?.unpaid ?? 0}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="psych-statement-list">
+                                        <div className="psych-statement-header">
+                                            <h4><FaFileInvoiceDollar /> Monthly statements</h4>
+                                            <button type="button" className="btn btn-outline btn-small" onClick={handleGenerateStatement} disabled={statementGenerating}>
+                                                {statementGenerating ? 'Generating...' : 'Generate current month'}
+                                            </button>
+                                        </div>
+                                        {psychStatements.length === 0 ? (
+                                            <p className="empty-message">No statements yet.</p>
+                                        ) : (
+                                            psychStatements.map((statement) => (
+                                                <div key={statement.id} className="psych-statement-row">
+                                                    <span>{statement.period_start} – {statement.period_end}</span>
+                                                    <a className="btn btn-secondary btn-small" href={`/api/psychologists/dashboard/statements/${statement.id}/download`}>
+                                                        Download
+                                                    </a>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </section>
+                            )}
+
                             {/* Leads card */}
                             <section className="psych-card psych-card--compact">
                                 <header className="psych-card__header">
@@ -2377,3 +3032,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

@@ -45,6 +45,7 @@ const sessionRatingRoutes = require('./routes/sessionRatingRoutes');
 const kodiRoutes = require('./routes/kodiRoutes');
 const kodiAuthRoutes = require('./routes/kodiAuthRoutes');
 const kodiPlatformRoutes = require('./modules/kodi/kodi.routes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const { getEmailProviderStatus } = require('./utils/emailService');
 const { initMarketingTables, startMarketingScheduler } = require('./services/marketingEmailService');
 const { startScheduler: startMarketingCampaignScheduler } = require('./modules/marketing/marketing.scheduler');
@@ -56,6 +57,12 @@ const { createUserNotification } = require('./utils/userNotifications');
 const { getActiveSubscription, getPlanPayload } = require('./services/subscriptionService');
 const { hasPremiumException } = require('./utils/premiumAccess');
 const { ROLE_FLAGS } = require('./middleware/roleFlags');
+const {
+    getPsychologistClientEntitlement,
+    getPsychologistClientCallFeeMinor,
+    updateClientMinutes,
+    isPsychologistBusy
+} = require('./services/psychologistCallService');
 
 // Database connection with better error handling
 const { sequelize, testConnection } = require('./models');
@@ -210,6 +217,7 @@ app.use('/api/admin/emailCampaigns', emailMarketingRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/sessions', sessionRatingRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/kodi/platform', kodiPlatformRoutes);
 app.use('/api/kodi', kodiRoutes);
 app.use('/api/kodi-auth', kodiAuthRoutes);
@@ -309,6 +317,17 @@ io.use((socket, next) => {
 const activeCalls = new Map();
 const CALL_CAP_CACHE = new Map();
 const CALL_CAP_TTL_MS = Number(process.env.CALL_CAP_CACHE_TTL_MS || 60000);
+const CALL_DURATION_MIN = Number(process.env.CALL_DURATION_MIN || 5);
+const CALL_DURATION_MAX = Number(process.env.CALL_DURATION_MAX || 180);
+
+const isParticipantBusy = (userId) => {
+    for (const call of activeCalls.values()) {
+        if (call?.psychologistId === userId || call?.employeeId === userId) {
+            return true;
+        }
+    }
+    return false;
+};
 
 const getUserCallCapabilities = async (userId) => {
     if (!userId) {
@@ -404,10 +423,30 @@ const endCallSession = async (conversationId, reason = 'ended', endedByUserId = 
     if (active.startedAt && employeeId && psychologistId) {
         const endedAt = new Date();
         const durationSeconds = Math.max(0, Math.round((Date.now() - active.startedAt) / 1000));
+        const durationMinutes = Math.max(1, Math.ceil(durationSeconds / 60));
+        let clientMinutesBefore = active.clientMinutesBefore ?? null;
+        let clientMinutesAfter = active.clientMinutesAfter ?? null;
+        if (psychologistId && employeeId) {
+            try {
+                const updated = await updateClientMinutes({
+                    psychologistId,
+                    employeeId,
+                    minutesUsedDelta: durationMinutes
+                });
+                clientMinutesAfter = updated?.minutes_remaining ?? clientMinutesAfter;
+                if (clientMinutesBefore == null) {
+                    clientMinutesBefore = updated?.minutes_remaining != null
+                        ? updated.minutes_remaining + durationMinutes
+                        : null;
+                }
+            } catch (error) {
+                console.warn('Failed to update client minutes:', error.message);
+            }
+        }
         await query(
             `INSERT INTO call_logs
-             (conversation_id, psychologist_id, employee_id, media_type, started_at, ended_at, duration_seconds)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+             (conversation_id, psychologist_id, employee_id, media_type, started_at, ended_at, duration_seconds, requested_duration_minutes, psychologist_plan_tier, call_fee_minor, client_minutes_before, client_minutes_after)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
             [
                 conversationId,
                 psychologistId,
@@ -415,7 +454,12 @@ const endCallSession = async (conversationId, reason = 'ended', endedByUserId = 
                 active.mediaType || 'video',
                 new Date(active.startedAt),
                 endedAt,
-                durationSeconds
+                durationSeconds,
+                active.durationMinutes || null,
+                active.planTier || null,
+                active.callFeeMinor || null,
+                clientMinutesBefore,
+                clientMinutesAfter
             ]
         );
     } else if (!active.startedAt && active.targetId && endedByUserId && endedByUserId === active.initiatorId) {
@@ -570,7 +614,7 @@ io.on('connection', (socket) => {
         return conversationAccess.rows.length > 0;
     };
 
-      socket.on('call:offer', async ({ conversationId, sdp, mediaType }) => {
+      socket.on('call:offer', async ({ conversationId, sdp, mediaType, durationMinutes: durationMinutesInput, scheduledAt }) => {
           try {
               if (!conversationId || !sdp) return;
               const allowed = await ensureConversationAccess(conversationId);
@@ -592,9 +636,47 @@ io.on('connection', (socket) => {
                   return socket.emit('error', { message: 'Conversation not found' });
               }
               const row = convoParticipants.rows[0];
+              if (isParticipantBusy(row.psychologist_id) || isParticipantBusy(row.employee_id)) {
+                  return socket.emit('error', { message: 'Psychologist is busy', code: 'CALL_BUSY' });
+              }
               const employeeCapabilities = await getUserCallCapabilities(row.employee_id);
               const isEmployeeFreeTier = employeeCapabilities.role === 'employee' && employeeCapabilities.tier === 'free';
               const targetId = row.employee_id === socket.userId ? row.psychologist_id : row.employee_id;
+
+              const durationMinutesRaw = Number(durationMinutesInput);
+              const durationMinutes = Number.isFinite(durationMinutesRaw)
+                  ? Math.max(CALL_DURATION_MIN, Math.min(CALL_DURATION_MAX, durationMinutesRaw))
+                  : null;
+              if (callerCapabilities.role === 'psychologist' && !durationMinutes) {
+                  return socket.emit('error', { message: 'Select call duration before starting.', code: 'CALL_DURATION_REQUIRED' });
+              }
+
+              let clientEntitlement = null;
+              let callFeeMinor = 0;
+              if (row.psychologist_id && row.employee_id) {
+                  clientEntitlement = await getPsychologistClientEntitlement(row.psychologist_id, row.employee_id);
+                  if (clientEntitlement?.plan_tier === 'premium' && durationMinutes) {
+                      const remaining = Number(clientEntitlement.minutes_remaining || 0);
+                      if (remaining > 0 && durationMinutes > remaining) {
+                          return socket.emit('error', { message: 'Selected duration exceeds remaining minutes.', code: 'CALL_MINUTES_EXCEEDED' });
+                      }
+                  }
+                  if (clientEntitlement?.plan_tier === 'free') {
+                      callFeeMinor = await getPsychologistClientCallFeeMinor(row.psychologist_id, row.employee_id);
+                  }
+              }
+
+              if (scheduledAt && row.psychologist_id) {
+                  const busy = await isPsychologistBusy({
+                      psychologistId: row.psychologist_id,
+                      scheduledAt,
+                      durationMinutes: durationMinutes || 60
+                  });
+                  if (busy) {
+                      return socket.emit('error', { message: 'Psychologist is busy', code: 'CALL_BUSY' });
+                  }
+              }
+
               const existing = activeCalls.get(conversationId) || {};
               activeCalls.set(conversationId, {
                   ...existing,
@@ -605,6 +687,10 @@ io.on('connection', (socket) => {
                   employeeId: row.employee_id,
                   psychologistId: row.psychologist_id,
                   isEmployeeFreeTier,
+                  durationMinutes: durationMinutes || existing.durationMinutes || null,
+                  callFeeMinor,
+                  planTier: clientEntitlement?.plan_tier || 'free',
+                  clientMinutesBefore: clientEntitlement?.minutes_remaining ?? null,
                   timer: existing.timer || null,
                   maxDurationMs: existing.maxDurationMs || null
               });
@@ -655,19 +741,8 @@ io.on('connection', (socket) => {
               const active = activeCalls.get(conversationId);
               if (active && !active.startedAt) {
                   active.startedAt = Date.now();
-                  if (active.isEmployeeFreeTier && active.psychologistId) {
-                      const psychologistCapabilities = await getUserCallCapabilities(active.psychologistId);
-                      const limitMinutes = Math.max(
-                          1,
-                          Number(
-                              psychologistCapabilities.callMinutes ||
-                              ROLE_FLAGS.psychologist?.call_minutes_per_client ||
-                              0
-                          )
-                      );
-                      if (limitMinutes > 0) {
-                          scheduleCallDurationLimit(conversationId, limitMinutes * 60 * 1000, active.psychologistId);
-                      }
+                  if (active.durationMinutes) {
+                      scheduleCallDurationLimit(conversationId, active.durationMinutes * 60 * 1000, active.psychologistId);
                   }
                   activeCalls.set(conversationId, active);
               }
