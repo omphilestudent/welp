@@ -36,7 +36,8 @@ const Login = () => {
     const verificationTimer = useRef(null);
 
     // Get redirect path from location state
-    const from = location.state?.from?.pathname || '/';
+    const inviteReturn = localStorage.getItem('welp_invite_return');
+    const from = location.state?.from?.pathname || inviteReturn || '/';
     const message = location.state?.message;
 
     // Cleanup on unmount
@@ -249,6 +250,9 @@ const Login = () => {
                     navigate('/admin/dashboard', { replace: true });
                 } else {
                     navigate(from, { replace: true });
+                }
+                if (inviteReturn) {
+                    localStorage.removeItem('welp_invite_return');
                 }
             } else {
                 console.log('Login failed:', result?.error);

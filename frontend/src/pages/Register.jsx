@@ -156,7 +156,13 @@ const EmployeeRegistrationForm = () => {
             }
 
             toast.success('Welcome to Welp! 🎉');
-            navigate('/dashboard');
+            const inviteReturn = localStorage.getItem('welp_invite_return');
+            if (inviteReturn) {
+                localStorage.removeItem('welp_invite_return');
+                navigate(inviteReturn);
+            } else {
+                navigate('/dashboard');
+            }
         } catch (err) {
             const msg = err?.message || 'Registration failed';
             toast.error(msg);

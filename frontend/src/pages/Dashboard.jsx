@@ -2012,12 +2012,17 @@ const Dashboard = () => {
                                 <p className="empty-message">You don't have any companies yet. <a href="/search">Search for your profile</a> to claim it.</p>
                             ) : (
                                 <>
-                                    {selectedCompany && (
-                                        <div className="business-about-card">
-                                            <h4>About {selectedCompany.name}</h4>
-                                            <p>{selectedCompany.description || 'Add a short company description to appear here.'}</p>
-                                        </div>
-                                    )}
+                                      {selectedCompany && (
+                                          <div className="business-about-card">
+                                              <h4>About {selectedCompany.name}</h4>
+                                              <p>{selectedCompany.description || 'Add a short company description to appear here.'}</p>
+                                              {selectedCompany.account_number && (
+                                                  <p className="business-account-number">
+                                                      <strong>Account Number:</strong> {selectedCompany.account_number}
+                                                  </p>
+                                              )}
+                                          </div>
+                                      )}
                                     <div className="business-panel-tabs">
                                         {[
                                             { id: 'reviews', label: 'Reviews' },

@@ -52,6 +52,7 @@ const { startScheduler: startMarketingCampaignScheduler } = require('./modules/m
 const { initEmailMarketingTables, startEmailCampaignScheduler } = require('./services/emailMarketingService');
 const { startDailyReviewReminderScheduler } = require('./services/dailyReviewReminderService');
 const { startAdInvoiceScheduler } = require('./services/adInvoiceService');
+const { startEventScheduler } = require('./services/psychologistEventService');
 const { query } = require('./utils/database');
 const { createUserNotification } = require('./utils/userNotifications');
 const { getActiveSubscription, getPlanPayload } = require('./services/subscriptionService');
@@ -132,6 +133,7 @@ const io = new Server(httpServer, {
 });
 
 app.set('io', io);
+startEventScheduler({ io });
 
 // Security middleware
 app.use(helmet({

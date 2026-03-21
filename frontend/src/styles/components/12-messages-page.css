@@ -1653,19 +1653,21 @@
 }
 
 .msg-support-panel {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 0.9rem;
-  padding: 0.75rem 1rem;
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border-color);
-  max-height: 45vh;
-  overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.9rem;
+    padding: 0.75rem 1rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    max-height: 45vh;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .msg-support-panel section {
-  max-width: none;
-  min-width: 220px;
+    max-width: none;
+    min-width: 220px;
+    height: auto;
 }
 
 .msg-sponsored-slot {
@@ -1953,6 +1955,7 @@
 @media (max-width: 900px) {
   .msg-support-panel {
     grid-template-columns: 1fr;
+    max-height: 55vh;
   }
 
   .msg-psych-card,
@@ -2344,6 +2347,17 @@ body.sidebar-open {
 
 .msg-typing-dot:nth-child(3) {
     animation-delay: 0.4s;
+}
+
+@media (max-width: 640px) {
+  .msg-support-panel {
+    max-height: 60vh;
+    padding: 0.75rem 0.8rem;
+  }
+
+  .msg-support-panel section {
+    min-width: 0;
+  }
 }
 
 .msg-booking {

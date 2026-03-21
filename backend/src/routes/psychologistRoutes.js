@@ -12,6 +12,7 @@ const psychologistController = require('../controllers/psychologistController');
 const psychologistDashboardController = require('../controllers/psychologistDashboardController');
 const sessionRatingController = require('../controllers/sessionRatingController');
 const psychologistBillingController = require('../controllers/psychologistBillingController');
+const psychologistEventController = require('../controllers/psychologistEventController');
 const { requirePsychologistLeadAccess } = require('../middleware/psychologistEntitlements');
 const { restrictUnverifiedPsychologist } = require('../middleware/restrictUnverifiedPsychologist');
 
@@ -231,6 +232,18 @@ router.post('/dashboard/calendar-integrations/:integrationId/sync',
     checkRoleFlag('schedule'),
     restrictUnverifiedPsychologist,
     psychologistDashboardController.syncCalendarIntegration
+);
+
+// Public psychologist events + booking scheduling
+router.get('/:psychologistId/events',
+    apiLimiter,
+    psychologistEventController.listPsychologistEvents
+);
+
+router.post('/:psychologistId/events',
+    authenticate,
+    apiLimiter,
+    psychologistEventController.createPsychologistEvent
 );
 
 // Psychologist rates + payouts

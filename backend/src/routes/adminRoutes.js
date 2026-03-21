@@ -32,6 +32,7 @@ router.get('/psychologists/search', adminController.searchPsychologists);
 router.get('/psychologists/:id/schedule', adminController.getPsychologistSchedule);
 router.get('/psychologists/:id/calendar-integrations', adminController.getPsychologistCalendarIntegrations);
 router.get('/psychologists/:id/external-events', adminController.getPsychologistExternalEvents);
+router.get('/ledger/lookup/:accountNumber', adminController.lookupLedgerByAccountNumber);
 router.post('/users',
     validate([
         body('email').isEmail(),

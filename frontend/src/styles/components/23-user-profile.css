@@ -148,6 +148,124 @@
   font-size: 0.9rem;
 }
 
+.profile-schedule-card .profile-schedule-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.profile-schedule-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.profile-calendar {
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.profile-calendar__header {
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+}
+
+.profile-calendar__grid {
+  display: grid;
+  gap: 0;
+}
+
+.profile-calendar__row {
+  display: grid;
+  grid-template-columns: 70px repeat(7, 1fr);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-calendar__row--header {
+  background: rgba(15, 23, 42, 0.04);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.profile-calendar__day-label {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: center;
+  border-left: 1px solid var(--border-color);
+}
+
+.profile-calendar__hour {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-right: 1px solid var(--border-color);
+}
+
+.profile-calendar__cell {
+  min-height: 32px;
+  border-left: 1px solid var(--border-color);
+  background: #fff;
+  cursor: pointer;
+}
+
+.profile-calendar__cell.is-available {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.profile-calendar__cell.is-available:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.profile-calendar__cell.is-unavailable {
+  background: rgba(15, 23, 42, 0.04);
+  cursor: not-allowed;
+}
+
+.profile-schedule-modal .profile-schedule-modal__body {
+  display: grid;
+  gap: 1rem;
+}
+
+.profile-schedule-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.profile-schedule-modal__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.profile-schedule-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+  .profile-schedule-card .profile-schedule-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profile-calendar__row {
+    grid-template-columns: 56px repeat(7, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .user-profile-header {
     flex-direction: column;

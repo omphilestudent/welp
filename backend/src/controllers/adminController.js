@@ -10,6 +10,7 @@ const {
     STATUS_LABELS: APPLICATION_STATUS_LABELS
 } = require('../services/applicationWorkflowService');
 const { sendApplicationStatusEmail } = require('../utils/emailService');
+const { resolveAccountNumber } = require('../services/accountNumberService');
 const {
     listReviewNotificationLogs,
     resendReviewNotificationLog
@@ -1983,6 +1984,51 @@ const getPsychologistExternalEvents = async (req, res) => {
     }
 };
 
+const lookupLedgerByAccountNumber = async (req, res) => {
+    try {
+        const { accountNumber } = req.params;
+        const record = await resolveAccountNumber(accountNumber);
+        if (!record) {
+            return res.status(404).json({ error: 'Account number not found' });
+        }
+
+        let owner = null;
+        if (record.owner_type === 'user') {
+            const userResult = await query(
+                `SELECT id, email, display_name, role, account_number
+                 FROM users WHERE id = $1`,
+                [record.owner_id]
+            );
+            owner = userResult.rows[0] || null;
+        } else if (record.owner_type === 'company') {
+            const companyResult = await query(
+                `SELECT id, name, email, account_number
+                 FROM companies WHERE id = $1`,
+                [record.owner_id]
+            );
+            owner = companyResult.rows[0] || null;
+        }
+
+        const payments = await query(
+            `SELECT id, owner_type, owner_id, currency_code, amount_minor, status, created_at
+             FROM payment_records
+             WHERE owner_id = $1
+             ORDER BY created_at DESC
+             LIMIT 50`,
+            [record.owner_id]
+        );
+
+        return res.json({
+            account: record,
+            owner,
+            payments: payments.rows
+        });
+    } catch (error) {
+        console.error('Lookup ledger error:', error);
+        return res.status(500).json({ error: 'Failed to lookup ledger' });
+    }
+};
+
 const WELP_STAFF_ROLES = ['admin', 'hr_admin', 'developer', 'call_center_agent', 'kodi_admin', 'support_agent', 'operations', 'welp_employee'];
 
 const listWelpStaff = async (_req, res) => {
@@ -2093,6 +2139,7 @@ module.exports = {
     searchPsychologists,
     getPsychologistSchedule,
     getPsychologistCalendarIntegrations,
-    getPsychologistExternalEvents
+    getPsychologistExternalEvents,
+    lookupLedgerByAccountNumber
 };
 

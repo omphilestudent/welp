@@ -1941,10 +1941,16 @@
 }
 
 .business-about-card p {
-  margin: 0;
-  color: #475569;
-  line-height: 1.6;
-  font-size: 0.875rem;
+    margin: 0;
+    color: #475569;
+    line-height: 1.6;
+    font-size: 0.875rem;
+}
+
+.business-account-number {
+    margin-top: 0.5rem;
+    font-size: 0.88rem;
+    color: #0f172a;
 }
 
 /* Business Review Filters */

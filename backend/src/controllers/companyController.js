@@ -9,6 +9,7 @@ const { getBusinessPlanSnapshotByBusinessId, getBusinessDailyApiLimit } = requir
 const { getUsageRecord } = require('../services/businessApiUsageService');
 const { REVIEW_TYPES, normalizeReviewType } = require('../utils/reviewTypes');
 const { uploadToCloudinary, isCloudinaryConfigured } = require('../utils/cloudinary');
+const { assignAccountNumberToCompany } = require('../services/accountNumberService');
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
 const OWNER_ACCESS_ROLES = new Set(['business', ...ADMIN_ROLES]);
@@ -610,6 +611,9 @@ const createCompany = async (req, res) => {
         );
 
         const company = result.rows[0];
+        await assignAccountNumberToCompany(company.id).catch((error) => {
+            console.warn('Company account number assignment failed:', error.message);
+        });
 
         if (isBusinessCreator) {
             try {

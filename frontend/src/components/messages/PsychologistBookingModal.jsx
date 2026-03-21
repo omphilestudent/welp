@@ -45,7 +45,6 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
         setAvailability([]);
         setSelectedRateId('');
         setScheduledAt('');
-        setDurationMinutes(60);
         setStep('select');
         setBooking(null);
         setPayment(null);

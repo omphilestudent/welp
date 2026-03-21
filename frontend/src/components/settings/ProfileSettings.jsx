@@ -20,7 +20,9 @@ const ProfileSettings = ({ onUpdate }) => {
         bio: '',
         location: '',
         website: '',
-        avatarUrl: ''
+        avatarUrl: '',
+        accountNumber: '',
+        businessAccountNumber: ''
     });
 
     const fileInputRef = useRef(null);
@@ -45,7 +47,9 @@ const ProfileSettings = ({ onUpdate }) => {
                 bio: data.bio || '',
                 location: data.location || '',
                 website: data.website || '',
-                avatarUrl: data.avatar_url || ''
+                avatarUrl: data.avatar_url || '',
+                accountNumber: data.account_number || '',
+                businessAccountNumber: data.business_account_number || ''
             });
             setWorkplaceSearch(data.workplace?.name || '');
         } catch (error) {
@@ -243,6 +247,22 @@ const ProfileSettings = ({ onUpdate }) => {
                     />
                     <small className="input-help">Email cannot be changed</small>
                 </div>
+
+                {(profile.accountNumber || profile.businessAccountNumber) && (
+                    <div className="form-group">
+                        <label className="form-label">
+                            <FaGlobe /> Account Number
+                        </label>
+                        <input
+                            type="text"
+                            value={profile.accountNumber || profile.businessAccountNumber}
+                            className="form-input"
+                            disabled
+                            readOnly
+                        />
+                        <small className="input-help">System-assigned account number</small>
+                    </div>
+                )}
 
                 <h3>Professional Information</h3>
 

@@ -17,6 +17,7 @@ const {
     getPlanPayload
 } = require('../services/subscriptionService');
 const { getLatestApplicationStatusForUser } = require('../services/applicationWorkflowService');
+const { assignAccountNumberToUser } = require('../services/accountNumberService');
 
 const ROLE_TO_OWNER = {
     employee: 'user',
@@ -376,6 +377,9 @@ const registerEmployee = async (req, res) => {
             isVerified: true,
             isAnonymous
         });
+        await assignAccountNumberToUser(user.id, user.role).catch((error) => {
+            console.warn('Employee account number assignment failed:', error.message);
+        });
         const token = generateToken(user);
 
         enqueueMarketingForUser(user.id).catch((error) => {
@@ -478,6 +482,9 @@ const registerPsychologist = async (req, res) => {
             kycStatus,
             documentsSubmitted,
             canUseProfile: false
+        });
+        await assignAccountNumberToUser(user.id, user.role).catch((error) => {
+            console.warn('Psychologist account number assignment failed:', error.message);
         });
 
         const appTableAvailable = await tableExists('psychologist_applications');
@@ -841,6 +848,9 @@ const registerBusiness = async (req, res) => {
             isVerified: false,
             status: 'pending_review',
             jobTitle
+        });
+        await assignAccountNumberToUser(user.id, user.role).catch((error) => {
+            console.warn('Business account number assignment failed:', error.message);
         });
 
         const appTableAvailable = await tableExists('business_applications');

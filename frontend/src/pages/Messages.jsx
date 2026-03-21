@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
@@ -69,10 +69,21 @@ const Messages = () => {
     const [videoCallWeekStart, setVideoCallWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
     const [hasSavedCard, setHasSavedCard] = useState(false);
     const [videoCallScheduling, setVideoCallScheduling] = useState(false);
+    const autoStartRef = useRef(false);
 
     useEffect(() => {
         setPsychologistDeletedNotice('');
     }, [activeConversation?.id]);
+
+    useEffect(() => {
+        const autoStart = searchParams.get('autostart');
+        if (!autoStart || autoStartRef.current) return;
+        if (!activeConversation?.id || user?.role !== 'psychologist') return;
+        autoStartRef.current = true;
+        startCall('video', 60, null).catch(() => {
+            autoStartRef.current = false;
+        });
+    }, [activeConversation?.id, searchParams, user?.role]);
     useEffect(() => {
         const mediaQuery = window.matchMedia('(max-width: 768px)');
         const handleChange = () => setIsMobileView(mediaQuery.matches);

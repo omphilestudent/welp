@@ -18,10 +18,19 @@ const getProfile = async (req, res) => {
                  u.location,
                  u.website,
                  u.occupation,
+                 u.account_number,
                  u.workplace_id,
                  u.kyc_status,
                  u.documents_submitted,
                  u.can_use_profile,
+                 (
+                     SELECT c2.account_number
+                     FROM company_owners co2
+                     JOIN companies c2 ON c2.id = co2.company_id
+                     WHERE co2.user_id = u.id
+                     ORDER BY c2.created_at ASC
+                     LIMIT 1
+                 ) AS business_account_number,
                  json_build_object(
                          'id', c.id,
                          'name', c.name,
@@ -445,19 +454,33 @@ const getPublicProfile = async (req, res) => {
                 response.psychologistProfile = null;
             }
 
-            try {
-                const scheduleResult = await query(
-                    `SELECT id, title, scheduled_for, type, status, location
-                     FROM psychologist_schedule_items
-                     WHERE psychologist_id = $1
-                       AND scheduled_for >= CURRENT_TIMESTAMP - INTERVAL '1 day'
-                     ORDER BY scheduled_for ASC`,
-                    [id]
-                );
-                response.schedule = scheduleResult.rows;
-            } catch (error) {
-                response.schedule = [];
-            }
+              try {
+                  const scheduleResult = await query(
+                      `SELECT id, title, scheduled_for, type, status, location
+                       FROM psychologist_schedule_items
+                       WHERE psychologist_id = $1
+                         AND scheduled_for >= CURRENT_TIMESTAMP - INTERVAL '1 day'
+                       ORDER BY scheduled_for ASC`,
+                      [id]
+                  );
+                  response.schedule = scheduleResult.rows;
+              } catch (error) {
+                  response.schedule = [];
+              }
+
+              try {
+                  const eventResult = await query(
+                      `SELECT id, title, description, starts_at, ends_at, event_type, is_video_call, status
+                       FROM psychologist_events
+                       WHERE psychologist_id = $1
+                       AND status IN ('scheduled','ready')
+                       ORDER BY starts_at ASC`,
+                      [id]
+                  );
+                  response.events = eventResult.rows;
+              } catch (error) {
+                  response.events = [];
+              }
 
             try {
                 const externalEvents = await query(

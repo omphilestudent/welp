@@ -6,6 +6,7 @@ const { restrictUnverifiedPsychologist } = require('../middleware/restrictUnveri
 const { apiLimiter, accountSecurityLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validation');
 const userController = require('../controllers/userController');
+const psychologistEventController = require('../controllers/psychologistEventController');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -52,6 +53,10 @@ router.get('/profile', authenticate, apiLimiter, userController.getProfile);
 router.patch('/profile', authenticate, apiLimiter, restrictUnverifiedPsychologist, userController.updateProfile);
 
 router.get('/public/:id', authenticate, apiLimiter, userController.getPublicProfile);
+
+// Event invite lookup
+router.get('/events/invite/:token', apiLimiter, psychologistEventController.getInviteDetails);
+router.post('/events/invite/:token/accept', authenticate, apiLimiter, psychologistEventController.acceptInviteToken);
 
 
 router.post('/upload-avatar',

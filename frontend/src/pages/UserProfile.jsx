@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { addDays, addHours, format, startOfWeek } from 'date-fns';
 import api from '../services/api';
 import Loading from '../components/common/Loading';
 import AvatarImage from '../components/common/AvatarImage';
 import { useAuth } from '../hooks/useAuth';
 import PsychologistBookingModal from '../components/messages/PsychologistBookingModal';
 import { formatAmountMinor } from '../utils/currency';
+import Modal from '../components/common/Modal';
 
 const formatDateTime = (value) => {
     if (!value) return '';
@@ -26,6 +28,20 @@ const UserProfile = () => {
     const [rates, setRates] = useState([]);
     const [ratesLoading, setRatesLoading] = useState(false);
     const [bookingOpen, setBookingOpen] = useState(false);
+    const [scheduleView, setScheduleView] = useState('availability');
+    const [events, setEvents] = useState([]);
+    const [eventModalOpen, setEventModalOpen] = useState(false);
+    const [eventSaving, setEventSaving] = useState(false);
+    const [eventDraft, setEventDraft] = useState({
+        title: '',
+        description: '',
+        invitees: '',
+        eventType: 'meeting',
+        isVideoCall: true,
+        startsAt: '',
+        endsAt: '',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg'
+    });
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -34,6 +50,7 @@ const UserProfile = () => {
             try {
                 const { data } = await api.get(`/users/public/${id}`);
                 setProfile(data);
+                setEvents(data?.events || []);
             } catch (err) {
                 setError(err?.response?.data?.error || 'Failed to load profile');
             } finally {
@@ -69,12 +86,98 @@ const UserProfile = () => {
         return acc;
     }, {});
     const dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const availabilityMap = useMemo(() => {
+        const map = new Map();
+        availabilitySlots.forEach((slot) => {
+            if (!slot?.isAvailable) return;
+            if (slot.dayOfWeek == null || slot.hour == null) return;
+            map.set(`${slot.dayOfWeek}-${slot.hour}`, true);
+        });
+        return map;
+    }, [availabilitySlots]);
     const activeRate = rates.find((rate) => rate.is_active ?? rate.isActive) || rates[0];
     const handleBack = () => {
         if (location.key !== 'default') {
             navigate(-1);
         } else {
             navigate('/messages');
+        }
+    };
+
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const weekDays = Array.from({ length: 7 }, (_, idx) => addDays(weekStart, idx));
+    const hours = Array.from({ length: 24 }, (_, idx) => idx);
+
+    const combinedAgenda = useMemo(() => {
+        const agenda = [
+            ...events.map((event) => ({
+                id: event.id,
+                title: event.title,
+                startsAt: event.starts_at,
+                endsAt: event.ends_at,
+                type: event.event_type || 'Session',
+                source: 'internal'
+            })),
+            ...schedule.map((item) => ({
+                id: item.id,
+                title: item.title,
+                startsAt: item.scheduled_for,
+                endsAt: item.scheduled_for,
+                type: item.type || 'meeting',
+                source: 'schedule'
+            })),
+            ...externalEvents.map((item, index) => ({
+                id: `${item.title}-${index}`,
+                title: item.title,
+                startsAt: item.starts_at,
+                endsAt: item.ends_at,
+                type: item.location || 'External calendar',
+                source: 'external'
+            }))
+        ];
+        return agenda
+            .filter((item) => item.startsAt)
+            .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+    }, [events, schedule, externalEvents]);
+
+    const openEventModal = (slotDate) => {
+        const start = slotDate;
+        const end = addHours(start, 1);
+        setEventDraft((prev) => ({
+            ...prev,
+            title: prev.title || `Session with ${user.display_name || 'psychologist'}`,
+            startsAt: start.toISOString().slice(0, 16),
+            endsAt: end.toISOString().slice(0, 16)
+        }));
+        setEventModalOpen(true);
+    };
+
+    const handleEventSave = async () => {
+        if (!eventDraft.title || !eventDraft.startsAt || !eventDraft.endsAt) {
+            setError('Please provide a title and start/end time.');
+            return;
+        }
+        setEventSaving(true);
+        try {
+            const payload = {
+                title: eventDraft.title,
+                description: eventDraft.description,
+                startsAt: new Date(eventDraft.startsAt).toISOString(),
+                endsAt: new Date(eventDraft.endsAt).toISOString(),
+                timezone: eventDraft.timezone,
+                eventType: eventDraft.eventType,
+                isVideoCall: eventDraft.isVideoCall,
+                invitees: eventDraft.invitees
+            };
+            const { data } = await api.post(`/psychologists/${user.id}/events`, payload);
+            if (data?.event) {
+                setEvents((prev) => [...prev, data.event]);
+            }
+            setEventModalOpen(false);
+        } catch (err) {
+            setError(err?.response?.data?.error || 'Failed to create event');
+        } finally {
+            setEventSaving(false);
         }
     };
 
@@ -182,66 +285,84 @@ const UserProfile = () => {
                         )}
                     </section>
 
-                    <section className="profile-section-card">
-                        <h3>Availability</h3>
-                        {Object.keys(availabilityByDay).length > 0 ? (
-                            <div className="availability-grid">
-                                {Object.entries(availabilityByDay)
-                                    .sort(([a], [b]) => Number(a) - Number(b))
-                                    .map(([dayKey, hours]) => {
-                                    const label = dayLabels[Number(dayKey)] || `Day ${dayKey}`;
-                                    const formatted = (hours || [])
-                                        .sort((a, b) => a - b)
-                                        .map((hour) => `${String(hour).padStart(2, '0')}:00`)
-                                        .join(', ');
-                                    return (
-                                        <div key={dayKey} className="availability-card">
-                                            <strong>{label}</strong>
-                                            <div>{formatted || 'No slots'}</div>
-                                        </div>
-                                    );
-                                })}
+                    <section className="profile-section-card profile-schedule-card">
+                        <div className="profile-schedule-header">
+                            <div>
+                                <h3>Scheduling</h3>
+                                <p>Pick a slot to create a meeting invite.</p>
                             </div>
-                        ) : (
-                            <p>No availability shared yet.</p>
-                        )}
-                    </section>
+                            <div className="profile-schedule-toggle">
+                                <button
+                                    type="button"
+                                    className={`btn btn-small ${scheduleView === 'availability' ? 'btn-primary' : 'btn-outline'}`}
+                                    onClick={() => setScheduleView('availability')}
+                                >
+                                    Availability
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`btn btn-small ${scheduleView === 'agenda' ? 'btn-primary' : 'btn-outline'}`}
+                                    onClick={() => setScheduleView('agenda')}
+                                >
+                                    Agenda
+                                </button>
+                            </div>
+                        </div>
 
-                    <section className="profile-section-card">
-                        <h3>Calendar</h3>
-                        {schedule.length > 0 ? (
-                            <div className="schedule-list">
-                                {schedule.map((item) => (
-                                    <div key={item.id} className="schedule-item">
-                                        <div>
-                                            <strong>{item.title}</strong>
-                                            <span>{item.location || item.type}</span>
-                                        </div>
-                                        <span>{formatDateTime(item.scheduled_for)}</span>
+                        {scheduleView === 'availability' ? (
+                            <div className="profile-calendar">
+                                <div className="profile-calendar__header">
+                                    <span>{format(weekStart, 'MMMM d')} – {format(addDays(weekStart, 6), 'MMMM d')}</span>
+                                </div>
+                                <div className="profile-calendar__grid">
+                                    <div className="profile-calendar__row profile-calendar__row--header">
+                                        <span />
+                                        {weekDays.map((day) => (
+                                            <div key={day.toISOString()} className="profile-calendar__day-label">
+                                                <strong>{format(day, 'EEE')}</strong>
+                                                <span>{format(day, 'd')}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                    {hours.map((hour) => (
+                                        <div key={hour} className="profile-calendar__row">
+                                            <span className="profile-calendar__hour">{String(hour).padStart(2, '0')}:00</span>
+                                            {weekDays.map((day) => {
+                                                const dayIndex = day.getDay();
+                                                const key = `${dayIndex}-${hour}`;
+                                                const isAvailable = availabilityMap.get(key);
+                                                const slotDate = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, 0, 0);
+                                                return (
+                                                    <button
+                                                        key={`${key}-${day.toISOString()}`}
+                                                        type="button"
+                                                        className={`profile-calendar__cell ${isAvailable ? 'is-available' : 'is-unavailable'}`}
+                                                        onClick={() => isAvailable && openEventModal(slotDate)}
+                                                        disabled={!isAvailable}
+                                                        title={isAvailable ? 'Schedule a session' : 'Unavailable'}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         ) : (
-                            <p>No upcoming schedule items.</p>
-                        )}
-                    </section>
-
-                    <section className="profile-section-card">
-                        <h3>External Calendar Events</h3>
-                        {externalEvents.length > 0 ? (
                             <div className="schedule-list">
-                                {externalEvents.map((item, index) => (
-                                    <div key={`${item.title}-${index}`} className="schedule-item">
-                                        <div>
-                                            <strong>{item.title}</strong>
-                                            <span>{item.location || 'External calendar'}</span>
+                                {combinedAgenda.length > 0 ? (
+                                    combinedAgenda.map((item) => (
+                                        <div key={item.id} className="schedule-item">
+                                            <div>
+                                                <strong>{item.title}</strong>
+                                                <span>{item.type}</span>
+                                            </div>
+                                            <span>{formatDateTime(item.startsAt)}</span>
                                         </div>
-                                        <span>{formatDateTime(item.starts_at)}</span>
-                                    </div>
-                                ))}
+                                    ))
+                                ) : (
+                                    <p>No upcoming schedule items.</p>
+                                )}
                             </div>
-                        ) : (
-                            <p>No external events synced.</p>
                         )}
                     </section>
                 </>
@@ -251,6 +372,98 @@ const UserProfile = () => {
                 psychologist={user.role === 'psychologist' ? user : null}
                 onClose={() => setBookingOpen(false)}
             />
+            <Modal
+                isOpen={eventModalOpen}
+                onClose={() => setEventModalOpen(false)}
+                title="Schedule a session"
+                size="lg"
+                className="profile-schedule-modal"
+            >
+                <div className="profile-schedule-modal__body">
+                    <div className="form-group">
+                        <label>Title</label>
+                        <input
+                            type="text"
+                            value={eventDraft.title}
+                            onChange={(e) => setEventDraft((prev) => ({ ...prev, title: e.target.value }))}
+                            placeholder="Session title"
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Invitees (email)</label>
+                        <input
+                            type="text"
+                            value={eventDraft.invitees}
+                            onChange={(e) => setEventDraft((prev) => ({ ...prev, invitees: e.target.value }))}
+                            placeholder="client@example.com, colleague@example.com"
+                        />
+                    </div>
+                    <div className="profile-schedule-modal__grid">
+                        <div className="form-group">
+                            <label>Start</label>
+                            <input
+                                type="datetime-local"
+                                value={eventDraft.startsAt}
+                                onChange={(e) => setEventDraft((prev) => ({ ...prev, startsAt: e.target.value }))}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>End</label>
+                            <input
+                                type="datetime-local"
+                                value={eventDraft.endsAt}
+                                onChange={(e) => setEventDraft((prev) => ({ ...prev, endsAt: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+                    <div className="profile-schedule-modal__grid">
+                        <div className="form-group">
+                            <label>Event type</label>
+                            <select
+                                value={eventDraft.eventType}
+                                onChange={(e) => setEventDraft((prev) => ({ ...prev, eventType: e.target.value }))}
+                            >
+                                <option value="meeting">Meeting</option>
+                                <option value="video_call">Video call</option>
+                                <option value="consultation">Consultation</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Timezone</label>
+                            <input
+                                type="text"
+                                value={eventDraft.timezone}
+                                onChange={(e) => setEventDraft((prev) => ({ ...prev, timezone: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-group">
+                        <label>Description</label>
+                        <textarea
+                            rows="3"
+                            value={eventDraft.description}
+                            onChange={(e) => setEventDraft((prev) => ({ ...prev, description: e.target.value }))}
+                            placeholder="Add notes for this session"
+                        />
+                    </div>
+                    <label className="profile-schedule-modal__toggle">
+                        <input
+                            type="checkbox"
+                            checked={eventDraft.isVideoCall}
+                            onChange={(e) => setEventDraft((prev) => ({ ...prev, isVideoCall: e.target.checked }))}
+                        />
+                        Video call
+                    </label>
+                </div>
+                <div className="profile-schedule-modal__actions">
+                    <button type="button" className="btn btn-secondary" onClick={() => setEventModalOpen(false)}>
+                        Cancel
+                    </button>
+                    <button type="button" className="btn btn-primary" onClick={handleEventSave} disabled={eventSaving}>
+                        {eventSaving ? 'Saving...' : 'Send invite'}
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 };

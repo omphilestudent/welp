@@ -34,6 +34,7 @@ import Internships from './pages/Internships';
 import GeneralApplication from './pages/GeneralApplication';
 import MentalHealthResources from './pages/MentalHealthResources';
 import UserProfile from './pages/UserProfile';
+import InviteEvent from './pages/InviteEvent';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
@@ -119,6 +120,7 @@ function App() {
                                 <Route path="/" element={<Home />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
+                                <Route path="/invite/:token" element={<InviteEvent />} />
                                 <Route path="/search" element={<SearchPage />} />
                                 <Route path="/companies/:id" element={<CompanyPage />} />
                                 <Route path="/pricing" element={<Pricing />} />
