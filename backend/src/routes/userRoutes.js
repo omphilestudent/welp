@@ -67,9 +67,10 @@ router.post('/upload-avatar',
             let avatarUrl = `/uploads/avatars/${req.file.filename}`;
             if (isCloudinaryConfigured()) {
                 const cloudUrl = await uploadToCloudinary(req.file.path, { folder: 'welp/avatars' });
-                if (cloudUrl) {
-                    avatarUrl = cloudUrl;
+                if (!cloudUrl) {
+                    return res.status(500).json({ error: 'Failed to upload avatar to cloud storage' });
                 }
+                avatarUrl = cloudUrl;
             }
 
 

@@ -1217,9 +1217,10 @@ const uploadCompanyLogo = async (req, res) => {
         let logoUrl = `/uploads/company-logos/${req.file.filename}`;
         if (isCloudinaryConfigured()) {
             const cloudUrl = await uploadToCloudinary(req.file.path, { folder: 'welp/company-logos' });
-            if (cloudUrl) {
-                logoUrl = cloudUrl;
+            if (!cloudUrl) {
+                return res.status(500).json({ error: 'Failed to upload logo to cloud storage' });
             }
+            logoUrl = cloudUrl;
         }
         await query(
             `UPDATE companies

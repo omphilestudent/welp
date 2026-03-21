@@ -1262,9 +1262,10 @@ const sendVoiceNote = async (req, res) => {
                 folder: 'welp/voice-notes',
                 resourceType: resolveResourceType(req.file)
             });
-            if (cloudUrl) {
-                attachmentUrl = cloudUrl;
+            if (!cloudUrl) {
+                return res.status(500).json({ error: 'Failed to upload voice note to cloud storage' });
             }
+            attachmentUrl = cloudUrl;
         }
         const attachmentMime = req.file.mimetype || null;
 

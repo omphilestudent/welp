@@ -108,9 +108,10 @@ const uploadAssets = async (req, res) => {
         let assetUrl = `/uploads/email-marketing/${path.basename(file.filename)}`;
         if (isCloudinaryConfigured()) {
             const cloudUrl = await uploadToCloudinary(file.path, { folder: 'welp/email-assets' });
-            if (cloudUrl) {
-                assetUrl = cloudUrl;
+            if (!cloudUrl) {
+                return res.status(500).json({ error: 'Failed to upload asset to cloud storage' });
             }
+            assetUrl = cloudUrl;
         }
         const absoluteUrl = assetUrl.startsWith('http') ? assetUrl : `${BASE_BACKEND_URL}${assetUrl}`;
         assets.push({

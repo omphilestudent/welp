@@ -42,9 +42,10 @@ router.post(
                     folder: 'welp/applications',
                     resourceType: 'raw'
                 });
-                if (cloudUrl) {
-                    relativeUrl = cloudUrl;
+                if (!cloudUrl) {
+                    return res.status(500).json({ error: 'Failed to upload document to cloud storage' });
                 }
+                relativeUrl = cloudUrl;
             }
             res.json({
                 success: true,

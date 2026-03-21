@@ -345,10 +345,11 @@ const createCampaign = async (req, res) => {
                         folder: 'welp/ads',
                         resourceType: resolveResourceType(file)
                     });
-                    if (cloudUrl) {
-                        uploadedAssets.push(cloudUrl);
-                        continue;
+                    if (!cloudUrl) {
+                        return res.status(500).json({ success: false, error: 'Failed to upload media to cloud storage' });
                     }
+                    uploadedAssets.push(cloudUrl);
+                    continue;
                 }
                 uploadedAssets.push(buildAssetUrl(req, file.filename));
             }
@@ -768,10 +769,11 @@ const updateCampaign = async (req, res) => {
                         folder: 'welp/ads',
                         resourceType: resolveResourceType(file)
                     });
-                    if (cloudUrl) {
-                        uploadedAssets.push(cloudUrl);
-                        continue;
+                    if (!cloudUrl) {
+                        return res.status(500).json({ success: false, error: 'Failed to upload media to cloud storage' });
                     }
+                    uploadedAssets.push(cloudUrl);
+                    continue;
                 }
                 uploadedAssets.push(buildAssetUrl(req, file.filename));
             }
