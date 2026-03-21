@@ -631,13 +631,22 @@ io.on('connection', (socket) => {
                   });
               }
               const convoParticipants = await query(
-                  `SELECT employee_id, psychologist_id FROM conversations WHERE id = $1`,
+                  `SELECT employee_id, psychologist_id, status, expires_at, started_at
+                   FROM conversations
+                   WHERE id = $1`,
                   [conversationId]
               );
               if (!convoParticipants.rows.length) {
                   return socket.emit('error', { message: 'Conversation not found' });
               }
               const row = convoParticipants.rows[0];
+              const isConversationExpired = row.status === 'ended'
+                  || (row.expires_at && new Date(row.expires_at) <= new Date());
+              const canPsychologistInitiateCall = callerCapabilities.role === 'psychologist';
+              const canEmployeeInitiateCall = callerCapabilities.role === 'employee' && !isConversationExpired;
+              if (!canPsychologistInitiateCall && !canEmployeeInitiateCall) {
+                  return socket.emit('error', { message: 'Session expired', code: 'CALL_SESSION_EXPIRED' });
+              }
               if (isParticipantBusy(row.psychologist_id) || isParticipantBusy(row.employee_id)) {
                   return socket.emit('error', { message: 'Psychologist is busy', code: 'CALL_BUSY' });
               }

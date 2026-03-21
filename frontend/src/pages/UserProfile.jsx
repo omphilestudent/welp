@@ -8,7 +8,6 @@ import { useAuth } from '../hooks/useAuth';
 import PsychologistBookingModal from '../components/messages/PsychologistBookingModal';
 import { formatMoneyForUser } from '../utils/currency';
 import Modal from '../components/common/Modal';
-import outlookHeader from '../../../salesforce images/outlook.png';
 import toast from 'react-hot-toast';
 
 const formatDateTime = (value) => {
@@ -390,9 +389,6 @@ const UserProfile = () => {
                                             Day
                                         </button>
                                     </div>
-                                </div>
-                                <div className="profile-calendar-brand" aria-hidden="true">
-                                    <img src={outlookHeader} alt="" />
                                 </div>
                             </div>
                             <div className="profile-calendar-legend">

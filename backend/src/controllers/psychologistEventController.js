@@ -13,6 +13,7 @@ const createPsychologistEvent = async (req, res) => {
         const {
             title,
             description,
+            location,
             startsAt,
             endsAt,
             timezone,
@@ -25,6 +26,7 @@ const createPsychologistEvent = async (req, res) => {
             createdBy: req.user.id,
             title,
             description,
+            location,
             startsAt,
             endsAt,
             timezone,

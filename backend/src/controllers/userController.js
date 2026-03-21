@@ -470,7 +470,7 @@ const getPublicProfile = async (req, res) => {
 
               try {
                   const eventResult = await query(
-                      `SELECT id, title, description, starts_at, ends_at, event_type, is_video_call, status
+                      `SELECT id, title, description, location, starts_at, ends_at, event_type, is_video_call, status
                        FROM psychologist_events
                        WHERE psychologist_id = $1
                        AND status IN ('scheduled','ready')

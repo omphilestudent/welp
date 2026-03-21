@@ -2192,6 +2192,7 @@ const runMigrations = async () => {
                 can_execute BOOLEAN DEFAULT false,
                 PRIMARY KEY(flow_id, role)
             );`,
+            "ALTER TABLE psychologist_events ADD COLUMN IF NOT EXISTS location TEXT;",
         ];
 
         for (const migration of migrations) {

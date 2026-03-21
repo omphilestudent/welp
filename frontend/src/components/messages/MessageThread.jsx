@@ -328,7 +328,7 @@ const MessageThread = ({
     }
 
     const other = getOtherParticipant();
-    const canCall = !isExpired && conversation?.status === 'accepted';
+    const canCall = conversation?.status === 'accepted' && (user?.role === 'psychologist' || !isExpired);
     const allowPsychCalls = callConfig?.roleFlags?.voice_video_calls;
     const showCallActions = user?.role === 'psychologist'
         ? Boolean(allowPsychCalls || callConfig)
@@ -559,6 +559,7 @@ const MessageThread = ({
 };
 
 export default MessageThread;
+
 
 
 

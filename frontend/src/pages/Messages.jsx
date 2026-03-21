@@ -206,7 +206,7 @@ const Messages = () => {
         && visibleConversations.length === 0
         && !!featuredPsychologist
         && (chatUsage?.remaining ?? 1) > 0;
-    const canStartVideoCall = Boolean(activeConversation) && !isConversationExpired;
+    const canStartVideoCall = Boolean(activeConversation) && (user?.role === 'psychologist' || !isConversationExpired);
     const isPaidTier = subscriptionPlan !== 'free';
 
     const fetchConversations = async () => {
@@ -838,13 +838,7 @@ const Messages = () => {
         if (callState.status !== 'idle') {
             toast('You are already in a call.');
             return;
-        }
-
-        if (isConversationExpired) {
-            toast('This session has ended. Upgrade to premium to keep chatting longer.');
-            return;
-        }
-
+        }\r\n
         if (activeConversation?.status !== 'accepted') {
             toast('This request is still pending. Calls unlock after acceptance.');
             return;
@@ -868,13 +862,7 @@ const Messages = () => {
         if (callState.status !== 'idle') {
             toast('You are already in a call.');
             return;
-        }
-
-        if (isConversationExpired) {
-            toast('This session has ended. Upgrade to premium to keep chatting longer.');
-            return;
-        }
-
+        }\r\n
         if (activeConversation?.status !== 'accepted') {
             toast('This request is still pending. Calls unlock after acceptance.');
             return;
@@ -1833,6 +1821,7 @@ const Messages = () => {
 };
 
 export default Messages;
+
 
 
 

@@ -10,6 +10,7 @@ import AdvertisingSection from '../components/ads/AdvertisingSection';
 import { resolveMediaUrl } from '../utils/media';
 import { getPlanKey, getPlanPermissions, requirePaidBusinessOrRedirect } from '../utils/subscriptionAccess';
 import { currencyForCountry } from '../utils/currency';
+import Modal from '../components/common/Modal';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
     FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo,
@@ -24,8 +25,8 @@ import {
     Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip, Legend
 } from 'recharts';
 import {
-    addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format,
-    isSameDay, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks
+    addDays, addWeeks, endOfWeek, format,
+    startOfWeek, subWeeks
 } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -421,12 +422,14 @@ const Dashboard = () => {
     // Psychologist state
     const [psychLeads, setPsychLeads] = useState([]);
     const [psychSchedule, setPsychSchedule] = useState([]);
+    const [psychEvents, setPsychEvents] = useState([]);
     const [psychPermissions, setPsychPermissions] = useState(null);
     const [psychRatingSummary, setPsychRatingSummary] = useState(null);
     const [calendarIntegrations, setCalendarIntegrations] = useState([]);
     const [externalEvents, setExternalEvents] = useState([]);
     const [recentCalls, setRecentCalls] = useState([]);
     const [psychRates, setPsychRates] = useState([]);
+    const [isEditingRates, setIsEditingRates] = useState(false);
     const [psychRateForm, setPsychRateForm] = useState({
         15: '',
         30: '',
@@ -457,8 +460,35 @@ const Dashboard = () => {
     const [psychStatements, setPsychStatements] = useState([]);
     const [statementGenerating, setStatementGenerating] = useState(false);
     const [calendarIntegrationDraft, setCalendarIntegrationDraft] = useState({ provider: 'google', name: '', icalUrl: '' });
-    const [scheduleDraft, setScheduleDraft] = useState({ title: '', date: '', time: '', type: 'meeting', location: '' });
-    const [calendarView, setCalendarView] = useState('month');
+    const [scheduleView, setScheduleView] = useState('week');
+    const [availabilityMode, setAvailabilityMode] = useState(false);
+    const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+    const [scheduleSaving, setScheduleSaving] = useState(false);
+    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [scheduleDraft, setScheduleDraft] = useState({
+        title: '',
+        description: '',
+        invitees: '',
+        eventType: 'meeting',
+        isVideoCall: false,
+        date: '',
+        startTime: '',
+        endTime: '',
+        location: ''
+    });
+
+    const hasPricingConfigured = psychRates.length > 0;
+
+    useEffect(() => {
+        if (!psychRates.length) return;
+        const nextForm = { 15: '', 30: '', 60: '' };
+        psychRates.forEach((rate) => {
+            const minutes = Number(rate.duration_minutes || 0);
+            if (!minutes) return;
+            nextForm[minutes] = (Number(rate.amount_minor || 0) / 100).toFixed(2);
+        });
+        setPsychRateForm((prev) => ({ ...prev, ...nextForm }));
+    }, [psychRates]);
     const [calendarDate, setCalendarDate] = useState(new Date());
     const [psychCardCollapse, setPsychCardCollapse] = useState({ schedule: false, leads: false, calls: false });
     const [kycDocuments, setKycDocuments] = useState({});
@@ -829,8 +859,6 @@ const Dashboard = () => {
             { name: 'Negative', value: Number(companyAnalytics.sentimentBreakdown.negative || 0), color: '#ef4444' }
         ]
         : [];
-
-    const availabilityWeekDays = Array.from({ length: 7 }, (_, idx) => addDays(availabilityWeekStart, idx));
     const availabilityMap = useMemo(() => {
         const map = new Map();
         availabilitySlots.forEach((slot) => {
@@ -839,6 +867,14 @@ const Dashboard = () => {
         return map;
     }, [availabilitySlots]);
 
+
+    useEffect(() => {
+        if (user?.role !== 'psychologist') return;
+        const weekStart = startOfWeek(calendarDate, { weekStartsOn: 1 });
+        if (weekStart.getTime() !== availabilityWeekStart.getTime()) {
+            setAvailabilityWeekStart(weekStart);
+        }
+    }, [calendarDate, user?.role]);
     /* ── Lifecycle ── */
     useEffect(() => {
         if (!userKey) {
@@ -918,6 +954,7 @@ const Dashboard = () => {
                     pendingRes,
                     leadsRes,
                     scheduleRes,
+                    eventsRes,
                     permissionsRes,
                     ratesRes,
                     payoutRes,
@@ -929,6 +966,7 @@ const Dashboard = () => {
                     api.get('/messages/conversations/pending').catch(() => ({ data: [] })),
                     api.get('/psychologists/dashboard/leads').catch(() => ({ data: [] })),
                     api.get('/psychologists/dashboard/schedule').catch(() => ({ data: [] })),
+                    api.get(`/psychologists/${user.id}/events`).catch(() => ({ data: { events: [] } })),
                     api.get('/psychologists/dashboard/permissions').catch(() => ({ data: null })),
                     api.get('/psychologists/dashboard/rates').catch(() => ({ data: { rates: [] } })),
                     api.get('/psychologists/dashboard/payout-account').catch(() => ({ data: { account: null } })),
@@ -942,6 +980,7 @@ const Dashboard = () => {
                 setPendingRequests(pendingRes.data || []);
                 setPsychLeads(leadsRes.data || []);
                 setPsychSchedule(scheduleRes.data || []);
+                setPsychEvents(eventsRes.data?.events || []);
                 setPsychPermissions(permissionsRes.data || null);
                 const loadedRates = ratesRes.data?.rates || [];
                 setPsychRates(loadedRates);
@@ -1043,25 +1082,87 @@ const Dashboard = () => {
     };
 
     /* ── Psychologist schedule handlers ── */
+    const openScheduleModalForSlot = (day, hour) => {
+        const date = format(day, 'yyyy-MM-dd');
+        const startTime = `${String(hour).padStart(2, '0')}:00`;
+        const endHour = hour + 1;
+        const endTime = endHour >= 24 ? '00:00' : `${String(endHour).padStart(2, '0')}:00`;
+        setSelectedSlot({ day, hour });
+        setScheduleDraft({
+            title: '',
+            description: '',
+            invitees: '',
+            eventType: 'meeting',
+            isVideoCall: false,
+            date,
+            startTime,
+            endTime,
+            location: ''
+        });
+        setScheduleModalOpen(true);
+    };
+
+    const closeScheduleModal = () => {
+        setScheduleModalOpen(false);
+        setSelectedSlot(null);
+        setScheduleDraft({
+            title: '',
+            description: '',
+            invitees: '',
+            eventType: 'meeting',
+            isVideoCall: false,
+            date: '',
+            startTime: '',
+            endTime: '',
+            location: ''
+        });
+    };
+
     const handleScheduleSubmit = async (e) => {
         e.preventDefault();
         if (isPsychRestricted) {
             toast.error('Your account is restricted until KYC is approved.');
             return;
         }
-        if (!scheduleDraft.title || !scheduleDraft.date || !scheduleDraft.time) {
-            toast.error('Please complete title, date, and time.'); return;
+        if (!scheduleDraft.title || !scheduleDraft.date || !scheduleDraft.startTime || !scheduleDraft.endTime) {
+            toast.error('Please complete title, start, and end time.');
+            return;
         }
-        const scheduledFor = new Date(`${scheduleDraft.date}T${scheduleDraft.time}`).toISOString();
+        const startsAtLocal = new Date(`${scheduleDraft.date}T${scheduleDraft.startTime}`);
+        const endsAtLocal = new Date(`${scheduleDraft.date}T${scheduleDraft.endTime}`);
+        if (Number.isNaN(startsAtLocal.getTime()) || Number.isNaN(endsAtLocal.getTime())) {
+            toast.error('Invalid time selection.');
+            return;
+        }
+        if (endsAtLocal <= startsAtLocal) {
+            endsAtLocal.setDate(endsAtLocal.getDate() + 1);
+        }
+        setScheduleSaving(true);
         try {
-            const { data } = await api.post('/psychologists/dashboard/schedule', {
-                title: scheduleDraft.title, scheduledFor, type: scheduleDraft.type, location: scheduleDraft.location
+            const { data } = await api.post(`/psychologists/${user.id}/events`, {
+                title: scheduleDraft.title,
+                description: scheduleDraft.description,
+                location: scheduleDraft.location,
+                startsAt: startsAtLocal.toISOString(),
+                endsAt: endsAtLocal.toISOString(),
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg',
+                eventType: scheduleDraft.eventType,
+                isVideoCall: scheduleDraft.isVideoCall,
+                invitees: scheduleDraft.invitees
             });
-            setPsychSchedule((prev) => [data, ...prev]);
-            setScheduleDraft({ title: '', date: '', time: '', type: 'meeting', location: '' });
-            setCalendarDate(new Date(scheduledFor));
-            toast.success('Schedule updated');
-        } catch { toast.error('Failed to add schedule item'); }
+            const nextEvent = data?.event || data;
+            if (nextEvent) {
+                setPsychEvents((prev) => [...prev, nextEvent].sort((a, b) => new Date(a.starts_at || a.startsAt) - new Date(b.starts_at || b.startsAt)));
+            }
+            setCalendarDate(startsAtLocal);
+            toast.success('Event scheduled and invites sent');
+            closeScheduleModal();
+        } catch (error) {
+            const message = error?.response?.data?.error || 'Failed to schedule event';
+            toast.error(message);
+        } finally {
+            setScheduleSaving(false);
+        }
     };
 
     const handleScheduleRemove = async (itemId) => {
@@ -1290,51 +1391,66 @@ const Dashboard = () => {
     };
 
     /* ── Calendar helpers ── */
-    const scheduleItems = psychSchedule
-        .map((item) => {
+    const scheduleEntries = [
+        ...psychSchedule.map((item) => {
             const raw = item.scheduled_for || item.scheduledFor || item.scheduled_at;
-            const date = raw ? new Date(raw) : null;
-            return date && !Number.isNaN(date.getTime()) ? { ...item, scheduledDate: date } : null;
+            const start = raw ? new Date(raw) : null;
+            if (!start || Number.isNaN(start.getTime())) return null;
+            const end = new Date(start.getTime() + 60 * 60 * 1000);
+            return {
+                id: item.id,
+                title: item.title,
+                type: item.type || 'meeting',
+                source: 'legacy',
+                location: item.location || '',
+                startsAt: start,
+                endsAt: end
+            };
+        }),
+        ...psychEvents.map((event) => {
+            const start = event.starts_at || event.startsAt;
+            const end = event.ends_at || event.endsAt;
+            const startDate = start ? new Date(start) : null;
+            const endDate = end ? new Date(end) : null;
+            if (!startDate || !endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+            return {
+                id: event.id,
+                title: event.title,
+                type: event.event_type || event.eventType || 'meeting',
+                source: 'event',
+                isVideoCall: Boolean(event.is_video_call ?? event.isVideoCall),
+                location: event.location || '',
+                startsAt: startDate,
+                endsAt: endDate
+            };
+        }),
+        ...externalEvents.map((item, index) => {
+            const start = item.starts_at || item.startsAt;
+            const end = item.ends_at || item.endsAt;
+            const startDate = start ? new Date(start) : null;
+            const endDate = end ? new Date(end) : null;
+            if (!startDate || !endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+            return {
+                id: item.id || `external-${index}`,
+                title: item.title || 'External event',
+                type: 'external',
+                source: 'external',
+                location: item.location || '',
+                startsAt: startDate,
+                endsAt: endDate
+            };
         })
-        .filter(Boolean);
-
-    const itemsByDate = scheduleItems.reduce((acc, item) => {
-        const key = format(item.scheduledDate, 'yyyy-MM-dd');
-        acc[key] = acc[key] || [];
-        acc[key].push(item);
-        return acc;
-    }, {});
-
-    const selectedDateKey = format(calendarDate, 'yyyy-MM-dd');
-    const selectedDateItems = itemsByDate[selectedDateKey] || [];
-
-    const externalItemsByDate = externalEvents.reduce((acc, item) => {
-        const raw = item.starts_at || item.startsAt;
-        const date = raw ? new Date(raw) : null;
-        if (!date || Number.isNaN(date.getTime())) return acc;
-        const key = format(date, 'yyyy-MM-dd');
-        acc[key] = acc[key] || [];
-        acc[key].push({ ...item, scheduledDate: date });
-        return acc;
-    }, {});
-
-    const selectedExternalItems = externalItemsByDate[selectedDateKey] || [];
+    ].filter(Boolean).sort((a, b) => a.startsAt - b.startsAt);
 
     const weekStartsOn = 1;
-    const calendarStart = calendarView === 'month'
-        ? startOfWeek(startOfMonth(calendarDate), { weekStartsOn })
-        : startOfWeek(calendarDate, { weekStartsOn });
-    const calendarEnd = calendarView === 'month'
-        ? endOfWeek(endOfMonth(calendarDate), { weekStartsOn })
-        : endOfWeek(calendarDate, { weekStartsOn });
+    const calendarStart = startOfWeek(calendarDate, { weekStartsOn });
+    const calendarEnd = endOfWeek(calendarDate, { weekStartsOn });
+    const calendarDays = Array.from({ length: 7 }, (_, idx) => addDays(calendarStart, idx));
+    const weekLabel = `${format(calendarStart, 'MMM d')} â€“ ${format(calendarEnd, 'MMM d')}`;
+    const agendaItems = scheduleEntries.filter((entry) => entry.startsAt >= calendarStart && entry.startsAt <= calendarEnd);
 
-    const calendarDays = [];
-    for (let day = calendarStart; day <= calendarEnd; day = addDays(day, 1)) {
-        calendarDays.push(day);
-    }
-
-    const handleCalendarPrev = () => setCalendarDate((prev) => (calendarView === 'month' ? subMonths(prev, 1) : subWeeks(prev, 1)));
-    const handleCalendarNext = () => setCalendarDate((prev) => (calendarView === 'month' ? addMonths(prev, 1) : addWeeks(prev, 1)));
+    const handleCalendarPrev = () => setCalendarDate((prev) => subWeeks(prev, 1));
+    const handleCalendarNext = () => setCalendarDate((prev) => addWeeks(prev, 1));
     const handleCalendarToday = () => setCalendarDate(new Date());
     const togglePsychCard = (key) => setPsychCardCollapse((prev) => ({ ...prev, [key]: !prev[key] }));
     const isPsychRestricted = userRole === 'psychologist' && user?.can_use_profile === false;
@@ -1729,33 +1845,71 @@ const Dashboard = () => {
                                         </span>
                                     </div>
 
-                                    <div className="psych-rate-grid">
-                                        {[15, 30, 60].map((minutes) => (
-                                            <div key={minutes} className="psych-rate-card">
-                                                <div>
-                                                    <h4>{minutes === 60 ? '60 minutes / 1 hour' : `${minutes} minutes`}</h4>
-                                                    <p>Set your session price for this duration.</p>
+                                    {!hasPricingConfigured || isEditingRates ? (
+                                        <div className="psych-rate-grid">
+                                            {[15, 30, 60].map((minutes) => (
+                                                <div key={minutes} className="psych-rate-card">
+                                                    <div>
+                                                        <h4>{minutes === 60 ? '60 minutes / 1 hour' : `${minutes} minutes`}</h4>
+                                                        <p>Set your session price for this duration.</p>
+                                                    </div>
+                                                    <div className="psych-rate-card__input">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            placeholder="0.00"
+                                                            value={psychRateForm[minutes]}
+                                                            onChange={(e) => setPsychRateForm({ ...psychRateForm, [minutes]: e.target.value })}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-primary btn-small"
+                                                            onClick={() => handleRateSubmit(minutes)}
+                                                            disabled={savingRate}
+                                                        >
+                                                            {savingRate ? 'Saving...' : 'Save rate'}
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="psych-rate-card__input">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        placeholder="0.00"
-                                                        value={psychRateForm[minutes]}
-                                                        onChange={(e) => setPsychRateForm({ ...psychRateForm, [minutes]: e.target.value })}
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-primary btn-small"
-                                                        onClick={() => handleRateSubmit(minutes)}
-                                                        disabled={savingRate}
-                                                    >
-                                                        {savingRate ? 'Saving...' : 'Save rate'}
-                                                    </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="psych-rate-grid">
+                                            {psychRates.map((rate) => (
+                                                <div key={rate.id} className="psych-rate-card">
+                                                    <div>
+                                                        <h4>{rate.label || `${rate.duration_minutes} minutes`}</h4>
+                                                        <p>{rate.duration_minutes === 60 ? '60 minutes / 1 hour' : `${rate.duration_minutes} minutes`} session</p>
+                                                    </div>
+                                                    <div className="psych-rate-card__input">
+                                                        <span className={`badge ${rate.is_active ? 'badge-success' : 'badge-secondary'}`}>
+                                                            {rate.is_active ? 'Active' : 'Inactive'}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div style={{ marginTop: '0.75rem' }}>
+                                        {hasPricingConfigured && !isEditingRates && (
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline btn-small"
+                                                onClick={() => setIsEditingRates(true)}
+                                            >
+                                                Edit pricing
+                                            </button>
+                                        )}
+                                        {hasPricingConfigured && isEditingRates && (
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline btn-small"
+                                                onClick={() => setIsEditingRates(false)}
+                                            >
+                                                Done
+                                            </button>
+                                        )}
                                     </div>
 
                                     <form className="psych-payout-form" onSubmit={handlePayoutSubmit}>
@@ -2479,177 +2633,135 @@ const Dashboard = () => {
                                 </header>
                                 {!psychCardCollapse.schedule && (
                                     <div className="psych-card__body">
-                                        <div className="psych-calendar-controls">
+                                        <div className="psych-calendar-header">
                                             <div className="psych-calendar-nav">
-                                                <button type="button" className="btn btn-secondary btn-small" onClick={handleCalendarPrev}>Prev</button>
+                                                <button type="button" className="btn btn-outline btn-small" onClick={handleCalendarPrev}>Prev</button>
                                                 <button type="button" className="btn btn-outline btn-small" onClick={handleCalendarToday}>Today</button>
-                                                <button type="button" className="btn btn-secondary btn-small" onClick={handleCalendarNext}>Next</button>
+                                                <button type="button" className="btn btn-outline btn-small" onClick={handleCalendarNext}>Next</button>
                                             </div>
                                             <div className="psych-calendar-title">
-                                                {calendarView === 'month'
-                                                    ? format(calendarDate, 'MMMM yyyy')
-                                                    : `${format(calendarStart, 'MMM d')} – ${format(calendarEnd, 'MMM d')}`}
+                                                <h4>{format(calendarDate, 'MMMM yyyy')}</h4>
+                                                <span>{weekLabel}</span>
                                             </div>
                                             <div className="psych-calendar-view">
-                                                <button type="button" className={`btn btn-small ${calendarView === 'month' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setCalendarView('month')}>Month</button>
-                                                <button type="button" className={`btn btn-small ${calendarView === 'week' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setCalendarView('week')}>Week</button>
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-small ${scheduleView === 'week' ? 'btn-primary' : 'btn-outline'}`}
+                                                    onClick={() => setScheduleView('week')}
+                                                >
+                                                    Week
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-small ${scheduleView === 'agenda' ? 'btn-primary' : 'btn-outline'}`}
+                                                    onClick={() => setScheduleView('agenda')}
+                                                >
+                                                    Agenda
+                                                </button>
+                                            </div>
+                                            <div className="psych-calendar-actions">
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-small ${availabilityMode ? 'btn-primary' : 'btn-outline'}`}
+                                                    onClick={() => setAvailabilityMode((prev) => !prev)}
+                                                >
+                                                    {availabilityMode ? 'Availability mode' : 'Edit availability'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-primary btn-small"
+                                                    onClick={handleAvailabilitySave}
+                                                    disabled={availabilitySaving || isPsychRestricted}
+                                                >
+                                                    {availabilitySaving ? 'Saving�' : 'Save availability'}
+                                                </button>
                                             </div>
                                         </div>
-                                        <form className="psych-schedule-form" onSubmit={handleScheduleSubmit}>
-                                            <input type="text" placeholder="Title" value={scheduleDraft.title} onChange={(e) => setScheduleDraft({ ...scheduleDraft, title: e.target.value })} />
-                                            <input type="date" value={scheduleDraft.date} onChange={(e) => setScheduleDraft({ ...scheduleDraft, date: e.target.value })} />
-                                            <input type="time" value={scheduleDraft.time} onChange={(e) => setScheduleDraft({ ...scheduleDraft, time: e.target.value })} />
-                                            <select value={scheduleDraft.type} onChange={(e) => setScheduleDraft({ ...scheduleDraft, type: e.target.value })}>
-                                                <option value="meeting">Meeting</option>
-                                                <option value="video">Video</option>
-                                                <option value="voice">Voice</option>
-                                                <option value="note">Note</option>
-                                            </select>
-                                            <input type="text" placeholder="Location / link" value={scheduleDraft.location} onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })} />
-                                            <button type="submit" className="btn btn-primary btn-small" disabled={isPsychRestricted}>Add</button>
-                                        </form>
-                                        <div className="psych-availability">
-                                            <div className="psych-availability__header">
-                                                <div>
-                                                    <h4>Weekly hourly availability</h4>
-                                                    <p>Select hours you are available for sessions.</p>
-                                                </div>
-                                                <div className="psych-availability__actions">
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-outline btn-small"
-                                                        onClick={() => setAvailabilityWeekStart((prev) => addDays(prev, -7))}
-                                                    >
-                                                        Previous week
-                                                    </button>
-                                                    <span className="psych-availability__range">
-                                                        {format(availabilityWeekStart, 'MMM d')} â€“ {format(addDays(availabilityWeekStart, 6), 'MMM d')}
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-outline btn-small"
-                                                        onClick={() => setAvailabilityWeekStart((prev) => addDays(prev, 7))}
-                                                    >
-                                                        Next week
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-primary btn-small"
-                                                        onClick={handleAvailabilitySave}
-                                                        disabled={availabilitySaving}
-                                                    >
-                                                        {availabilitySaving ? 'Savingâ€¦' : 'Save availability'}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div className="psych-availability__grid">
-                                                <div className="psych-availability__row psych-availability__row--header">
-                                                    <span />
-                                                    {availabilityWeekDays.map((day) => (
-                                                        <span key={day.toISOString()}>{format(day, 'EEE d')}</span>
+                                        {scheduleView === 'week' ? (
+                                            <div className={`psych-calendar-grid-shell ${availabilityMode ? 'is-editing' : ''}`}>
+                                                <div className="psych-calendar-grid-head">
+                                                    <span className="psych-calendar-time-label" />
+                                                    {calendarDays.map((day) => (
+                                                        <div key={day.toISOString()} className="psych-calendar-day-label">
+                                                            <span>{format(day, 'EEE')}</span>
+                                                            <strong>{format(day, 'd')}</strong>
+                                                        </div>
                                                     ))}
                                                 </div>
-                                                {Array.from({ length: 24 }, (_, hour) => (
-                                                    <div key={hour} className="psych-availability__row">
-                                                        <span className="psych-availability__hour">{String(hour).padStart(2, '0')}:00</span>
-                                                        {availabilityWeekDays.map((day) => {
-                                                            const dayOfWeek = day.getDay();
-                                                            const key = `${dayOfWeek}-${hour}`;
-                                                            const isAvailable = availabilityMap.get(key);
-                                                            return (
+                                                <div className="psych-calendar-grid-body">
+                                                    {Array.from({ length: 24 }, (_, hour) => (
+                                                        <div key={hour} className="psych-calendar-row">
+                                                            <span className="psych-calendar-time">{String(hour).padStart(2, '0')}:00</span>
+                                                            {calendarDays.map((day) => {
+                                                                const dayOfWeek = day.getDay();
+                                                                const key = `${dayOfWeek}-${hour}`;
+                                                                const isAvailable = availabilityMap.get(key);
+                                                                const slotStart = new Date(day);
+                                                                slotStart.setHours(hour, 0, 0, 0);
+                                                                const slotEnd = new Date(slotStart);
+                                                                slotEnd.setHours(slotEnd.getHours() + 1);
+                                                                const slotEvents = scheduleEntries.filter(
+                                                                    (entry) => entry.startsAt < slotEnd && entry.endsAt > slotStart
+                                                                );
+                                                                const isSelected = selectedSlot
+                                                                    ? format(selectedSlot.day, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd') && selectedSlot.hour === hour
+                                                                    : false;
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        key={`${key}-${day.toISOString()}`}
+                                                                        className={`psych-calendar-slot ${isAvailable ? 'is-available' : 'is-unavailable'} ${isSelected ? 'is-selected' : ''}`}
+                                                                        onClick={() => (availabilityMode
+                                                                            ? handleAvailabilityToggle(dayOfWeek, hour)
+                                                                            : openScheduleModalForSlot(day, hour))}
+                                                                        disabled={isPsychRestricted}
+                                                                        title={availabilityMode ? 'Toggle availability' : 'Create event'}
+                                                                    >
+                                                                        {slotEvents.map((entry) => (
+                                                                            <div
+                                                                                key={entry.id}
+                                                                                className={`psych-calendar-event psych-calendar-event--${entry.type} psych-calendar-event--${entry.source}`}
+                                                                            >
+                                                                                <span>{entry.title}</span>
+                                                                                <small>{format(entry.startsAt, 'HH:mm')}</small>
+                                                                            </div>
+                                                                        ))}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="psych-calendar-agenda">
+                                                {agendaItems.length === 0 && <p className="empty-message">No items for this week.</p>}
+                                                {agendaItems.map((entry) => (
+                                                    <div key={entry.id} className="psych-calendar-agenda-item">
+                                                        <div>
+                                                            <strong>{entry.title}</strong>
+                                                            <span>{format(entry.startsAt, 'EEE, MMM d � HH:mm')}</span>
+                                                            <span className="psych-calendar-agenda-meta">
+                                                                {entry.source === 'external' ? 'External' : entry.type}
+                                                                {entry.isVideoCall ? ' � Video' : ''}
+                                                            </span>
+                                                        </div>
+                                                        <div className="psych-calendar-agenda-actions">
+                                                            {entry.source === 'legacy' && (
                                                                 <button
                                                                     type="button"
-                                                                    key={`${key}-${day.toISOString()}`}
-                                                                    className={`psych-availability__cell ${isAvailable ? 'is-available' : ''}`}
-                                                                    onClick={() => handleAvailabilityToggle(dayOfWeek, hour)}
+                                                                    className="btn btn-secondary btn-small"
+                                                                    onClick={() => handleScheduleRemove(entry.id)}
                                                                     disabled={isPsychRestricted}
-                                                                />
-                                                            );
-                                                        })}
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
-                                        </div>
-                                        <div className={`psych-calendar psych-calendar--${calendarView}`}>
-                                            <div className="psych-calendar-weekdays">
-                                                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
-                                                    <span key={label}>{label}</span>
-                                                ))}
-                                            </div>
-                                            <div className="psych-calendar-grid">
-                                                {calendarDays.map((day) => {
-                                                    const key = format(day, 'yyyy-MM-dd');
-                                                    const items = itemsByDate[key] || [];
-                                                    const isMuted = calendarView === 'month' && !isSameMonth(day, calendarDate);
-                                                    const isToday = isSameDay(day, new Date());
-                                                    return (
-                                                        <button type="button" key={key}
-                                                                className={`psych-calendar-day ${isMuted ? 'is-muted' : ''} ${isToday ? 'is-today' : ''}`}
-                                                                onClick={() => setScheduleDraft((prev) => ({ ...prev, date: format(day, 'yyyy-MM-dd') }))}>
-                                                            <div className="psych-calendar-day-header">
-                                                                <span>{format(day, 'd')}</span>
-                                                                {items.length > 0 && <span className="psych-calendar-count">{items.length}</span>}
-                                                            </div>
-                                                            <div className="psych-calendar-items">
-                                                                {items.slice(0, 2).map((item) => (
-                                                                    <div key={item.id} className={`psych-calendar-item psych-calendar-item--${item.type}`}>
-                                                                        <strong>{item.title}</strong>
-                                                                        <span>{format(item.scheduledDate, 'p')}</span>
-                                                                    </div>
-                                                                ))}
-                                                                {items.length > 2 && <div className="psych-calendar-more">+{items.length - 2} more</div>}
-                                                            </div>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                            {psychSchedule.length === 0 && <p className="empty-message">No scheduled items yet.</p>}
-                                        </div>
-                                        {/* Day detail list */}
-                                        <div className="psych-schedule-list">
-                                            <div className="psych-schedule-list__header">
-                                                <h4>{format(calendarDate, 'MMMM d, yyyy')}</h4>
-                                                <span>{selectedDateItems.length} item{selectedDateItems.length === 1 ? '' : 's'}</span>
-                                            </div>
-                                            {selectedDateItems.length > 0 ? (
-                                                <div className="psych-schedule-list__items">
-                                                    {selectedDateItems.map((item) => (
-                                                        <div key={item.id} className="psych-schedule-list__item">
-                                                            <div>
-                                                                <strong>{item.title}</strong>
-                                                                <span>{format(item.scheduledDate, 'p')}</span>
-                                                                {item.location && <span>{item.location}</span>}
-                                                            </div>
-                                                            <button type="button" className="btn btn-secondary btn-small" onClick={() => handleScheduleRemove(item.id)} disabled={isPsychRestricted}>Remove</button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="empty-message">No items for this day.</p>
-                                            )}
-                                        </div>
-                                        {/* External events */}
-                                        <div className="psych-schedule-list">
-                                            <div className="psych-schedule-list__header">
-                                                <h4>External calendar</h4>
-                                                <span>{selectedExternalItems.length} item{selectedExternalItems.length === 1 ? '' : 's'}</span>
-                                            </div>
-                                            {selectedExternalItems.length > 0 ? (
-                                                <div className="psych-schedule-list__items">
-                                                    {selectedExternalItems.map((item, index) => (
-                                                        <div key={`${item.title}-${index}`} className="psych-schedule-list__item">
-                                                            <div>
-                                                                <strong>{item.title}</strong>
-                                                                <span>{item.location || 'External event'}</span>
-                                                            </div>
-                                                            <span>{format(item.scheduledDate, 'p')}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="empty-message">No external items for this day.</p>
-                                            )}
-                                        </div>
+                                        )}
                                         {/* Calendar integrations */}
                                         <div className="psych-schedule-list">
                                             <div className="psych-schedule-list__header">
@@ -2945,6 +3057,121 @@ const Dashboard = () => {
         </div>
                                     
 
+            <Modal
+                isOpen={scheduleModalOpen}
+                onClose={closeScheduleModal}
+                title="Schedule a session"
+                size="large"
+                className="psych-schedule-modal"
+            >
+                <form onSubmit={handleScheduleSubmit} className="psych-schedule-modal__form">
+                    <div className="psych-schedule-modal__header">
+                        <h4>
+                            {scheduleDraft.date && scheduleDraft.startTime
+                                ? format(new Date(`${scheduleDraft.date}T${scheduleDraft.startTime}`), 'EEE, MMM d - HH:mm')
+                                : 'Select a time'}
+                        </h4>
+                        <span>{availabilityMode ? 'Availability edit is active' : 'Create a new event'}</span>
+                    </div>
+                    <div className="psych-schedule-modal__grid">
+                        <label>
+                            Title
+                            <input
+                                type="text"
+                                value={scheduleDraft.title}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, title: e.target.value })}
+                                placeholder="Session title"
+                                required
+                            />
+                        </label>
+                        <label>
+                            Description
+                            <textarea
+                                value={scheduleDraft.description}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, description: e.target.value })}
+                                placeholder="Optional notes or agenda"
+                                rows={3}
+                            />
+                        </label>
+                        <label>
+                            Invitee emails
+                            <input
+                                type="text"
+                                value={scheduleDraft.invitees}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, invitees: e.target.value })}
+                                placeholder="name@example.com, name2@example.com"
+                            />
+                        </label>
+                        <label>
+                            Event type
+                            <select
+                                value={scheduleDraft.eventType}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, eventType: e.target.value })}
+                            >
+                                <option value="meeting">Meeting</option>
+                                <option value="consultation">Consultation</option>
+                                <option value="checkin">Check-in</option>
+                                <option value="followup">Follow-up</option>
+                            </select>
+                        </label>
+                        <label>
+                            Video call
+                            <select
+                                value={scheduleDraft.isVideoCall ? 'yes' : 'no'}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, isVideoCall: e.target.value === 'yes' })}
+                            >
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </label>
+                        <label>
+                            Date
+                            <input
+                                type="date"
+                                value={scheduleDraft.date}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, date: e.target.value })}
+                                required
+                            />
+                        </label>
+                        <label>
+                            Start time
+                            <input
+                                type="time"
+                                value={scheduleDraft.startTime}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, startTime: e.target.value })}
+                                required
+                            />
+                        </label>
+                        <label>
+                            End time
+                            <input
+                                type="time"
+                                value={scheduleDraft.endTime}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, endTime: e.target.value })}
+                                required
+                            />
+                        </label>
+                        <label>
+                            Location / link
+                            <input
+                                type="text"
+                                value={scheduleDraft.location}
+                                onChange={(e) => setScheduleDraft({ ...scheduleDraft, location: e.target.value })}
+                                placeholder="Zoom, Meet, or room"
+                            />
+                        </label>
+                    </div>
+                    <div className="psych-schedule-modal__footer">
+                        <button type="button" className="btn btn-outline" onClick={closeScheduleModal}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={scheduleSaving}>
+                            {scheduleSaving ? 'Saving...' : 'Save event'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
             {showKycModal && (
                 <div className="reg-modal-backdrop">
                     <div className="reg-modal">
@@ -3013,4 +3240,8 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+
+
+
 

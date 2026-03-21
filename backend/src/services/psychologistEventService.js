@@ -47,6 +47,7 @@ const createEvent = async ({
     createdBy,
     title,
     description,
+    location,
     startsAt,
     endsAt,
     timezone,
@@ -90,14 +91,15 @@ const createEvent = async ({
 
     const eventResult = await query(
         `INSERT INTO psychologist_events
-         (psychologist_id, created_by, title, description, starts_at, ends_at, timezone, event_type, is_video_call, conversation_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         (psychologist_id, created_by, title, description, location, starts_at, ends_at, timezone, event_type, is_video_call, conversation_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          RETURNING *`,
         [
             psychologistId,
             createdBy,
             title,
             description || null,
+            location || null,
             start.toISOString(),
             end.toISOString(),
             timezone || 'Africa/Johannesburg',
