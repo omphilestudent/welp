@@ -1618,7 +1618,16 @@ const runMigrations = async () => {
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_psychologist_id UUID;",
             "ALTER TABLE subscription_pricing_by_country ADD COLUMN IF NOT EXISTS multiplier NUMERIC(6,3) DEFAULT 1.0;",
             "UPDATE subscription_pricing_by_country SET multiplier = 1.0 WHERE multiplier IS NULL;",
-            "UPDATE pricing_catalog SET currency_code = 'ZAR' WHERE audience IN ('user','psychologist','business');",
+            `UPDATE pricing_catalog pc
+             SET currency_code = 'ZAR'
+             WHERE audience IN ('user','psychologist','business')
+               AND currency_code <> 'ZAR'
+               AND NOT EXISTS (
+                   SELECT 1 FROM pricing_catalog pc2
+                   WHERE pc2.audience = pc.audience
+                     AND pc2.plan_code = pc.plan_code
+                     AND pc2.currency_code = 'ZAR'
+               );`,
             "UPDATE pricing_catalog SET amount_minor = 15000 WHERE audience = 'user' AND plan_code = 'user_premium';",
             "UPDATE pricing_catalog SET amount_minor = 0 WHERE audience = 'user' AND plan_code = 'user_free';",
             "UPDATE pricing_catalog SET amount_minor = 50000 WHERE audience = 'psychologist' AND plan_code = 'psychologist_standard';",
