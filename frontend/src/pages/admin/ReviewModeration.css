@@ -658,7 +658,7 @@
 }
 
 /* Modal */
-.modal-overlay {
+.review-moderation-modal__overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -672,7 +672,7 @@
     animation: fadeIn 0.2s;
 }
 
-.modal {
+.review-moderation-modal {
     background: white;
     border-radius: 16px;
     max-width: 600px;
@@ -682,7 +682,7 @@
     animation: slideUp 0.3s;
 }
 
-.modal__header {
+.review-moderation-modal__header {
     padding: 1.5rem;
     border-bottom: 1px solid var(--gray-200);
     display: flex;
@@ -694,12 +694,12 @@
     z-index: 1;
 }
 
-.modal__title {
+.review-moderation-modal__title {
     margin: 0;
     color: var(--gray-800);
 }
 
-.modal__close {
+.review-moderation-modal__close {
     background: none;
     border: none;
     font-size: 1.5rem;
@@ -707,11 +707,11 @@
     color: var(--gray-400);
 }
 
-.modal__close:hover {
+.review-moderation-modal__close:hover {
     color: var(--gray-600);
 }
 
-.modal__body {
+.review-moderation-modal__body {
     padding: 1.5rem;
 }
 

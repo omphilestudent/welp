@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import './Applications.css';
 import { format } from 'date-fns';
 import {
     FiCheckCircle,
@@ -653,8 +654,8 @@ const Applications = () => {
 
             {/* Application Detail Modal */}
             {openDialog && selectedApplication && (
-                <div className="modal-overlay" role="dialog" aria-modal="true">
-                    <div className="modal-content" style={{ width: 'min(1200px, 95vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+                <div className="hr-applications-modal__overlay" role="dialog" aria-modal="true">
+                    <div className="hr-applications-modal__content">
                         {/* Header */}
                         <div style={{
                             display: 'flex',

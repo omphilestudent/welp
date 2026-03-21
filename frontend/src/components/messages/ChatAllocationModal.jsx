@@ -54,8 +54,8 @@ const ChatAllocationModal = ({
     }
 
     return (
-        <div className="msg-modal-overlay" role="dialog" aria-modal="true">
-            <div className="msg-allocation-modal">
+        <div className="msg-modal-overlay msg-modal-overlay--allocation" role="dialog" aria-modal="true">
+            <div className="msg-allocation-modal msg-modal-content--allocation">
                 <div className="msg-modal-header">
                     <h3 className="msg-modal-title">{title}</h3>
                     <button

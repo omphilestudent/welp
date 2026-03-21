@@ -185,7 +185,7 @@
     grid-template-columns: 1fr;
   }
 
-  .modal-content {
+  .app-modal {
     width: 95%;
     margin: 1rem;
   }

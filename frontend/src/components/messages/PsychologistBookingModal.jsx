@@ -313,6 +313,7 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
             onClose={onClose}
             title={`Book a session${psychologist?.display_name ? ` with ${psychologist.display_name}` : ''}`}
             size="large"
+            className="msg-booking-modal"
         >
             {loading && <p className="msg-loading-inline">Loading...</p>}
             {!loading && step === 'select' && renderSelectStep()}

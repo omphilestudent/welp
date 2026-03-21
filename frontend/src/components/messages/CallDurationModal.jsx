@@ -15,7 +15,7 @@ const CallDurationModal = ({ open, onClose, onConfirm, entitlement, callFeeMinor
     }, [callFeeMinor, entitlement?.currency_code]);
 
     return (
-        <Modal isOpen={open} onClose={onClose} title="Select call duration" size="medium">
+        <Modal isOpen={open} onClose={onClose} title="Select call duration" size="medium" className="msg-call-duration-modal">
             <div className="msg-booking">
                 <p>Select how long you want to call this client.</p>
                 {planTier === 'premium' && (

@@ -8,13 +8,13 @@ export default function ModalPopup({ props = {} }) {
     const trigger = props.trigger || 'button';
 
     return (
-        <div className={`modal-popup modal-${size}`}>
-            <div className="modal-title">
+        <div className={`kodi-modal-popup kodi-modal-popup--${size}`}>
+            <div className="kodi-modal-popup__title">
                 <strong>{title}</strong>
-                {closable && <span className="modal-close">×</span>}
+                {closable && <span className="kodi-modal-popup__close">×</span>}
             </div>
-            <p className="modal-subtitle">Trigger: {trigger}</p>
-            <div className="modal-content">
+            <p className="kodi-modal-popup__subtitle">Trigger: {trigger}</p>
+            <div className="kodi-modal-popup__content">
                 <p>{`Rendering ${contentComponent}`}</p>
             </div>
         </div>

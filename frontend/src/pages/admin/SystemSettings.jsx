@@ -926,9 +926,9 @@ const SystemSettings = () => {
                 </section>
             )}
             {showModal && (
-                <div className="modal-backdrop" role="dialog" aria-modal="true">
-                    <div className="modal-card">
-                        <div className="modal-header">
+                <div className="system-settings-modal__backdrop" role="dialog" aria-modal="true">
+                    <div className="system-settings-modal__card">
+                        <div className="system-settings-modal__header">
                             <div>
                                 <p className="kicker">{selectedAdmin ? 'Update Admin' : 'Invite Admin'}</p>
                                 <h3>{selectedAdmin ? 'Edit Access' : 'Create Admin Account'}</h3>
@@ -937,7 +937,7 @@ const SystemSettings = () => {
                                 x
                             </button>
                         </div>
-                        <form onSubmit={handleAdminSubmit} className="modal-body">
+                        <form onSubmit={handleAdminSubmit} className="system-settings-modal__body">
                             <label>
                                 <span>Display Name</span>
                                 <input
@@ -1005,7 +1005,7 @@ const SystemSettings = () => {
                                 />
                             </label>
 
-                            <div className="modal-actions">
+                            <div className="system-settings-modal__actions">
                                 <button type="button" className="btn btn-secondary" onClick={closeModal} disabled={isBusy}>
                                     Cancel
                                 </button>

@@ -792,7 +792,7 @@
 }
 
 /* Modal - Enhanced */
-.modal-overlay {
+.ad-approvals-modal__overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -809,7 +809,7 @@
     animation: fadeIn 0.2s ease;
 }
 
-.modal {
+.ad-approvals-modal {
     background: white;
     border-radius: var(--radius-2xl);
     width: 90%;
@@ -821,7 +821,7 @@
     box-shadow: var(--shadow-2xl);
 }
 
-.modal__header {
+.ad-approvals-modal__header {
     padding: 20px 28px;
     border-bottom: 1px solid var(--gray-200);
     display: flex;
@@ -834,7 +834,7 @@
     border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
 }
 
-.modal__header h2 {
+.ad-approvals-modal__header h2 {
     margin: 0;
     font-size: 1.25rem;
     font-weight: 600;
@@ -843,7 +843,7 @@
     width: 100%;
 }
 
-.modal__close {
+.ad-approvals-modal__close {
     background: none;
     border: none;
     font-size: 1.5rem;
@@ -858,11 +858,11 @@
     transform: translateY(-50%);
 }
 
-.modal__close:hover {
+.ad-approvals-modal__close:hover {
     color: var(--gray-700);
 }
 
-.modal__body {
+.ad-approvals-modal__body {
     padding: 28px;
 }
 
@@ -1245,7 +1245,7 @@
         padding: 6px;
     }
 
-    .modal__body {
+    .ad-approvals-modal__body {
         padding: 20px;
     }
 
@@ -1296,7 +1296,7 @@
     .filter-toggle,
     .bulk-actions,
     .action-buttons,
-    .modal-overlay {
+    .ad-approvals-modal__overlay {
         display: none;
     }
 

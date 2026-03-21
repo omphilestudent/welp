@@ -584,7 +584,7 @@
 }
 
 /* Modal customization */
-.modal-content {
+.hr-interviews-modal__content {
     max-height: 90vh;
     overflow-y: auto;
 }

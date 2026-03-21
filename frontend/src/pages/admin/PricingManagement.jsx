@@ -906,8 +906,8 @@ const PricingManagement = () => {
 
             {/* Add Country Modal */}
             {showAddCountry && (
-                <div className="modal" onClick={() => setShowAddCountry(false)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <div className="pricing-modal" onClick={() => setShowAddCountry(false)}>
+                    <div className="pricing-modal__content" onClick={e => e.stopPropagation()}>
                         <h2>Add New Country</h2>
 
                         <div className="form-group">
@@ -972,7 +972,7 @@ const PricingManagement = () => {
                             />
                         </div>
 
-                        <div className="modal-actions">
+                        <div className="pricing-modal__actions">
                             <button
                                 className="btn-primary"
                                 onClick={handleAddCountry}

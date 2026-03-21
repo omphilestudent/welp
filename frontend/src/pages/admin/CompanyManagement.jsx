@@ -148,13 +148,13 @@ const Modal = ({ isOpen, onClose, title, size = 'medium', children }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className={`modal modal--${size}`} onClick={e => e.stopPropagation()}>
-                <div className="modal__header">
-                    <h2 className="modal__title">{title}</h2>
-                    <button className="modal__close" onClick={onClose}>×</button>
+        <div className="company-modal__overlay" onClick={onClose}>
+            <div className={`company-modal company-modal--${size}`} onClick={e => e.stopPropagation()}>
+                <div className="company-modal__header">
+                    <h2 className="company-modal__title">{title}</h2>
+                    <button className="company-modal__close" onClick={onClose}>×</button>
                 </div>
-                <div className="modal__body">
+                <div className="company-modal__body">
                     {children}
                 </div>
             </div>
@@ -1319,7 +1319,7 @@ const CompanyManagement = () => {
                         )}
 
                         {/* Modal Actions */}
-                        <div className="modal-actions">
+                        <div className="company-modal__actions">
                             <button className="btn btn-outline" onClick={() => {
                                 setShowDetails(false);
                                 setEditMode(false);
@@ -1457,7 +1457,7 @@ const CompanyManagement = () => {
                         </div>
                     </div>
 
-                    <div className="modal-actions">
+                    <div className="company-modal__actions">
                         <button className="btn btn-outline" onClick={() => setShowCreateModal(false)}>
                             Cancel
                         </button>
@@ -2242,7 +2242,7 @@ const CompanyManagement = () => {
                 }
 
                 /* Modal */
-                .modal-overlay {
+                .company-modal__overlay {
                     position: fixed;
                     top: 0;
                     left: 0;
@@ -2256,7 +2256,7 @@ const CompanyManagement = () => {
                     animation: fadeIn 0.2s;
                 }
 
-                .modal {
+                .company-modal {
                     background: white;
                     border-radius: 16px;
                     max-height: 90vh;
@@ -2264,17 +2264,17 @@ const CompanyManagement = () => {
                     animation: slideUp 0.3s;
                 }
 
-                .modal--medium {
+                .company-modal--medium {
                     max-width: 600px;
                     width: 90%;
                 }
 
-                .modal--large {
+                .company-modal--large {
                     max-width: 900px;
                     width: 95%;
                 }
 
-                .modal__header {
+                .company-modal__header {
                     padding: 1.5rem;
                     border-bottom: 1px solid #e2e8f0;
                     display: flex;
@@ -2286,12 +2286,12 @@ const CompanyManagement = () => {
                     z-index: 1;
                 }
 
-                .modal__title {
+                .company-modal__title {
                     margin: 0;
                     color: #1e293b;
                 }
 
-                .modal__close {
+                .company-modal__close {
                     background: none;
                     border: none;
                     font-size: 1.5rem;
@@ -2299,11 +2299,11 @@ const CompanyManagement = () => {
                     color: #94a3b8;
                 }
 
-                .modal__close:hover {
+                .company-modal__close:hover {
                     color: #1e293b;
                 }
 
-                .modal__body {
+                .company-modal__body {
                     padding: 1.5rem;
                 }
 
@@ -2514,7 +2514,7 @@ const CompanyManagement = () => {
                 }
 
                 /* Modal Actions */
-                .modal-actions {
+                .company-modal__actions {
                     display: flex;
                     gap: 1rem;
                     justify-content: flex-end;
@@ -2618,11 +2618,11 @@ const CompanyManagement = () => {
                         justify-content: center;
                     }
 
-                    .modal-actions {
+                    .company-modal__actions {
                         flex-direction: column;
                     }
 
-                    .modal-actions button {
+                    .company-modal__actions button {
                         width: 100%;
                     }
                 }

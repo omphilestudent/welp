@@ -312,7 +312,7 @@
     font-weight: 500;
 }
 
-.modal-backdrop {
+.system-settings-modal__backdrop {
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.55);
@@ -323,7 +323,7 @@
     z-index: 1000;
 }
 
-.modal-card {
+.system-settings-modal__card {
     background: #fff;
     border-radius: 24px;
     width: min(500px, 100%);
@@ -331,39 +331,39 @@
     box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
 }
 
-.modal-header {
+.system-settings-modal__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
 }
 
-.modal-header h3 {
+.system-settings-modal__header h3 {
     margin: 4px 0 0;
 }
 
-.modal-body {
+.system-settings-modal__body {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-.modal-body label {
+.system-settings-modal__body label {
     display: flex;
     flex-direction: column;
     gap: 6px;
     font-weight: 600;
 }
 
-.modal-body input,
-.modal-body select {
+.system-settings-modal__body input,
+.system-settings-modal__body select {
     border-radius: 12px;
     border: 1px solid #e2e8f0;
     padding: 10px 12px;
     font-size: 14px;
 }
 
-.modal-actions {
+.system-settings-modal__actions {
     display: flex;
     gap: 12px;
     justify-content: flex-end;

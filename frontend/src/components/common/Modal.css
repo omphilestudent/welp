@@ -1,4 +1,4 @@
-.modal-overlay {
+.app-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
@@ -10,7 +10,7 @@
   backdrop-filter: blur(4px);
 }
 
-.modal-content {
+.app-modal {
   background: var(--card-bg, #fff);
   border-radius: 16px;
   width: min(96vw, 720px);
@@ -20,10 +20,10 @@
   box-shadow: 0 30px 60px rgba(15, 23, 42, 0.2);
 }
 
-.modal-medium { max-width: 720px; }
-.modal-large { max-width: 980px; }
+.app-modal--medium { max-width: 720px; }
+.app-modal--large { max-width: 980px; }
 
-.modal-header {
+.app-modal__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -35,15 +35,15 @@
   z-index: 2;
 }
 
-.modal-header h3 {
+.app-modal__header h3 {
   margin: 0;
   font-size: 1.05rem;
   color: var(--text-primary, #0f172a);
 }
 
-.modal-body { padding: 1.25rem; }
+.app-modal__body { padding: 1.25rem; }
 
-.modal-close {
+.app-modal__close {
   border: none;
   background: transparent;
   font-size: 1.6rem;
@@ -57,18 +57,27 @@
   justify-content: center;
 }
 
-.modal-close:hover {
+.app-modal__close:hover {
   background: rgba(15, 23, 42, 0.08);
   color: var(--text-primary, #0f172a);
 }
 
+.app-modal.app-confirm-modal {
+  max-width: 520px;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+}
+
+.app-modal.app-confirm-modal .app-modal__header {
+  background: rgba(239, 68, 68, 0.08);
+}
+
 @media (max-width: 480px) {
-  .modal-content {
+  .app-modal {
     width: 100%;
     border-radius: 14px;
   }
 
-  .modal-body {
+  .app-modal__body {
     padding: 1rem;
   }
 }

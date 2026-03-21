@@ -497,7 +497,7 @@ button:disabled {
 }
 
 /* Modal */
-.modal {
+.pricing-modal {
     position: fixed;
     top: 0;
     left: 0;
@@ -510,7 +510,7 @@ button:disabled {
     z-index: 1000;
 }
 
-.modal-content {
+.pricing-modal__content {
     background: white;
     padding: 30px;
     border-radius: 10px;
@@ -520,12 +520,12 @@ button:disabled {
     overflow-y: auto;
 }
 
-.modal-content h2 {
+.pricing-modal__content h2 {
     margin: 0 0 20px 0;
     color: #333;
 }
 
-.modal-actions {
+.pricing-modal__actions {
     display: flex;
     gap: 10px;
     justify-content: flex-end;

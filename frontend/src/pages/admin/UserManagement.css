@@ -369,27 +369,27 @@
 }
 
 /* Modal Adjustments */
-.modal-large {
+.um-modal--large {
     width: 90%;
     max-width: 800px;
 }
 
-.modal-content {
+.um-modal {
     border-radius: 12px;
     overflow: hidden;
 }
 
-.modal-header {
+.um-modal-header {
     padding: 1.5rem;
     border-bottom: 1px solid #e2e8f0;
     background: #f8fafc;
 }
 
-.modal-body {
+.um-modal-body {
     padding: 1.5rem;
 }
 
-.modal-footer {
+.um-modal-footer {
     padding: 1rem 1.5rem;
     border-top: 1px solid #e2e8f0;
     background: #f8fafc;

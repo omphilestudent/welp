@@ -36,7 +36,7 @@ const EmployeeVideoCallModal = ({
     };
 
     return (
-        <Modal isOpen={open} onClose={onClose} title="Schedule video call" size="large">
+        <Modal isOpen={open} onClose={onClose} title="Schedule video call" size="large" className="msg-video-call-modal">
             <div className="msg-booking">
                 {!hasSavedCard && (
                     <p className="msg-modal-hint">Add a saved card to schedule a paid video call.</p>

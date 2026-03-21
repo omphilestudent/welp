@@ -887,8 +887,8 @@ const KodiBuilder = () => {
             )}
 
             {isAddModalOpen && (
-                <div className="modal-backdrop">
-                    <div className="modal-card">
+                <div className="kodi-builder-modal__backdrop">
+                    <div className="kodi-builder-modal__card">
                         <h3>Label your Kodi page</h3>
                         <p>Name the page so other teams instantly recognize it.</p>
                         <form onSubmit={submitNewPage}>
@@ -900,7 +900,7 @@ const KodiBuilder = () => {
                                 placeholder="e.g., Client Intake Dashboard"
                                 required
                             />
-                            <div className="modal-actions">
+                            <div className="kodi-builder-modal__actions">
                                 <button type="button" className="btn-secondary" onClick={() => setIsAddModalOpen(false)}>Cancel</button>
                                 <button type="submit" className="btn-primary" disabled={creatingPage}>
                                     {creatingPage ? 'Creating...' : 'Create page'}

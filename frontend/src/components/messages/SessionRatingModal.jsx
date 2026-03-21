@@ -27,8 +27,8 @@ const SessionRatingModal = ({ session, open, onSubmit, onSkip, submitting }) => 
     };
 
     return (
-        <div className="msg-modal-overlay" role="dialog" aria-modal="true">
-            <div className="msg-modal-content msg-rating-modal">
+        <div className="msg-modal-overlay msg-modal-overlay--rating" role="dialog" aria-modal="true">
+            <div className="msg-modal-content msg-rating-modal msg-modal-content--rating">
                 <div className="msg-modal-header">
                     <h3 className="msg-modal-title">Rate your session</h3>
                     <button className="msg-modal-close" type="button" onClick={onSkip} aria-label="Close">
