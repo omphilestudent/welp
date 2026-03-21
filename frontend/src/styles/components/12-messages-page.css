@@ -2086,7 +2086,7 @@
     overflow-y: auto;
   }
 
-  .msg-thread-header {\r\n    flex-wrap: wrap;\r\n    align-items: center;\r\n    gap: 0.5rem;\r\n  }
+  .msg-thread-header {    flex-wrap: wrap;    align-items: center;    gap: 0.5rem;  }
 
   .msg-thread-back {
     display: flex;
@@ -2101,13 +2101,13 @@
     cursor: pointer;
   }
 
-  .msg-thread-header-left {\r\n    width: 100%;\r\n    flex: 1 1 100%;\r\n    gap: 0.5rem;\r\n  }
+  .msg-thread-header-left {    width: 100%;    flex: 1 1 100%;    gap: 0.5rem;  }
 
   .msg-thread-action-label {
     display: none;
   }
 
-  .msg-thread-actions {\r\n    width: auto;\r\n    margin-left: auto;\r\n    justify-content: flex-end;\r\n    flex-wrap: wrap;\r\n    gap: 0.4rem;\r\n  }
+  .msg-thread-actions {    width: auto;    margin-left: auto;    justify-content: flex-end;    flex-wrap: wrap;    gap: 0.4rem;  }
 
   .msg-thread-action-btn {
     width: 36px;
@@ -2191,7 +2191,7 @@
     padding: 0.5rem 0.9rem 0.25rem;
   }
 
-  .msg-thread-call-limit {\r\n    width: 100%;\r\n    margin-left: 0;\r\n    order: 2;\r\n    margin-top: 0.35rem;\r\n  }
+  .msg-thread-call-limit {    width: 100%;    margin-left: 0;    order: 2;    margin-top: 0.35rem;  }
 
   .msg-sidebar-fab {
     display: none;
@@ -2584,13 +2584,13 @@ body.sidebar-open {
     font-size: 1.05rem;
   }
 
-  .msg-thread-header {\r\n    flex-wrap: wrap;\r\n    align-items: center;\r\n    gap: 0.5rem;\r\n  }
+  .msg-thread-header {    flex-wrap: wrap;    align-items: center;    gap: 0.5rem;  }
 
-  .msg-thread-header-left {\r\n    width: 100%;\r\n    flex: 1 1 100%;\r\n    gap: 0.5rem;\r\n  }
+  .msg-thread-header-left {    width: 100%;    flex: 1 1 100%;    gap: 0.5rem;  }
 
-  .msg-thread-actions {\r\n    width: auto;\r\n    margin-left: auto;\r\n    justify-content: flex-end;\r\n    flex-wrap: wrap;\r\n    gap: 0.4rem;\r\n  }
+  .msg-thread-actions {    width: auto;    margin-left: auto;    justify-content: flex-end;    flex-wrap: wrap;    gap: 0.4rem;  }
 
-  .msg-thread-call-limit {\r\n    width: 100%;\r\n    margin-left: 0;\r\n    order: 2;\r\n    margin-top: 0.35rem;\r\n  }
+  .msg-thread-call-limit {    width: 100%;    margin-left: 0;    order: 2;    margin-top: 0.35rem;  }
 }
 
 @media (max-width: 480px) {
@@ -2614,4 +2614,5 @@ body.sidebar-open {
     font-size: 0.95rem;
   }
 }
+
 
