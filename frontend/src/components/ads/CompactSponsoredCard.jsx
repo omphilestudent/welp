@@ -39,7 +39,7 @@ const CompactSponsoredCard = ({ campaign, onClick }) => {
         if (media.media_type === 'video') {
             return (
                 <video
-                    className="compact-ad__media"
+                    className="compact-ad__media compact-ad__media--fade"
                     src={media.asset_url}
                     muted
                     loop
@@ -49,7 +49,7 @@ const CompactSponsoredCard = ({ campaign, onClick }) => {
         }
         return (
             <img
-                className="compact-ad__media"
+                className="compact-ad__media compact-ad__media--fade"
                 src={media.asset_url}
                 alt={media.alt_text || campaign.name}
                 loading="lazy"

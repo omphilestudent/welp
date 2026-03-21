@@ -8,7 +8,7 @@ const SponsoredCard = ({
     location = '',
     industry = '',
     behaviors = [],
-    rotateIntervalMs = 45000
+    rotateIntervalMs = 5000
 }) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [mediaIndex, setMediaIndex] = useState(0);
@@ -76,7 +76,7 @@ const SponsoredCard = ({
         if (media.media_type === 'video') {
             return (
                 <video
-                    className="sponsored-media"
+                    className="sponsored-media sponsored-media--fade"
                     src={media.asset_url}
                     controls
                     muted
@@ -87,7 +87,7 @@ const SponsoredCard = ({
         }
         return (
             <img
-                className="sponsored-media"
+                className="sponsored-media sponsored-media--fade"
                 src={media.asset_url}
                 alt={media.alt_text || campaign.name}
                 loading="lazy"

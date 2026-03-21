@@ -18,6 +18,10 @@
   display: block;
 }
 
+.compact-ad__media--fade {
+  animation: adMediaFade 0.4s ease-in-out;
+}
+
 .compact-ad__content {
   padding: 8px 10px 10px;
   display: flex;
@@ -46,4 +50,9 @@
   .compact-ad__media {
     height: 70px;
   }
+}
+
+@keyframes adMediaFade {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
 }

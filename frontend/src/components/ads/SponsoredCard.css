@@ -31,6 +31,10 @@
     display: block;
 }
 
+.sponsored-media--fade {
+    animation: adMediaFade 0.4s ease-in-out;
+}
+
 .sponsored-card__content {
     display: flex;
     flex-direction: column;
@@ -66,4 +70,9 @@
 @keyframes adFadeIn {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes adMediaFade {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
 }
