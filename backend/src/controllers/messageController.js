@@ -14,6 +14,7 @@ const {
     getPsychologistRatingAggregates,
     getRecommendationScore
 } = require('../services/psychologistSessionRatingService');
+const { uploadToCloudinary, resolveResourceType, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 const tableExists = async (tableName) => {
     try {
@@ -1255,7 +1256,16 @@ const sendVoiceNote = async (req, res) => {
         const duration = Number(req.body?.duration);
         const safeDuration = Number.isFinite(duration) ? Math.max(1, Math.round(duration)) : null;
         const content = req.body?.content?.trim() || 'Voice note';
-        const attachmentUrl = `/uploads/messages/${req.file.filename}`;
+        let attachmentUrl = `/uploads/messages/${req.file.filename}`;
+        if (isCloudinaryConfigured()) {
+            const cloudUrl = await uploadToCloudinary(req.file.path, {
+                folder: 'welp/voice-notes',
+                resourceType: resolveResourceType(req.file)
+            });
+            if (cloudUrl) {
+                attachmentUrl = cloudUrl;
+            }
+        }
         const attachmentMime = req.file.mimetype || null;
 
         const insertCols = ['conversation_id', 'sender_id', 'content', 'message_type', 'attachment_url'];

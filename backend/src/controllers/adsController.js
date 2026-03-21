@@ -31,11 +31,13 @@ const {
 } = require('../services/adsService');
 const { recordAuditLog } = require('../utils/auditLogger');
 const { hasPremiumException } = require('../utils/premiumAccess');
+const { uploadToCloudinary, resolveResourceType, isCloudinaryConfigured } = require('../utils/cloudinary');
 const {
     listBusinessInvoices,
     getInvoiceWithItems,
     generateInvoiceDocument
 } = require('../services/adInvoiceService');
+const { getCurrencyContext } = require('../services/pricingService');
 
 const AD_ASSET_FOLDER = path.join(__dirname, '../../uploads/ads');
 fs.mkdirSync(AD_ASSET_FOLDER, { recursive: true });
@@ -338,6 +340,16 @@ const createCampaign = async (req, res) => {
                 if (!mediaType || EXTENSION_TYPE_MAP[ext] !== mediaType) {
                     mediaType = inferredType;
                 }
+                if (isCloudinaryConfigured()) {
+                    const cloudUrl = await uploadToCloudinary(file.path, {
+                        folder: 'welp/ads',
+                        resourceType: resolveResourceType(file)
+                    });
+                    if (cloudUrl) {
+                        uploadedAssets.push(cloudUrl);
+                        continue;
+                    }
+                }
                 uploadedAssets.push(buildAssetUrl(req, file.filename));
             }
         }
@@ -595,9 +607,16 @@ const listCampaigns = async (req, res) => {
     }
 };
 
-const getAdPricing = (req, res) => {
+const getAdPricing = async (req, res) => {
     try {
-        return res.json({ success: true, pricing: getAdPricingCatalog() });
+        const { currency, country } = req.query;
+        const currencyContext = await getCurrencyContext({ currency, country });
+        const pricing = await getAdPricingCatalog({
+            currencyCode: currencyContext.currencyCode,
+            currencySymbol: currencyContext.currencySymbol,
+            multiplier: currencyContext.multiplier
+        });
+        return res.json({ success: true, pricing });
     } catch (error) {
         return res.status(500).json({ success: false, error: 'Unable to load pricing' });
     }
@@ -744,6 +763,16 @@ const updateCampaign = async (req, res) => {
                 const ext = path.extname(file.originalname).toLowerCase();
                 const inferred = EXTENSION_TYPE_MAP[ext];
                 mediaTypeOverride = mediaTypeOverride || inferred;
+                if (isCloudinaryConfigured()) {
+                    const cloudUrl = await uploadToCloudinary(file.path, {
+                        folder: 'welp/ads',
+                        resourceType: resolveResourceType(file)
+                    });
+                    if (cloudUrl) {
+                        uploadedAssets.push(cloudUrl);
+                        continue;
+                    }
+                }
                 uploadedAssets.push(buildAssetUrl(req, file.filename));
             }
         }

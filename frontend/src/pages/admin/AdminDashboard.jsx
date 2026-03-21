@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { Link } from 'react-router-dom';
+import { guessCurrencySymbol } from '../../utils/currency';
 import {
     FaUsers,
     FaBuilding,
@@ -52,6 +53,8 @@ const AdminDashboard = () => {
     const [userActivity, setUserActivity] = useState([]);
     const [subscriptionData, setSubscriptionData] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [currencyCode, setCurrencyCode] = useState('ZAR');
+    const [currencySymbol, setCurrencySymbol] = useState('R');
 
     useEffect(() => {
         fetchDashboardData();
@@ -71,11 +74,11 @@ const AdminDashboard = () => {
 
     // Helper function to safely format currency
     const safeFormatCurrency = (value) => {
-        if (value === undefined || value === null) return '$0';
+        if (value === undefined || value === null) return `${currencySymbol}0`;
         try {
-            return `$${Number(value).toLocaleString()}`;
+            return `${currencySymbol}${Number(value).toLocaleString()}`;
         } catch (e) {
-            return '$0';
+            return `${currencySymbol}0`;
         }
     };
 
@@ -88,14 +91,21 @@ const AdminDashboard = () => {
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
-            const [dashboardRes, usersRes, reviewsRes, revenueRes, userAnalyticsRes, subscriptionAnalyticsRes] = await Promise.all([
+            const [dashboardRes, usersRes, reviewsRes, revenueRes, userAnalyticsRes, subscriptionAnalyticsRes, settingsRes] = await Promise.all([
                 api.get('/admin/dashboard/stats'),
                 api.get('/admin/users', { params: { page: 1, limit: 5 } }),
                 api.get('/admin/reviews', { params: { page: 1, limit: 5 } }),
                 api.get('/admin/analytics/revenue', { params: { period: 'day' } }),
                 api.get('/admin/analytics/users'),
-                api.get('/admin/analytics/subscriptions')
+                api.get('/admin/analytics/subscriptions'),
+                api.get('/admin/settings')
             ]);
+
+            const settings = settingsRes.data || {};
+            const code = (settings.currency_code || settings.currencyCode || 'ZAR').toUpperCase();
+            const symbol = settings.currency_symbol || settings.currencySymbol || guessCurrencySymbol(code);
+            setCurrencyCode(code);
+            setCurrencySymbol(symbol);
 
             // Safely extract dashboard stats
             const dashboard = dashboardRes.data || {};

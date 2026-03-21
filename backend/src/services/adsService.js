@@ -1,6 +1,7 @@
 const path = require('path');
 const { query } = require('../utils/database');
 const { getActiveSubscription, PLAN_LIMITS } = require('./subscriptionService');
+const { convertAmountMinor, getCurrencyRecord, DEFAULT_CURRENCY } = require('./pricingService');
 const { hasPremiumException } = require('../utils/premiumAccess');
 
 const ACCEPTED_MEDIA_TYPES = ['image', 'video', 'gif'];
@@ -476,11 +477,37 @@ const getAdChargeBreakdown = ({ placement, adOption, priorityLevel }) => {
     };
 };
 
-const getAdPricingCatalog = () => ({
-    placements: AD_PRICING.placements,
-    options: AD_PRICING.options,
-    priorityMultipliers: PRIORITY_MULTIPLIERS
-});
+const getAdPricingCatalog = async (options = {}) => {
+    const normalizedCurrency = (options.currencyCode || DEFAULT_CURRENCY).toUpperCase();
+    const multiplier = Number.isFinite(options.multiplier) ? options.multiplier : 1;
+
+    if (normalizedCurrency === DEFAULT_CURRENCY && multiplier === 1) {
+        return {
+            placements: AD_PRICING.placements,
+            options: AD_PRICING.options,
+            priorityMultipliers: PRIORITY_MULTIPLIERS,
+            currency: { code: normalizedCurrency, symbol: options.currencySymbol || '$' },
+            multiplier
+        };
+    }
+
+    const baseCurrency = (await getCurrencyRecord(DEFAULT_CURRENCY)) || { fxRateToUsd: 1, symbol: '$' };
+    const targetCurrency = (await getCurrencyRecord(normalizedCurrency)) || baseCurrency;
+    const placements = Object.fromEntries(
+        Object.entries(AD_PRICING.placements).map(([key, value]) => ([
+            key,
+            convertAmountMinor(value, baseCurrency, targetCurrency, multiplier)
+        ]))
+    );
+
+    return {
+        placements,
+        options: AD_PRICING.options,
+        priorityMultipliers: PRIORITY_MULTIPLIERS,
+        currency: { code: normalizedCurrency, symbol: targetCurrency.symbol || options.currencySymbol || '$' },
+        multiplier
+    };
+};
 
 const campaignWeight = (campaign) => {
     const placementWeight = Array.isArray(campaign.placements) && campaign.placements.length

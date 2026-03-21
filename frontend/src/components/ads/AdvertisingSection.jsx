@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
+import { formatAmountMinor, resolveUserCurrency } from '../../utils/currency';
 import {
     createCampaign,
     deleteCampaign,
@@ -122,12 +123,16 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
 
     const loadPricing = useCallback(async () => {
         try {
-            const { data } = await getAdPricing();
+            const preference = resolveUserCurrency(user);
+            const { data } = await getAdPricing({
+                currency: preference.currency?.code,
+                country: preference.countryCode
+            });
             setPricing(data.pricing || null);
         } catch {
             setPricing(null);
         }
-    }, []);
+    }, [user]);
 
     const loadInvoices = useCallback(async () => {
         setInvoiceLoading(true);
@@ -363,6 +368,12 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         return null;
     }
 
+    const currencyCode = pricing?.currency?.code;
+    const currencySymbol = pricing?.currency?.symbol;
+
+    const formatMoney = (minor) =>
+        formatAmountMinor(minor, currencyCode || undefined, currencySymbol || undefined);
+
     const summaryCards = [
         {
             label: 'Active campaigns',
@@ -387,7 +398,7 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
         },
         {
             label: 'Lifetime spend',
-            value: `$${analyticsTotals.spend.toFixed(2)}`,
+            value: formatMoney(Math.round(analyticsTotals.spend * 100)) || '—',
             hint: 'All campaigns'
         }
     ];
@@ -466,7 +477,7 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
                         </select>
                     </label>
                     <label>
-                        Daily budget (USD)
+                        Daily budget ({currencyCode || 'USD'})
                         <input
                             type="number"
                             min="0"
@@ -576,12 +587,12 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
                             {pricingSummary.placementTotals.map((entry) => (
                                 <div key={entry.placement}>
                                     <span>{entry.placement.replace('_', ' ')}</span>
-                                    <strong>${(entry.total / 100).toFixed(2)}</strong>
+                                    <strong>{formatMoney(entry.total)}</strong>
                                 </div>
                             ))}
                         </div>
                         <p className="ads-pricing-total">
-                            Total: <strong>${(pricingSummary.total / 100).toFixed(2)}</strong>
+                            Total: <strong>{formatMoney(pricingSummary.total)}</strong>
                         </p>
                     </div>
                 )}
@@ -661,7 +672,7 @@ const AdvertisingSection = ({ premiumExceptionActive = false }) => {
                                     </p>
                                 </div>
                                 <div className="ads-invoice-meta">
-                                    <strong>${((invoice.total_minor || 0) / 100).toFixed(2)}</strong>
+                                    <strong>{formatMoney(invoice.total_minor || 0)}</strong>
                                     <button
                                         type="button"
                                         className="btn btn-outline btn-sm"

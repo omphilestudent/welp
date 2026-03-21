@@ -9,6 +9,7 @@ const userController = require('../controllers/userController');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { uploadToCloudinary, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 2 * 1024 * 1024 },
+    limits: { fileSize: Number(process.env.AVATAR_MAX_BYTES || 10 * 1024 * 1024) },
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|gif/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -63,7 +64,13 @@ router.post('/upload-avatar',
             }
 
 
-            const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+            let avatarUrl = `/uploads/avatars/${req.file.filename}`;
+            if (isCloudinaryConfigured()) {
+                const cloudUrl = await uploadToCloudinary(req.file.path, { folder: 'welp/avatars' });
+                if (cloudUrl) {
+                    avatarUrl = cloudUrl;
+                }
+            }
 
 
             const { query } = require('../utils/database');

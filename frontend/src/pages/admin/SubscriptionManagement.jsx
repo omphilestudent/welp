@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { guessCurrencySymbol } from '../../utils/currency';
 import {
     FaCreditCard,
     FaUsers,
@@ -60,6 +61,8 @@ const SubscriptionManagement = () => {
     const [showPricingModal, setShowPricingModal] = useState(false);
     const [editingPricing, setEditingPricing] = useState(null);
     const [dateRange, setDateRange] = useState('30d');
+    const [currencyCode, setCurrencyCode] = useState('ZAR');
+    const [currencySymbol, setCurrencySymbol] = useState('R');
     const [formData, setFormData] = useState({
         user_id: '',
         role: 'employee',
@@ -91,11 +94,12 @@ const SubscriptionManagement = () => {
         try {
             setLoading(true);
             const period = dateRange === '7d' ? 'day' : dateRange === '30d' ? 'day' : dateRange === '90d' ? 'week' : 'month';
-            const [subsRes, pricingRes, revenueRes, statsRes] = await Promise.all([
+            const [subsRes, pricingRes, revenueRes, statsRes, settingsRes] = await Promise.all([
                 api.get('/admin/subscriptions', { params: { range: dateRange } }),
                 api.get('/admin/pricing/countries'),
                 api.get('/admin/analytics/revenue', { params: { period } }),
-                api.get('/admin/analytics/subscriptions')
+                api.get('/admin/analytics/subscriptions'),
+                api.get('/admin/settings')
             ]);
 
             const rawSubs = subsRes.data.subscriptions || subsRes.data || [];
@@ -108,6 +112,12 @@ const SubscriptionManagement = () => {
             setPricingData(pricingRes.data.pricing || pricingRes.data || []);
             setRevenueData(revenueRes.data || []);
             setStats(statsRes.data || {});
+
+            const settings = settingsRes.data || {};
+            const code = (settings.currency_code || settings.currencyCode || 'ZAR').toUpperCase();
+            const symbol = settings.currency_symbol || settings.currencySymbol || guessCurrencySymbol(code);
+            setCurrencyCode(code);
+            setCurrencySymbol(symbol);
         } catch (err) {
             setError(err?.response?.data?.message || 'Failed to load subscription data');
         } finally {
@@ -307,7 +317,7 @@ const SubscriptionManagement = () => {
                 />
                 <SummaryCard
                     title="Monthly Revenue"
-                    value={`$${summaryStats.totalRevenue.toFixed(2)}`}
+                    value={`${currencySymbol}${summaryStats.totalRevenue.toFixed(2)}`}
                     icon={<FaDollarSign />}
                     color="#9f7aea"
                 />
@@ -350,7 +360,7 @@ const SubscriptionManagement = () => {
                                 type="monotone"
                                 dataKey="revenue"
                                 stroke="#48bb78"
-                                name="Revenue ($)"
+                                name={`Revenue (${currencyCode})`}
                             />
                         </AreaChart>
                     </ResponsiveContainer>

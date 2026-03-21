@@ -1,5 +1,6 @@
 const path = require('path');
 const emailMarketingService = require('../services/emailMarketingService');
+const { uploadToCloudinary, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 const BASE_BACKEND_URL = (process.env.BACKEND_URL || process.env.API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
@@ -102,16 +103,24 @@ const uploadAssets = async (req, res) => {
     if (!files.length) {
         return res.status(400).json({ error: 'No files uploaded' });
     }
-    const assets = files.map((file) => {
-        const relativePath = `/uploads/email-marketing/${path.basename(file.filename)}`;
-        return {
-            url: relativePath,
-            absoluteUrl: `${BASE_BACKEND_URL}${relativePath}`,
+    const assets = [];
+    for (const file of files) {
+        let assetUrl = `/uploads/email-marketing/${path.basename(file.filename)}`;
+        if (isCloudinaryConfigured()) {
+            const cloudUrl = await uploadToCloudinary(file.path, { folder: 'welp/email-assets' });
+            if (cloudUrl) {
+                assetUrl = cloudUrl;
+            }
+        }
+        const absoluteUrl = assetUrl.startsWith('http') ? assetUrl : `${BASE_BACKEND_URL}${assetUrl}`;
+        assets.push({
+            url: assetUrl,
+            absoluteUrl,
             size: file.size,
             originalName: file.originalname,
             mimetype: file.mimetype
-        };
-    });
+        });
+    }
     res.status(201).json({ assets });
 };
 

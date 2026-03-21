@@ -6,7 +6,7 @@ const ADMIN_BASE = `${ADS_BASE}/admin`;
 export const listCampaigns = (params = {}) => api.get(ADS_BASE, { params });
 
 export const getMyCampaigns = () => api.get(`${ADS_BASE}/me`);
-export const getAdPricing = () => api.get(`${ADS_BASE}/pricing`);
+export const getAdPricing = (params) => api.get(`${ADS_BASE}/pricing`, params ? { params } : undefined);
 export const getMyAdInvoices = () => api.get(`${ADS_BASE}/invoices`);
 export const downloadAdInvoice = (invoiceId) => api.get(`${ADS_BASE}/invoices/${invoiceId}/download`, {
     responseType: 'blob'

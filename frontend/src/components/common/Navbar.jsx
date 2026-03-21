@@ -211,7 +211,6 @@ const Navbar = () => {
                     {user && user.role === 'business' && (
                         <>
                             {renderLink('/dashboard', 'Dashboard')}
-                            {renderLink('/search', 'Search Companies')}
                         </>
                     )}
                 </div>
@@ -400,7 +399,6 @@ const Navbar = () => {
 
                                 {user.role === 'business' && (
                                     <>
-                                        {renderLink('/search', 'Search Companies')}
                                         {renderLink('/dashboard', 'Business Dashboard')}
                                     </>
                                 )}

@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const { apiLimiter } = require('../middleware/rateLimiter');
+const { uploadToCloudinary, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage,
     limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB
+        fileSize: Number(process.env.APPLICATION_UPLOAD_MAX_BYTES || 25 * 1024 * 1024)
     }
 });
 
@@ -29,17 +30,31 @@ router.post(
     '/upload',
     apiLimiter,
     upload.single('document'),
-    (req, res) => {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No document uploaded' });
-        }
+    async (req, res) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ error: 'No document uploaded' });
+            }
 
-        const relativeUrl = `/uploads/applications/${req.file.filename}`;
-        res.json({
-            success: true,
-            url: relativeUrl,
-            filename: req.file.originalname
-        });
+            let relativeUrl = `/uploads/applications/${req.file.filename}`;
+            if (isCloudinaryConfigured()) {
+                const cloudUrl = await uploadToCloudinary(req.file.path, {
+                    folder: 'welp/applications',
+                    resourceType: 'raw'
+                });
+                if (cloudUrl) {
+                    relativeUrl = cloudUrl;
+                }
+            }
+            res.json({
+                success: true,
+                url: relativeUrl,
+                filename: req.file.originalname
+            });
+        } catch (error) {
+            console.error('Upload application error:', error);
+            res.status(500).json({ error: 'Failed to upload document' });
+        }
     }
 );
 

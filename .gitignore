@@ -29,6 +29,13 @@ backend/sendgrid.env
 backend/uploads/
 tmp/
 
+# python caches
+__pycache__/
+*.pyc
+
+# local screenshots
+salesforce images/
+
 # Build artifacts
 frontend/dist/
 # Reports

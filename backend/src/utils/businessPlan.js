@@ -1,5 +1,6 @@
 const { query } = require('./database');
 const { getActiveSubscription, PLAN_LIMITS } = require('../services/subscriptionService');
+const { hasPremiumException } = require('./premiumAccess');
 
 const BUSINESS_PLAN_BY_TIER = {
     free_tier: 'business_free_tier',
@@ -93,13 +94,44 @@ const getBusinessRecordByOwner = async (ownerUserId) => {
     return businessResult.rows[0] || null;
 };
 
+const getOwnerEmail = async (ownerUserId) => {
+    if (!ownerUserId) return null;
+    const result = await query(
+        `SELECT email FROM users WHERE id = $1 LIMIT 1`,
+        [ownerUserId]
+    );
+    return result.rows[0]?.email || null;
+};
+
+const getLatestSubscriptionRecord = async (ownerUserId) => {
+    if (!ownerUserId) return null;
+    const result = await query(
+        `SELECT *
+         FROM subscription_records
+         WHERE owner_type = 'business'
+           AND owner_id = $1
+         ORDER BY ends_at DESC NULLS LAST, created_at DESC
+         LIMIT 1`,
+        [ownerUserId]
+    );
+    return result.rows[0] || null;
+};
+
 const resolvePlanCodeForBusiness = async (businessRecord) => {
     if (!businessRecord?.owner_user_id) {
         return resolvePlanCodeFromTier(businessRecord?.subscription_tier);
     }
+    const ownerEmail = await getOwnerEmail(businessRecord.owner_user_id);
+    if (hasPremiumException({ email: ownerEmail })) {
+        return 'business_premium';
+    }
     const activeRecord = await getActiveSubscription('business', businessRecord.owner_user_id);
     if (activeRecord?.plan_code) {
         return activeRecord.plan_code;
+    }
+    const latestRecord = await getLatestSubscriptionRecord(businessRecord.owner_user_id);
+    if (latestRecord?.plan_code && latestRecord.ends_at && new Date(latestRecord.ends_at) > new Date()) {
+        return latestRecord.plan_code;
     }
     return resolvePlanCodeFromTier(businessRecord?.subscription_tier);
 };

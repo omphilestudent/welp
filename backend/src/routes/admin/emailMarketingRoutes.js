@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage,
     limits: {
-        fileSize: Number(process.env.EMAIL_ASSET_MAX_BYTES || 5 * 1024 * 1024)
+        fileSize: Number(process.env.EMAIL_ASSET_MAX_BYTES || 10 * 1024 * 1024)
     },
     fileFilter: (req, file, cb) => {
         const allowed = /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(file.originalname);

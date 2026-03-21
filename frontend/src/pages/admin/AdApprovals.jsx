@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import Loading from '../../components/common/Loading';
+import api from '../../services/api';
+import { guessCurrencySymbol } from '../../utils/currency';
 import {
     adminApproveAd,
     adminListAds,
@@ -73,6 +75,8 @@ const AdApprovals = () => {
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [failureLog, setFailureLog] = useState([]);
     const [failureLoading, setFailureLoading] = useState(false);
+    const [currencyCode, setCurrencyCode] = useState('ZAR');
+    const [currencySymbol, setCurrencySymbol] = useState('R');
 
     const getAdId = (ad) => ad?.id || ad?.campaign_id || ad?.campaignId;
     const normalizeReviewStatus = (status) => {
@@ -158,6 +162,26 @@ const AdApprovals = () => {
         fetchFailureLog();
         fetchActiveAds();
     }, [fetchAds, fetchFailureLog, fetchActiveAds]);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const { data } = await api.get('/admin/settings');
+                const code = (data?.currency_code || data?.currencyCode || 'ZAR').toUpperCase();
+                const symbol = data?.currency_symbol || data?.currencySymbol || guessCurrencySymbol(code);
+                setCurrencyCode(code);
+                setCurrencySymbol(symbol);
+            } catch {
+                /* noop */
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const formatMoney = (minor) => {
+        const amount = Number(minor || 0) / 100;
+        return `${currencySymbol}${amount.toFixed(2)}`;
+    };
 
     // Apply local filters
     const applyLocalFilters = (adsData) => {
@@ -436,7 +460,7 @@ const AdApprovals = () => {
                 />
                 <StatCard
                     label="Total Spend"
-                    value={`$${stats.totalSpend.toFixed(2)}`}
+                    value={`${currencySymbol}${stats.totalSpend.toFixed(2)}`}
                     color="pink"
                 />
             </div>
@@ -554,7 +578,7 @@ const AdApprovals = () => {
                         </div>
 
                         <div className="range-filter">
-                            <label>Spend ($):</label>
+                            <label>Spend ({currencyCode}):</label>
                             <input
                                 type="number"
                                 placeholder="Min"
@@ -769,11 +793,11 @@ const AdApprovals = () => {
                                 <td>
                                     <div className="spend-info">
                       <span className="spend-amount">
-                        ${((ad.spend_minor || 0) / 100).toFixed(2)}
+                        {formatMoney(ad.spend_minor || 0)}
                       </span>
                                         {ad.budget && (
                                             <span className="budget-info">
-                          of ${(ad.budget / 100).toFixed(2)}
+                          of {formatMoney(ad.budget || 0)}
                         </span>
                                         )}
                                     </div>
@@ -975,7 +999,7 @@ const AdApprovals = () => {
                                     </div>
                                     <div className="analytics-item">
                                         <label>Total Spend</label>
-                                        <span>${selectedAd.analytics.totalSpend?.toFixed(2)}</span>
+                                        <span>{formatMoney((selectedAd.analytics?.totalSpend || 0) * 100)}</span>
                                     </div>
                                 </div>
                             </div>

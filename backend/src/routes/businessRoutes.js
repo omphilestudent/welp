@@ -33,7 +33,7 @@ const logoStorage = multer.diskStorage({
 
 const uploadLogo = multer({
     storage: logoStorage,
-    limits: { fileSize: 2 * 1024 * 1024 }
+    limits: { fileSize: Number(process.env.COMPANY_LOGO_MAX_BYTES || 10 * 1024 * 1024) }
 });
 
 router.get('/', apiLimiter, companyController.searchCompanies);

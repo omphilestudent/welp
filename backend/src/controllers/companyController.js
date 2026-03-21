@@ -8,6 +8,7 @@ const { generateAutoReview } = require('../services/autoReviewService');
 const { getBusinessPlanSnapshotByBusinessId, getBusinessDailyApiLimit } = require('../utils/businessPlan');
 const { getUsageRecord } = require('../services/businessApiUsageService');
 const { REVIEW_TYPES, normalizeReviewType } = require('../utils/reviewTypes');
+const { uploadToCloudinary, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin']);
 const OWNER_ACCESS_ROLES = new Set(['business', ...ADMIN_ROLES]);
@@ -1213,7 +1214,13 @@ const uploadCompanyLogo = async (req, res) => {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const logoUrl = `/uploads/company-logos/${req.file.filename}`;
+        let logoUrl = `/uploads/company-logos/${req.file.filename}`;
+        if (isCloudinaryConfigured()) {
+            const cloudUrl = await uploadToCloudinary(req.file.path, { folder: 'welp/company-logos' });
+            if (cloudUrl) {
+                logoUrl = cloudUrl;
+            }
+        }
         await query(
             `UPDATE companies
              SET logo_url = $1, updated_at = CURRENT_TIMESTAMP

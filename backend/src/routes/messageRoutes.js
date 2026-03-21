@@ -28,7 +28,7 @@ const voiceStorage = multer.diskStorage({
 
 const voiceUpload = multer({
     storage: voiceStorage,
-    limits: { fileSize: 15 * 1024 * 1024 },
+    limits: { fileSize: Number(process.env.VOICE_NOTE_MAX_BYTES || 25 * 1024 * 1024) },
     fileFilter: (req, file, cb) => {
         if (!file.mimetype?.startsWith('audio/')) {
             return cb(new Error('Only audio files are allowed'));

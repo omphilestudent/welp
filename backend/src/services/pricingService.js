@@ -688,6 +688,22 @@ const getAudiencePricing = async (audienceInput, options = {}) => {
     };
 };
 
+const getCurrencyContext = async (options = {}) => {
+    const preference = await resolveCountryPreference(options.country, options.currency);
+    const currencyMeta =
+        (await getCurrencyRecord(preference.currencyCode)) || {
+            code: preference.currencyCode,
+            symbol: preference.currencySymbol || '$'
+        };
+    return {
+        currencyCode: preference.currencyCode,
+        currencySymbol: currencyMeta.symbol || preference.currencySymbol || '$',
+        multiplier: preference.multiplier,
+        country: preference.countryCode,
+        source: preference.source
+    };
+};
+
 const getPlanByCode = async (audienceInput, planCode, currencyCode, options = {}) => {
     if (!planCode) return null;
     const normalizedAudience = normalizeAudience(audienceInput);
@@ -699,6 +715,9 @@ const getPlanByCode = async (audienceInput, planCode, currencyCode, options = {}
 };
 
 module.exports = {
+    convertAmountMinor,
+    getCurrencyContext,
+    getCurrencyRecord,
     getAudiencePricing,
     getPlanByCode,
     listCountryPricing,

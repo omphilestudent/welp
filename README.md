@@ -1,72 +1,107 @@
 # Welp - Employee Wellbeing Review Platform
 
-Welp is a company review platform focused on employee experience and wellbeing, where employees can safely review companies, businesses can respond and improve, and psychologists can step in when reviews signal distress.
+Welp is a review and wellbeing platform where employees share workplace experiences, businesses respond and improve, and psychologists can intervene when reviews signal distress. This repository contains the full product stack: web client, API, and ML microservices.
 
-## Features
+## Product Overview (Non-Technical)
 
-- **Three User Roles**: Employee, Psychologist, Business with distinct permissions
-- **Anonymous Reviews**: Employees can post anonymously while maintaining internal accountability
-- **24-Hour Edit/Delete**: Time-limited window for review modifications
-- **Company Claim System**: Businesses can claim and manage their profiles
-- **Private Messaging**: Secure communication between psychologists and employees
-- **Real-time Chat**: WebSocket-based messaging system
-- **Review Replies**: Both employees and businesses can reply to reviews
-- **Search Functionality**: Full-text search for companies
-- **Dark/Light Theme**: Toggle between dark and light modes
+**Core outcomes**
+- **Employees** submit anonymous or named reviews and engage safely through messaging.
+- **Businesses** claim profiles, manage reputation, access analytics, and run advertising campaigns.
+- **Psychologists** receive leads, communicate with employees, and manage their schedules.
 
-## Tech Stack
+**Key flows**
+- Review submission → moderation + sentiment → saved to the company profile.
+- Business hub → reviews, analytics, profile editing, and ads management.
+- Messaging → real-time chat between employees and psychologists.
 
-### Backend
-- Node.js with Express
-- PostgreSQL (Neon)
-- JWT Authentication
-- Socket.io for real-time messaging
-- Rate limiting for security
+## Architecture (Technical)
 
-### Frontend
-- React with Vite
-- Vanilla CSS with CSS variables
-- React Router v6
-- Context API for state management
-- Axios for API calls
-- Socket.io-client for real-time updates
+```
+React (Vite) Frontend
+  ↕ HTTPS + WebSockets
+Node.js/Express API
+  ↕ PostgreSQL
+  ↕ ML Services (FastAPI)
+```
 
-## Environments
-
-- **Production**: https://welphub.onrender.com
+**Major components**
+- **Frontend**: React + Vite app that handles all user roles and dashboards.
+- **Backend**: Express API with JWT auth, Socket.io for chat, and a PostgreSQL database.
+- **ML services**: Python FastAPI microservices for moderation, sentiment, recommendations, image analysis, and fraud detection.
 
 ## Repository Structure
 
-Use this as the source of truth for naming and navigation.
+- `frontend/` — React app (UI, pages, components, routing)
+- `backend/` — Node.js API (controllers, routes, DB integration)
+- `backend-java/` — Spring Boot migration scaffold
+- `ml-services/` — Python ML microservices
+- `docker-compose.yml` — local orchestration
 
-- [`frontend/`](frontend/README.md) — React app (UI, pages, components, routing)
-- [`backend/`](backend/README.md) — Node.js API (controllers, routes, DB integration)
-- [`backend-java/`](backend-java/README.md) — Spring Boot migration scaffold
-- [`ml-services/`](ml-services/README.md) — standalone Python ML microservices
-- [`docker-compose.yml`](docker-compose.yml) — local service orchestration
+## Local Development
 
-## Naming + Organization Guidelines
+### Prerequisites
+- Node.js 20+
+- Python 3.10+ (for ML services)
+- Docker (recommended for full stack)
 
-These conventions keep files easy to find and link correctly:
+### Quick Start (Docker)
 
-- **React components/pages:** `PascalCase.jsx`
-  - Example: `CompanyProfile.jsx`, `ReviewCard.jsx`
-- **Hooks:** `camelCase` with `use` prefix
-  - Example: `useAuth.js`, `useTheme.js`
-- **Service modules:** lowercase in `frontend/src/services/`
-  - Example: `api.js`, `socket.js`
-- **Backend routes/controllers:** `camelCase` + role/feature suffix
-  - Example: `userRoutes.js`, `adminController.js`
-- **Shared docs:** always use `README.md` at folder root and link from parent README.
+```bash
+docker-compose up --build
+```
 
-## ML Microservices
+This brings up:
+- Postgres
+- Backend API on `http://localhost:5000`
+- Frontend on `http://localhost:5173`
+- ML services on `http://localhost:8000+`
 
-Welp includes independently deployable Python ML services under `ml-services/`:
+### Manual (Without Docker)
 
-- `content-moderation` (`POST /moderate-review`)
-- `sentiment-analysis` (`POST /analyze-sentiment`)
-- `recommendation-engine` (`GET /recommendations?user_id=<id>`)
-- `image-analysis` (`POST /analyze-image`)
-- `fraud-detection` (`POST /detect-fraud`)
+1) Backend
+```bash
+cd backend
+npm install
+npm run dev
+```
 
-The backend review creation flow calls moderation and sentiment services before inserting a review. Moderation can block submission, and sentiment label/score are persisted with each review.
+2) Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+3) ML services (run each needed service)
+```bash
+cd ml-services/content-moderation
+pip install -r requirements.txt
+python main.py
+```
+
+## Configuration
+
+Each service has its own environment variables:
+
+- **Frontend**: `VITE_API_URL` (see `frontend/README.md`)
+- **Backend**: `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`, optional ML + email config, and `CLOUDINARY_URL` for durable media storage (see `backend/README.md`)
+- **ML services**: `ALLOWED_ORIGINS`, `PORT`, `LOG_LEVEL` (see `ml-services/README.md`)
+
+## Deployment Overview
+
+**Frontend**
+- Build and host as a static site (Render, Vercel, Netlify, S3).
+- Set `VITE_API_URL` to your backend URL.
+
+**Backend**
+- Deploy as a Node.js web service (Render, Railway, Fly.io).
+- Connect to Postgres and set required environment variables.
+
+**ML Services**
+- Deploy each as a separate service/container.
+- Point backend `ML_*_URL` variables at the deployed endpoints.
+
+Detailed deployment steps live in:
+- `frontend/README.md`
+- `backend/README.md`
+- `ml-services/README.md`
