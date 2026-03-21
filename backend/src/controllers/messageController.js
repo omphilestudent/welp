@@ -71,6 +71,9 @@ const getChatMinutesForTier = (tier = 'free') => {
     return PLAN_LIMITS.user_free?.chatMinutes ?? 30;
 };
 
+const FREE_TIER_CHAT_RETENTION_HOURS = Number(process.env.FREE_TIER_CHAT_RETENTION_HOURS || 24);
+const FREE_TIER_CHAT_RETENTION_MS = FREE_TIER_CHAT_RETENTION_HOURS * 60 * 60 * 1000;
+
 const fetchEmployeeTier = async (userId) => {
     if (!userId) {
         return 'free';
@@ -96,6 +99,41 @@ const fetchEmployeeTier = async (userId) => {
 
 const getPerSessionCapForUser = (user = {}) => {
     return getChatMinutesForTier(user.subscription_tier);
+};
+
+const getConversationActivityAt = (conversation = {}) => (
+    conversation.updated_at || conversation.created_at || conversation.started_at
+);
+
+const isFreeTierEmployeeId = async (employeeId) => {
+    const tier = await fetchEmployeeTier(employeeId);
+    return String(tier || 'free').toLowerCase() === 'free';
+};
+
+const deleteExpiredFreeTierConversations = async (employeeId) => {
+    try {
+        if (!employeeId) return;
+        if (!(await isFreeTierEmployeeId(employeeId))) return;
+        const hasConversations = await tableExists('conversations');
+        if (!hasConversations) return;
+        const [hasEmployeeId, hasUserId, hasUpdatedAt, hasCreatedAt] = await Promise.all([
+            columnExists('conversations', 'employee_id'),
+            columnExists('conversations', 'user_id'),
+            columnExists('conversations', 'updated_at'),
+            columnExists('conversations', 'created_at')
+        ]);
+        const employeeColumn = hasEmployeeId ? 'employee_id' : hasUserId ? 'user_id' : null;
+        const activityColumn = hasUpdatedAt ? 'updated_at' : hasCreatedAt ? 'created_at' : null;
+        if (!employeeColumn || !activityColumn) return;
+        await query(
+            `DELETE FROM conversations
+             WHERE ${employeeColumn} = $1
+               AND ${activityColumn} <= CURRENT_TIMESTAMP - INTERVAL '${FREE_TIER_CHAT_RETENTION_HOURS} hours'`,
+            [employeeId]
+        );
+    } catch (error) {
+        console.warn('Free tier chat cleanup skipped:', error?.message || error);
+    }
 };
 
 const expireConversations = async () => {
@@ -211,6 +249,7 @@ const requestChatWithPsychologist = async (req, res) => {
             ? Math.min(planCap, Math.max(5, requestedMinutesRaw))
             : Math.min(planCap, 10);
         await ensureChatQuota(req.user, sessionMinutes);
+        await deleteExpiredFreeTierConversations(req.user.id);
 
         const hasCanUseProfile = await columnExists('users', 'can_use_profile');
         const hasKycStatus = await columnExists('users', 'kyc_status');
@@ -844,6 +883,9 @@ const getConversations = async (req, res) => {
             return res.status(200).json({ success: true, conversations: [] });
         }
         await expireConversations();
+        if (req.user.role === 'employee') {
+            await deleteExpiredFreeTierConversations(userId);
+        }
 
         const [
             hasUserAnonymous,
@@ -1038,9 +1080,19 @@ const getConversationMessages = async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
+        const convo = conversation.rows[0];
         const allowedStatuses = ['accepted', 'ended', 'pending', 'rejected', 'blocked'];
-        if (!allowedStatuses.includes(conversation.rows[0].status)) {
+        if (!allowedStatuses.includes(convo.status)) {
             return res.json([]);
+        }
+        if (await isFreeTierEmployeeId(convo.employee_id)) {
+            const activityAt = getConversationActivityAt(convo);
+            if (activityAt && Date.now() - new Date(activityAt).getTime() >= FREE_TIER_CHAT_RETENTION_MS) {
+                await query('DELETE FROM conversations WHERE id = $1', [convo.id]);
+                return res.status(403).json({
+                    error: 'Free plan chats expire after 24 hours. Please request a new chat.'
+                });
+            }
         }
 
         const result = await query(
@@ -1090,6 +1142,15 @@ const sendMessage = async (req, res) => {
         const convo = conversation.rows[0];
         if (convo.status !== 'accepted') {
             return res.status(403).json({ error: 'Conversation is not active' });
+        }
+        if (await isFreeTierEmployeeId(convo.employee_id)) {
+            const activityAt = getConversationActivityAt(convo);
+            if (activityAt && Date.now() - new Date(activityAt).getTime() >= FREE_TIER_CHAT_RETENTION_MS) {
+                await query('DELETE FROM conversations WHERE id = $1', [convo.id]);
+                return res.status(403).json({
+                    error: 'Free plan chats expire after 24 hours. Please request a new chat.'
+                });
+            }
         }
 
         const now = new Date();
@@ -1227,6 +1288,15 @@ const sendVoiceNote = async (req, res) => {
         const convo = conversation.rows[0];
         if (convo.status !== 'accepted') {
             return res.status(403).json({ error: 'Conversation is not active' });
+        }
+        if (await isFreeTierEmployeeId(convo.employee_id)) {
+            const activityAt = getConversationActivityAt(convo);
+            if (activityAt && Date.now() - new Date(activityAt).getTime() >= FREE_TIER_CHAT_RETENTION_MS) {
+                await query('DELETE FROM conversations WHERE id = $1', [convo.id]);
+                return res.status(403).json({
+                    error: 'Free plan chats expire after 24 hours. Please request a new chat.'
+                });
+            }
         }
 
         const now = new Date();
