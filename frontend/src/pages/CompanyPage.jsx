@@ -202,10 +202,10 @@ const CompanyPage = () => {
 
                             <div className="company-meta">
                                 {company.address && (
-                                    <span className="company-address">?? {company.address}</span>
+                                    <span className="company-address">📍 {company.address}</span>
                                 )}
                                 {company.phone && (
-                                    <span className="company-phone">?? {company.phone}</span>
+                                    <span className="company-phone">📞 {company.phone}</span>
                                 )}
                                 {company.registration_number && (
                                     <span className="company-registration">Reg No: {company.registration_number}</span>
