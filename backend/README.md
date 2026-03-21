@@ -62,6 +62,15 @@ EMAIL_PASSWORD=...
 EMAIL_FROM="Welp <no-reply@welp.com>"
 ```
 
+Remote PIN security defaults:
+
+```dotenv
+REMOTE_PIN_MIN_LENGTH=4
+REMOTE_PIN_MAX_LENGTH=6
+REMOTE_PIN_MAX_ATTEMPTS=5
+REMOTE_PIN_LOCK_MINUTES=15
+```
+
 Upload size overrides (bytes):
 
 ```dotenv

@@ -1,0 +1,74 @@
+.remote-pin-page {
+    min-height: calc(100vh - 120px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.remote-pin-card {
+    width: min(420px, 92vw);
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+}
+
+.remote-pin-card h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.5rem;
+    color: #0f172a;
+}
+
+.remote-pin-card p {
+    margin: 0 0 1.5rem;
+    color: #475569;
+}
+
+.remote-pin-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.remote-pin-form label {
+    display: grid;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.remote-pin-form input {
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+    padding: 0.75rem 0.9rem;
+    font-size: 1rem;
+    outline: none;
+}
+
+.remote-pin-form input:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.remote-pin-form button {
+    margin-top: 0.5rem;
+    padding: 0.85rem 1rem;
+    border: none;
+    border-radius: 999px;
+    background: #4f46e5;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.remote-pin-form button:disabled {
+    background: #a5b4fc;
+    cursor: not-allowed;
+}
+
+.remote-pin-form button:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
+}

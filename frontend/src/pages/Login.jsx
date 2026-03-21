@@ -247,10 +247,16 @@ const Login = () => {
                 const userRole = result.user?.role;
                 const adminRoles = ['admin', 'super_admin', 'superadmin', 'system_admin', 'hr_admin'];
 
-                if (adminRoles.includes(userRole)) {
-                    navigate('/admin/dashboard', { replace: true });
+                const destination = adminRoles.includes(userRole) ? '/admin/dashboard' : from;
+
+                if (result.pinSetupRequired) {
+                    sessionStorage.setItem('welp_pin_redirect', destination);
+                    navigate('/remote-pin/setup', { replace: true });
+                } else if (result.pinRequired && !result.pinVerified) {
+                    sessionStorage.setItem('welp_pin_redirect', destination);
+                    navigate('/remote-pin/verify', { replace: true });
                 } else {
-                    navigate(from, { replace: true });
+                    navigate(destination, { replace: true });
                 }
                 if (inviteReturn) {
                     localStorage.removeItem('welp_invite_return');

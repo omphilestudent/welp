@@ -122,6 +122,10 @@ const createTables = async () => {
                 token_version INT DEFAULT 0,
                 last_login TIMESTAMP,
                 last_active TIMESTAMP,
+                remote_pin_hash TEXT,
+                remote_pin_set_at TIMESTAMP,
+                remote_pin_attempt_count INT DEFAULT 0,
+                remote_pin_locked_until TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -1585,6 +1589,10 @@ const runMigrations = async () => {
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS remote_pin_hash TEXT;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS remote_pin_set_at TIMESTAMP;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS remote_pin_attempt_count INT DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS remote_pin_locked_until TIMESTAMP;",
             `DO $$
              DECLARE
                  con_name text;

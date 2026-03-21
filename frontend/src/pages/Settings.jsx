@@ -66,6 +66,16 @@ const Settings = () => {
         newPassword: '',
         confirmPassword: ''
     });
+    const [remotePinData, setRemotePinData] = useState({
+        currentPin: '',
+        newPin: '',
+        confirmPin: ''
+    });
+    const [remotePinStatus, setRemotePinStatus] = useState({
+        enabled: false,
+        lockedUntil: null,
+        policy: { minLength: 4, maxLength: 6 }
+    });
 
     const [psychologistData, setPsychologistData] = useState({
         licenseNumber: '',
@@ -87,6 +97,7 @@ const Settings = () => {
     useEffect(() => {
         fetchProfile();
         fetchSettings();
+        fetchRemotePinStatus();
     }, []);
 
     useEffect(() => {
@@ -167,6 +178,19 @@ const Settings = () => {
         }
     };
 
+    const fetchRemotePinStatus = async () => {
+        try {
+            const { data } = await api.get('/auth/remote-pin/status');
+            setRemotePinStatus({
+                enabled: Boolean(data?.enabled),
+                lockedUntil: data?.lockedUntil || null,
+                policy: data?.pinPolicy || { minLength: 4, maxLength: 6 }
+            });
+        } catch (error) {
+            console.error('Failed to fetch Remote PIN status:', error);
+        }
+    };
+
     const handleProfileUpdate = async () => {
         setLoading(true);
         try {
@@ -237,6 +261,39 @@ const Settings = () => {
             });
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to change password');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemotePinChange = async () => {
+        if (!remotePinData.currentPin || !remotePinData.newPin) {
+            toast.error('Please fill in all Remote PIN fields');
+            return;
+        }
+        if (remotePinData.newPin !== remotePinData.confirmPin) {
+            toast.error('Remote PINs do not match');
+            return;
+        }
+        const minLen = remotePinStatus.policy?.minLength ?? 4;
+        const maxLen = remotePinStatus.policy?.maxLength ?? 6;
+        if (remotePinData.newPin.length < minLen || remotePinData.newPin.length > maxLen) {
+            toast.error(`Remote PIN must be ${minLen}-${maxLen} digits`);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await api.post('/auth/remote-pin/change', {
+                currentPin: remotePinData.currentPin,
+                newPin: remotePinData.newPin,
+                confirmPin: remotePinData.confirmPin
+            });
+            toast.success('Remote PIN updated');
+            setRemotePinData({ currentPin: '', newPin: '', confirmPin: '' });
+            fetchRemotePinStatus();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to update Remote PIN');
         } finally {
             setLoading(false);
         }
@@ -713,6 +770,56 @@ const Settings = () => {
                                 </label>
                                 <p className="checkbox-help">Adds an extra layer of security to your account.</p>
 
+                                <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                                    <label className="form-label">Remote PIN</label>
+                                    <p className="section-description">
+                                        Required after every login to confirm access.
+                                    </p>
+                                    {remotePinStatus.enabled ? (
+                                        <div className="form-row">
+                                            <div className="form-group">
+                                                <label className="form-label">Current PIN</label>
+                                                <input
+                                                    type="password"
+                                                    inputMode="numeric"
+                                                    className="form-input"
+                                                    value={remotePinData.currentPin}
+                                                    onChange={(e) => setRemotePinData({ ...remotePinData, currentPin: e.target.value.replace(/\D/g, '') })}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label">New PIN</label>
+                                                <input
+                                                    type="password"
+                                                    inputMode="numeric"
+                                                    className="form-input"
+                                                    value={remotePinData.newPin}
+                                                    onChange={(e) => setRemotePinData({ ...remotePinData, newPin: e.target.value.replace(/\D/g, '') })}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label">Confirm PIN</label>
+                                                <input
+                                                    type="password"
+                                                    inputMode="numeric"
+                                                    className="form-input"
+                                                    value={remotePinData.confirmPin}
+                                                    onChange={(e) => setRemotePinData({ ...remotePinData, confirmPin: e.target.value.replace(/\D/g, '') })}
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="checkbox-help">
+                                            Remote PIN is not set yet. You will be prompted to set it on next login.
+                                        </p>
+                                    )}
+                                    {remotePinStatus.lockedUntil && (
+                                        <p className="checkbox-help" style={{ color: '#b45309' }}>
+                                            Remote PIN locked until {new Date(remotePinStatus.lockedUntil).toLocaleString()}.
+                                        </p>
+                                    )}
+                                </div>
+
                                 <div className="form-actions">
                                     <button
                                         onClick={handleSettingsUpdate}
@@ -721,6 +828,16 @@ const Settings = () => {
                                     >
                                         <FaSave /> {loading ? 'Saving...' : 'Save Security Settings'}
                                     </button>
+                                    {remotePinStatus.enabled && (
+                                        <button
+                                            onClick={handleRemotePinChange}
+                                            disabled={loading}
+                                            className="btn btn-secondary"
+                                            style={{ marginLeft: '0.75rem' }}
+                                        >
+                                            <FaLock /> {loading ? 'Updating...' : 'Update Remote PIN'}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}

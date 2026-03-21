@@ -8,6 +8,10 @@ const {
     login,
     getMe,
     getSessionSettings,
+    getRemotePinInfo,
+    setupRemotePinController,
+    verifyRemotePinController,
+    changeRemotePinController,
     logout,
     refreshToken
 } = require('../controllers/authController');
@@ -17,7 +21,7 @@ const {
 } = require('../controllers/authController');
 
 const { authenticate } = require('../middleware/auth');
-const { authLimiter, loginLimiter } = require('../middleware/rateLimiter');
+const { authLimiter, loginLimiter, accountSecurityLimiter } = require('../middleware/rateLimiter');
 const { validate, loginValidation } = require('../middleware/validation');
 
 // Public
@@ -33,5 +37,9 @@ router.get('/google/callback', handleGoogleOAuthCallback);
 // Protected
 router.get('/me', authenticate, getMe);
 router.get('/session-settings', authenticate, getSessionSettings);
+router.get('/remote-pin/status', authenticate, accountSecurityLimiter, getRemotePinInfo);
+router.post('/remote-pin/setup', authenticate, accountSecurityLimiter, setupRemotePinController);
+router.post('/remote-pin/verify', authenticate, accountSecurityLimiter, verifyRemotePinController);
+router.post('/remote-pin/change', authenticate, accountSecurityLimiter, changeRemotePinController);
 
 module.exports = router;

@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
 const AdminRoute = ({ children, requiredRole = 'admin' }) => {
-    const { user, loading: authLoading } = useAuth();
+    const { user, loading: authLoading, pinStatus } = useAuth();
     const [isAuthorized, setIsAuthorized] = useState(null);
     const [checking, setChecking] = useState(true);
     const userId = user?.id ?? null;
@@ -93,6 +93,14 @@ const AdminRoute = ({ children, requiredRole = 'admin' }) => {
     if (!user) {
         console.log('Redirecting to login - no user');
         return <Navigate to="/login" replace />;
+    }
+
+    if (pinStatus?.setupRequired) {
+        return <Navigate to="/remote-pin/setup" replace />;
+    }
+
+    if (pinStatus?.required && !pinStatus?.verified) {
+        return <Navigate to="/remote-pin/verify" replace />;
     }
 
     if (!isAuthorized) {

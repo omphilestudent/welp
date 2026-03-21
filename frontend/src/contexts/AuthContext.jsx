@@ -115,10 +115,18 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [isBackendAvailable, setIsBackendAvailable] = useState(true);
     const [rateLimitInfo, setRateLimitInfo] = useState(null);
+    const [pinStatus, setPinStatus] = useState({
+        required: false,
+        setupRequired: false,
+        verified: false,
+        policy: null
+    });
     const initializedRef = useRef(false);
 
     // Derived state
     const isAuthenticated = !!user;
+    const isPinVerified = Boolean(pinStatus?.verified);
+    const isFullyAuthenticated = isAuthenticated && isPinVerified;
 
     const checkBackendHealth = useCallback(async () => {
         try {
@@ -154,6 +162,12 @@ export const AuthProvider = ({ children }) => {
 
             console.log("Auth restored:", data);
             setUser(normalizeUserPayload(data.user));
+            setPinStatus({
+                required: Boolean(data.pinRequired),
+                setupRequired: Boolean(data.pinSetupRequired),
+                verified: Boolean(data.pinVerified),
+                policy: data.pinPolicy || null
+            });
             setRateLimitInfo(null);
         } catch (error) {
             console.error("Auth check failed:", error.message);
@@ -196,6 +210,12 @@ export const AuthProvider = ({ children }) => {
                 // Keep existing user on transient backend/network errors.
             } else {
                 setUser(null);
+                setPinStatus({
+                    required: false,
+                    setupRequired: false,
+                    verified: false,
+                    policy: null
+                });
             }
         } finally {
             setLoading(false);
@@ -206,6 +226,12 @@ export const AuthProvider = ({ children }) => {
         try {
             const { data } = await api.get("/auth/me");
             setUser(normalizeUserPayload(data.user));
+            setPinStatus({
+                required: Boolean(data.pinRequired),
+                setupRequired: Boolean(data.pinSetupRequired),
+                verified: Boolean(data.pinVerified),
+                policy: data.pinPolicy || null
+            });
             setRateLimitInfo(null);
             return data.user;
         } catch (error) {
@@ -215,6 +241,12 @@ export const AuthProvider = ({ children }) => {
                 sessionStorage.removeItem("token");
                 setRequestToken(null);
                 setUser(null);
+                setPinStatus({
+                    required: false,
+                    setupRequired: false,
+                    verified: false,
+                    policy: null
+                });
             }
             throw error;
         }
@@ -297,13 +329,23 @@ export const AuthProvider = ({ children }) => {
             }
             api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
             setUser(normalizeUserPayload(data.user));
+            setPinStatus({
+                required: Boolean(data.pinRequired),
+                setupRequired: Boolean(data.pinSetupRequired),
+                verified: Boolean(data.pinVerified),
+                policy: data.pinPolicy || null
+            });
             setRateLimitInfo(null);
 
             console.log("✅ Login successful:", data.user);
 
             return {
                 success: true,
-                user: data.user
+                user: data.user,
+                pinRequired: Boolean(data.pinRequired),
+                pinSetupRequired: Boolean(data.pinSetupRequired),
+                pinVerified: Boolean(data.pinVerified),
+                pinPolicy: data.pinPolicy || null
             };
 
         } catch (error) {
@@ -381,11 +423,21 @@ export const AuthProvider = ({ children }) => {
             }
 
             setUser(normalizeUserPayload(data.user));
+            setPinStatus({
+                required: Boolean(data.pinRequired),
+                setupRequired: Boolean(data.pinSetupRequired),
+                verified: Boolean(data.pinVerified),
+                policy: data.pinPolicy || null
+            });
             setRateLimitInfo(null);
 
             return {
                 success: true,
-                user: data.user
+                user: data.user,
+                pinRequired: Boolean(data.pinRequired),
+                pinSetupRequired: Boolean(data.pinSetupRequired),
+                pinVerified: Boolean(data.pinVerified),
+                pinPolicy: data.pinPolicy || null
             };
 
         } catch (error) {
@@ -472,6 +524,12 @@ export const AuthProvider = ({ children }) => {
             sessionStorage.removeItem("token");
             delete api.defaults.headers.common["Authorization"];
             setUser(null);
+            setPinStatus({
+                required: false,
+                setupRequired: false,
+                verified: false,
+                policy: null
+            });
             setRateLimitInfo(null);
         }
     };
@@ -507,6 +565,9 @@ export const AuthProvider = ({ children }) => {
         user,
         loading,
         isAuthenticated,
+        isFullyAuthenticated,
+        pinStatus,
+        isPinVerified,
         login,
         register,
         logout,

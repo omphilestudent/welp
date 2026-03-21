@@ -39,6 +39,7 @@ import UserProfile from './pages/UserProfile';
 import InviteEvent from './pages/InviteEvent';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
+import PinRoute from './components/auth/PinRoute';
 import AdminLayout from './components/admin/AdminLayout';
 import AppTopBar from './components/kodi/AppTopBar';
 
@@ -75,6 +76,8 @@ import KodiInviteAccept from './pages/kodi/KodiInviteAccept';
 import KodiAppsList from './pages/kodi/KodiAppsList';
 import KodiSignIn from './pages/kodi/auth/KodiSignIn';
 import KodiFirstLogin from './pages/kodi/auth/KodiFirstLogin';
+import RemotePinSetup from './pages/RemotePinSetup';
+import RemotePinVerify from './pages/RemotePinVerify';
 
 // HR Pages
 import Employees from './pages/hr/Employees';
@@ -135,6 +138,22 @@ function App() {
                                 <Route path="/register/psychologist" element={<PsychologistRegister />} />
                                 <Route path="/register/business" element={<BusinessRegister />} />
                                 <Route path="/application-success" element={<ApplicationSuccess />} />
+                                <Route
+                                    path="/remote-pin/setup"
+                                    element={
+                                        <PinRoute>
+                                            <RemotePinSetup />
+                                        </PinRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/remote-pin/verify"
+                                    element={
+                                        <PinRoute>
+                                            <RemotePinVerify />
+                                        </PinRoute>
+                                    }
+                                />
 
                                 {/* Public Career Routes */}
                                 <Route path="/careers" element={<Careers />} />

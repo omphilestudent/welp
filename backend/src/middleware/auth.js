@@ -91,10 +91,12 @@ const authenticate = async (req, res, next) => {
     } catch (error) {
         return res.status(401).json({ error: 'Invalid token' });
     }
+    req.auth = decoded;
 
     const cached = authCache.get(token);
     const finalizeAuth = async (user) => {
         req.user = user;
+        req.auth = decoded;
         try {
             const inactivity = await enforceInactivityTimeout(user?.id);
             if (inactivity.expired) {
@@ -103,6 +105,34 @@ const authenticate = async (req, res, next) => {
         } catch (error) {
             console.warn('Failed to enforce inactivity timeout:', error.message);
         }
+
+        const path = String(req.originalUrl || req.url || '').replace(/^\/api/, '');
+        const bypassPrefixes = [
+            '/auth/remote-pin',
+            '/auth/me',
+            '/auth/logout',
+            '/auth/refresh',
+            '/auth/session-settings'
+        ];
+        const shouldBypassPin = bypassPrefixes.some((prefix) => path.startsWith(prefix));
+        const hasPin = Boolean(user.remote_pin_hash);
+        const pinVerified = Boolean(decoded?.pinVerified);
+
+        if (!shouldBypassPin) {
+            if (!hasPin) {
+                return res.status(403).json({
+                    error: 'Remote PIN setup required',
+                    code: 'PIN_SETUP_REQUIRED'
+                });
+            }
+            if (!pinVerified) {
+                return res.status(403).json({
+                    error: 'Remote PIN verification required',
+                    code: 'PIN_REQUIRED'
+                });
+            }
+        }
+
         return next();
     };
     if (cached && cached.expiresAt > Date.now()) {
@@ -137,6 +167,10 @@ const authenticate = async (req, res, next) => {
                  u.kyc_status,
                  u.documents_submitted,
                  u.can_use_profile,
+                 u.remote_pin_hash,
+                 u.remote_pin_set_at,
+                 u.remote_pin_attempt_count,
+                 u.remote_pin_locked_until,
                  ws.staff_role_key,
                  ws.department as staff_department
              FROM users u

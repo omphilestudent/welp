@@ -40,8 +40,18 @@ api.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
+        const redactedData = (() => {
+            if (!config.data || typeof config.data !== 'object') return config.data;
+            const sensitiveKeys = ['pin', 'confirmPin', 'currentPin', 'newPin', 'password', 'confirmPassword'];
+            const clone = { ...config.data };
+            sensitiveKeys.forEach((key) => {
+                if (clone[key] !== undefined) clone[key] = '***';
+            });
+            return clone;
+        })();
+
         console.log(`🚀 ${config.method.toUpperCase()} ${config.url}`, {
-            data: config.data,
+            data: redactedData,
             params: config.params,
             headers: config.headers
         });
@@ -71,6 +81,17 @@ api.interceptors.response.use(
             data: error.response?.data,
             url: error.config?.url
         });
+
+        if (error.response?.status === 403) {
+            const code = String(error.response?.data?.code || '').toUpperCase();
+            if (code === 'PIN_REQUIRED' || code === 'PIN_SETUP_REQUIRED') {
+                const target = code === 'PIN_SETUP_REQUIRED' ? '/remote-pin/setup' : '/remote-pin/verify';
+                if (window.location.pathname !== target) {
+                    window.location.href = target;
+                }
+                return Promise.reject(error);
+            }
+        }
 
         // Handle 401 errors
         if (error.response?.status === 401) {

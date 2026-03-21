@@ -306,6 +306,9 @@ io.use((socket, next) => {
     try {
         const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!decoded?.pinVerified) {
+            return next(new Error('Authentication error: Remote PIN required'));
+        }
         socket.userId = decoded.userId;
         socket.userRole = decoded.role || 'user';
         next();

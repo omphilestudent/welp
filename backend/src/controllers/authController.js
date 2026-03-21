@@ -20,6 +20,16 @@ const {
 } = require('../services/subscriptionService');
 const { getLatestApplicationStatusForUser } = require('../services/applicationWorkflowService');
 const { assignAccountNumberToUser } = require('../services/accountNumberService');
+const {
+    PIN_MIN_LENGTH,
+    PIN_MAX_LENGTH,
+    PIN_MAX_ATTEMPTS,
+    PIN_LOCK_MINUTES,
+    getRemotePinStatus,
+    setRemotePin,
+    verifyRemotePin,
+    changeRemotePin
+} = require('../services/remotePinService');
 
 const ROLE_TO_OWNER = {
     employee: 'user',
@@ -258,7 +268,8 @@ const generateToken = (user, options = {}) => {
     const payload = {
         userId: user.id,
         role: user.role,
-        tokenVersion: Number(user.token_version ?? 0)
+        tokenVersion: Number(user.token_version ?? 0),
+        pinVerified: Boolean(options.pinVerified)
     };
 
     // Admin roles keep a non-expiring token to avoid frequent forced re-logins.
@@ -282,12 +293,20 @@ const getUserByEmailForLogin = async (email) => {
     const hasIsActive = await columnExists('users', 'is_active');
     const hasStatus = await columnExists('users', 'status');
     const hasTokenVersion = await columnExists('users', 'token_version');
+    const hasRemotePinHash = await columnExists('users', 'remote_pin_hash');
+    const hasRemotePinSetAt = await columnExists('users', 'remote_pin_set_at');
+    const hasRemotePinAttempts = await columnExists('users', 'remote_pin_attempt_count');
+    const hasRemotePinLockedUntil = await columnExists('users', 'remote_pin_locked_until');
 
     let selectPart = `SELECT id, email, password_hash, role, display_name, avatar_url`;
     selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
     selectPart += hasIsActive ? `, is_active` : `, true as is_active`;
     selectPart += hasStatus ? `, status` : `, NULL::text as status`;
     selectPart += hasTokenVersion ? `, token_version` : `, 0 as token_version`;
+    selectPart += hasRemotePinHash ? `, remote_pin_hash` : `, NULL::text as remote_pin_hash`;
+    selectPart += hasRemotePinSetAt ? `, remote_pin_set_at` : `, NULL::timestamp as remote_pin_set_at`;
+    selectPart += hasRemotePinAttempts ? `, remote_pin_attempt_count` : `, 0 as remote_pin_attempt_count`;
+    selectPart += hasRemotePinLockedUntil ? `, remote_pin_locked_until` : `, NULL::timestamp as remote_pin_locked_until`;
     selectPart += `, subscription_tier, subscription_expires, daily_chat_quota_mins, used_chat_minutes, last_chat_reset`;
 
     return query(
@@ -302,6 +321,8 @@ const getUserByIdForProfile = async (userId) => {
     const hasKycStatus = await columnExists('users', 'kyc_status');
     const hasDocsSubmitted = await columnExists('users', 'documents_submitted');
     const hasCanUseProfile = await columnExists('users', 'can_use_profile');
+    const hasRemotePinHash = await columnExists('users', 'remote_pin_hash');
+    const hasRemotePinSetAt = await columnExists('users', 'remote_pin_set_at');
 
     let selectPart = `SELECT id, email, role, display_name, created_at, avatar_url`;
         selectPart += hasIsAnonymous ? `, is_anonymous` : `, false as is_anonymous`;
@@ -309,6 +330,8 @@ const getUserByIdForProfile = async (userId) => {
         selectPart += hasKycStatus ? `, kyc_status` : `, 'not_submitted'::text as kyc_status`;
         selectPart += hasDocsSubmitted ? `, documents_submitted` : `, false as documents_submitted`;
         selectPart += hasCanUseProfile ? `, can_use_profile` : `, true as can_use_profile`;
+        selectPart += hasRemotePinHash ? `, remote_pin_hash` : `, NULL::text as remote_pin_hash`;
+        selectPart += hasRemotePinSetAt ? `, remote_pin_set_at` : `, NULL::timestamp as remote_pin_set_at`;
         selectPart += `, subscription_tier, subscription_expires, daily_chat_quota_mins, used_chat_minutes, last_chat_reset`;
 
     return query(
@@ -464,7 +487,7 @@ const registerEmployee = async (req, res) => {
         await assignAccountNumberToUser(user.id, user.role).catch((error) => {
             console.warn('Employee account number assignment failed:', error.message);
         });
-        const token = generateToken(user);
+        const token = generateToken(user, { pinVerified: false });
 
         enqueueMarketingForUser(user.id).catch((error) => {
             console.warn('Marketing enqueue failed:', error.message);
@@ -490,11 +513,22 @@ const registerEmployee = async (req, res) => {
             success: true,
             message: 'Account created successfully',
             token,
+            pinRequired: false,
+            pinSetupRequired: true,
+            pinVerified: false,
+            pinPolicy: {
+                minLength: PIN_MIN_LENGTH,
+                maxLength: PIN_MAX_LENGTH,
+                maxAttempts: PIN_MAX_ATTEMPTS,
+                lockMinutes: PIN_LOCK_MINUTES
+            },
             user: {
                 id: user.id,
                 email: user.email,
                 displayName: user.display_name,
                 role: user.role,
+                remotePinEnabled: false,
+                remotePinSetAt: null,
                 subscription: employeeSubscriptionData
             }
         });
@@ -1168,7 +1202,11 @@ const login = async (req, res) => {
         const subscriptionRecord = await getActiveSubscription(ownerType, user.id);
         const subscriptionPayload = await getPlanPayload(subscriptionRecord, ownerType);
 
-        const token = generateToken(user, { rememberMe: Boolean(rememberMe) });
+        const remotePinEnabled = Boolean(user.remote_pin_hash);
+        const token = generateToken(user, {
+            rememberMe: Boolean(rememberMe),
+            pinVerified: false
+        });
 
         // Set httpOnly cookie to support cookie-based auth (e.g., HR departments page)
         const cookieOptions = {
@@ -1216,6 +1254,15 @@ const login = async (req, res) => {
         return res.json({
             success: true,
             token,
+            pinRequired: remotePinEnabled,
+            pinSetupRequired: !remotePinEnabled,
+            pinVerified: false,
+            pinPolicy: {
+                minLength: PIN_MIN_LENGTH,
+                maxLength: PIN_MAX_LENGTH,
+                maxAttempts: PIN_MAX_ATTEMPTS,
+                lockMinutes: PIN_LOCK_MINUTES
+            },
             user: {
                 id: enrichedUser.id,
                 email: enrichedUser.email,
@@ -1228,6 +1275,8 @@ const login = async (req, res) => {
                 isWelpStaff: enrichedUser.isWelpStaff,
                 staffRoleKey: enrichedUser.staffRoleKey,
                 staffDepartment: enrichedUser.staffDepartment,
+                remotePinEnabled,
+                remotePinSetAt: user.remote_pin_set_at || null,
                 subscription: subscriptionPayload,
                 applicationStatus
             }
@@ -1254,8 +1303,19 @@ const getMe = async (req, res) => {
         const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
 
         const enriched = await enrichUserWithStaff(user);
+        const remotePinEnabled = Boolean(user.remote_pin_hash);
+        const pinVerified = Boolean(req.auth?.pinVerified);
         return res.json({
             success: true,
+            pinRequired: remotePinEnabled,
+            pinSetupRequired: !remotePinEnabled,
+            pinVerified,
+            pinPolicy: {
+                minLength: PIN_MIN_LENGTH,
+                maxLength: PIN_MAX_LENGTH,
+                maxAttempts: PIN_MAX_ATTEMPTS,
+                lockMinutes: PIN_LOCK_MINUTES
+            },
             user: {
                 id: enriched.id,
                 email: enriched.email,
@@ -1272,6 +1332,8 @@ const getMe = async (req, res) => {
                 isWelpStaff: enriched.isWelpStaff,
                 staffRoleKey: enriched.staffRoleKey,
                 staffDepartment: enriched.staffDepartment,
+                remotePinEnabled,
+                remotePinSetAt: user.remote_pin_set_at || null,
                 subscription: subscriptionPayload,
                 applicationStatus
             }
@@ -1305,6 +1367,146 @@ const getSessionSettings = async (req, res) => {
     }
 };
 
+const buildPinAuthResponse = async ({ userId, rememberMe = false }) => {
+    const result = await getUserByIdForProfile(userId);
+    if (result.rows.length === 0) {
+        const error = new Error('User not found');
+        error.statusCode = 404;
+        throw error;
+    }
+    const user = result.rows[0];
+    const token = generateToken(user, { rememberMe, pinVerified: true });
+    const normalizedRole = (user.role || 'employee').toLowerCase();
+    const ownerType = ROLE_TO_OWNER[normalizedRole] || 'user';
+    const planRecord = await getActiveSubscription(ownerType, user.id);
+    const subscriptionInfo = await getPlanPayload(planRecord, ownerType);
+    const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
+    const enriched = await enrichUserWithStaff(user);
+    return {
+        token,
+        user: {
+            id: enriched.id,
+            email: enriched.email,
+            displayName: enriched.display_name,
+            display_name: enriched.display_name,
+            role: enriched.role,
+            avatarUrl: enriched.avatar_url,
+            avatar_url: enriched.avatar_url,
+            status: enriched.status,
+            isWelpStaff: enriched.isWelpStaff,
+            staffRoleKey: enriched.staffRoleKey,
+            staffDepartment: enriched.staffDepartment,
+            remotePinEnabled: Boolean(user.remote_pin_hash),
+            remotePinSetAt: user.remote_pin_set_at || null,
+            subscription: subscriptionInfo,
+            applicationStatus
+        },
+        pinRequired: false,
+        pinSetupRequired: false,
+        pinVerified: true,
+        pinPolicy: {
+            minLength: PIN_MIN_LENGTH,
+            maxLength: PIN_MAX_LENGTH,
+            maxAttempts: PIN_MAX_ATTEMPTS,
+            lockMinutes: PIN_LOCK_MINUTES
+        }
+    };
+};
+
+const getRemotePinInfo = async (req, res) => {
+    try {
+        const status = await getRemotePinStatus(req.user.id);
+        return res.json({
+            success: true,
+            enabled: status.enabled,
+            setAt: status.setAt || null,
+            attemptCount: status.attemptCount || 0,
+            lockedUntil: status.lockedUntil || null,
+            pinPolicy: {
+                minLength: PIN_MIN_LENGTH,
+                maxLength: PIN_MAX_LENGTH,
+                maxAttempts: PIN_MAX_ATTEMPTS,
+                lockMinutes: PIN_LOCK_MINUTES
+            }
+        });
+    } catch (error) {
+        console.error('Remote PIN status error:', error);
+        return res.status(500).json({ error: 'Failed to fetch Remote PIN status' });
+    }
+};
+
+const setupRemotePinController = async (req, res) => {
+    try {
+        const { pin, confirmPin } = req.body || {};
+        if (pin !== confirmPin) {
+            return res.status(400).json({ error: 'Remote PINs do not match' });
+        }
+        const currentStatus = await getRemotePinStatus(req.user.id);
+        if (currentStatus.enabled) {
+            return res.status(409).json({ error: 'Remote PIN already set' });
+        }
+        await setRemotePin({ userId: req.user.id, pin });
+        const payload = await buildPinAuthResponse({ userId: req.user.id });
+        res.cookie('token', payload.token, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production'
+        });
+        return res.json({ success: true, ...payload });
+    } catch (error) {
+        const status = error.statusCode || 500;
+        const response = { error: error.message || 'Failed to set Remote PIN' };
+        if (error.lockedUntil) response.lockedUntil = error.lockedUntil;
+        return res.status(status).json(response);
+    }
+};
+
+const verifyRemotePinController = async (req, res) => {
+    try {
+        const { pin } = req.body || {};
+        await verifyRemotePin({ userId: req.user.id, pin });
+        const payload = await buildPinAuthResponse({ userId: req.user.id });
+        res.cookie('token', payload.token, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production'
+        });
+        return res.json({ success: true, ...payload });
+    } catch (error) {
+        const status = error.statusCode || 500;
+        const response = { error: error.message || 'Remote PIN verification failed' };
+        if (error.lockedUntil) response.lockedUntil = error.lockedUntil;
+        if (error.attemptsRemaining !== undefined) response.attemptsRemaining = error.attemptsRemaining;
+        return res.status(status).json(response);
+    }
+};
+
+const changeRemotePinController = async (req, res) => {
+    try {
+        const { currentPin, newPin, confirmPin } = req.body || {};
+        if (!currentPin || !newPin) {
+            return res.status(400).json({ error: 'Current and new Remote PINs are required' });
+        }
+        if (newPin !== confirmPin) {
+            return res.status(400).json({ error: 'Remote PINs do not match' });
+        }
+        await changeRemotePin({ userId: req.user.id, currentPin, newPin });
+        const payload = await buildPinAuthResponse({ userId: req.user.id });
+        res.cookie('token', payload.token, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production'
+        });
+        return res.json({ success: true, ...payload });
+    } catch (error) {
+        const status = error.statusCode || 500;
+        const response = { error: error.message || 'Remote PIN update failed' };
+        if (error.lockedUntil) response.lockedUntil = error.lockedUntil;
+        if (error.attemptsRemaining !== undefined) response.attemptsRemaining = error.attemptsRemaining;
+        return res.status(status).json(response);
+    }
+};
+
 const refreshToken = async (req, res) => {
     try {
         const token = getTokenFromRequest(req);
@@ -1327,7 +1529,7 @@ const refreshToken = async (req, res) => {
         }
 
         const result = await query(
-            'SELECT id, email, display_name, role, token_version FROM users WHERE id = $1',
+            'SELECT id, email, display_name, role, token_version, remote_pin_hash, remote_pin_set_at FROM users WHERE id = $1',
             [decoded.userId]
         );
 
@@ -1340,7 +1542,7 @@ const refreshToken = async (req, res) => {
             return res.status(401).json({ error: 'Session invalidated. Please log in again.' });
         }
 
-        const newToken = generateToken(user);
+        const newToken = generateToken(user, { pinVerified: Boolean(decoded?.pinVerified) });
         res.cookie('token', newToken, {
             httpOnly: true,
             sameSite: 'lax',
@@ -1353,14 +1555,26 @@ const refreshToken = async (req, res) => {
         const subscriptionInfo = await getPlanPayload(planRecord, ownerType);
         const applicationStatus = await getLatestApplicationStatusForUser({ userId: user.id, role: user.role });
 
+        const remotePinEnabled = Boolean(user.remote_pin_hash);
         return res.json({
             success: true,
             token: newToken,
+            pinRequired: remotePinEnabled,
+            pinSetupRequired: !remotePinEnabled,
+            pinVerified: Boolean(decoded?.pinVerified),
+            pinPolicy: {
+                minLength: PIN_MIN_LENGTH,
+                maxLength: PIN_MAX_LENGTH,
+                maxAttempts: PIN_MAX_ATTEMPTS,
+                lockMinutes: PIN_LOCK_MINUTES
+            },
             user: {
                 id: user.id,
                 email: user.email,
                 displayName: user.display_name,
                 role: user.role,
+                remotePinEnabled,
+                remotePinSetAt: user.remote_pin_set_at || null,
                 subscription: subscriptionInfo,
                 applicationStatus
             }
@@ -1450,7 +1664,7 @@ const handleGoogleOAuthCallback = async (req, res) => {
             return res.redirect(buildFrontendSignupRedirect('google', signupToken));
         }
 
-        const token = generateToken(user);
+        const token = generateToken(user, { pinVerified: false });
         const redirectPath = req.query?.redirect || req.cookies?.oauth_redirect || '/';
         res.clearCookie('oauth_state');
         return res.redirect(buildFrontendRedirect(token, redirectPath));
@@ -1467,6 +1681,10 @@ module.exports = {
     login,
     getMe,
     getSessionSettings,
+    getRemotePinInfo,
+    setupRemotePinController,
+    verifyRemotePinController,
+    changeRemotePinController,
     logout,
     refreshToken,
     startGoogleOAuth,

@@ -183,7 +183,20 @@ const EmployeeRegistrationForm = ({ isSocial, socialToken, socialProvider }) => 
 
             toast.success('Welcome to Welp! 🎉');
             const inviteReturn = localStorage.getItem('welp_invite_return');
-            if (inviteReturn) {
+            const destination = inviteReturn || '/dashboard';
+            if (data.pinSetupRequired) {
+                sessionStorage.setItem('welp_pin_redirect', destination);
+                if (inviteReturn) {
+                    localStorage.removeItem('welp_invite_return');
+                }
+                navigate('/remote-pin/setup');
+            } else if (data.pinRequired && !data.pinVerified) {
+                sessionStorage.setItem('welp_pin_redirect', destination);
+                if (inviteReturn) {
+                    localStorage.removeItem('welp_invite_return');
+                }
+                navigate('/remote-pin/verify');
+            } else if (inviteReturn) {
                 localStorage.removeItem('welp_invite_return');
                 navigate(inviteReturn);
             } else {
@@ -268,7 +281,7 @@ const EmployeeRegistrationForm = ({ isSocial, socialToken, socialProvider }) => 
                             </div>
                         )}
                     </div>
-                )
+                )}
 
                 {!isSocial && (
                     <div className="reg-field">
@@ -282,7 +295,6 @@ const EmployeeRegistrationForm = ({ isSocial, socialToken, socialProvider }) => 
                         />
                     </div>
                 )}
-                )})}
 
                 <label className="reg-checkbox">
                     <input type="checkbox" checked={form.isAnonymous} onChange={set('isAnonymous')} />
