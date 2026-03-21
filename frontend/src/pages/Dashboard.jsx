@@ -1555,6 +1555,24 @@ const Dashboard = () => {
                                 )}
                             </div>
 
+                            <div className="business-about-card">
+                                <h4>Advertising</h4>
+                                <p>Launch campaigns, manage spend, and download ad invoices.</p>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary btn-small"
+                                    onClick={() => {
+                                        if (advertisingUnlocked) {
+                                            setActiveTab('ads');
+                                        } else {
+                                            requirePaidBusinessOrRedirect(navigate, user, 'advertising');
+                                        }
+                                    }}
+                                >
+                                    {advertisingUnlocked ? 'Open Advertising' : 'Upgrade to advertise'}
+                                </button>
+                            </div>
+
                             {/* Claim Status Banner */}
                             {selectedCompany && (
                                 <ClaimStatusBanner
