@@ -217,6 +217,16 @@ export const resolveUserCurrency = (user) => {
     return { countryCode, currency };
 };
 
+export const formatMoneyForCountry = (amountMinor, countryCode) => {
+    const currency = currencyForCountry(countryCode);
+    return formatAmountMinor(amountMinor, currency.code, currency.symbol);
+};
+
+export const formatMoneyForUser = (amountMinor, user) => {
+    const { currency } = resolveUserCurrency(user || {});
+    return formatAmountMinor(amountMinor, currency.code, currency.symbol);
+};
+
 export const formatPlanPrice = (plan, fallbackCurrency = DEFAULT_CURRENCY) => {
     if (!plan) return `${fallbackCurrency.symbol}0.00`;
     if (plan.priceFormatted) return plan.priceFormatted;

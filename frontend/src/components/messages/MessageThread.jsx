@@ -33,7 +33,7 @@ const MessageThread = ({
     const [isRecording, setIsRecording] = useState(false);
     const [recordDuration, setRecordDuration] = useState(0);
     const [voiceNote, setVoiceNote] = useState(null);
-    const [autoSendOnStop, setAutoSendOnStop] = useState(false);
+    const autoSendRef = useRef(false);
     const messagesEndRef = useRef(null);
     const threadRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -151,12 +151,36 @@ const MessageThread = ({
         };
     });
 
+    const getPreferredMimeType = () => {
+        if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+            return null;
+        }
+        const candidates = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/ogg',
+            'audio/mp4'
+        ];
+        return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || null;
+    };
+
+    const getExtensionFromMime = (mime) => {
+        if (!mime) return 'webm';
+        if (mime.includes('ogg')) return 'ogg';
+        if (mime.includes('mp4')) return 'm4a';
+        if (mime.includes('mpeg')) return 'mp3';
+        return 'webm';
+    };
+
     const sendVoiceNoteBlob = async ({ blob, mimeType, duration }) => {
         if (!blob || !onSendVoiceNote) return;
         setSending(true);
         setError('');
         try {
-            const file = new File([blob], 'voice-note.webm', { type: mimeType || 'audio/webm' });
+            const safeMime = mimeType || blob.type || 'audio/webm';
+            const extension = getExtensionFromMime(safeMime);
+            const file = new File([blob], `voice-note.${extension}`, { type: safeMime });
             let safeDuration = Number.isFinite(duration) ? duration : null;
             if (!safeDuration || safeDuration <= 0) {
                 safeDuration = await getAudioDuration(blob);
@@ -181,7 +205,8 @@ const MessageThread = ({
             }
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             recordStreamRef.current = stream;
-            const recorder = new MediaRecorder(stream);
+            const preferredMime = getPreferredMimeType();
+            const recorder = preferredMime ? new MediaRecorder(stream, { mimeType: preferredMime }) : new MediaRecorder(stream);
             const chunks = [];
             recorder.ondataavailable = (event) => {
                 if (event.data && event.data.size > 0) {
@@ -189,11 +214,16 @@ const MessageThread = ({
                 }
             };
             recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+                if (!chunks.length) {
+                    setRecordingError('No audio captured. Please try again.');
+                    setIsRecording(false);
+                    return;
+                }
+                const blob = new Blob(chunks, { type: recorder.mimeType || preferredMime || 'audio/webm' });
                 const url = URL.createObjectURL(blob);
                 const duration = recordDuration || Math.ceil((Date.now() - recorder.startTime) / 1000) || 1;
-                if (autoSendOnStop) {
-                    setAutoSendOnStop(false);
+                if (autoSendRef.current) {
+                    autoSendRef.current = false;
                     sendVoiceNoteBlob({ blob, mimeType: recorder.mimeType || blob.type, duration });
                 } else {
                     setVoiceNote({
@@ -407,9 +437,13 @@ const MessageThread = ({
                                         <div className="msg-voice-note">
                                             <audio
                                                 controls
-                                                src={attachmentUrl.startsWith('blob:') ? attachmentUrl : resolveMediaUrl(attachmentUrl)}
                                                 preload="metadata"
-                                            />
+                                            >
+                                                <source
+                                                    src={attachmentUrl.startsWith('blob:') ? attachmentUrl : resolveMediaUrl(attachmentUrl)}
+                                                    type={message.attachment_mime || message.attachmentMime || undefined}
+                                                />
+                                            </audio>
                                             <div className="msg-voice-meta">
                                                 <span>Voice note</span>
                                                 {attachmentDuration ? (
@@ -461,7 +495,7 @@ const MessageThread = ({
                             className={`msg-mic-btn ${isRecording ? 'is-recording' : ''}`}
                             onClick={() => {
                                 if (isRecording) {
-                                    setAutoSendOnStop(true);
+                                    autoSendRef.current = true;
                                     stopRecording();
                                 } else {
                                     startRecording();

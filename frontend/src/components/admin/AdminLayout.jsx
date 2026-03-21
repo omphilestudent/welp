@@ -206,7 +206,7 @@ const AdminLayout = () => {
         {
             path: '/admin/psychologist-ledger',
             icon: <FaWallet />,
-            label: 'Psychologist Ledger',
+            label: 'Account Ledger',
             color: '#0ea5e9'
         },
         {

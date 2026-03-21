@@ -16,7 +16,7 @@ const PsychologistLedger = () => {
         setLoading(true);
         setError('');
         try {
-            const { data } = await api.post('/admin/psychologist-ledger/lookup', { accountNumber });
+            const { data } = await api.get(`/admin/ledger/lookup/${accountNumber}`);
             setLedger(data);
         } catch (err) {
             setLedger(null);
@@ -26,74 +26,72 @@ const PsychologistLedger = () => {
         }
     };
 
-    const handleMarkPaid = async (paymentId) => {
-        if (!paymentId) return;
-        setLoading(true);
-        try {
-            const { data } = await api.patch(`/admin/psychologist-ledger/payouts/${paymentId}`);
-            const nextPayments = (ledger?.payments || []).map((payment) => (
-                payment.id === paymentId ? data.payment : payment
-            ));
-            setLedger({ ...ledger, payments: nextPayments });
-        } catch (err) {
-            setError(err?.response?.data?.error || 'Failed to update payout status');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     return (
-        <div className="admin-page">
-            <div className="admin-page__header">
-                <h1>Psychologist Ledger</h1>
-                <p>Lookup ledger by payout account number.</p>
+        <div className="admin-page ledger-page">
+            <div className="admin-page__header ledger-page__header">
+                <div>
+                    <h1>Account Ledger</h1>
+                    <p>Lookup any user or business account by its 10-digit account number.</p>
+                </div>
             </div>
-            <form className="admin-form" onSubmit={handleLookup}>
+            <form className="admin-form ledger-lookup" onSubmit={handleLookup}>
                 <label>Account number</label>
-                <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="Enter account number" />
-                <button className="btn btn-primary" type="submit" disabled={loading}>Lookup</button>
+                <div className="ledger-lookup__row">
+                    <input
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value)}
+                        placeholder="100xxxxxxx / 200xxxxxxx / 300xxxxxxx"
+                    />
+                    <button className="btn btn-primary" type="submit" disabled={loading}>Lookup</button>
+                </div>
             </form>
             {loading && <Loading text="Loading ledger..." />}
             {error && <p className="error-message">{error}</p>}
             {ledger && (
-                <div className="admin-card">
-                    <h3>Account</h3>
-                    <p><strong>Account:</strong> {ledger.account?.account_number}</p>
-                    <p><strong>Holder:</strong> {ledger.account?.account_holder || '—'}</p>
-                    <p><strong>Bank:</strong> {ledger.account?.bank_name || '—'}</p>
-                    <div className="admin-card__totals">
-                        <span>Gross: {formatMoney(ledger.totals?.grossMinor)}</span>
-                        <span>Fees: {formatMoney(ledger.totals?.feeMinor)}</span>
-                        <span>Net: {formatMoney(ledger.totals?.netMinor)}</span>
-                        <span>Unpaid: {formatMoney(ledger.totals?.unpaidMinor)}</span>
+                <div className="admin-card ledger-card">
+                    <div className="ledger-card__header">
+                        <div>
+                            <h3>Account Details</h3>
+                            <p>Account: {ledger.account?.account_number}</p>
+                        </div>
+                        <span className="ledger-card__badge">{ledger.account?.owner_type || 'account'}</span>
                     </div>
-                    <div className="admin-table">
+                    <div className="ledger-card__meta">
+                        <div>
+                            <strong>Name</strong>
+                            <span>{ledger.owner?.display_name || ledger.owner?.name || '—'}</span>
+                        </div>
+                        <div>
+                            <strong>Email</strong>
+                            <span>{ledger.owner?.email || '—'}</span>
+                        </div>
+                        <div>
+                            <strong>Role</strong>
+                            <span>{ledger.owner?.role || ledger.account?.owner_type || '—'}</span>
+                        </div>
+                    </div>
+                    <div className="admin-table ledger-table">
                         <table>
                             <thead>
                             <tr>
                                 <th>Date</th>
-                                <th>Base</th>
-                                <th>Fee</th>
-                                <th>Total</th>
-                                <th>Payout</th>
-                                <th>Action</th>
+                                <th>Amount</th>
+                                <th>Currency</th>
+                                <th>Status</th>
                             </tr>
                             </thead>
                             <tbody>
+                            {(ledger.payments || []).length === 0 && (
+                                <tr>
+                                    <td colSpan="4">No payment records yet.</td>
+                                </tr>
+                            )}
                             {(ledger.payments || []).map((payment) => (
                                 <tr key={payment.id}>
-                                    <td>{new Date(payment.paid_at || payment.created_at).toLocaleDateString()}</td>
-                                    <td>{formatMoney(payment.base_amount_minor)}</td>
-                                    <td>{formatMoney(payment.welp_fee_minor)}</td>
-                                    <td>{formatMoney(payment.total_amount_minor)}</td>
-                                    <td>{payment.payout_status}</td>
-                                    <td>
-                                        {payment.payout_status !== 'paid' && (
-                                            <button className="btn btn-outline btn-small" onClick={() => handleMarkPaid(payment.id)}>
-                                                Mark paid
-                                            </button>
-                                        )}
-                                    </td>
+                                    <td>{new Date(payment.created_at).toLocaleDateString()}</td>
+                                    <td>{formatMoney(payment.amount_minor)}</td>
+                                    <td>{payment.currency_code}</td>
+                                    <td>{payment.status}</td>
                                 </tr>
                             ))}
                             </tbody>

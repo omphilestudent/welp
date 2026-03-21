@@ -243,6 +243,89 @@
     gap: 4px;
 }
 
+/* Account Ledger */
+.ledger-page__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ledger-lookup {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.ledger-lookup__row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.ledger-card {
+    margin-top: 20px;
+    border-radius: 18px;
+    padding: 20px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
+}
+
+.ledger-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.ledger-card__badge {
+    background: #eef2ff;
+    color: #3730a3;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 999px;
+    text-transform: capitalize;
+    font-size: 0.8rem;
+}
+
+.ledger-card__meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.ledger-card__meta div {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 4px;
+}
+
+.ledger-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ledger-table th,
+.ledger-table td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .ledger-lookup__row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .marketing-log__meta span {
     font-size: 0.8rem;
     color: #64748b;

@@ -9,6 +9,7 @@ import ProfileSettings from '../components/settings/ProfileSettings';
 import AdvertisingSection from '../components/ads/AdvertisingSection';
 import { resolveMediaUrl } from '../utils/media';
 import { getPlanKey, getPlanPermissions, requirePaidBusinessOrRedirect } from '../utils/subscriptionAccess';
+import { currencyForCountry } from '../utils/currency';
 import {
     FaCamera, FaUpload, FaBriefcase, FaBuilding, FaEdit,
     FaCalendarAlt, FaEnvelopeOpenText, FaPhoneAlt, FaVideo,
@@ -1087,9 +1088,11 @@ const Dashboard = () => {
         }
         setSavingRate(true);
         try {
+            const currencyCode = currencyForCountry(payoutForm.countryCode || 'ZA').code;
             await api.post('/psychologists/dashboard/rates', {
                 amount,
-                durationMinutes
+                durationMinutes,
+                currencyCode
             });
             const { data } = await api.get('/psychologists/dashboard/rates');
             setPsychRates(data?.rates || []);

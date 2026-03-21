@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import Modal from '../common/Modal';
 import { addDays, format, startOfWeek } from 'date-fns';
-import { formatAmountMinor } from '../../utils/currency';
+import { formatMoneyForUser } from '../../utils/currency';
 
 const EmployeeVideoCallModal = ({
     open,
@@ -14,6 +15,7 @@ const EmployeeVideoCallModal = ({
     hasSavedCard,
     loading
 }) => {
+    const { user } = useAuth();
     const [selectedRateId, setSelectedRateId] = useState('');
     const [selectedSlot, setSelectedSlot] = useState('');
 
@@ -31,12 +33,15 @@ const EmployeeVideoCallModal = ({
     );
 
     const activeRates = useMemo(() => (
-        (rates || []).filter((rate) => rate.is_active ?? rate.isActive ?? true)
+        rates || []
     ), [rates]);
 
-    const selectedRate = useMemo(() => (
-        activeRates.find((rate) => String(rate.id) === String(selectedRateId)) || activeRates[0] || null
-    ), [activeRates, selectedRateId]);
+    const selectedRate = useMemo(() => {
+        const direct = activeRates.find((rate) => String(rate.id) === String(selectedRateId));
+        if (direct) return direct;
+        const firstActive = activeRates.find((rate) => rate.is_active ?? rate.isActive);
+        return firstActive || activeRates[0] || null;
+    }, [activeRates, selectedRateId]);
 
     const handleConfirm = () => {
         if (!selectedSlot || !selectedRate) return;
@@ -66,11 +71,12 @@ const EmployeeVideoCallModal = ({
                                         name="rate"
                                         checked={String(rate.id) === String(selectedRate?.id)}
                                         onChange={() => setSelectedRateId(rate.id)}
+                                        disabled={!(rate.is_active ?? rate.isActive)}
                                     />
                                     <div>
-                                        <strong>{rate.label || `${rate.duration_minutes} min session`}</strong>
+                                        <strong>{rate.label || `${rate.duration_minutes} min session`}{!(rate.is_active ?? rate.isActive) ? ' (inactive)' : ''}</strong>
                                         <div className="msg-booking-rate-meta">
-                                            {formatAmountMinor(rate.amount_minor, rate.currency_code)} {rate.duration_minutes ? `${rate.duration_minutes} min` : ''}
+                                            {formatMoneyForUser(rate.amount_minor, user)} {rate.duration_minutes ? `${rate.duration_minutes} min` : ''}
                                         </div>
                                     </div>
                                 </label>
@@ -148,3 +154,4 @@ EmployeeVideoCallModal.defaultProps = {
 };
 
 export default EmployeeVideoCallModal;
+

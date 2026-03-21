@@ -277,6 +277,14 @@ const CompanyManagement = () => {
         return Number.isFinite(n) ? n.toLocaleString() : fallback;
     };
 
+    const normalizeCompany = (company) => ({
+        ...company,
+        reviews_count: toNumber(company.review_count ?? company.reviews_count ?? 0),
+        avg_rating: toNumber(company.avg_rating ?? 0),
+        employee_count: toNumber(company.employee_count ?? 0),
+        claimed_by: company.claimed_by_name || company.claimed_by
+    });
+
     const industries = [
         'Technology', 'Finance', 'Healthcare', 'Education', 'Retail',
         'Manufacturing', 'Construction', 'Transportation', 'Hospitality',
@@ -303,13 +311,7 @@ const CompanyManagement = () => {
             });
 
             const companyRows = data.companies || [];
-            const normalizedCompanies = companyRows.map((company) => ({
-                ...company,
-                reviews_count: Number(company.review_count || 0),
-                avg_rating: Number(company.avg_rating || 0),
-                employee_count: Number(company.employee_count || 0),
-                claimed_by: company.claimed_by_name || company.claimed_by
-            }));
+            const normalizedCompanies = companyRows.map(normalizeCompany);
 
             setCompanies(normalizedCompanies);
 
@@ -387,9 +389,10 @@ const CompanyManagement = () => {
         setSaving(true);
         try {
             const { data } = await api.put(`/companies/${selectedCompany.id}`, editForm);
-            setSelectedCompany(data);
+            const normalized = normalizeCompany(data);
+            setSelectedCompany(normalized);
             setCompanies((prev) =>
-                prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
+                prev.map((c) => (c.id === normalized.id ? { ...c, ...normalized } : c))
             );
             toast.success('Company updated');
             setEditMode(false);
@@ -418,7 +421,8 @@ const CompanyManagement = () => {
             const { data } = await api.patch(`/admin/companies/${id}/unclaim`);
             toast.success('Company unclaimed');
             if (selectedCompany?.id === id) {
-                setSelectedCompany(data.company || null);
+                const nextCompany = data.company || data || null;
+                setSelectedCompany(nextCompany ? normalizeCompany(nextCompany) : null);
             }
             fetchCompanies();
         } catch (error) {
@@ -889,11 +893,11 @@ const CompanyManagement = () => {
                                         <Badge variant="danger" icon={FaTimesCircle}>No</Badge>
                                     )}
                                 </td>
-                                <td>{company.reviews_count.toLocaleString()}</td>
+                                <td>{toLocale(company.reviews_count)}</td>
                                 <td>
-                                    <Rating value={company.avg_rating} />
+                                    <Rating value={toNumber(company.avg_rating)} />
                                 </td>
-                                <td>{company.employee_count.toLocaleString()}</td>
+                                <td>{toLocale(company.employee_count)}</td>
                                 <td>
                                     <RowActions
                                         actions={[
@@ -965,15 +969,15 @@ const CompanyManagement = () => {
                             <div className="company-card__stats">
                                 <div className="company-card__stat">
                                     <FaRegStar />
-                                    <span>{company.avg_rating.toFixed(1)} Rating</span>
+                                    <span>{toNumber(company.avg_rating).toFixed(1)} Rating</span>
                                 </div>
                                 <div className="company-card__stat">
                                     <FaRegFileAlt />
-                                    <span>{company.reviews_count} Reviews</span>
+                                    <span>{toLocale(company.reviews_count)} Reviews</span>
                                 </div>
                                 <div className="company-card__stat">
                                     <FaUsers />
-                                    <span>{company.employee_count} Employees</span>
+                                    <span>{toLocale(company.employee_count)} Employees</span>
                                 </div>
                             </div>
 
@@ -1173,16 +1177,16 @@ const CompanyManagement = () => {
                                         <div className="company-details__items">
                                             <div className="company-details__item">
                                                 <FaStar />
-                                                <span>Rating: {selectedCompany.avg_rating.toFixed(1)}</span>
-                                                <Rating value={selectedCompany.avg_rating} showValue={false} />
+                                                <span>Rating: {toNumber(selectedCompany.avg_rating).toFixed(1)}</span>
+                                                <Rating value={toNumber(selectedCompany.avg_rating)} showValue={false} />
                                             </div>
                                             <div className="company-details__item">
                                                 <FaRegFileAlt />
-                                                <span>Reviews: {selectedCompany.reviews_count.toLocaleString()}</span>
+                                                <span>Reviews: {toLocale(selectedCompany.reviews_count)}</span>
                                             </div>
                                             <div className="company-details__item">
                                                 <FaUsers />
-                                                <span>Employees: {selectedCompany.employee_count.toLocaleString()}</span>
+                                                <span>Employees: {toLocale(selectedCompany.employee_count)}</span>
                                             </div>
                                             {selectedCompany.monthly_revenue && (
                                                 <div className="company-details__item">

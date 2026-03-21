@@ -30,7 +30,14 @@ const voiceUpload = multer({
     storage: voiceStorage,
     limits: { fileSize: Number(process.env.VOICE_NOTE_MAX_BYTES || 25 * 1024 * 1024) },
     fileFilter: (req, file, cb) => {
-        if (!file.mimetype?.startsWith('audio/')) {
+        const type = String(file.mimetype || '').toLowerCase();
+        if (!type) {
+            return cb(new Error('Missing audio mime type'));
+        }
+        const isAudio = type.startsWith('audio/');
+        const isWebmAudio = type === 'video/webm' || type === 'video/webm;codecs=opus';
+        const isOctetStream = type === 'application/octet-stream';
+        if (!isAudio && !isWebmAudio && !isOctetStream) {
             return cb(new Error('Only audio files are allowed'));
         }
         return cb(null, true);

@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '../common/Modal';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { formatAmountMinor } from '../../utils/currency';
+import { formatMoneyForUser, resolveUserCurrency } from '../../utils/currency';
 import { addDays, startOfWeek, format } from 'date-fns';
+import { useAuth } from '../../hooks/useAuth';
 
 const WELP_FEE_MINOR = 200 * 100;
 
@@ -28,6 +29,7 @@ const deriveBaseAmountMinor = (rate, durationMinutes) => {
 };
 
 const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [rates, setRates] = useState([]);
     const [availability, setAvailability] = useState([]);
@@ -79,21 +81,25 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
     );
 
     const activeRates = useMemo(
-        () => rates.filter((rate) => rate.is_active ?? rate.isActive ?? true),
+        () => rates || [],
         [rates]
     );
 
-    const selectedRate = useMemo(
-        () => activeRates.find((rate) => String(rate.id) === String(selectedRateId)) || activeRates[0] || null,
-        [activeRates, selectedRateId]
-    );
+    const selectedRate = useMemo(() => {
+        const direct = activeRates.find((rate) => String(rate.id) === String(selectedRateId));
+        if (direct) return direct;
+        const firstActive = activeRates.find((rate) => rate.is_active ?? rate.isActive);
+        return firstActive || activeRates[0] || null;
+    }, [activeRates, selectedRateId]);
 
     useEffect(() => {
         if (activeRates.length && !selectedRateId) {
-            setSelectedRateId(activeRates[0].id);
+            const firstActive = activeRates.find((rate) => rate.is_active ?? rate.isActive) || activeRates[0];
+            setSelectedRateId(firstActive?.id || '');
         }
     }, [activeRates, selectedRateId]);
 
+    const { currency: userCurrency } = resolveUserCurrency(user || {});
     const selectedDuration = Number(selectedRate?.duration_minutes || 60);
     const baseAmountMinor = deriveBaseAmountMinor(selectedRate, selectedDuration);
     const totalAmountMinor = baseAmountMinor + WELP_FEE_MINOR;
@@ -165,11 +171,12 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
                                     name="rate"
                                     checked={String(rate.id) === String(selectedRateId)}
                                     onChange={() => setSelectedRateId(rate.id)}
+                                    disabled={!(rate.is_active ?? rate.isActive)}
                                 />
                                 <div>
-                                    <strong>{rate.label || 'Session rate'}</strong>
+                                    <strong>{rate.label || 'Session rate'}{!(rate.is_active ?? rate.isActive) ? ' (inactive)' : ''}</strong>
                                     <div className="msg-booking-rate-meta">
-                                        {formatAmountMinor(rate.amount_minor, rate.currency_code)} {rate.duration_minutes ? `${rate.duration_minutes} min` : (rate.duration_type === 'per_minute' ? 'per minute' : 'per hour')}
+                                        {formatMoneyForUser(rate.amount_minor, user)} {rate.duration_minutes ? `${rate.duration_minutes} min` : (rate.duration_type === 'per_minute' ? 'per minute' : 'per hour')}
                                     </div>
                                 </div>
                             </label>
@@ -239,15 +246,15 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
             <div className="msg-booking-summary">
                 <div>
                     <span>Psychologist fee</span>
-                    <strong>{formatAmountMinor(baseAmountMinor, selectedRate?.currency_code || 'USD') || '—'}</strong>
+                    <strong>{formatMoneyForUser(baseAmountMinor, user) || '—'}</strong>
                 </div>
                 <div>
                     <span>Welp processing fee</span>
-                    <strong>{formatAmountMinor(WELP_FEE_MINOR, selectedRate?.currency_code || 'USD') || '—'}</strong>
+                    <strong>{formatMoneyForUser(WELP_FEE_MINOR, user) || '—'}</strong>
                 </div>
                 <div className="msg-booking-total">
                     <span>Total</span>
-                    <strong>{formatAmountMinor(totalAmountMinor, selectedRate?.currency_code || 'USD') || '—'}</strong>
+                    <strong>{formatMoneyForUser(totalAmountMinor, user) || '—'}</strong>
                 </div>
             </div>
         </div>
@@ -265,15 +272,15 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
             <div className="msg-booking-summary">
                 <div>
                     <span>Psychologist fee</span>
-                    <strong>{formatAmountMinor(baseAmountMinor, selectedRate?.currency_code || 'USD')}</strong>
+                    <strong>{formatMoneyForUser(baseAmountMinor, user)}</strong>
                 </div>
                 <div>
                     <span>Welp processing fee</span>
-                    <strong>{formatAmountMinor(WELP_FEE_MINOR, selectedRate?.currency_code || 'USD')}</strong>
+                    <strong>{formatMoneyForUser(WELP_FEE_MINOR, user)}</strong>
                 </div>
                 <div className="msg-booking-total">
                     <span>Total due</span>
-                    <strong>{formatAmountMinor(totalAmountMinor, selectedRate?.currency_code || 'USD')}</strong>
+                    <strong>{formatMoneyForUser(totalAmountMinor, user)}</strong>
                 </div>
             </div>
         </div>
@@ -288,7 +295,7 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
                     <div className="msg-booking-summary">
                         <div>
                             <span>Paid</span>
-                            <strong>{formatAmountMinor(payment.total_amount_minor, payment.currency_code || 'USD')}</strong>
+                            <strong>{formatMoneyForUser(payment.total_amount_minor, user)}</strong>
                         </div>
                         <div>
                             <span>Booking ID</span>
@@ -343,3 +350,6 @@ const PsychologistBookingModal = ({ open, psychologist, onClose }) => {
 };
 
 export default PsychologistBookingModal;
+
+
+

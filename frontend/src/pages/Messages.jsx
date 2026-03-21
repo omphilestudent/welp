@@ -17,7 +17,7 @@ import { FaSearch, FaStar, FaUserPlus, FaVideo, FaHistory, FaClock, FaExclamatio
 import { fetchChatUsage } from '../services/chatUsageService';
 import SponsoredCard from '../components/ads/SponsoredCard';
 import { getPlanKey, hasAccess } from '../utils/subscriptionAccess';
-import { formatAmountMinor } from '../utils/currency';
+import { formatMoneyForUser } from '../utils/currency';
 import { addDays, startOfWeek } from 'date-fns';
 
 const Messages = () => {
@@ -1169,6 +1169,7 @@ const Messages = () => {
             message_type: 'voice_note',
             attachment_url: tempUrl,
             attachment_duration: duration || null,
+            attachment_mime: file?.type || null,
             created_at: new Date().toISOString()
         };
         setMessages((prev) => [...prev, optimisticMessage]);
@@ -1588,7 +1589,7 @@ const Messages = () => {
                                             <strong>Loading...</strong>
                                         ) : activePsychRate ? (
                                             <strong>
-                                                {formatAmountMinor(activePsychRate.amount_minor, activePsychRate.currency_code) || '—'}{' '}
+                                                {formatMoneyForUser(activePsychRate.amount_minor, user) || '—'}{' '}
                                                 {activePsychRate.duration_type === 'per_minute' ? 'per minute' : 'per hour'}
                                             </strong>
                                         ) : (
@@ -1832,6 +1833,7 @@ const Messages = () => {
 };
 
 export default Messages;
+
 
 
 
