@@ -1,0 +1,24 @@
+.page-transition-ad {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 240ms ease, transform 240ms ease;
+  pointer-events: none;
+}
+
+.page-transition-ad--visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+  .page-transition-ad {
+    right: 12px;
+    bottom: 12px;
+    max-width: 92vw;
+  }
+}

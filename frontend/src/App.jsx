@@ -53,6 +53,7 @@ import CalendarTroubleshoot from './pages/admin/CalendarTroubleshoot';
 import ClaimRequests from './pages/admin/ClaimRequests';
 import AdminMarketing from './pages/admin/AdminMarketing';
 import AdApprovals from './pages/admin/AdApprovals';
+import PageTransitionAd from './components/ads/PageTransitionAd';
 import FlowManagement from './pages/admin/FlowManagement';
 import FlowAdmin from './pages/admin/FlowAdmin';
 import FlowBuilder from './pages/admin/FlowBuilder';
@@ -111,6 +112,7 @@ function App() {
                             <Navbar />
                             <AppTopBar />
                             <main className="main-content">
+                                <PageTransitionAd placement="recommended" />
                                 <Routes>
                                 {/* Public Routes */}
                                 <Route path="/" element={<Home />} />
