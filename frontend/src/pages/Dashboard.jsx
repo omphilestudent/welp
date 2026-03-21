@@ -1446,7 +1446,7 @@ const Dashboard = () => {
     const calendarStart = startOfWeek(calendarDate, { weekStartsOn });
     const calendarEnd = endOfWeek(calendarDate, { weekStartsOn });
     const calendarDays = Array.from({ length: 7 }, (_, idx) => addDays(calendarStart, idx));
-    const weekLabel = `${format(calendarStart, 'MMM d')} â€“ ${format(calendarEnd, 'MMM d')}`;
+    const weekLabel = ${format(calendarStart, 'MMM d')} - ;
     const agendaItems = scheduleEntries.filter((entry) => entry.startsAt >= calendarStart && entry.startsAt <= calendarEnd);
 
     const handleCalendarPrev = () => setCalendarDate((prev) => subWeeks(prev, 1));

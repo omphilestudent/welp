@@ -65,6 +65,23 @@ const UserProfile = () => {
     }, [id]);
 
     useEffect(() => {
+        if (!id) return;
+        api.get(`/psychologists/${id}/events`)
+            .then(({ data }) => {
+                const incoming = data?.events || [];
+                if (!incoming.length) return;
+                setEvents((prev) => {
+                    const map = new Map();
+                    [...prev, ...incoming].forEach((event) => {
+                        if (event?.id) map.set(event.id, event);
+                    });
+                    return Array.from(map.values());
+                });
+            })
+            .catch(() => {});
+    }, [id]);
+
+    useEffect(() => {
         if (!profile?.user || profile.user.role !== 'psychologist') return;
         setRatesLoading(true);
         api.get(`/psychologists/${profile.user.id}/rates`)
@@ -108,15 +125,15 @@ const UserProfile = () => {
         : weekDays;
     const rangeLabel = scheduleView === 'day'
         ? format(calendarDate, 'MMM d, yyyy')
-        : `${format(weekStart, 'MMM d')} – ${format(addDays(weekStart, 6), 'MMM d')}`;
+        : `${format(weekStart, 'MMM d')} - ${format(addDays(weekStart, 6), 'MMM d')}`;
 
     const combinedAgenda = useMemo(() => {
         const agenda = [
             ...events.map((event) => ({
                 id: event.id,
                 title: event.title,
-                startsAt: event.starts_at,
-                endsAt: event.ends_at,
+                startsAt: event.starts_at || event.startsAt,
+                endsAt: event.ends_at || event.endsAt,
                 type: event.event_type || 'Session',
                 source: 'internal'
             })),
@@ -357,7 +374,7 @@ const UserProfile = () => {
                                 <div className="profile-calendar-title">
                                     <h3>Scheduling</h3>
                                     <span className="profile-calendar-range">
-                                        {rangeLabel}
+        : ${format(weekStart, 'MMM d')} - ;
                                     </span>
                                     <p>Click a time block to create an invite.</p>
                                 </div>
